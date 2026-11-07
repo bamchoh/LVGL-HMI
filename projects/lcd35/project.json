@@ -3,7 +3,7 @@
   "display": {
     "width": 480, "height": 320,
     "fbdev": "/dev/fb0",
-    "touch": { "swap_axes": false, "calibration": [3850, 3850, 220, 150] }
+    "touch": { "swap_axes": true, "calibration": [150, 3850, 3850, 220] }
   },
   "theme": { "dark": true, "primary": "#2196f3", "secondary": "#ff9800", "font": 14 },
   "start_screen": "main",
