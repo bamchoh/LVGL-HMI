@@ -1,0 +1,7 @@
+# Normalise to LF in the repository; build.sh must stay LF to run on Linux,
+# build.cmd must be CRLF for cmd.exe.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.bmp binary

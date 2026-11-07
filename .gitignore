@@ -1,0 +1,15 @@
+# build output (build/, build-fbdev/, build-fbdev-aarch64/, ...)
+build/
+build-*/
+_deps/
+
+# test artifacts
+*.bmp
+*.log
+__pycache__/
+
+# editor / IDE
+.vs/
+.vscode/
+.idea/
+*.swp
