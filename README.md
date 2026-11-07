@@ -73,6 +73,9 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
 - コンソールのカーソル点滅が画面に残る場合は `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`。
 - 画面サイズは framebuffer の解像度が使われます。`project.json` の `display.width/height` は
   画面 JSON の座標基準なので、Pi の解像度に合わせておくか `rotation` と合わせて調整してください。
+- fbdev/drm ドライバはカーネルが返す物理サイズから DPI を計算しますが、HDMI ではでたらめな値
+  （Pi 4 で 1280 px = 70 mm → 464 dpi）が返ることがあり、テーマの余白や角丸が数倍に膨らみます。
+  ランタイムは `display.dpi`（既定 130）で必ず上書きするので、通常は何もしなくて大丈夫です。
 - 入力は `/dev/input/event*` を自動検出します（タッチ / マウス / キーボード）。特定のデバイスだけ
   使う場合は `display.input` か環境変数 `HML_INPUT` で指定します。
 - 終了は `Ctrl-C` (SIGINT/SIGTERM)、画面 JSON のホットリロードは `kill -HUP <pid>` または `kill -USR1 <pid>`。
@@ -83,6 +86,7 @@ Linux 用の `display` 設定:
 "display": {
   "width": 800, "height": 480,
   "rotation": 0,                       // 0 / 90 / 180 / 270
+  "dpi": 130,                          // テーマの余白・角丸の基準（省略時 130 = Windows/SDL と同じ）
   "fbdev": "/dev/fb0",                 // fbdev バックエンドのデバイス（省略可）
   "drm":   "/dev/dri/card0",           // drm バックエンドのデバイス（省略可）
   "input": "",                         // 空 = 自動検出、例 "/dev/input/event0"

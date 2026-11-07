@@ -31,6 +31,7 @@ lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
     lv_display_t* disp = lv_sdl_window_create(info.width, info.height);
     if(!disp) { HML_ERROR("cannot create SDL window"); return nullptr; }
     lv_sdl_window_set_title(disp, info.title.c_str());
+    lv_display_set_dpi(disp, info.dpi);
     if(info.zoom > 0 && info.zoom != 1.0) lv_sdl_window_set_zoom(disp, static_cast<float>(info.zoom));
     if(info.rotation) lv_display_set_rotation(disp, static_cast<lv_display_rotation_t>(info.rotation / 90));
     lv_sdl_mouse_create();

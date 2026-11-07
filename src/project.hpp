@@ -11,6 +11,7 @@ struct ProjectInfo {
     int    width = 800, height = 480;
     double zoom = 1.0;
     int    rotation = 0;            // 0, 90, 180, 270 (degrees)
+    int    dpi = 130;               // theme scale (padding, radius, default sizes); 130 = LVGL default
     // Linux backends (fbdev / drm): device paths, empty = default
     std::string fbdev;              // "/dev/fb0"
     std::string drm;                // "/dev/dri/card0"

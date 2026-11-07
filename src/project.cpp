@@ -67,6 +67,13 @@ bool Project::load(const std::string& path)
         HML_WARN("display.rotation must be 0, 90, 180 or 270 (got %d); using 0", info_.rotation);
         info_.rotation = 0;
     }
+    // Linux fbdev/drm drivers derive the DPI from the (often wrong) physical size the kernel
+    // reports; fix it so that the theme looks the same on every backend.
+    info_.dpi = static_cast<int>(jnum(d, "dpi", 130));
+    if(info_.dpi < 50 || info_.dpi > 600) {
+        HML_WARN("display.dpi must be 50..600 (got %d); using 130", info_.dpi);
+        info_.dpi = 130;
+    }
     info_.fbdev = jstr(d, "fbdev", "");
     info_.drm = jstr(d, "drm", "");
     info_.input = jstr(d, "input", "");

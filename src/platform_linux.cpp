@@ -95,9 +95,14 @@ lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
     if(!disp) return nullptr;
     lv_linux_drm_set_file(disp, dev.c_str(), -1);
 #endif
-    HML_INFO("%s display %s: %dx%d (project says %dx%d)", name(), dev.c_str(),
+    // The driver computes the DPI from the physical size reported by the kernel; HDMI often
+    // reports nonsense (a Pi 4 says 70 mm for 1280 px -> 464 dpi) which blows up every theme
+    // padding and radius. Use the project's value instead (130 = same as the SDL backend).
+    int driver_dpi = static_cast<int>(lv_display_get_dpi(disp));
+    lv_display_set_dpi(disp, info.dpi);
+    HML_INFO("%s display %s: %dx%d (project says %dx%d), dpi %d (driver reported %d)", name(), dev.c_str(),
              static_cast<int>(lv_display_get_horizontal_resolution(disp)), static_cast<int>(lv_display_get_vertical_resolution(disp)),
-             info.width, info.height);
+             info.width, info.height, info.dpi, driver_dpi);
     if(info.rotation) lv_display_set_rotation(disp, static_cast<lv_display_rotation_t>(info.rotation / 90));
 
     // Input: explicit device or auto-discovery
