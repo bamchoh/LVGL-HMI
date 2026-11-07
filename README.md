@@ -80,6 +80,22 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
   使う場合は `display.input` か環境変数 `HML_INPUT` で指定します。
 - 終了は `Ctrl-C` (SIGINT/SIGTERM)、画面 JSON のホットリロードは `kill -HUP <pid>` または `kill -USR1 <pid>`。
 
+### 3.5 インチ HDMI LCD (480x320) + ADS7846 タッチの例
+
+`tools/rpi/` に Raspberry Pi OS 用の設定一式があります。`projects/lcd35` は同じデモを 480x320 向けに
+組み直したものです（タッチは 180 度回転なので `calibration` が [max, max, min, min] の順になっています）。
+
+```
+scp -r tools/rpi pi:~/hml/lcd          # config-lcd.txt / apply_lcd.sh / hml.service
+sudo ~/hml/lcd/apply_lcd.sh            # config.txt と cmdline.txt を書き換え（--revert で元に戻る）
+sudo reboot
+sudo cp ~/hml/lcd/hml.service /etc/systemd/system/ && sudo systemctl enable --now hml   # 自動起動
+```
+
+- 既定は vc4 オーバーレイなし（firmware が `hdmi_cvt` で 480x320 を出し、`/dev/fb0` は simple-framebuffer）。
+  `vc4-fkms-v3d` はカーネル 6.18 では `Cannot find any crtc or sizes` で失敗し fb0 が消えるため使いません。
+- タッチの向きを調べるには `python3 tools/rpi/touch_raw.py /dev/input/event0 60` で生の座標を見ます。
+
 Linux 用の `display` 設定:
 
 ```json

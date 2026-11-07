@@ -1,0 +1,19 @@
+[Unit]
+Description=HML runtime (LVGL HMI on /dev/fb0)
+After=multi-user.target
+
+[Service]
+Type=simple
+User=bamchoh
+WorkingDirectory=/home/bamchoh/hml
+ExecStart=/home/bamchoh/hml/hml_runtime /home/bamchoh/hml/projects/lcd35/project.json
+# SIGHUP reloads the screen JSON files without restarting
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+# keep the console (tty1) text away from the HMI
+StandardOutput=append:/home/bamchoh/hml/hml.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

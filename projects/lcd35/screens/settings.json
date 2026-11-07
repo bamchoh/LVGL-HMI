@@ -1,0 +1,68 @@
+{
+  "name": "settings",
+  "scrollable": false,
+  "style": { "bg_color": "#141a22", "pad": 0 },
+  "children": [
+    {
+      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 40, "scrollable": false,
+      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
+      "children": [
+        { "type": "button", "align": "left_mid", "text": "< Back", "w": 70, "h": 30, "style_label": { "font": 12 },
+          "on_click": { "action": "back" } },
+        { "type": "label", "text": "Settings", "align": "center", "style": { "font": 18, "text_color": "#ffffff" } },
+        { "type": "label", "align": "right_mid", "style": { "text_color": "#9fb3c8", "font": 12 },
+          "bind": { "text": { "tag": "operator", "format": "Operator: %s" } } }
+      ]
+    },
+
+    {
+      "type": "panel", "x": 8, "y": 48, "w": 228, "h": 208, "scrollable": false,
+      "flex": "column", "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8, "pad_row": 4 },
+      "children": [
+        { "type": "label", "text": "Operation mode", "style": { "font": 12, "text_color": "#9fb3c8" } },
+        { "type": "dropdown", "w": "100%", "options": ["Manual", "Automatic", "Maintenance"], "bind": "mode" },
+        { "type": "label", "text": "Maintenance mode is active!", "style": { "font": 12, "text_color": "#f44336" },
+          "bind": { "visible": { "tag": "mode", "eq": 2 } } },
+        { "type": "label", "text": "Operator name", "style": { "font": 12, "text_color": "#9fb3c8" } },
+        { "type": "textarea", "w": "100%", "placeholder": "tap to type", "one_line": true, "max_length": 16, "bind": "operator" }
+      ]
+    },
+
+    {
+      "type": "panel", "x": 244, "y": 48, "w": 228, "h": 208, "scrollable": false,
+      "flex": "column", "flex_cross": "center", "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8, "pad_row": 2 },
+      "children": [
+        { "type": "label", "text": "Setpoint (holding reg 1)", "style": { "font": 12, "text_color": "#9fb3c8" } },
+        { "type": "arc", "w": 104, "h": 104, "min": 0, "max": 100, "bind": "setpoint",
+          "style": { "arc_width": 8 }, "style_indicator": { "arc_color": "#2196f3", "arc_width": 8 }, "style_knob": { "bg_color": "#2196f3", "pad": 4 } },
+        { "type": "label", "style": { "font": 20, "text_color": "#ffffff" },
+          "bind": { "text": { "tag": "setpoint", "format": "%d %%" } } },
+        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+          "children": [
+            { "type": "button", "text": "0",   "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 0 } },
+            { "type": "button", "text": "50",  "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 50 } },
+            { "type": "button", "text": "100", "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 100 } }
+          ] }
+      ]
+    },
+
+    {
+      "type": "panel", "x": 8, "y": 264, "w": 464, "h": 48, "scrollable": false,
+      "flex": "row", "flex_main": "space_between", "flex_cross": "center",
+      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
+      "children": [
+        { "type": "label", "style": { "text_color": "#9fb3c8", "font": 12 }, "text": "kill -HUP <pid> reloads the screens" },
+        { "type": "panel", "w": "content", "h": "content", "flex": "row", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 6 },
+          "children": [
+            { "type": "button", "text": "Reload", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "reload" } },
+            { "type": "button", "text": "Main", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "goto", "screen": "main", "anim": "slide_right" } },
+            { "type": "button", "text": "Exit", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#455a64" }, "on_click": { "action": "exit" } }
+          ] }
+      ]
+    },
+
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 140 }
+  ]
+}

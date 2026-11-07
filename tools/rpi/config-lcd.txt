@@ -1,0 +1,24 @@
+# ---- HML: 3.5" 480x320 HDMI LCD + ADS7846 touch (ported from the old Yocto local.conf) ----
+# The firmware drives HDMI with the legacy hdmi_* settings below. apply_lcd.sh removes the next
+# line unless run with --fkms (vc4-fkms-v3d fails on kernel 6.18 and takes /dev/fb0 away);
+# the stock vc4-kms-v3d ignores hdmi_* entirely (see --kms in apply_lcd.sh).
+dtoverlay=vc4-fkms-v3d
+gpu_mem=16
+
+hdmi_force_hotplug=1
+hdmi_ignore_edid=0xa5000080
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=480 320 60 6 0 0 0
+hdmi_drive=1
+hdmi_pixel_freq_limit=20000000
+framebuffer_width=480
+framebuffer_height=320
+
+# Resistive touch controller on SPI0 CE1, pen IRQ on GPIO25
+dtparam=spi=on
+dtoverlay=ads7846,cs=1,penirq=25,penirq_pull=2,speed=50000,keep_vref_on=0,swapxy=0,pmax=255,xohms=150,xmin=200,xmax=3900,ymin=200,ymax=3900
+
+disable_splash=1
+enable_uart=1
+# ---- end HML LCD ----
