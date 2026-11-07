@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HML Designer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toolbar">
+  <button id="b-new" title="New project (Ctrl+N)">New</button>
+  <button id="b-open" title="Open project.json (Ctrl+O)">Open</button>
+  <button id="b-save" title="Save (Ctrl+S)">Save</button>
+  <button id="b-saveas" title="Save as">Save As</button>
+  <span class="sep"></span>
+  <button id="b-undo" title="Undo (Ctrl+Z)">&#8630;</button>
+  <button id="b-redo" title="Redo (Ctrl+Y)">&#8631;</button>
+  <span class="sep"></span>
+  <label>Screen <select id="sel-screen"></select></label>
+  <span class="sep"></span>
+  <button id="b-zoom-out" title="Zoom out">&minus;</button>
+  <span id="zoom-label">100%</span>
+  <button id="b-zoom-in" title="Zoom in">+</button>
+  <button id="b-zoom-fit" title="Fit to window">Fit</button>
+  <span class="grow"></span>
+  <span id="title-label" class="dim"></span>
+  <span class="sep"></span>
+  <button id="b-json" title="Show the JSON of the current screen">JSON</button>
+  <button id="b-preview" class="primary" title="Render this screen with hml_runtime (saves first)">Preview</button>
+  <button id="b-run" title="Launch hml_runtime with this project (saves first)">Run</button>
+</div>
+
+<div id="main">
+  <div id="left">
+    <div class="tabs" id="left-tabs">
+      <button data-tab="widgets" class="active">Widgets</button>
+      <button data-tab="screens">Screens</button>
+      <button data-tab="tags">Tags</button>
+      <button data-tab="drivers">Drivers</button>
+      <button data-tab="project">Project</button>
+    </div>
+    <div class="tab-body" id="tab-widgets"></div>
+    <div class="tab-body" id="tab-screens" hidden></div>
+    <div class="tab-body" id="tab-tags" hidden></div>
+    <div class="tab-body" id="tab-drivers" hidden></div>
+    <div class="tab-body" id="tab-project" hidden></div>
+  </div>
+
+  <div id="center">
+    <div id="canvas-wrap">
+      <div id="canvas-scale"><div id="canvas"></div></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="tree-tools">
+      <button id="t-dup" title="Duplicate (Ctrl+D)">&#10697;</button>
+      <button id="t-del" title="Delete (Del)" class="danger">&#10005;</button>
+      <button id="t-up" title="Move up (earlier = drawn below)">&#9650;</button>
+      <button id="t-down" title="Move down (later = drawn on top)">&#9660;</button>
+      <button id="t-in" title="Move into the previous panel">&#8677;</button>
+      <button id="t-out" title="Move out of the parent panel">&#8676;</button>
+    </div>
+    <div id="tree"></div>
+    <div id="props"></div>
+  </div>
+</div>
+
+<div id="status"></div>
+<datalist id="dl-tags"></datalist>
+
+<div id="modal" hidden>
+  <div id="modal-box">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-buttons"></div>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script src="js/util.js"></script>
+<script src="js/schema.js"></script>
+<script src="js/model.js"></script>
+<script src="js/canvas.js"></script>
+<script src="js/tree.js"></script>
+<script src="js/props.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

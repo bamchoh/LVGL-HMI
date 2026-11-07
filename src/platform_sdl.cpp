@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 #include "platform.hpp"
+#include "screenshot.hpp"
 #include "util.hpp"
 
 namespace hml::platform {
@@ -44,20 +45,9 @@ lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
 
 void poll() {}
 
-void screenshot(lv_display_t* disp, const std::string& path)
-{
-    SDL_Renderer* r = static_cast<SDL_Renderer*>(lv_sdl_window_get_renderer(disp));
-    if(!r) { HML_WARN("screenshot: no renderer"); return; }
-    int w = 0, h = 0;
-    SDL_GetRendererOutputSize(r, &w, &h);
-    SDL_Surface* s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
-    if(!s) return;
-    if(SDL_RenderReadPixels(r, nullptr, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch) == 0 && SDL_SaveBMP(s, path.c_str()) == 0) {
-        HML_INFO("screenshot saved to %s", path.c_str());
-    }
-    else HML_WARN("screenshot: %s", SDL_GetError());
-    SDL_FreeSurface(s);
-}
+// Rendered with lv_snapshot rather than read back from the SDL renderer, so that it also works
+// with SDL_VIDEODRIVER=dummy (headless previews for the designer).
+void screenshot(lv_display_t* disp, const std::string& path) { save_screenshot_bmp(disp, path); }
 
 void deinit() { SDL_Quit(); }
 

@@ -17,7 +17,7 @@ project.json ──┬── tags      : 名前付き変数（bool/int/float/str
 ## ビルド（Windows / MSVC）
 
 必要なもの: Visual Studio 2022 以降 (C++ ツール), CMake 3.24+, Ninja, ネットワーク接続
-（初回に LVGL / SDL2 / nlohmann-json / open62541 をダウンロードします）。OPC UA サーバーを組み込むには
+（初回に LVGL / SDL2 / nlohmann-json / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
 Python 3 も必要です（open62541 のコード生成に使用。不要なら `-DHML_OPCUA=OFF`）。
 
 ```
@@ -156,6 +156,35 @@ python tools\modbus_server.py --port 5020
 
 接続すると画面右上の PLC ランプが点灯し、Run スイッチ・Speed スライダー・Setpoint アークが
 サーバーのコイル / 保持レジスタと同期します。サーバーが無い場合も画面は動作します（オフライン表示）。
+
+## デザイナー（GUI でプロジェクトを作る）
+
+`hml_designer.exe`（Windows ビルドでは既定で一緒にビルドされます）は、`project.json` と画面 JSON を
+GUI で編集するツールです。追加のランタイムは不要で、OS 標準の WebView（Windows: WebView2、
+Windows 10/11 に標準搭載）に HTML/JS の画面を表示し、C++ のホストがファイル入出力とランタイムの起動を担当します。
+
+```
+buildin\hml_designer.exe                       # 起動（New / Open で開始）
+buildin\hml_designer.exe projects\demo\project.json   # プロジェクトを指定して起動
+```
+
+| 場所 | 内容 |
+|---|---|
+| 左: Widgets | パレット。クリックすると選択中のパネル（または画面）に追加 |
+| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバ設定（sim / modbus_tcp / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正 |
+| 中央: キャンバス | ドラッグで移動、右下のハンドルでサイズ変更、矢印キーで 1 px（Shift で 10 px）移動。flex レイアウトの子は親の設定に従うので移動不可 |
+| 右: ツリー + プロパティ | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列） |
+| Preview | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
+| Run | 保存して `hml_runtime` を通常起動 |
+| JSON | 現在の画面 JSON を直接編集して適用 |
+
+- キーボード: Ctrl+S 保存、Ctrl+Z / Ctrl+Y 取り消し / やり直し、Ctrl+D 複製、Delete 削除、Esc 選択解除。
+- 画面 JSON のコメントは読み込めますが、保存時には整形された JSON（コメントなし）になります。
+- `hml_runtime.exe` は `hml_designer.exe` と同じフォルダから探します。
+- ページ本体は `tools/designer/renderer/`（`index.html`, `js/*.js`）で、ビルド時に `bin/designer/` へコピーされます。
+  ランタイムが対応するウィジェット・プロパティ一覧は `js/schema.js` にまとまっているので、ランタイムに
+  機能を足したらここに 1 行追加すれば GUI に現れます。
+- Linux でもビルドできます（`-DHML_DESIGNER=ON`、`libwebkit2gtk-4.1-dev` が必要）。Raspberry Pi 上で使う想定ではありません。
 
 ## project.json
 
@@ -392,6 +421,9 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | `tools/modbus_server.py` | テスト用 Modbus TCP サーバー（標準ライブラリのみ） |
 | `tools/opcua_client_test.py` | OPC UA 動作確認クライアント（asyncua） |
 | `tools/bmp2png.py` | スクリーンショット BMP → PNG 変換 |
+| `tools/designer/host/main.cpp` | デザイナーのホスト（webview、ファイルダイアログ、ランタイム起動） |
+| `tools/designer/renderer/` | デザイナーの画面（HTML / CSS / JS、ビルド不要） |
+| `tools/rpi/` | Raspberry Pi の LCD 設定スクリプト、systemd ユニット、タッチ生データ確認 |
 
 ### 組み込みターゲットへの移植
 

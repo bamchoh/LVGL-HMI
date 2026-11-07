@@ -36,6 +36,12 @@ else()
 endif()
 option(HML_FETCH_SDL "Build SDL2 from source with FetchContent" ${_hml_fetch_sdl_default})
 option(HML_OPCUA "Build the OPC UA server driver (open62541, MPL-2.0; needs Python 3 at build time)" ON)
+if(WIN32)
+  set(_hml_designer_default ON)
+else()
+  set(_hml_designer_default OFF)
+endif()
+option(HML_DESIGNER "Build the GUI project designer (hml_designer: webview + HTML/JS; Linux needs libwebkit2gtk-4.1-dev)" ${_hml_designer_default})
 
 if(MSVC)
   add_compile_options(/utf-8)
@@ -174,4 +180,9 @@ endif()
 
 install(TARGETS hml_runtime RUNTIME DESTINATION bin)
 
-message(STATUS "HML backend: ${HML_BACKEND}  OPC UA: ${HML_OPCUA}  (system: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})")
+# ---------------------------------------------------------------- designer (optional)
+if(HML_DESIGNER)
+  add_subdirectory(tools/designer)
+endif()
+
+message(STATUS "HML backend: ${HML_BACKEND}  OPC UA: ${HML_OPCUA}  designer: ${HML_DESIGNER}  (system: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})")
