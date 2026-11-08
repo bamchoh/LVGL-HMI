@@ -1,37 +1,155 @@
 {
   "title": "HML Demo - Pump Station",
-  "display": { "width": 800, "height": 480, "zoom": 1.0 },
-  "theme": { "dark": true, "primary": "#2196f3", "secondary": "#ff9800", "font": 16 },
+  "display": {
+    "width": 800,
+    "height": 480,
+    "zoom": 1,
+    "touch": {}
+  },
+  "theme": {
+    "dark": true,
+    "primary": "#2196f3",
+    "secondary": "#ff9800",
+    "font": 16
+  },
   "start_screen": "main",
-
   "tags": [
-    { "name": "temp",        "type": "float",  "init": 20.0 },
-    { "name": "pressure",    "type": "float",  "init": 1.5 },
-    { "name": "level",       "type": "int",    "init": 0,   "min": 0, "max": 100 },
-    { "name": "speed_sp",    "type": "int",    "init": 40,  "min": 0, "max": 100 },
-    { "name": "speed_pv",    "type": "int",    "init": 0,   "min": 0, "max": 100 },
-    { "name": "run",         "type": "bool",   "init": false },
-    { "name": "auto_mode",   "type": "bool",   "init": true },
-    { "name": "state_text",  "type": "string", "init": "Idle" },
-    { "name": "mode",        "type": "int",    "init": 0,   "min": 0, "max": 2 },
-    { "name": "setpoint",    "type": "int",    "init": 50,  "min": 0, "max": 100 },
-    { "name": "operator",    "type": "string", "init": "" },
-    { "name": "plc_online",  "type": "bool",   "init": false },
-    { "name": "pin",         "type": "string", "init": "" },
-    { "name": "temp_lo",     "type": "float",  "init": 20.0, "min": 0, "max": 50 },
-    { "name": "temp_hi",     "type": "float",  "init": 30.0, "min": 0, "max": 50 },
-    { "name": "blink",       "type": "bool",   "init": false }
+    {
+      "name": "temp",
+      "type": "float",
+      "init": 20
+    },
+    {
+      "name": "pressure",
+      "type": "float",
+      "init": 1.5
+    },
+    {
+      "name": "level",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "speed_sp",
+      "type": "int",
+      "init": 40,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "speed_pv",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "run",
+      "type": "bool",
+      "init": false
+    },
+    {
+      "name": "auto_mode",
+      "type": "bool",
+      "init": true
+    },
+    {
+      "name": "state_text",
+      "type": "string",
+      "init": "Idle"
+    },
+    {
+      "name": "mode",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "setpoint",
+      "type": "int",
+      "init": 50,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "operator",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "plc_online",
+      "type": "bool",
+      "init": false
+    },
+    {
+      "name": "pin",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "temp_lo",
+      "type": "float",
+      "init": 20,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "name": "temp_hi",
+      "type": "float",
+      "init": 30,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "name": "blink",
+      "type": "bool",
+      "init": false
+    }
   ],
-
   "drivers": [
     {
       "type": "sim",
       "items": [
-        { "tag": "temp",       "mode": "sine",     "min": 18,  "max": 32,  "period_ms": 12000 },
-        { "tag": "pressure",   "mode": "triangle", "min": 1.0, "max": 3.5, "period_ms": 7000 },
-        { "tag": "level",      "mode": "ramp",     "min": 0,   "max": 100, "period_ms": 20000 },
-        { "tag": "state_text", "mode": "cycle",    "values": ["Idle", "Starting", "Running", "Stopping"], "period_ms": 3000 },
-        { "tag": "blink",      "mode": "square",   "period_ms": 1000 }
+        {
+          "tag": "temp",
+          "mode": "sine",
+          "min": 18,
+          "max": 32,
+          "period_ms": 12000
+        },
+        {
+          "tag": "pressure",
+          "mode": "triangle",
+          "min": 1,
+          "max": 3.5,
+          "period_ms": 7000
+        },
+        {
+          "tag": "level",
+          "mode": "ramp",
+          "min": 0,
+          "max": 100,
+          "period_ms": 20000
+        },
+        {
+          "tag": "state_text",
+          "mode": "cycle",
+          "values": [
+            "Idle",
+            "Starting",
+            "Running",
+            "Stopping"
+          ],
+          "period_ms": 3000
+        },
+        {
+          "tag": "blink",
+          "mode": "square",
+          "period_ms": 1000
+        }
       ]
     },
     {
@@ -43,21 +161,55 @@
     {
       "type": "modbus_tcp",
       "enabled": true,
-      "host": "127.0.0.1", "port": 5020, "unit_id": 1,
-      "poll_ms": 200, "timeout_ms": 1000,
+      "host": "127.0.0.1",
+      "port": 5020,
+      "unit_id": 1,
+      "poll_ms": 200,
+      "timeout_ms": 1000,
       "status_tag": "plc_online",
       "map": [
-        { "tag": "speed_sp", "area": "holding", "addr": 0 },
-        { "tag": "speed_pv", "area": "input",   "addr": 0 },
-        { "tag": "setpoint", "area": "holding", "addr": 1 },
-        { "tag": "temp_lo",  "area": "holding", "addr": 2, "dtype": "s16", "scale": 0.1 },
-        { "tag": "temp_hi",  "area": "holding", "addr": 3, "dtype": "s16", "scale": 0.1 },
-        { "tag": "run",      "area": "coil",    "addr": 0 },
-        { "tag": "auto_mode","area": "coil",    "addr": 1 }
+        {
+          "tag": "speed_sp",
+          "area": "holding",
+          "addr": 0
+        },
+        {
+          "tag": "speed_pv",
+          "area": "input",
+          "addr": 0
+        },
+        {
+          "tag": "setpoint",
+          "area": "holding",
+          "addr": 1
+        },
+        {
+          "tag": "temp_lo",
+          "area": "holding",
+          "addr": 2,
+          "dtype": "s16",
+          "scale": 0.1
+        },
+        {
+          "tag": "temp_hi",
+          "area": "holding",
+          "addr": 3,
+          "dtype": "s16",
+          "scale": 0.1
+        },
+        {
+          "tag": "run",
+          "area": "coil",
+          "addr": 0
+        },
+        {
+          "tag": "auto_mode",
+          "area": "coil",
+          "addr": 1
+        }
       ]
     }
   ],
-
   "screens": [
     "screens/main.json",
     "screens/settings.json"

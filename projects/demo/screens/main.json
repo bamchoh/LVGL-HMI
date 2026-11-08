@@ -1,138 +1,640 @@
 {
   "name": "main",
   "scrollable": false,
-  "style": { "bg_color": "#141a22", "pad": 0 },
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
   "children": [
     {
-      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
-      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad_left": 16,
+        "pad_right": 16
+      },
       "children": [
-        { "type": "image", "src": "assets/logo.png", "align": "left_mid", "zoom": 0.6 },
-        { "type": "label", "text": "Pump Station #1", "align": "left_mid", "x": 40, "style": { "font": 24, "text_color": "#ffffff" } },
-        { "type": "label", "align": "center", "bind": { "text": { "tag": "state_text", "format": "State: %s" } },
-          "style": { "font": 18, "text_color": "#9fb3c8" } },
-        { "type": "led", "align": "right_mid", "x": -110, "w": 14, "h": 14, "color": "#4caf50",
-          "bind": { "on": "plc_online" } },
-        { "type": "label", "align": "right_mid", "x": -56, "style": { "text_color": "#9fb3c8" },
-          "bind": { "text": { "tag": "plc_online", "format": "PLC" }, "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } } } },
-        { "type": "button", "align": "right_mid", "text": "Setup", "w": 48, "h": 36,
-          "style_label": { "font": 14 },
-          "on_click": { "action": "goto", "screen": "settings", "anim": "slide_left" } }
+        {
+          "type": "image",
+          "src": "assets/logo.png",
+          "align": "left_mid",
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "Pump Station #1",
+          "align": "left_mid",
+          "x": 40,
+          "style": {
+            "font": 24,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "label",
+          "align": "center",
+          "bind": {
+            "text": {
+              "tag": "state_text",
+              "format": "State: %s"
+            }
+          },
+          "style": {
+            "font": 18,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -110,
+          "w": 14,
+          "h": 14,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "x": -56,
+          "style": {
+            "text_color": "#9fb3c8"
+          },
+          "bind": {
+            "text": {
+              "tag": "plc_online",
+              "format": "PLC"
+            },
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "button",
+          "align": "right_mid",
+          "text": "Setup",
+          "w": 48,
+          "h": 36,
+          "style_label": {
+            "font": 14
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "slide_left"
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 16, "y": 72, "w": 240, "h": 150, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
+      "type": "panel",
+      "x": 16,
+      "y": 72,
+      "w": 240,
+      "h": 150,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0
+      },
       "children": [
-        { "type": "label", "text": "Temperature", "style": { "text_color": "#9fb3c8" } },
-        { "type": "label", "align": "center", "y": 4, "style": { "font": 40, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "temp", "format": "%.1f C" } } },
-        { "type": "bar", "align": "bottom_mid", "w": "100%", "h": 8, "min": 0, "max": 50,
-          "style_indicator": { "bg_color": "#2196f3" },
-          "bind": { "value": "temp" } }
+        {
+          "type": "label",
+          "text": "Temperature",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "label",
+          "align": "center",
+          "y": 4,
+          "style": {
+            "font": 40,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "temp",
+              "format": "%.1f C"
+            }
+          }
+        },
+        {
+          "type": "bar",
+          "align": "bottom_mid",
+          "w": "100%",
+          "h": 8,
+          "min": 0,
+          "max": 50,
+          "style_indicator": {
+            "bg_color": "#2196f3"
+          },
+          "bind": {
+            "value": "temp"
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 272, "y": 72, "w": 240, "h": 150, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
+      "type": "panel",
+      "x": 272,
+      "y": 72,
+      "w": 240,
+      "h": 150,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0
+      },
       "children": [
-        { "type": "label", "text": "Pressure", "style": { "text_color": "#9fb3c8" } },
-        { "type": "arc", "align": "center", "y": 10, "w": 110, "h": 110, "min": 0, "max": 40, "adjustable": false,
-          "style": { "arc_width": 10 }, "style_indicator": { "arc_color": "#ff9800", "arc_width": 10 },
-          "bind": { "value": { "tag": "pressure", "scale": 10 } } },
-        { "type": "label", "align": "center", "y": 10, "style": { "font": 20, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "pressure", "format": "%.2f bar" } } }
+        {
+          "type": "label",
+          "text": "Pressure",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "arc",
+          "align": "center",
+          "y": 10,
+          "w": 110,
+          "h": 110,
+          "min": 0,
+          "max": 40,
+          "adjustable": false,
+          "style": {
+            "arc_width": 10
+          },
+          "style_indicator": {
+            "arc_color": "#ff9800",
+            "arc_width": 10
+          },
+          "bind": {
+            "value": {
+              "tag": "pressure",
+              "scale": 10
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "center",
+          "y": 10,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "pressure",
+              "format": "%.2f bar"
+            }
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 528, "y": 72, "w": 256, "h": 150, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
+      "type": "panel",
+      "x": 528,
+      "y": 72,
+      "w": 256,
+      "h": 150,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0
+      },
       "children": [
-        { "type": "label", "text": "Alarm", "style": { "text_color": "#9fb3c8" } },
-        { "type": "panel", "align": "bottom_mid", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+        {
+          "type": "label",
+          "text": "Alarm",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "align": "bottom_mid",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_main": "space_between",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0
+          },
           "children": [
-            { "type": "label", "text": "Lo", "style": { "text_color": "#9fb3c8", "font": 14 } },
-            { "type": "numeric_display", "w": 84, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_lo",
-              "style": { "font": 14, "pad": 6 } },
-            { "type": "label", "text": "Hi", "style": { "text_color": "#9fb3c8", "font": 14 } },
-            { "type": "numeric_display", "w": 84, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_hi",
-              "style": { "font": 14, "pad": 6 } }
-          ] },
-        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
-          "style": { "radius": 8, "border_width": 0, "bg_color": "#2e7d32" },
+            {
+              "type": "label",
+              "text": "Lo",
+              "style": {
+                "text_color": "#9fb3c8",
+                "font": 14
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 84,
+              "input": true,
+              "min": 0,
+              "max": 50,
+              "decimals": 1,
+              "unit": " C",
+              "bind": "temp_lo",
+              "style": {
+                "font": 14,
+                "pad": 6
+              }
+            },
+            {
+              "type": "label",
+              "text": "Hi",
+              "style": {
+                "text_color": "#9fb3c8",
+                "font": 14
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 84,
+              "input": true,
+              "min": 0,
+              "max": 50,
+              "decimals": 1,
+              "unit": " C",
+              "bind": "temp_hi",
+              "style": {
+                "font": 14,
+                "pad": 6
+              }
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "align": "top_mid",
+          "y": 26,
+          "w": "100%",
+          "h": 50,
+          "scrollable": false,
+          "style": {
+            "radius": 8,
+            "border_width": 0,
+            "bg_color": "#2e7d32"
+          },
           "children": [
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "NORMAL" }
-          ] },
-        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
-          "style": { "radius": 8, "border_width": 0, "bg_color": "#f9a825" },
-          "bind": { "visible": { "tag": "temp", "lt": { "tag": "temp_lo" } } },
+            {
+              "type": "label",
+              "align": "center",
+              "style": {
+                "font": 24,
+                "text_color": "#ffffff"
+              },
+              "text": "NORMAL"
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "align": "top_mid",
+          "y": 26,
+          "w": "100%",
+          "h": 50,
+          "scrollable": false,
+          "style": {
+            "radius": 8,
+            "border_width": 0,
+            "bg_color": "#f9a825"
+          },
+          "bind": {
+            "visible": {
+              "tag": "temp",
+              "lt": {
+                "tag": "temp_lo"
+              }
+            }
+          },
           "children": [
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#000000" }, "text": "LOW" }
-          ] },
-        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
-          "style": { "radius": 8, "border_width": 0, "bg_color": "#c62828" },
-          "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } },
+            {
+              "type": "label",
+              "align": "center",
+              "style": {
+                "font": 24,
+                "text_color": "#000000"
+              },
+              "text": "LOW"
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "align": "top_mid",
+          "y": 26,
+          "w": "100%",
+          "h": 50,
+          "scrollable": false,
+          "style": {
+            "radius": 8,
+            "border_width": 0,
+            "bg_color": "#c62828"
+          },
+          "bind": {
+            "visible": {
+              "tag": "temp",
+              "gt": {
+                "tag": "temp_hi"
+              }
+            }
+          },
           "children": [
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "HIGH" }
-          ] }
+            {
+              "type": "label",
+              "align": "center",
+              "style": {
+                "font": 24,
+                "text_color": "#ffffff"
+              },
+              "text": "HIGH"
+            }
+          ]
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 16, "y": 238, "w": 496, "h": 226, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
+      "type": "panel",
+      "x": 16,
+      "y": 238,
+      "w": 496,
+      "h": 226,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0
+      },
       "children": [
-        { "type": "label", "text": "Trend (temperature / level)", "style": { "text_color": "#9fb3c8" } },
-        { "type": "chart", "align": "bottom_mid", "w": "100%", "h": 170, "chart_type": "line",
-          "points": 120, "min": 0, "max": 100, "sample_ms": 250, "hdiv": 4, "vdiv": 6,
-          "style": { "bg_color": "#141a22", "border_width": 0, "line_color": "#2b3645" },
+        {
+          "type": "label",
+          "text": "Trend (temperature / level)",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "chart",
+          "align": "bottom_mid",
+          "w": "100%",
+          "h": 170,
+          "chart_type": "line",
+          "points": 120,
+          "min": 0,
+          "max": 100,
+          "sample_ms": 250,
+          "hdiv": 4,
+          "vdiv": 6,
+          "style": {
+            "bg_color": "#141a22",
+            "border_width": 0,
+            "line_color": "#2b3645"
+          },
           "series": [
-            { "tag": "temp",  "color": "#2196f3", "scale": 2 },
-            { "tag": "level", "color": "#4caf50" }
-          ] }
+            {
+              "tag": "temp",
+              "color": "#2196f3",
+              "scale": 2
+            },
+            {
+              "tag": "level",
+              "color": "#4caf50"
+            }
+          ]
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 528, "y": 238, "w": 256, "h": 226, "scrollable": false,
-      "flex": "column", "flex_cross": "center",
-      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad_row": 6 },
+      "type": "panel",
+      "x": 528,
+      "y": 238,
+      "w": 256,
+      "h": 226,
+      "scrollable": false,
+      "flex": "column",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0,
+        "pad_row": 6
+      },
       "children": [
-        { "type": "label", "text": "Pump control", "style": { "text_color": "#9fb3c8" } },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+        {
+          "type": "label",
+          "text": "Pump control",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_main": "space_between",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0
+          },
           "children": [
-            { "type": "label", "text": "Run", "style": { "font": 18, "text_color": "#ffffff" } },
-            { "type": "led", "w": 16, "h": 16, "color": "#4caf50", "bind": { "on": "run" } },
-            { "type": "switch", "bind": "run" }
-          ] },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+            {
+              "type": "label",
+              "text": "Run",
+              "style": {
+                "font": 18,
+                "text_color": "#ffffff"
+              }
+            },
+            {
+              "type": "led",
+              "w": 16,
+              "h": 16,
+              "color": "#4caf50",
+              "bind": {
+                "on": "run"
+              }
+            },
+            {
+              "type": "switch",
+              "bind": "run"
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_main": "space_between",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0
+          },
           "children": [
-            { "type": "label", "text": "SP", "style": { "text_color": "#9fb3c8", "font": 14 } },
-            { "type": "numeric_display", "w": 78, "input": true, "min": 0, "max": 100, "unit": " %", "bind": "speed_sp",
-              "style": { "font": 14, "pad": 6 } },
-            { "type": "label", "text": "PV", "style": { "text_color": "#9fb3c8", "font": 14 } },
-            { "type": "numeric_display", "w": 78, "unit": " %", "bind": "speed_pv", "style": { "font": 14, "pad": 6 } }
-          ] },
-        { "type": "slider", "w": "90%", "min": 0, "max": 100,
-          "bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } } },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+            {
+              "type": "label",
+              "text": "SP",
+              "style": {
+                "text_color": "#9fb3c8",
+                "font": 14
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 78,
+              "input": true,
+              "min": 0,
+              "max": 100,
+              "unit": " %",
+              "bind": "speed_sp",
+              "style": {
+                "font": 14,
+                "pad": 6
+              }
+            },
+            {
+              "type": "label",
+              "text": "PV",
+              "style": {
+                "text_color": "#9fb3c8",
+                "font": 14
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 78,
+              "unit": " %",
+              "bind": "speed_pv",
+              "style": {
+                "font": 14,
+                "pad": 6
+              }
+            }
+          ]
+        },
+        {
+          "type": "slider",
+          "w": "90%",
+          "min": 0,
+          "max": 100,
+          "bind": {
+            "value": "speed_sp",
+            "enabled": {
+              "tag": "auto_mode",
+              "invert": true
+            }
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_main": "space_evenly",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0
+          },
           "children": [
-            { "type": "button", "text": "-10", "w": 64, "on_click": { "action": "dec", "tag": "speed_sp", "by": 10 } },
-            { "type": "button", "text": "+10", "w": 64, "on_click": { "action": "inc", "tag": "speed_sp", "by": 10 } },
-            { "type": "button", "text": "Stop", "w": 64, "style": { "bg_color": "#c62828" },
-              "on_click": [ { "action": "set", "tag": "run", "value": false }, { "action": "set", "tag": "speed_sp", "value": 0 } ] }
-          ] },
-        { "type": "checkbox", "text": "Auto mode (locks slider)", "bind": "auto_mode", "style": { "text_color": "#9fb3c8", "font": 14 } }
+            {
+              "type": "button",
+              "text": "-10",
+              "w": 64,
+              "on_click": {
+                "action": "dec",
+                "tag": "speed_sp",
+                "by": 10
+              }
+            },
+            {
+              "type": "button",
+              "text": "+10",
+              "w": 64,
+              "on_click": {
+                "action": "inc",
+                "tag": "speed_sp",
+                "by": 10
+              }
+            },
+            {
+              "type": "button",
+              "text": "Stop",
+              "w": 64,
+              "style": {
+                "bg_color": "#c62828"
+              },
+              "on_click": [
+                {
+                  "action": "set",
+                  "tag": "run",
+                  "value": false
+                },
+                {
+                  "action": "set",
+                  "tag": "speed_sp",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "checkbox",
+          "text": "Auto mode (locks slider)",
+          "bind": "auto_mode",
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 14
+          }
+        }
       ]
     },
-
-    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 220, "style_items": { "font": 18 } }
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 220,
+      "style_items": {
+        "font": 18
+      }
+    }
   ]
 }
