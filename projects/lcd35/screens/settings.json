@@ -24,7 +24,15 @@
         { "type": "label", "text": "Maintenance mode is active!", "style": { "font": 12, "text_color": "#f44336" },
           "bind": { "visible": { "tag": "mode", "eq": 2 } } },
         { "type": "label", "text": "Operator name", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "textarea", "w": "100%", "placeholder": "tap to type", "one_line": true, "max_length": 16, "bind": "operator" }
+        { "type": "text_display", "w": "100%", "placeholder": "tap to type", "max_length": 16, "input": true, "bind": "operator" },
+        { "type": "label", "text": "Maintenance PIN (1234)", "style": { "font": 12, "text_color": "#9fb3c8" } },
+        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_cross": "center", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 8 },
+          "children": [
+            { "type": "password_display", "w": 90, "max_length": 4, "accepted_chars": "0123456789", "placeholder": "PIN", "bind": "pin" },
+            { "type": "label", "text": "unlocked", "style": { "font": 12, "text_color": "#4caf50" }, "bind": { "visible": { "tag": "pin", "eq": "1234" } } },
+            { "type": "label", "text": "locked", "style": { "font": 12, "text_color": "#f44336" }, "bind": { "hidden": { "tag": "pin", "eq": "1234" } } }
+          ] }
       ]
     },
 
@@ -35,8 +43,8 @@
         { "type": "label", "text": "Setpoint (holding reg 1)", "style": { "font": 12, "text_color": "#9fb3c8" } },
         { "type": "arc", "w": 104, "h": 104, "min": 0, "max": 100, "bind": "setpoint",
           "style": { "arc_width": 8 }, "style_indicator": { "arc_color": "#2196f3", "arc_width": 8 }, "style_knob": { "bg_color": "#2196f3", "pad": 4 } },
-        { "type": "label", "style": { "font": 20, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "setpoint", "format": "%d %%" } } },
+        { "type": "numeric_display", "w": 96, "input": true, "min": 0, "max": 100, "unit": " %",
+          "style": { "font": 20, "text_color": "#ffffff", "pad": 4 }, "bind": "setpoint" },
         { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
           "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
           "children": [

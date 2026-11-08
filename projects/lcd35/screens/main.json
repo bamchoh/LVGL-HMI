@@ -24,8 +24,7 @@
       "children": [
         { "type": "label", "text": "Temperature", "style": { "font": 12, "text_color": "#9fb3c8" } },
         { "type": "label", "align": "center", "y": 2, "style": { "font": 28, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "temp", "format": "%.1f C" },
-                    "text_color": { "tag": "alarm", "map": { "0": "#ffffff", "1": "#ffc107", "2": "#f44336" } } } },
+          "bind": { "text": { "tag": "temp", "format": "%.1f C" } } },
         { "type": "bar", "align": "bottom_mid", "w": "100%", "h": 6, "min": 0, "max": 50,
           "style_indicator": { "bg_color": "#2196f3" }, "bind": { "value": "temp" } }
       ]
@@ -48,19 +47,26 @@
       "type": "panel", "x": 324, "y": 48, "w": 148, "h": 108, "scrollable": false,
       "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8 },
       "children": [
-        { "type": "label", "text": "Alarm", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "panel", "align": "center", "y": 8, "w": "100%", "h": 54, "scrollable": false,
-          "style": { "radius": 6, "border_width": 0 },
-          "bind": { "bg_color": { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828" } } },
+        { "type": "label", "text": "Alarm (lo / hi)", "style": { "font": 12, "text_color": "#9fb3c8" } },
+        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
+          "style": { "radius": 6, "border_width": 0, "bg_color": "#2e7d32" },
+          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#ffffff" }, "text": "NORMAL" } ] },
+        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
+          "style": { "radius": 6, "border_width": 0, "bg_color": "#f9a825" },
+          "bind": { "visible": { "tag": "temp", "lt": { "tag": "temp_lo" } } },
+          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#000000" }, "text": "LOW" } ] },
+        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
+          "style": { "radius": 6, "border_width": 0, "bg_color": "#c62828" },
+          "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } },
+          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#ffffff" }, "text": "HIGH" } ] },
+        { "type": "panel", "align": "bottom_mid", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
           "children": [
-            { "type": "label", "align": "center", "style": { "font": 18, "text_color": "#ffffff" }, "text": "NORMAL",
-              "bind": { "visible": { "tag": "alarm", "eq": 0 } } },
-            { "type": "label", "align": "center", "style": { "font": 18, "text_color": "#000000" }, "text": "WARNING",
-              "bind": { "visible": { "tag": "alarm", "eq": 1 } } },
-            { "type": "label", "align": "center", "style": { "font": 18, "text_color": "#ffffff" }, "text": "ALARM",
-              "bind": { "visible": { "tag": "alarm", "eq": 2 } } }
-          ]
-        }
+            { "type": "numeric_display", "w": 62, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_lo",
+              "style": { "font": 12, "pad": 4 } },
+            { "type": "numeric_display", "w": 62, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_hi",
+              "style": { "font": 12, "pad": 4 } }
+          ] }
       ]
     },
 
@@ -91,7 +97,14 @@
             { "type": "led", "w": 12, "h": 12, "color": "#4caf50", "bind": { "on": "run" } },
             { "type": "switch", "w": 44, "h": 22, "bind": "run" }
           ] },
-        { "type": "label", "bind": { "text": { "tag": "speed_sp", "format": "Speed setpoint: %d %%" } }, "style": { "font": 12, "text_color": "#ffffff" } },
+        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+          "children": [
+            { "type": "label", "text": "SP", "style": { "font": 12, "text_color": "#9fb3c8" } },
+            { "type": "numeric_display", "w": 64, "input": true, "min": 0, "max": 100, "unit": " %", "bind": "speed_sp", "style": { "font": 12, "pad": 4 } },
+            { "type": "label", "text": "PV", "style": { "font": 12, "text_color": "#9fb3c8" } },
+            { "type": "numeric_display", "w": 64, "unit": " %", "bind": "speed_pv", "style": { "font": 12, "pad": 4 } }
+          ] },
         { "type": "slider", "w": "90%", "h": 8, "min": 0, "max": 100,
           "bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } } },
         { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
@@ -104,6 +117,8 @@
           ] },
         { "type": "checkbox", "text": "Auto mode", "bind": "auto_mode", "style": { "text_color": "#9fb3c8", "font": 12 } }
       ]
-    }
+    },
+
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 140 }
   ]
 }
