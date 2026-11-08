@@ -25,6 +25,20 @@ build.cmd            # Release ビルド → build\bin\hml_runtime.exe
 build.cmd Debug
 ```
 
+### 単体テスト
+
+`src/jsonutil.cpp` / `src/tag.cpp` / `src/util.cpp` の単体テスト（[doctest](https://github.com/doctest/doctest)）が
+`tests/` にあります。LVGL / SDL には依存しないので数秒でビルド・実行できます。
+
+```
+test.cmd                         # ビルドして全テストを実行
+test.cmd -tc="*format*"          # doctest の引数をそのまま渡せる（テストケース名でフィルタ）
+ctest --test-dir build --output-on-failure   # CTest から実行する場合
+```
+
+Linux では `./build.sh` のあとに `build-<backend>/bin/hml_tests` を実行してください。
+テストを組み込みたくない場合は `-DHML_TESTS=OFF` を付けます。
+
 ## ビルド（Raspberry Pi / Linux）
 
 表示バックエンドは CMake の `-DHML_BACKEND=` で選びます（`build.sh` が引数で切り替えます）。
@@ -417,6 +431,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | `legacy_c/` | 書き直し前の C 版（参照用、ビルド対象外。不要なら削除可） |
 | `lv_conf.h` | LVGL 設定（`HML_BACKEND_*` でドライバ切替、フォント、ウィジェット有効化） |
 | `build.cmd` / `build.sh` | Windows (MSVC) / Linux・Raspberry Pi (gcc, クロスコンパイル対応) のビルドスクリプト |
+| `test.cmd` / `tests/` | 単体テスト（doctest）: `test_jsonutil.cpp`, `test_tag.cpp`。`hml_tests` にビルドされ CTest にも登録 |
 | `cmake/toolchain-*.cmake` | aarch64 / armhf クロスコンパイル用ツールチェーンファイル |
 | `tools/modbus_server.py` | テスト用 Modbus TCP サーバー（標準ライブラリのみ） |
 | `tools/opcua_client_test.py` | OPC UA 動作確認クライアント（asyncua） |
