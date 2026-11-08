@@ -1120,7 +1120,7 @@ TEST_CASE("Ui::init may be called again to replace the app callbacks")
 {
     Runtime rt;
     int reloads = 0;
-    ui().init(nullptr, AppCallbacks{ [&] { reloads++; }, nullptr });
+    ui().init(nullptr, AppCallbacks{ [&] { reloads++; }, nullptr, nullptr });
     lv_obj_t* b = build_widgets(J(R"json([ { "type": "button", "on_click": { "action": "reload" } }, { "type": "button", "on_click": { "action": "exit" } } ])json"));
     REQUIRE(b);
     click(b);
