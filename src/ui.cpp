@@ -1,6 +1,7 @@
 #include "ui.hpp"
 #include "tag.hpp"
 #include "util.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <deque>
@@ -147,8 +148,6 @@ bool focus_comes_from_pointer()
     return indev && lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER;
 }
 
-// LVGL keeps the pressed object until the finger is lifted (PRESS_LOCK), so CLICKED also arrives
-// when the finger was dragged off the object before release. Treat that as "not a tap".
 // ---- data display edit session (see Ui::Impl::on_widget_focus and friends) ----
 // Flags on the textarea: USER_2 tap pending, USER_3 editing, USER_4 whole text selected (next insert replaces).
 void select_all(lv_obj_t* ta)
@@ -175,10 +174,30 @@ void end_edit_session(lv_obj_t* ta)
     lv_obj_remove_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3 | LV_OBJ_FLAG_USER_4));
 }
 
-bool released_on(lv_obj_t* obj)
+// LVGL keeps the pressed object until the finger is lifted (PRESS_LOCK), so CLICKED also arrives
+// when the finger slid before release: off the object, or along it on a screen that does not
+// scroll. Only a release on the object without sliding more than the scroll limit is a tap.
+struct PressTrack { lv_obj_t* obj = nullptr; lv_point_t start{}; int32_t moved = 0; };
+PressTrack g_press;
+constexpr int32_t kTapSlop = 10;   // px, same as LVGL's default scroll limit
+
+void track_press(lv_event_t* e)   // PRESSED / PRESSING on input fields
+{
+    lv_indev_t* indev = lv_indev_active();
+    if(!indev || lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) return;
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    lv_obj_t* obj = lv_event_get_target_obj(e);
+    if(lv_event_get_code(e) == LV_EVENT_PRESSED || g_press.obj != obj) { g_press = { obj, p, 0 }; return; }
+    int32_t d = std::max(std::abs(p.x - g_press.start.x), std::abs(p.y - g_press.start.y));
+    g_press.moved = std::max(g_press.moved, d);
+}
+
+bool is_tap(lv_obj_t* obj)
 {
     lv_indev_t* indev = lv_indev_active();
     if(!indev || lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) return true;   // keypad / programmatic
+    if(g_press.obj == obj && g_press.moved > kTapSlop) return false;
     lv_point_t p;
     lv_indev_get_point(indev, &p);
     lv_area_t a;
@@ -618,7 +637,7 @@ struct Ui::Impl {
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
         if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_2)) return;
-        if(!released_on(ta)) return;                              // dragged off the field: keep waiting for a real tap
+        if(!is_tap(ta)) return;                                   // slid or dragged off: keep waiting for a real tap
         lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_2);
         select_all(ta);
     }
@@ -648,7 +667,7 @@ struct Ui::Impl {
         lv_event_code_t code = lv_event_get_code(e);
         if(code == LV_EVENT_VALUE_CHANGED) { update_echo(scr, ta); return; }
         if(code == LV_EVENT_FOCUSED && focus_comes_from_pointer()) return;   // wait for CLICKED: it may be a scroll
-        if(code == LV_EVENT_CLICKED && !released_on(ta)) return;             // finger left the field before release
+        if(code == LV_EVENT_CLICKED && !is_tap(ta)) return;                  // finger slid or left the field: not a tap
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
             lv_keyboard_set_textarea(scr->keyboard, ta);
             // numeric_display marks itself with USER_1: give it the number pad
@@ -1169,6 +1188,8 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
             lv_textarea_set_accepted_chars(obj, owned_strings.back()->c_str());
         }
         if(group) lv_group_add_obj(group, obj);
+        lv_obj_add_event_cb(obj, track_press, LV_EVENT_PRESSED, nullptr);
+        lv_obj_add_event_cb(obj, track_press, LV_EVENT_PRESSING, nullptr);
         if(building) {
             for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL, LV_EVENT_VALUE_CHANGED }) {
                 lv_obj_add_event_cb(obj, &Impl::on_textarea_event, code, building);
@@ -1212,6 +1233,8 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         }
         if(input) {
             if(group) lv_group_add_obj(group, obj);
+            lv_obj_add_event_cb(obj, track_press, LV_EVENT_PRESSED, nullptr);
+            lv_obj_add_event_cb(obj, track_press, LV_EVENT_PRESSING, nullptr);
             if(building) {
                 for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL, LV_EVENT_VALUE_CHANGED }) {
                     lv_obj_add_event_cb(obj, &Impl::on_textarea_event, code, building);

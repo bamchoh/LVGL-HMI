@@ -473,6 +473,26 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         CHECK(ta_text(num) == "42");
         CHECK(selected(num));
     }
+    SUBCASE("press, slide along the field without scrolling, release on it: not a tap") {
+        ptr.press(a.x1 + 10, cy, rt);
+        ptr.move(a.x2 - 10, cy, rt);                             // horizontal: the list does not scroll
+        ptr.release(rt);
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(selected(num));
+        ptr.press(cx, cy, rt);                                   // slide off and back onto the press point
+        ptr.move(a.x2 + 40, cy, rt);
+        ptr.move(cx, cy, rt);
+        ptr.release(rt);
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(selected(num));
+    }
+    SUBCASE("a few pixels of jitter while pressed is still a tap") {
+        ptr.press(cx, cy, rt);
+        ptr.move(cx + 4, cy - 3, rt);
+        ptr.release(rt);
+        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(selected(num));
+    }
     SUBCASE("a plain tap opens the keyboard and clears the field") {
         ptr.press(cx, cy, rt);
         ptr.release(rt);
