@@ -149,6 +149,32 @@ bool focus_comes_from_pointer()
 
 // LVGL keeps the pressed object until the finger is lifted (PRESS_LOCK), so CLICKED also arrives
 // when the finger was dragged off the object before release. Treat that as "not a tap".
+// ---- data display edit session (see Ui::Impl::on_widget_focus and friends) ----
+// Flags on the textarea: USER_2 tap pending, USER_3 editing, USER_4 whole text selected (next insert replaces).
+void select_all(lv_obj_t* ta)
+{
+    lv_textarea_set_cursor_pos(ta, LV_TEXTAREA_CURSOR_LAST);
+    uint32_t len = lv_textarea_get_cursor_pos(ta);             // characters, not bytes
+    lv_obj_t* label = lv_textarea_get_label(ta);
+    lv_label_set_text_selection_start(label, 0);
+    lv_label_set_text_selection_end(label, len);
+    lv_obj_add_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_3 | LV_OBJ_FLAG_USER_4));
+}
+
+void clear_selection(lv_obj_t* ta)
+{
+    lv_obj_t* label = lv_textarea_get_label(ta);
+    lv_label_set_text_selection_start(label, LV_DRAW_LABEL_NO_TXT_SEL);
+    lv_label_set_text_selection_end(label, LV_DRAW_LABEL_NO_TXT_SEL);
+    lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_4);
+}
+
+void end_edit_session(lv_obj_t* ta)
+{
+    clear_selection(ta);
+    lv_obj_remove_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3 | LV_OBJ_FLAG_USER_4));
+}
+
 bool released_on(lv_obj_t* obj)
 {
     lv_indev_t* indev = lv_indev_active();
@@ -388,7 +414,7 @@ void Binding::on_tag_changed(const Value& v, const void* source)
 // widget -> tag (two-way bindings)
 void Binding::on_widget_changed(lv_obj_t* target)
 {
-    if(commit_on_ready) lv_obj_remove_flag(target, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3));   // edit session over
+    if(commit_on_ready) end_edit_session(target);   // edit session over
     if(commit_on_ready && wk == Widget::Textarea && lv_textarea_get_text(target)[0] == '\0') {
         on_tag_changed(tag->get(), nullptr);    // the field was cleared on focus and nothing was typed
         return;
@@ -576,17 +602,17 @@ struct Ui::Impl {
         end_edit_session(lv_event_get_target_obj(e));
         b->on_tag_changed(b->tag->get(), nullptr);
     }
-    // Data display edit session, tracked with two object flags:
-    //   USER_2 = "clear pending": focused by a pointer, waiting for the tap (CLICKED) that is not a scroll
-    //   USER_3 = "editing": the field was cleared once; later taps only move the cursor
+    // Data display edit session, tracked with object flags:
+    //   USER_2 = "tap pending": focused by a pointer, waiting for the CLICKED that is not a scroll
+    //   USER_3 = "editing": the session started (the text was selected once); later taps only move the cursor
+    //   USER_4 = "replace pending": the whole text is selected, the next insert replaces it
     // READY / CANCEL / DEFOCUSED end the session.
     static void on_widget_focus(lv_event_t* e)
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
         if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
         if(focus_comes_from_pointer()) { lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2); return; }
-        lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_3);                  // keypad / encoder: start editing right away
-        lv_textarea_set_text(ta, "");
+        select_all(ta);                                           // keypad / encoder: start editing right away
     }
     static void on_widget_click(lv_event_t* e)
     {
@@ -594,12 +620,22 @@ struct Ui::Impl {
         if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_2)) return;
         if(!released_on(ta)) return;                              // dragged off the field: keep waiting for a real tap
         lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_2);
-        lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_3);
-        lv_textarea_set_text(ta, "");
+        select_all(ta);
     }
-    static void end_edit_session(lv_obj_t* ta)
+    static void on_widget_insert(lv_event_t* e)   // first key after select-all replaces the old text
     {
-        lv_obj_remove_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3));
+        lv_obj_t* ta = lv_event_get_target_obj(e);
+        if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_4)) return;
+        const char* txt = static_cast<const char*>(lv_event_get_param(e));
+        clear_selection(ta);
+        lv_textarea_set_text(ta, "");                             // the pending insert then lands in the empty field
+        // backspace / delete on a selection: deleting the selection is all it does
+        if(txt && (txt[0] == LV_KEY_DEL || txt[0] == LV_KEY_BACKSPACE) && txt[1] == 0) lv_textarea_set_insert_replace(ta, "");
+    }
+    static void on_widget_edited(lv_event_t* e)   // any other change (e.g. backspace) just drops the selection
+    {
+        lv_obj_t* ta = lv_event_get_target_obj(e);
+        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_4)) clear_selection(ta);
     }
     static void on_widget_blur(lv_event_t* e) { end_edit_session(lv_event_get_target_obj(e)); }
     static void on_action_event(lv_event_t* e);
@@ -785,6 +821,8 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     if(two_way && raw->commit_on_ready) {
         lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_click, LV_EVENT_CLICKED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_insert, LV_EVENT_INSERT, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_edited, LV_EVENT_VALUE_CHANGED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_blur, LV_EVENT_DEFOCUSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_READY, raw);      // keyboard OK / Enter
         lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_DEFOCUSED, raw);

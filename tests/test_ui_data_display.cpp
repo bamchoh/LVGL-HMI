@@ -34,6 +34,14 @@ lv_obj_t* build_widgets(const json& widgets)
 }
 
 std::string ta_text(lv_obj_t* ta) { return lv_textarea_get_text(ta); }
+// the whole text is highlighted (tap on an input field)
+bool selected(lv_obj_t* ta)
+{
+    lv_obj_t* label = lv_textarea_get_label(ta);
+    uint32_t len = static_cast<uint32_t>(std::string(lv_textarea_get_text(ta)).size());   // ASCII in these tests
+    return lv_label_get_text_selection_start(label) == 0 && len > 0 &&
+           lv_label_get_text_selection_end(label) == len;
+}
 void send(lv_obj_t* o, lv_event_code_t c) { lv_obj_send_event(o, c, nullptr); }
 
 // Type into an input field the way the keyboard does, then confirm.
@@ -144,20 +152,38 @@ TEST_CASE("numeric_display with input: writes on confirmation, clamps, reverts o
         CHECK(sp->get_number() == doctest::Approx(0));
         CHECK(ta_text(in) == "0.0 rpm");
     }
-    SUBCASE("focusing clears the field; confirming without typing keeps the value") {
+    SUBCASE("focusing selects the whole value; the first key replaces it; confirming untouched keeps it") {
         send(in, LV_EVENT_FOCUSED);
-        CHECK(ta_text(in) == "");
+        CHECK(ta_text(in) == "10.0 rpm");                       // kept, highlighted
+        CHECK(selected(in));
         send(in, LV_EVENT_READY);
         CHECK(sp->get_number() == doctest::Approx(10));
         CHECK(ta_text(in) == "10.0 rpm");
+        CHECK_FALSE(selected(in));
         send(in, LV_EVENT_FOCUSED);
         send(in, LV_EVENT_DEFOCUSED);
         CHECK(sp->get_number() == doctest::Approx(10));
         CHECK(ta_text(in) == "10.0 rpm");
         send(in, LV_EVENT_FOCUSED);
         lv_textarea_add_text(in, "3");
+        CHECK(ta_text(in) == "3");                              // replaced the selection
+        CHECK_FALSE(selected(in));
+        lv_textarea_add_text(in, "5");
+        CHECK(ta_text(in) == "35");                             // further keys append
         send(in, LV_EVENT_READY);
-        CHECK(sp->get_number() == doctest::Approx(3));
+        CHECK(sp->get_number() == doctest::Approx(35));
+    }
+    SUBCASE("backspace on a selected value deletes the selection") {
+        send(in, LV_EVENT_FOCUSED);
+        lv_textarea_delete_char(in);
+        CHECK(ta_text(in) == "");
+        CHECK_FALSE(selected(in));
+        lv_textarea_add_text(in, "12");
+        CHECK(ta_text(in) == "12");
+        lv_textarea_delete_char(in);                            // no selection any more: normal backspace
+        CHECK(ta_text(in) == "1");
+        send(in, LV_EVENT_READY);
+        CHECK(sp->get_number() == doctest::Approx(1));
     }
     SUBCASE("accepted characters filter the keyboard input") {
         lv_textarea_set_text(in, "");
@@ -267,7 +293,8 @@ TEST_CASE("the on-screen keyboard switches to the number pad for numeric inputs"
     send(num, LV_EVENT_CLICKED);
     CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
     CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
-    CHECK(ta_text(num) == "");                               // cleared for a fresh entry
+    CHECK(ta_text(num) == "1");                              // kept and selected for replacement
+    CHECK(selected(num));
     CHECK(lv_keyboard_get_textarea(kb) == num);
 
     lv_textarea_add_text(num, "5");
@@ -429,7 +456,8 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         ptr.press((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2, rt);
         ptr.release(rt);
         CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
-        CHECK(ta_text(num) == "");
+        CHECK(ta_text(num) == "42");
+        CHECK(selected(num));
     }
     SUBCASE("press on the field, slide sideways off it, release: nothing happens") {
         ptr.press(cx, cy, rt);
@@ -442,16 +470,19 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         ptr.press(cx, cy, rt);
         ptr.release(rt);
         CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
-        CHECK(ta_text(num) == "");
+        CHECK(ta_text(num) == "42");
+        CHECK(selected(num));
     }
     SUBCASE("a plain tap opens the keyboard and clears the field") {
         ptr.press(cx, cy, rt);
         ptr.release(rt);
         CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
         CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
-        CHECK(ta_text(num) == "");
-        // a second tap while editing does not clear what was typed
+        CHECK(ta_text(num) == "42");
+        CHECK(selected(num));
+        // the first key replaces the selected value; a second tap does not reselect what was typed
         lv_textarea_add_text(num, "7");
+        CHECK(ta_text(num) == "7");
         ptr.press(cx, cy, rt);
         ptr.release(rt);
         CHECK(ta_text(num) == "7");
@@ -506,7 +537,7 @@ TEST_CASE("a field hidden by the keyboard either way gets an echo of the typed t
     lv_obj_t* echo = lv_obj_get_child(s, static_cast<int32_t>(children_before));
     REQUIRE(lv_obj_check_type(echo, &lv_label_class));
     CHECK_FALSE(lv_obj_has_flag(echo, LV_OBJ_FLAG_HIDDEN));
-    CHECK(std::string(lv_label_get_text(echo)) == "|");       // cleared on tap
+    CHECK(std::string(lv_label_get_text(echo)) == "abc|");    // the (selected) current value
 
     lv_textarea_add_text(field, "xy");
     CHECK(std::string(lv_label_get_text(echo)) == "xy|");
