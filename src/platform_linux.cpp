@@ -89,6 +89,7 @@ void console_graphics_mode(const std::string& path)
 {
     if(path.empty() || path == "none") return;
     int fd = open(path.c_str(), O_RDWR | O_NOCTTY | O_CLOEXEC);
+    const int open_errno = errno;
     bool owned = fd >= 0;
     if(!owned) {
         // fall back to stdin when systemd attached the VT to it
@@ -97,7 +98,7 @@ void console_graphics_mode(const std::string& path)
         else {
             HML_WARN("console: cannot open %s (%s): kernel text may be drawn over the HMI. Run from the hml.service unit "
                      "(it passes the VT as stdin) or set \"display\": { \"console\": \"none\" } to silence this.",
-                     path.c_str(), std::strerror(errno));
+                     path.c_str(), std::strerror(open_errno));
             return;
         }
     }
