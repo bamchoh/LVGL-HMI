@@ -19,6 +19,8 @@
     { "name": "operator",    "type": "string", "init": "" },
     { "name": "plc_online",  "type": "bool",   "init": false },
     { "name": "pin",         "type": "string", "init": "" },
+    { "name": "temp_lo",     "type": "float",  "init": 18.0, "min": 0, "max": 50 },
+    { "name": "temp_hi",     "type": "float",  "init": 30.0, "min": 0, "max": 50 },
     { "name": "blink",       "type": "bool",   "init": false }
   ],
 
@@ -50,6 +52,8 @@
         { "tag": "speed_sp", "area": "holding", "addr": 0 },
         { "tag": "speed_pv", "area": "input",   "addr": 0 },
         { "tag": "setpoint", "area": "holding", "addr": 1 },
+        { "tag": "temp_lo",  "area": "holding", "addr": 2, "dtype": "s16", "scale": 0.1 },
+        { "tag": "temp_hi",  "area": "holding", "addr": 3, "dtype": "s16", "scale": 0.1 },
         { "tag": "run",      "area": "coil",    "addr": 0 },
         { "tag": "auto_mode","area": "coil",    "addr": 1 }
       ]

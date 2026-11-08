@@ -53,7 +53,17 @@
       "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
       "children": [
         { "type": "label", "text": "Alarm", "style": { "text_color": "#9fb3c8" } },
-        { "type": "panel", "align": "center", "y": 10, "w": "100%", "h": 70, "scrollable": false,
+        { "type": "panel", "align": "bottom_mid", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+          "children": [
+            { "type": "label", "text": "Lo", "style": { "text_color": "#9fb3c8", "font": 14 } },
+            { "type": "numeric_display", "w": 84, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_lo",
+              "style": { "font": 14, "pad": 6 } },
+            { "type": "label", "text": "Hi", "style": { "text_color": "#9fb3c8", "font": 14 } },
+            { "type": "numeric_display", "w": 84, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_hi",
+              "style": { "font": 14, "pad": 6 } }
+          ] },
+        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
           "style": { "radius": 8, "border_width": 0 },
           "bind": { "bg_color": { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828" } } },
           "children": [
@@ -117,6 +127,8 @@
           ] },
         { "type": "checkbox", "text": "Auto mode (locks slider)", "bind": "auto_mode", "style": { "text_color": "#9fb3c8", "font": 14 } }
       ]
-    }
+    },
+
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 200 }
   ]
 }
