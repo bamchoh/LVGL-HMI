@@ -47,3 +47,10 @@ endif()
 
 add_test(NAME hml_tests COMMAND hml_tests)
 
+# Designer renderer (HTML/JS) unit tests: plain Node, no packages (node --test, Node 18+).
+find_program(HML_NODE node)
+if(HML_NODE)
+  add_test(NAME designer_js COMMAND ${HML_NODE} --test ${CMAKE_SOURCE_DIR}/tools/designer/test/model.test.js)
+else()
+  message(STATUS "node not found: the designer JS tests are not registered with CTest")
+endif()

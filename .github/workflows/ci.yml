@@ -63,7 +63,7 @@ jobs:
         run: cmake --build build --target hml_tests
 
       - name: Run unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -R hml_tests
 
       - name: Build everything (runtime, designer)
         run: cmake --build build
@@ -75,3 +75,15 @@ jobs:
           name: ctest-log-${{ runner.os }}
           path: build/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
+
+  designer-js:
+    name: Designer JS (node --test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run designer unit tests
+        run: node --test tools/designer/test/model.test.js
