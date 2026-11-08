@@ -17,7 +17,7 @@
 
     {
       "type": "panel", "x": 16, "y": 72, "w": 370, "h": 300, "scrollable": false,
-      "flex": "column", "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad_row": 8 },
+      "flex": "column", "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad_row": 6 },
       "children": [
         { "type": "label", "text": "Operation mode", "style": { "text_color": "#9fb3c8" } },
         { "type": "dropdown", "w": "100%", "options": ["Manual", "Automatic", "Maintenance"], "bind": "mode" },
@@ -28,8 +28,14 @@
         { "type": "label", "text": "Operator name", "style": { "text_color": "#9fb3c8" } },
         { "type": "text_display", "w": "100%", "placeholder": "type a name, Enter to confirm", "max_length": 24,
           "input": true, "bind": "operator" },
-        { "type": "label", "text": "Alarm limit", "style": { "text_color": "#9fb3c8" } },
-        { "type": "roller", "options": ["30 C", "35 C", "40 C", "45 C"], "visible_rows": 1, "w": "100%" }
+        { "type": "label", "text": "Maintenance PIN (1234 unlocks)", "style": { "text_color": "#9fb3c8" } },
+        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_cross": "center", "scrollable": false,
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 10 },
+          "children": [
+            { "type": "password_display", "w": 120, "max_length": 4, "accepted_chars": "0123456789", "placeholder": "PIN", "bind": "pin" },
+            { "type": "label", "text": "unlocked", "style": { "text_color": "#4caf50" }, "bind": { "visible": { "tag": "pin", "eq": "1234" } } },
+            { "type": "label", "text": "locked", "style": { "text_color": "#f44336" }, "bind": { "hidden": { "tag": "pin", "eq": "1234" } } }
+          ] }
       ]
     },
 

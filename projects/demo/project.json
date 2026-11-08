@@ -18,6 +18,7 @@
     { "name": "setpoint",    "type": "int",    "init": 50,  "min": 0, "max": 100 },
     { "name": "operator",    "type": "string", "init": "" },
     { "name": "plc_online",  "type": "bool",   "init": false },
+    { "name": "pin",         "type": "string", "init": "" },
     { "name": "blink",       "type": "bool",   "init": false }
   ],
 
