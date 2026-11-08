@@ -13,6 +13,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 if [ "${1:-}" = "--revert" ]; then
   cp -v "$BOOT/config.txt.hml-bak" "$BOOT/config.txt"
   cp -v "$BOOT/cmdline.txt.hml-bak" "$BOOT/cmdline.txt"
+  systemctl enable getty@tty1.service   # quiet_boot.sh disabled it
   echo "restored; reboot to apply"; exit 0
 fi
 
@@ -40,6 +41,9 @@ fi
 # hide the blinking console cursor and the boot logo on the LCD
 case "$CMDLINE" in *vt.global_cursor_default*) ;; *) CMDLINE="$CMDLINE vt.global_cursor_default=0 logo.nologo";; esac
 printf '%s\n' "$CMDLINE" > "$BOOT/cmdline.txt"
+
+# boot / shutdown messages off the LCD (console on tty3, no login prompt on tty1)
+[ -f "$HERE/quiet_boot.sh" ] && bash "$HERE/quiet_boot.sh" > /dev/null
 
 echo "---- $BOOT/config.txt (tail)"; tail -n 25 "$BOOT/config.txt"
 echo "---- $BOOT/cmdline.txt"; cat "$BOOT/cmdline.txt"
