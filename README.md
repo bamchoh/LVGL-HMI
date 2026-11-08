@@ -106,6 +106,20 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
   systemd から tty を受け取るか、root で実行してください（開けない場合は警告を出して続行します）。
   `"console": "none"` で無効化、環境変数 `HML_CONSOLE` で上書きできます。ユニットは `getty@tty1` と排他にして
   あるので tty1 のログインプロンプトは出なくなります（SSH を使ってください）。
+- 起動・終了時のコンソールログ（カーネルや systemd の `[ OK ] ...`）を画面に出さないようにするには
+  `sudo tools/rpi/quiet_boot.sh` を実行して再起動します。`cmdline.txt` の `console=tty1` を `console=tty3`
+  （画面に出ない VT）に変えて `quiet loglevel=3` を足し、`getty@tty1` を無効にします（ログインは SSH で）。
+  シリアルコンソールはそのままです。`--revert` で元に戻ります。`apply_lcd.sh` も最後にこれを実行します。
+- 起動スプラッシュ: `hml_runtime --splash project.json` は `display.splash`（PNG、プロジェクトからの相対パス。
+  中央に表示し、画面より大きければ縮小）を背景色 `display.splash_bg`（既定は黒）の上に 1 枚描いて終了します。
+  画像がなければプロジェクトのタイトルを表示します。tty1 をグラフィックスモードのまま残すので、HMI が描画を
+  始めるまで画面に残ります。`tools/rpi/hml-splash.service` が起動のごく初期（ルートファイルシステムが
+  あれば動く）にこれを実行します。デザイナーでは Project タブの「Boot splash」で設定できます。
+  ```
+  sudo install -m 644 ~/hml/tools/rpi/hml.service ~/hml/tools/rpi/hml-splash.service /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl enable hml-splash
+  ```
+  `hml.service` は `TTYReset` / `TTYVTDisallocate` を使いません（テキストモードに戻してスプラッシュが消えるため）。
 - コンソールのカーソル点滅が画面に残る場合は `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`。
 - 画面サイズは framebuffer の解像度が使われます。`project.json` の `display.width/height` は
   画面 JSON の座標基準なので、Pi の解像度に合わせておくか `rotation` と合わせて調整してください。
@@ -122,8 +136,8 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
 組み直したものです（タッチは 180 度回転なので `calibration` が [max, max, min, min] の順になっています）。
 
 ```
-scp -r tools/rpi pi:~/hml/lcd          # config-lcd.txt / apply_lcd.sh / hml.service
-sudo ~/hml/lcd/apply_lcd.sh            # config.txt と cmdline.txt を書き換え（--revert で元に戻る）
+scp -r tools/rpi pi:~/hml/lcd          # config-lcd.txt / apply_lcd.sh / quiet_boot.sh / hml.service
+sudo ~/hml/lcd/apply_lcd.sh            # config.txt と cmdline.txt を書き換え、起動ログも非表示（--revert で元に戻る）
 sudo reboot
 sudo cp ~/hml/lcd/hml.service /etc/systemd/system/ && sudo systemctl enable --now hml   # 自動起動
 ```

@@ -1,0 +1,20 @@
+[Unit]
+Description=HML boot splash on /dev/fb0
+# Runs very early (before sysinit.target is reached, only the root file system is needed) and
+# draws one frame: display.splash from project.json, or the project title. The runtime then exits
+# but leaves tty1 in graphics mode, so the picture stays until hml.service draws the HMI.
+# Install:  sudo install -m 644 ~/hml/tools/rpi/hml-splash.service /etc/systemd/system/
+#           sudo systemctl daemon-reload && sudo systemctl enable hml-splash
+DefaultDependencies=no
+RequiresMountsFor=/home/bamchoh/hml
+After=systemd-journald.socket
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+# root: /dev/tty1 is root-only (the runtime switches it to KD_GRAPHICS)
+ExecStart=/home/bamchoh/hml/hml_runtime --splash /home/bamchoh/hml/projects/lcd35/project.json
+
+[Install]
+WantedBy=sysinit.target

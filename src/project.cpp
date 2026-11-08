@@ -127,6 +127,9 @@ bool Project::load(const std::string& path)
     info_.drm = jstr(d, "drm", "");
     info_.input = jstr(d, "input", "");
     info_.console = jstr(d, "console", "/dev/tty1");
+    info_.splash = jstr(d, "splash", "");
+    if(!info_.splash.empty()) info_.splash = resolve_path(info_.splash);
+    info_.splash_bg = parse_color(jstr(d, "splash_bg", ""), lv_color_black());
     if(const json* touch = jget(d, "touch")) {
         info_.touch_swap_axes = jbool(*touch, "swap_axes", false);
         const json* calib = jget(*touch, "calibration");

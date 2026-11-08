@@ -1,6 +1,6 @@
 [Unit]
 Description=HML runtime (LVGL HMI on /dev/fb0)
-After=multi-user.target getty@tty1.service
+After=multi-user.target getty@tty1.service hml-splash.service
 # tty1 belongs to the HMI: no login prompt there (use SSH), and the runtime puts the VT into
 # graphics mode so that kernel messages are not drawn over the screen.
 Conflicts=getty@tty1.service
@@ -11,10 +11,10 @@ User=bamchoh
 WorkingDirectory=/home/bamchoh/hml
 # /dev/tty1 is root-only: systemd opens it and passes it as stdin; the runtime switches it to
 # KD_GRAPHICS (display.console in project.json, default /dev/tty1, "none" to disable).
+# No TTYReset / TTYVTDisallocate: they switch the VT back to text mode, which would wipe the boot
+# splash (hml-splash.service) before the HMI has drawn its first frame.
 TTYPath=/dev/tty1
 StandardInput=tty
-TTYReset=yes
-TTYVTDisallocate=yes
 ExecStart=/home/bamchoh/hml/hml_runtime /home/bamchoh/hml/projects/lcd35/project.json
 # SIGHUP reloads the screen JSON files without restarting
 ExecReload=/bin/kill -HUP $MAINPID

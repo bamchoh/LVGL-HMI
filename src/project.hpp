@@ -17,6 +17,10 @@ struct ProjectInfo {
     std::string drm;                // "/dev/dri/card0"
     std::string input;              // "/dev/input/eventN"; empty = auto-discover all
     std::string console;            // VT to put into graphics mode: "/dev/tty1" (default), "none" = leave alone
+    // boot splash (hml_runtime --splash): image path resolved against the project dir, empty =
+    // show the title; background colour (default black)
+    std::string splash;
+    lv_color_t  splash_bg{};
     bool touch_swap_axes = false;
     bool touch_has_calib = false;
     int  touch_calib[4] = { 0, 0, 0, 0 };   // min_x, min_y, max_x, max_y

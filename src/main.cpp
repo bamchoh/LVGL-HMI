@@ -3,7 +3,11 @@
 //
 //   hml_runtime [project.json] [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]
 //               [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...
+//   hml_runtime --splash [project.json] [--screenshot <file.bmp>] [--exit-after <ms>]
 //
+// --splash draws the boot splash (display.splash image, or the title) and exits at once, leaving
+// the frame on the framebuffer and the console VT in graphics mode until the HMI starts
+// (tools/rpi/hml-splash.service). On the SDL backend the window stays open for --exit-after ms.
 // --click injects a pointer click at (x,y) <ms> after start (UI test automation);
 // --shot-at saves a screenshot at the given time. Both may be repeated.
 //
@@ -17,6 +21,7 @@
 #include "driver.hpp"
 #include "platform.hpp"
 #include "project.hpp"
+#include "splash.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
@@ -57,8 +62,29 @@ bool file_exists(const std::string& p)
 int usage(const char* argv0)
 {
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
-                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n", argv0);
+                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
+                         "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n", argv0, argv0);
     return 1;
+}
+
+// --splash: draw one frame, then exit
+int run_splash(lv_display_t* disp, const hml::ProjectInfo& info, const std::string& screenshot, uint32_t exit_after)
+{
+    hml::build_splash(disp, info);
+    lv_refr_now(disp);
+    if(!screenshot.empty()) hml::platform::screenshot(disp, screenshot);
+    HML_INFO("splash shown (%s)", info.splash.empty() ? "title" : info.splash.c_str());
+#if defined(HML_BACKEND_SDL)
+    const uint32_t t0 = hml::millis(), until = exit_after ? exit_after : 2000;
+    while(!s_quit && hml::millis() - t0 < until) { hml::platform::poll(); lv_timer_handler(); hml::sleep_ms(10); }
+    hml::platform::deinit();
+#else
+    (void)exit_after;
+    // No platform::deinit(): it would switch the VT back to text mode and fbcon would clear the
+    // picture. The frame stays on /dev/fb0 until the HMI draws over it.
+#endif
+    std::fflush(nullptr);
+    std::_Exit(0);
 }
 
 } // namespace
@@ -67,6 +93,7 @@ int main(int argc, char** argv)
 {
     std::string project_path, screenshot, screen;
     uint32_t exit_after = 0, reload_after = 0;
+    bool splash = false;
 
     for(int i = 1; i < argc; i++) {
         std::string a = argv[i];
@@ -74,6 +101,7 @@ int main(int argc, char** argv)
         if(a == "--exit-after") { const char* v = next(); if(!v) return usage(argv[0]); exit_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--reload-after") { const char* v = next(); if(!v) return usage(argv[0]); reload_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
+        else if(a == "--splash") splash = true;
         else if(a == "--screen") { const char* v = next(); if(!v) return usage(argv[0]); screen = v; }
         else if(a == "--click") {
             const char* v = next();
@@ -107,6 +135,7 @@ int main(int argc, char** argv)
     lv_indev_t* kb = nullptr;
     lv_display_t* disp = hml::platform::init(info, pcb, &kb);
     if(!disp) { HML_ERROR("cannot initialise the '%s' display backend", hml::platform::name()); return 3; }
+    if(splash) return run_splash(disp, info, screenshot, exit_after);
     if(!s_clicks.empty()) {
         lv_indev_t* script = lv_indev_create();
         lv_indev_set_type(script, LV_INDEV_TYPE_POINTER);
