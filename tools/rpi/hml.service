@@ -1,11 +1,20 @@
 [Unit]
 Description=HML runtime (LVGL HMI on /dev/fb0)
-After=multi-user.target
+After=multi-user.target getty@tty1.service
+# tty1 belongs to the HMI: no login prompt there (use SSH), and the runtime puts the VT into
+# graphics mode so that kernel messages are not drawn over the screen.
+Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
 User=bamchoh
 WorkingDirectory=/home/bamchoh/hml
+# /dev/tty1 is root-only: systemd opens it and passes it as stdin; the runtime switches it to
+# KD_GRAPHICS (display.console in project.json, default /dev/tty1, "none" to disable).
+TTYPath=/dev/tty1
+StandardInput=tty
+TTYReset=yes
+TTYVTDisallocate=yes
 ExecStart=/home/bamchoh/hml/hml_runtime /home/bamchoh/hml/projects/lcd35/project.json
 # SIGHUP reloads the screen JSON files without restarting
 ExecReload=/bin/kill -HUP $MAINPID

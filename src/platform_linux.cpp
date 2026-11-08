@@ -13,6 +13,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <linux/kd.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include "platform.hpp"
 #include "screenshot.hpp"
@@ -73,6 +75,53 @@ std::string env_or(const char* env, const std::string& value, const std::string&
     return value.empty() ? dflt : value;
 }
 
+// ---- console (fbcon) suppression -------------------------------------------------------------
+// The kernel console shares /dev/fb0 with us: boot messages, the login prompt and kernel
+// warnings get drawn over the HMI. Switching the VT to KD_GRAPHICS stops fbcon from drawing
+// anything (and hides its cursor). /dev/tty1 is root-only, so either the systemd unit hands us
+// the tty as stdin (TTYPath=/dev/tty1 + StandardInput=tty, see tools/rpi/hml.service) or the
+// path must be writable by the user.
+int  s_console_fd = -1;
+bool s_console_owned = false;
+long s_console_prev_mode = KD_TEXT;
+
+void console_graphics_mode(const std::string& path)
+{
+    if(path.empty() || path == "none") return;
+    int fd = open(path.c_str(), O_RDWR | O_NOCTTY | O_CLOEXEC);
+    bool owned = fd >= 0;
+    if(!owned) {
+        // fall back to stdin when systemd attached the VT to it
+        long mode;
+        if(isatty(STDIN_FILENO) && ioctl(STDIN_FILENO, KDGETMODE, &mode) == 0) fd = STDIN_FILENO;
+        else {
+            HML_WARN("console: cannot open %s (%s): kernel text may be drawn over the HMI. Run from the hml.service unit "
+                     "(it passes the VT as stdin) or set \"display\": { \"console\": \"none\" } to silence this.",
+                     path.c_str(), std::strerror(errno));
+            return;
+        }
+    }
+    long mode = KD_TEXT;
+    ioctl(fd, KDGETMODE, &mode);
+    if(ioctl(fd, KDSETMODE, KD_GRAPHICS) != 0) {
+        HML_WARN("console: KDSETMODE on %s failed (%s)", owned ? path.c_str() : "stdin", std::strerror(errno));
+        if(owned) close(fd);
+        return;
+    }
+    s_console_fd = fd;
+    s_console_owned = owned;
+    s_console_prev_mode = mode;
+    HML_INFO("console: %s switched to graphics mode (text output suppressed)", owned ? path.c_str() : "stdin VT");
+}
+
+void console_restore()
+{
+    if(s_console_fd < 0) return;
+    ioctl(s_console_fd, KDSETMODE, s_console_prev_mode);
+    if(s_console_owned) close(s_console_fd);
+    s_console_fd = -1;
+}
+
 } // namespace
 
 lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
@@ -105,6 +154,8 @@ lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
              info.width, info.height, info.dpi, driver_dpi);
     if(info.rotation) lv_display_set_rotation(disp, static_cast<lv_display_rotation_t>(info.rotation / 90));
 
+    console_graphics_mode(env_or("HML_CONSOLE", info.console, "/dev/tty1"));
+
     // Input: explicit device or auto-discovery
     std::string in = env_or("HML_INPUT", info.input, "");
     if(!in.empty()) {
@@ -136,6 +187,7 @@ void screenshot(lv_display_t* disp, const std::string& path) { save_screenshot_b
 void deinit()
 {
     lv_evdev_discovery_stop();
+    console_restore();
 }
 
 const char* name()

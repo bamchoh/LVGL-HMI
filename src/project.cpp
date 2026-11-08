@@ -77,6 +77,7 @@ bool Project::load(const std::string& path)
     info_.fbdev = jstr(d, "fbdev", "");
     info_.drm = jstr(d, "drm", "");
     info_.input = jstr(d, "input", "");
+    info_.console = jstr(d, "console", "/dev/tty1");
     if(const json* touch = jget(d, "touch")) {
         info_.touch_swap_axes = jbool(*touch, "swap_axes", false);
         const json* calib = jget(*touch, "calibration");

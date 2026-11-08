@@ -87,6 +87,7 @@ TEST_CASE("Project::load applies defaults for everything that is missing")
     CHECK(i.fbdev.empty());
     CHECK(i.drm.empty());
     CHECK(i.input.empty());
+    CHECK(i.console == "/dev/tty1");
     CHECK_FALSE(i.touch_swap_axes);
     CHECK_FALSE(i.touch_has_calib);
     CHECK(i.dark);
@@ -104,7 +105,7 @@ TEST_CASE("Project::load reads display, touch and theme settings")
     REQUIRE(p.load(tp.project(R"({
         "title": "Panel",
         "display": { "width": 480, "height": 320, "zoom": 1.5, "rotation": 270, "dpi": 200,
-                     "fbdev": "/dev/fb1", "drm": "/dev/dri/card1", "input": "/dev/input/event3",
+                     "fbdev": "/dev/fb1", "drm": "/dev/dri/card1", "input": "/dev/input/event3", "console": "none",
                      "touch": { "swap_axes": true, "calibration": [100, 200, 3900, 3800] } },
         "theme": { "dark": false, "primary": "#ff0000", "secondary": "green" },
         "start_screen": "home"
@@ -119,6 +120,7 @@ TEST_CASE("Project::load reads display, touch and theme settings")
     CHECK(i.fbdev == "/dev/fb1");
     CHECK(i.drm == "/dev/dri/card1");
     CHECK(i.input == "/dev/input/event3");
+    CHECK(i.console == "none");
     CHECK(i.touch_swap_axes);
     REQUIRE(i.touch_has_calib);
     CHECK(i.touch_calib[0] == 100);

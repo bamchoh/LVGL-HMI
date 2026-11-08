@@ -100,6 +100,12 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
 - デスクトップ (X11/Wayland) が動いていると framebuffer を奪い合うので、`raspi-config` で
   「Console」起動にするか、`sudo systemctl stop lightdm` 等でデスクトップを止めてから起動してください。
 - root 以外で動かすには `sudo usermod -aG video,input $USER` を実行して再ログインします。
+- カーネルメッセージやログインプロンプトが HMI の上に描かれるのを防ぐため、ランタイムは起動時にコンソール
+  （`display.console`、既定 `/dev/tty1`）をグラフィックスモード（`KD_GRAPHICS`）に切り替え、終了時に戻します。
+  `/dev/tty1` は root 専用なので、`tools/rpi/hml.service` のように `TTYPath=/dev/tty1` + `StandardInput=tty` で
+  systemd から tty を受け取るか、root で実行してください（開けない場合は警告を出して続行します）。
+  `"console": "none"` で無効化、環境変数 `HML_CONSOLE` で上書きできます。ユニットは `getty@tty1` と排他にして
+  あるので tty1 のログインプロンプトは出なくなります（SSH を使ってください）。
 - コンソールのカーソル点滅が画面に残る場合は `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`。
 - 画面サイズは framebuffer の解像度が使われます。`project.json` の `display.width/height` は
   画面 JSON の座標基準なので、Pi の解像度に合わせておくか `rotation` と合わせて調整してください。
