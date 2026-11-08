@@ -55,9 +55,20 @@ jobs:
             build/_deps/*-src
             build/_deps/*-subbuild
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt', 'tools/designer/CMakeLists.txt') }}
+          # an older cache is still useful: FetchContent only re-downloads what changed
+          restore-keys: |
+            deps-${{ runner.os }}-
 
+      # FetchContent downloads from github.com; retry so that a transient 5xx does not fail the run
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }} && exit 0
+            echo "::warning::configure attempt $attempt failed, retrying in 30 s"
+            sleep 30
+          done
+          exit 1
 
       - name: Build unit tests
         run: cmake --build build --target hml_tests
