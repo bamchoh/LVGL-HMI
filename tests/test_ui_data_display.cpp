@@ -355,6 +355,98 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
     }
 }
 
+namespace {
+// Scripted pointer: the test sets the state, LVGL reads it on every timer handler run.
+struct ScriptedPointer {
+    lv_indev_t* indev = nullptr;
+    lv_point_t  point{ 0, 0 };
+    bool        pressed = false;
+    static void read(lv_indev_t* i, lv_indev_data_t* d)
+    {
+        auto* self = static_cast<ScriptedPointer*>(lv_indev_get_user_data(i));
+        d->point = self->point;
+        d->state = self->pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    }
+    ScriptedPointer()
+    {
+        indev = lv_indev_create();
+        lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(indev, &ScriptedPointer::read);
+        lv_indev_set_user_data(indev, this);
+    }
+    ~ScriptedPointer() { lv_indev_delete(indev); }
+    void press(int32_t x, int32_t y, Runtime& rt) { point = { x, y }; pressed = true; rt.advance(60, 10); }
+    void move(int32_t x, int32_t y, Runtime& rt) { point = { x, y }; rt.advance(60, 10); }
+    void release(Runtime& rt) { pressed = false; rt.advance(60, 10); }
+};
+} // namespace
+
+TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboard nor clears it")
+{
+    Runtime rt;
+    rt.tag("n", TagType::Float, 42);
+    rt.tag("t", std::string("hello"));
+    // a scrollable list taller than the 240 px display, inputs near the top
+    json children = json::array();
+    for(int i = 0; i < 3; i++) children.push_back(json{ { "type", "label" }, { "text", "head " + std::to_string(i) }, { "h", 30 } });
+    children.push_back(json{ { "type", "numeric_display" }, { "bind", "n" }, { "input", true }, { "w", 200 }, { "h", 40 } });
+    children.push_back(json{ { "type", "text_display" }, { "bind", "t" }, { "input", true }, { "w", 200 }, { "h", 40 } });
+    for(int i = 0; i < 12; i++) children.push_back(json{ { "type", "label" }, { "text", "filler " + std::to_string(i) }, { "h", 40 } });
+    json scr = { { "name", "s" }, { "children", json::array({
+        json{ { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", 320 }, { "h", 240 }, { "flex", "column" }, { "style", { { "pad", 10 }, { "pad_row", 6 } } }, { "children", children } },
+        json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", 60 } },   // small: must not cover the inputs
+    }) } };
+    lv_obj_t* s = ui().build_screen(scr, "");
+    REQUIRE(s);
+    REQUIRE(ui().show_screen("s", "none"));
+    lv_obj_t* list = nth(s, 0);
+    lv_obj_t* num = nth(list, 3);
+    lv_obj_t* kb = nth(s, 1);
+    rt.advance(50);
+    lv_obj_update_layout(s);
+    REQUIRE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    REQUIRE(ta_text(num) == "42");
+
+    ScriptedPointer ptr;
+    lv_area_t a;
+    lv_obj_get_coords(num, &a);
+    const int32_t cx = (a.x1 + a.x2) / 2, cy = (a.y1 + a.y2) / 2;
+
+    SUBCASE("press, drag far enough to scroll, release") {
+        int32_t before = lv_obj_get_scroll_y(list);
+        ptr.press(cx, cy, rt);
+        ptr.move(cx, cy - 25, rt);
+        ptr.move(cx, cy - 60, rt);
+        ptr.release(rt);
+        CHECK(lv_obj_get_scroll_y(list) > before);               // the list scrolled
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));          // no keyboard
+        CHECK(ta_text(num) == "42");                             // text untouched
+        // the field kept the focus; once it is back in view a tap starts editing as usual
+        rt.advance(800);                                         // let the scroll momentum settle
+        lv_obj_scroll_to_view(num, LV_ANIM_OFF);
+        rt.advance(50);
+        lv_obj_get_coords(num, &a);
+        ptr.press((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2, rt);
+        ptr.release(rt);
+        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(ta_text(num) == "");
+    }
+    SUBCASE("a plain tap opens the keyboard and clears the field") {
+        ptr.press(cx, cy, rt);
+        ptr.release(rt);
+        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
+        CHECK(ta_text(num) == "");
+        // a second tap while editing does not clear what was typed
+        lv_textarea_add_text(num, "7");
+        ptr.press(cx, cy, rt);
+        ptr.release(rt);
+        CHECK(ta_text(num) == "7");
+        lv_obj_send_event(num, LV_EVENT_READY, nullptr);
+        CHECK(tags().find("n")->get_number() == doctest::Approx(7));
+    }
+}
+
 TEST_CASE("plain textarea keeps writing on every change")
 {
     Runtime rt;

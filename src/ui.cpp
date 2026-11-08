@@ -138,6 +138,15 @@ lv_style_selector_t sel(lv_part_t part, lv_state_t state = LV_STATE_DEFAULT)
     return static_cast<lv_style_selector_t>(part) | static_cast<lv_style_selector_t>(state);
 }
 
+// A pointer (touch / mouse) focuses an object the moment it is pressed, before LVGL knows whether
+// the gesture is a tap or a scroll. For pointers we therefore act on CLICKED (released without
+// scrolling) instead of FOCUSED; keypads / encoders have no CLICKED, so FOCUSED stays for them.
+bool focus_comes_from_pointer()
+{
+    lv_indev_t* indev = lv_indev_active();
+    return indev && lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER;
+}
+
 // Show text in a textarea bypassing the operator-input filters (accepted_chars / max_length),
 // which lv_textarea_set_text would otherwise apply to the displayed value too ("42.3 rpm").
 void ta_show(lv_obj_t* ta, const std::string& text)
@@ -366,6 +375,7 @@ void Binding::on_tag_changed(const Value& v, const void* source)
 // widget -> tag (two-way bindings)
 void Binding::on_widget_changed(lv_obj_t* target)
 {
+    if(commit_on_ready) lv_obj_remove_flag(target, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3));   // edit session over
     if(commit_on_ready && wk == Widget::Textarea && lv_textarea_get_text(target)[0] == '\0') {
         on_tag_changed(tag->get(), nullptr);    // the field was cleared on focus and nothing was typed
         return;
@@ -549,12 +559,34 @@ struct Ui::Impl {
     static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
     {
         Binding* b = static_cast<Binding*>(lv_event_get_user_data(e));
+        end_edit_session(lv_event_get_target_obj(e));
         b->on_tag_changed(b->tag->get(), nullptr);
     }
-    static void on_widget_focus(lv_event_t* e)    // data display: start with an empty field
+    // Data display edit session, tracked with two object flags:
+    //   USER_2 = "clear pending": focused by a pointer, waiting for the tap (CLICKED) that is not a scroll
+    //   USER_3 = "editing": the field was cleared once; later taps only move the cursor
+    // READY / CANCEL / DEFOCUSED end the session.
+    static void on_widget_focus(lv_event_t* e)
     {
-        lv_textarea_set_text(lv_event_get_target_obj(e), "");
+        lv_obj_t* ta = lv_event_get_target_obj(e);
+        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
+        if(focus_comes_from_pointer()) { lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2); return; }
+        lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_3);                  // keypad / encoder: start editing right away
+        lv_textarea_set_text(ta, "");
     }
+    static void on_widget_click(lv_event_t* e)
+    {
+        lv_obj_t* ta = lv_event_get_target_obj(e);
+        if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_2)) return;
+        lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_2);
+        lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_3);
+        lv_textarea_set_text(ta, "");
+    }
+    static void end_edit_session(lv_obj_t* ta)
+    {
+        lv_obj_remove_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3));
+    }
+    static void on_widget_blur(lv_event_t* e) { end_edit_session(lv_event_get_target_obj(e)); }
     static void on_action_event(lv_event_t* e);
     static void on_chart_timer(lv_timer_t* t) { static_cast<ChartCtx*>(lv_timer_get_user_data(t))->tick(); }
     static void on_textarea_event(lv_event_t* e)
@@ -563,6 +595,7 @@ struct Ui::Impl {
         Screen* scr = static_cast<Screen*>(lv_event_get_user_data(e));
         if(!scr->keyboard) return;
         lv_event_code_t code = lv_event_get_code(e);
+        if(code == LV_EVENT_FOCUSED && focus_comes_from_pointer()) return;   // wait for CLICKED: it may be a scroll
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
             lv_keyboard_set_textarea(scr->keyboard, ta);
             // numeric_display marks itself with USER_1: give it the number pad
@@ -674,6 +707,8 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     }
     if(two_way && raw->commit_on_ready) {
         lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_click, LV_EVENT_CLICKED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_blur, LV_EVENT_DEFOCUSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_READY, raw);      // keyboard OK / Enter
         lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_DEFOCUSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_cancel, LV_EVENT_CANCEL, raw);
