@@ -436,6 +436,67 @@ struct Screen {
     lv_obj_t*   keyboard = nullptr;   // optional on-screen keyboard
 };
 
+// LVGL's stock keyboard closes through a key drawn as a keyboard icon. Operators look for an
+// "x", so the lower-case, symbol and number layouts are replaced with copies that show
+// LV_SYMBOL_CLOSE instead (the upper-case layout already has it). Pressing it sends
+// LV_EVENT_CANCEL, i.e. the edit is discarded; the check mark confirms.
+#define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
+const char* const kKbMapLower[] = {
+    "1#", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", LV_SYMBOL_BACKSPACE, "\n",
+    "ABC", "a", "s", "d", "f", "g", "h", "j", "k", "l", LV_SYMBOL_NEW_LINE, "\n",
+    "_", "-", "z", "x", "c", "v", "b", "n", "m", ".", ",", ":", "\n",
+    LV_SYMBOL_CLOSE, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, "",
+};
+const int kKbCtrlLower[] = {
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 5, HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6, HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1),
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 6, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+};
+const char* const kKbMapSpecial[] = {
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", LV_SYMBOL_BACKSPACE, "\n",
+    "abc", "+", "&", "/", "*", "=", "%", "!", "?", "#", "<", ">", "\n",
+    "\\", "@", "$", "(", ")", "{", "}", "[", "]", ";", "\"", "'", "\n",
+    LV_SYMBOL_CLOSE, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, "",
+};
+const int kKbCtrlSpecial[] = {
+    HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | 2,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
+    HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 6, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+};
+const char* const kKbMapNumber[] = {
+    "1", "2", "3", LV_SYMBOL_CLOSE, "\n",
+    "4", "5", "6", LV_SYMBOL_OK, "\n",
+    "7", "8", "9", LV_SYMBOL_BACKSPACE, "\n",
+    "+/-", "0", ".", LV_SYMBOL_LEFT, LV_SYMBOL_RIGHT, "",
+};
+const int kKbCtrlNumber[] = {
+    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, 2,
+    1, 1, 1, 1, 1,
+};
+#undef HML_KB_BTN
+
+template <size_t N>
+const lv_buttonmatrix_ctrl_t* ctrl_table(const int (&src)[N])
+{
+    static lv_buttonmatrix_ctrl_t table[N];           // LVGL keeps the pointer: must stay alive
+    for(size_t i = 0; i < N; i++) table[i] = static_cast<lv_buttonmatrix_ctrl_t>(src[i]);
+    return table;
+}
+
+void install_keyboard_maps(lv_obj_t* kb)
+{
+    static bool done = false;       // lv_keyboard_set_map() changes the layouts for every keyboard
+    if(done) return;
+    done = true;
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLower, ctrl_table(kKbCtrlLower));
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_SPECIAL, kKbMapSpecial, ctrl_table(kKbCtrlSpecial));
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_NUMBER, kKbMapNumber, ctrl_table(kKbCtrlNumber));
+}
+
 constexpr size_t kHistoryLen = 16;
 
 } // namespace
@@ -984,6 +1045,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "keyboard")) {
         wk = Widget::Keyboard;
         obj = lv_keyboard_create(parent);
+        install_keyboard_maps(obj);
         lv_group_remove_obj(obj);                            // pointer-operated: keep it out of the focus group
         lv_obj_remove_state(obj, LV_STATE_FOCUSED);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);

@@ -412,7 +412,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | `image`               | `src` (project.json からの相対パス, PNG 対応), `zoom`, `rotation`                                                         |
 | `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
 | `spinner`             | `time`, `angle`                                                                                                           |
-| `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のフォーカス時に表示される（`numeric_display` ではテンキーに切り替わる）    |
+| `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のフォーカス時に表示される（`numeric_display` ではテンキー）。✓ で確定、× で閉じる（入力は破棄） |
 | `line`                | `points: [[x,y], ...]`                                                                                                    |
 
 #### データ表示器 (`numeric_display` / `text_display` / `password_display`)

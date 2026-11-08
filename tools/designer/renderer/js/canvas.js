@@ -368,7 +368,7 @@ const Canvas = {
       for (const ch of row) r.append(U.el('div', { class: 'lv-key' }, ch));
       el.append(r);
     }
-    el.append(U.el('div', { class: 'lv-kbrow' }, U.el('div', { class: 'lv-key lv-key-wide' }, 'space'), U.el('div', { class: 'lv-key' }, '✓')));
+    el.append(U.el('div', { class: 'lv-kbrow' }, U.el('div', { class: 'lv-key' }, '×'), U.el('div', { class: 'lv-key lv-key-wide' }, 'space'), U.el('div', { class: 'lv-key' }, '✓')));
   },
   w_line(el, w, st, th) {
     const pts = Array.isArray(w.points) ? w.points.filter(p => Array.isArray(p) && p.length >= 2) : [];

@@ -287,6 +287,74 @@ TEST_CASE("the on-screen keyboard switches to the number pad for numeric inputs"
     CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
 }
 
+namespace {
+int key_index(lv_obj_t* kb, const char* symbol)
+{
+    const char* const* map = lv_buttonmatrix_get_map(kb);
+    int idx = 0;
+    for(const char* const* k = map; **k != '\0'; k++) {
+        if(std::string(*k) == "\n") continue;          // line breaks are not buttons
+        if(std::string(*k) == symbol) return idx;
+        idx++;
+    }
+    return -1;
+}
+} // namespace
+
+TEST_CASE("the keyboard has an explicit close key in every layout; it cancels the edit")
+{
+    Runtime rt;
+    Tag* n = rt.tag("n", TagType::Float, 7);
+    rt.tag("t", std::string("abc"));
+    lv_obj_t* s = build_widgets(J(R"json([
+        { "type": "numeric_display", "bind": "n", "input": true },
+        { "type": "text_display", "bind": "t", "input": true },
+        { "type": "keyboard" }
+    ])json"));
+    lv_obj_t* num = nth(s, 0);
+    lv_obj_t* txt = nth(s, 1);
+    lv_obj_t* kb = nth(s, 2);
+
+    for(lv_keyboard_mode_t mode : { LV_KEYBOARD_MODE_TEXT_LOWER, LV_KEYBOARD_MODE_TEXT_UPPER, LV_KEYBOARD_MODE_SPECIAL, LV_KEYBOARD_MODE_NUMBER }) {
+        CAPTURE(static_cast<int>(mode));
+        lv_keyboard_set_mode(kb, mode);
+        CHECK(key_index(kb, LV_SYMBOL_CLOSE) >= 0);
+        CHECK(key_index(kb, LV_SYMBOL_KEYBOARD) < 0);
+        CHECK(key_index(kb, LV_SYMBOL_OK) >= 0);
+    }
+
+    SUBCASE("number pad: x discards the typed value and hides the keyboard") {
+        send(num, LV_EVENT_FOCUSED);
+        send(num, LV_EVENT_CLICKED);
+        REQUIRE(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
+        lv_textarea_add_text(num, "99");
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
+        send(kb, LV_EVENT_VALUE_CHANGED);                    // what a tap on that key produces
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(n->get_number() == doctest::Approx(7));
+        CHECK(ta_text(num) == "7");
+    }
+    SUBCASE("number pad: the check mark confirms") {
+        send(num, LV_EVENT_FOCUSED);
+        send(num, LV_EVENT_CLICKED);
+        lv_textarea_add_text(num, "42");
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_OK)));
+        send(kb, LV_EVENT_VALUE_CHANGED);
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(n->get_number() == doctest::Approx(42));
+    }
+    SUBCASE("text keyboard: x restores the text") {
+        send(txt, LV_EVENT_FOCUSED);
+        send(txt, LV_EVENT_CLICKED);
+        REQUIRE(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_TEXT_LOWER);
+        lv_textarea_add_text(txt, "zzz");
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
+        send(kb, LV_EVENT_VALUE_CHANGED);
+        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(ta_text(txt) == "abc");
+    }
+}
+
 TEST_CASE("plain textarea keeps writing on every change")
 {
     Runtime rt;
