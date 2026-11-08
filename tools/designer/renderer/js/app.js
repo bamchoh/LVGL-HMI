@@ -38,7 +38,7 @@ const App = {
     q('b-json').onclick = () => this.jsonDialog();
     q('b-preview').onclick = () => this.preview();
     q('b-run').onclick = () => this.run();
-    q('sel-screen').onchange = e => M.selectScreen(Number(e.target.value));
+    q('sel-screen').onchange = e => { Panels.showView('screen'); M.selectScreen(Number(e.target.value)); };
     q('t-dup').onclick = () => M.duplicateWidget(M.st.sel);
     q('t-del').onclick = () => M.deleteWidget(M.st.sel);
     q('t-up').onclick = () => M.moveWidget(M.st.sel, -1);
@@ -66,7 +66,7 @@ const App = {
     if (fk) { const e = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]'); if (e) e.focus(); }
   },
   select(path) { M.st.sel = path; Canvas.render(); Tree.render(); Props.render(); this.status(); },
-  addWidget(type) { M.addWidget(type, M.st.sel); },
+  addWidget(type) { Panels.showView('screen'); M.addWidget(type, M.st.sel); },
 
   toolbar() {
     const st = M.st, sel = document.getElementById('sel-screen');
@@ -213,6 +213,7 @@ const App = {
   zoom(z) { M.st.zoom = Math.max(0.2, Math.min(4, z)); Canvas.render(); this.toolbar(); },
   zoomFit() {
     const wrap = document.getElementById('canvas-wrap'), d = M.display();
+    if (wrap.hidden) return;   // Tags / Drivers view is showing: nothing to fit
     const z = Math.min((wrap.clientWidth - 60) / d.w, (wrap.clientHeight - 60) / d.h);
     this.zoom(Math.max(0.2, Math.min(2, Math.floor(z * 20) / 20)));
   },
@@ -224,10 +225,11 @@ const App = {
     if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
     if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
     if (ctrl && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProjectDialog(); return; }
+    if (ctrl && /^[123]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers'][Number(e.key) - 1]); return; }
     if (ctrl && e.key.toLowerCase() === 'z' && !inInput) { e.preventDefault(); if (e.shiftKey) M.redo(); else M.undo(); return; }
     if (ctrl && e.key.toLowerCase() === 'y' && !inInput) { e.preventDefault(); M.redo(); return; }
     if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') document.getElementById('modal').hidden = true; return; }
-    if (inInput) return;
+    if (inInput || Panels.view !== 'screen') return;   // widget shortcuts only act on the canvas
     const sel = M.st.sel, w = M.selected();
     if (ctrl && e.key.toLowerCase() === 'd') { e.preventDefault(); M.duplicateWidget(sel); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (sel && sel.length) { e.preventDefault(); M.deleteWidget(sel); } return; }

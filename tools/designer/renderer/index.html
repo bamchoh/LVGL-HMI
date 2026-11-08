@@ -34,21 +34,24 @@
     <div class="tabs" id="left-tabs">
       <button data-tab="widgets" class="active">Widgets</button>
       <button data-tab="screens">Screens</button>
-      <button data-tab="tags">Tags</button>
-      <button data-tab="drivers">Drivers</button>
       <button data-tab="project">Project</button>
     </div>
     <div class="tab-body" id="tab-widgets"></div>
     <div class="tab-body" id="tab-screens" hidden></div>
-    <div class="tab-body" id="tab-tags" hidden></div>
-    <div class="tab-body" id="tab-drivers" hidden></div>
     <div class="tab-body" id="tab-project" hidden></div>
   </div>
 
   <div id="center">
-    <div id="canvas-wrap">
+    <div class="tabs" id="center-tabs">
+      <button data-view="screen" class="active" title="Screen editor (Ctrl+1)">Screen</button>
+      <button data-view="tags" title="Tag list (Ctrl+2)">Tags</button>
+      <button data-view="drivers" title="Drivers (Ctrl+3)">Drivers</button>
+    </div>
+    <div id="canvas-wrap" class="view">
       <div id="canvas-scale"><div id="canvas"></div></div>
     </div>
+    <div id="view-tags" class="view page" hidden></div>
+    <div id="view-drivers" class="view page drv-page" hidden></div>
   </div>
 
   <div id="right">

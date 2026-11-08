@@ -1,12 +1,25 @@
-// Left side panels: widget palette, screens, tags, drivers, project settings. Global `Panels`.
+// Left side panels (widget palette, screens, project settings) and the center views
+// (screen canvas / tag list / drivers). Global `Panels`.
 'use strict';
 
 const Panels = {
-  tab: 'widgets', driverSel: 0,
+  tab: 'widgets', view: 'screen', driverSel: 0, tagFilter: '',
 
   init() {
     document.querySelectorAll('#left-tabs button').forEach(b => b.addEventListener('click', () => this.show(b.dataset.tab)));
+    document.querySelectorAll('#center-tabs button').forEach(b => b.addEventListener('click', () => this.showView(b.dataset.view)));
     this.show('widgets');
+  },
+  // center area: 'screen' (canvas), 'tags' or 'drivers'
+  showView(v) {
+    if (this.view === v) return;
+    this.view = v;
+    document.querySelectorAll('#center-tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    document.getElementById('canvas-wrap').hidden = v !== 'screen';
+    document.getElementById('view-tags').hidden = v !== 'tags';
+    document.getElementById('view-drivers').hidden = v !== 'drivers';
+    document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
+    App.refresh();
   },
   show(tab) {
     this.tab = tab;
@@ -41,7 +54,7 @@ const Panels = {
     const list = U.el('div', { class: 'list' });
     M.st.screens.forEach((s, i) => {
       const isStart = M.st.project.start_screen === s.data.name;
-      list.append(U.el('div', { class: 'item' + (i === M.st.cur ? ' sel' : ''), onclick: () => M.selectScreen(i) },
+      list.append(U.el('div', { class: 'item' + (i === M.st.cur ? ' sel' : ''), onclick: () => { Panels.showView('screen'); M.selectScreen(i); } },
         U.el('input', { type: 'radio', name: 'start', checked: isStart, title: 'start screen', onclick: e => { e.stopPropagation(); M.mutate(() => { M.st.project.start_screen = s.data.name; }); } }),
         U.el('span', { class: 'grow' }, s.data.name, U.el('span', { class: 'dim' }, '  ' + s.file)),
         U.el('button', { class: 'mini', title: 'rename', onclick: async e => { e.stopPropagation(); const n = await App.prompt('Screen name', s.data.name); if (n) M.renameScreen(i, n); } }, '✎'),
@@ -53,16 +66,24 @@ const Panels = {
   },
 
   renderTags() {
-    const el = document.getElementById('tab-tags'); el.innerHTML = '';
+    const el = document.getElementById('view-tags'); el.innerHTML = '';
     if (!M.st.project) return;
     const tags = M.st.project.tags = M.st.project.tags || [];
+    const q = this.tagFilter.toLowerCase();
+    const filter = U.el('input', { type: 'search', class: 'filter', placeholder: 'filter by name', value: this.tagFilter, dataset: { fk: 'tagfilter' },
+      oninput: e => { this.tagFilter = e.target.value; this.renderTags(); document.querySelector('[data-fk="tagfilter"]').focus(); } });
+    const add = () => { this.tagFilter = ''; M.addTag(); };
+    el.append(U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, 'Tags'), U.el('span', { class: 'dim' }, tags.length + ' tags'),
+      U.el('span', { class: 'grow' }), filter, U.el('button', { class: 'primary', onclick: add }, '+ Add tag')));
     const tbl = U.el('table', { class: 'grid' });
-    tbl.append(U.el('tr', null, ...['name', 'type', 'init', 'min', 'max', ''].map(h => U.el('th', null, h))));
+    tbl.append(U.el('tr', null, ...['#', 'name', 'type', 'init', 'min', 'max', ''].map(h => U.el('th', null, h))));
     tags.forEach((t, i) => {
+      if (q && !(t.name || '').toLowerCase().includes(q)) return;
       const fk = 'tag.' + i;
       tbl.append(U.el('tr', null,
-        U.el('td', null, U.el('input', { type: 'text', value: t.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.mutate(() => { t.name = e.target.value.trim(); }) })),
-        U.el('td', null, Props.editor(t, 'type', { t: 'select', o: SCHEMA.tagTypes }, fk)),
+        U.el('td', { class: 'idx' }, String(i + 1)),
+        U.el('td', { style: { width: '34%' } }, U.el('input', { type: 'text', value: t.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.mutate(() => { t.name = e.target.value.trim(); }) })),
+        U.el('td', { style: { width: '110px' } }, Props.editor(t, 'type', { t: 'select', o: SCHEMA.tagTypes }, fk)),
         U.el('td', null, U.el('input', { type: 'text', value: t.init === undefined ? '' : String(t.init), dataset: { fk: fk + '.init' }, onchange: e => M.mutate(() => {
           const s = e.target.value.trim();
           if (s === '') delete t.init;
@@ -72,18 +93,23 @@ const Panels = {
         }) })),
         U.el('td', null, Props.editor(t, 'min', { t: 'number' }, fk)),
         U.el('td', null, Props.editor(t, 'max', { t: 'number' }, fk)),
-        U.el('td', null, U.el('button', { class: 'mini danger', onclick: () => M.removeTag(i) }, '×'))));
+        U.el('td', { class: 'act' }, U.el('button', { class: 'mini danger', title: 'delete', onclick: () => M.removeTag(i) }, '×'))));
     });
     el.append(tbl);
-    el.append(U.el('div', { class: 'row' }, U.el('button', { onclick: () => M.addTag() }, '+ Add tag')));
+    if (!tags.length) el.append(U.el('div', { class: 'hint' }, 'No tags yet. Tags are the named values that widgets bind to and drivers read / write.'));
+    el.append(U.el('div', { class: 'row' }, U.el('button', { onclick: add }, '+ Add tag')));
     const dup = tags.map(t => t.name).filter((n, i, a) => n && a.indexOf(n) !== i);
     if (dup.length) el.append(U.el('div', { class: 'warn' }, 'duplicate tag names: ' + [...new Set(dup)].join(', ')));
   },
 
   renderDrivers() {
-    const el = document.getElementById('tab-drivers'); el.innerHTML = '';
+    const page = document.getElementById('view-drivers'); page.innerHTML = '';
     if (!M.st.project) return;
     const drivers = M.st.project.drivers = M.st.project.drivers || [];
+    // left: driver list, right: the selected driver's settings
+    const side = U.el('div', { class: 'drv-side' }, U.el('h3', { style: { marginTop: 0 } }, 'Drivers'));
+    const el = U.el('div', { class: 'drv-main' });
+    page.append(side, el);
     const list = U.el('div', { class: 'list' });
     drivers.forEach((d, i) => {
       list.append(U.el('div', { class: 'item' + (i === this.driverSel ? ' sel' : ''), onclick: () => { this.driverSel = i; this.renderDrivers(); } },
@@ -91,23 +117,23 @@ const Panels = {
         U.el('span', { class: 'grow' }, d.type || '?', U.el('span', { class: 'dim' }, ' ' + this.driverSummary(d))),
         U.el('button', { class: 'mini danger', onclick: e => { e.stopPropagation(); M.removeDriver(i); } }, '×')));
     });
-    el.append(list);
-    const addSel = U.el('select');
+    side.append(list);
+    const addSel = U.el('select', { style: { flex: '1' } });
     for (const [k, v] of Object.entries(SCHEMA.drivers)) addSel.append(U.el('option', { value: k }, v.label + ' (' + k + ')'));
-    el.append(U.el('div', { class: 'row' }, addSel, U.el('button', { onclick: () => { M.addDriver(addSel.value); this.driverSel = drivers.length - 1; } }, '+ Add')));
+    side.append(U.el('div', { class: 'row' }, addSel, U.el('button', { onclick: () => { M.addDriver(addSel.value); this.driverSel = drivers.length - 1; } }, '+ Add')));
 
     const d = drivers[this.driverSel];
-    if (!d) return;
+    if (!d) { el.append(U.el('div', { class: 'hint' }, drivers.length ? 'Select a driver on the left.' : 'No drivers. Add one on the left (simulator, Modbus TCP, OPC UA server ...).')); return; }
     const sch = SCHEMA.drivers[d.type], fk = 'drv.' + this.driverSel;
     const body = U.el('div', { class: 'drv-form' });
     if (sch) {
-      body.append(...Props.fields(d, sch.fields, fk));
+      body.append(U.el('div', { class: 'drv-fields' }, ...Props.fields(d, sch.fields, fk)));
       if (sch.table) body.append(this.tableEditor(d, sch.table, fk));
     } else body.append(U.el('div', { class: 'hint' }, 'Unknown driver type; edit the JSON below.'));
-    const raw = U.el('textarea', { rows: 6, class: 'mono', value: JSON.stringify(d, null, 2), onchange: e => {
+    const raw = U.el('textarea', { rows: 12, class: 'mono', value: JSON.stringify(d, null, 2), onchange: e => {
       try { const o = JSON.parse(e.target.value); M.mutate(() => { drivers[this.driverSel] = o; }); } catch (err) { App.toast('JSON: ' + err.message); }
     } });
-    el.append(U.el('h3', null, (sch ? sch.label : d.type)), body, U.el('details', { class: 'sec' }, U.el('summary', null, 'raw JSON'), raw));
+    el.append(U.el('h3', { style: { marginTop: '0' } }, (sch ? sch.label : d.type)), body, U.el('details', { class: 'sec' }, U.el('summary', null, 'raw JSON'), raw));
   },
   driverSummary(d) {
     if (d.type === 'sim') return (d.items || []).length + ' items';
@@ -152,6 +178,9 @@ const Panels = {
       Props.row('touch swap_axes', Props.editor(touch, 'swap_axes', { t: 'bool' }, fk + '.touch')),
       Props.row('touch calibration', U.el('input', { type: 'text', value: Array.isArray(touch.calibration) ? touch.calibration.join(', ') : '', placeholder: 'min_x, min_y, max_x, max_y', dataset: { fk: fk + '.calib' },
         onchange: e => M.mutate(() => { const a = e.target.value.split(',').map(s => Number(s.trim())); if (a.length === 4 && !a.some(isNaN)) touch.calibration = a; else delete touch.calibration; if (!Object.keys(touch).length) delete d.touch; }) }))));
+    el.append(Props.section('Boot splash (Raspberry Pi)', false,
+      ...Props.fields(d, [{ k: 'splash', t: 'image' }, { k: 'splash_bg', t: 'color' }], fk + '.display'),
+      U.el('div', { class: 'hint' }, 'Shown during boot by hml-splash.service (hml_runtime --splash) until the HMI starts. PNG, centred and shrunk to fit; empty = the project title. Background default: black.')));
     el.append(Props.section('Theme', true,
       ...Props.fields(th, [{ k: 'dark', t: 'bool' }, { k: 'primary', t: 'color' }, { k: 'secondary', t: 'color' }, { k: 'font', t: 'font' }], fk + '.theme')));
     const raw = U.el('textarea', { rows: 10, class: 'mono', value: JSON.stringify(Object.assign({}, p, { screens: M.st.screens.map(s => s.file) }), null, 2), onchange: e => {
