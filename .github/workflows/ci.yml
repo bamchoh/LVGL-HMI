@@ -68,6 +68,10 @@ jobs:
       - name: Build everything (runtime, designer)
         run: cmake --build build
 
+      # designer_js (node) and, with the SDL backend, a headless smoke run of hml_runtime
+      - name: Run the remaining tests
+        run: ctest --test-dir build --output-on-failure -E hml_tests
+
       - name: Upload test log on failure
         if: failure()
         uses: actions/upload-artifact@v4

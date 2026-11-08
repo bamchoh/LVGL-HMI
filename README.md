@@ -29,13 +29,24 @@ build.cmd Debug
 
 ### 単体テスト
 
-`src/jsonutil.cpp` / `src/tag.cpp` / `src/util.cpp` の単体テスト（[doctest](https://github.com/doctest/doctest)）が
-`tests/` にあります。LVGL / SDL には依存しないので数秒でビルド・実行できます。
+`tests/` に [doctest](https://github.com/doctest/doctest) の単体テストがあります。LVGL はメモリ上のディスプレイで
+ヘッドレスに動かし（`tests/lvgl_fixture.hpp`）、ティックを手動で進めるのでタイマーや画面遷移も決定的にテストできます。
+
+| テスト | 対象 |
+|---|---|
+| `test_util.cpp`, `test_jsonutil.cpp`, `test_tag.cpp` | ヘルパー、JSON アクセサ、タグストア（型変換・リミット・通知） |
+| `test_project.cpp`, `test_demo_projects.cpp` | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること |
+| `test_ui.cpp`, `test_screenshot.cpp` | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力 |
+| `test_driver_registry.cpp`, `test_driver_sim.cpp` | ドライバの登録 / 起動 / 停止、シミュレーション波形 |
+| `test_driver_modbus.cpp` | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続） |
+| `test_driver_opcua.cpp` | open62541 クライアント API で OPC UA サーバードライバを読み書き |
+| `tools/designer/test/model.test.js` | デザイナーの util / schema / model（`node --test`、依存パッケージなし） |
+| `smoke_runtime.cmake` | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
 
 ```
-test.cmd                         # ビルドして全テストを実行
-test.cmd -tc="*format*"          # doctest の引数をそのまま渡せる（テストケース名でフィルタ）
-ctest --test-dir build --output-on-failure   # CTest から実行する場合
+test.cmd                         # ビルドして hml_tests を実行
+test.cmd -tc="*modbus*"          # doctest の引数をそのまま渡せる（テストケース名でフィルタ）
+ctest --test-dir build --output-on-failure   # hml_tests + designer_js (node) + hml_runtime_smoke
 ```
 
 Linux では `./build.sh` のあとに `build-<backend>/bin/hml_tests` を実行してください。

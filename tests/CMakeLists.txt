@@ -22,11 +22,14 @@ add_executable(hml_tests
   test_driver_sim.cpp
   test_driver_modbus.cpp
   test_driver_opcua.cpp
+  test_screenshot.cpp
+  test_demo_projects.cpp
   test_project.cpp
   test_ui.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})
+target_compile_definitions(hml_tests PRIVATE HML_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(hml_tests PRIVATE lvgl hml_json)
 if(HML_OPCUA)
   target_link_libraries(hml_tests PRIVATE open62541)
@@ -46,6 +49,18 @@ else()
 endif()
 
 add_test(NAME hml_tests COMMAND hml_tests)
+
+# Smoke test of the real runtime binary with the demo project. SDL's dummy video driver makes
+# it headless, so it runs on CI too (the fbdev/drm backends need a real device and are skipped).
+if(HML_BACKEND STREQUAL "sdl")
+  add_test(NAME hml_runtime_smoke
+    COMMAND ${CMAKE_COMMAND}
+      -DEXE=$<TARGET_FILE:hml_runtime>
+      -DPROJECT=${CMAKE_SOURCE_DIR}/projects/demo/project.json
+      -DOUT=${CMAKE_BINARY_DIR}/smoke
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/smoke_runtime.cmake)
+  set_tests_properties(hml_runtime_smoke PROPERTIES TIMEOUT 120)
+endif()
 
 # Designer renderer (HTML/JS) unit tests: plain Node, no packages (node --test, Node 18+).
 find_program(HML_NODE node)
