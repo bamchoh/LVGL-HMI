@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 #include "lvgl.h"
 #include "jsonutil.hpp"
 
@@ -39,6 +40,9 @@ public:
     bool show_screen(const std::string& name, const std::string& anim);
     bool back();
     std::optional<std::string> current_screen() const;
+    // Navigation history as screen names (oldest first), e.g. to survive a rebuild of the screens.
+    std::vector<std::string> history() const;
+    void set_history(const std::vector<std::string>& names);   // unknown names are skipped
     size_t screen_count() const;
 
 private:

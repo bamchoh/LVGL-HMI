@@ -304,6 +304,27 @@ TEST_CASE("Project::build_screens builds file and inline screens and shows the s
         CHECK(p.build_screens() == 4);
         CHECK(ui().current_screen() == std::optional<std::string>("main"));
     }
+    SUBCASE("a rebuild keeps the navigation history, so Back still works after a reload") {
+        REQUIRE(ui().show_screen("main", "none"));          // settings -> main
+        REQUIRE(ui().show_screen("abs", "none"));           // -> abs
+        CHECK(ui().history() == std::vector<std::string>{ "settings", "main" });
+        CHECK(p.build_screens() == 4);
+        CHECK(ui().current_screen() == std::optional<std::string>("abs"));
+        CHECK(ui().history() == std::vector<std::string>{ "settings", "main" });
+        CHECK(ui().back());
+        CHECK(ui().current_screen() == std::optional<std::string>("main"));
+        CHECK(ui().back());
+        CHECK(ui().current_screen() == std::optional<std::string>("settings"));
+        CHECK_FALSE(ui().back());
+    }
+    SUBCASE("history entries whose screen disappeared are dropped") {
+        REQUIRE(ui().show_screen("inline", "none"));        // settings -> inline
+        REQUIRE(ui().show_screen("main", "none"));          // -> main
+        tp.project(R"({ "start_screen": "settings", "screens": [ "screens/main.json", "screens/settings.json" ] })");
+        CHECK(p.build_screens() == 2);
+        CHECK(ui().current_screen() == std::optional<std::string>("main"));
+        CHECK(ui().history() == std::vector<std::string>{ "settings" });
+    }
     SUBCASE("a rebuild re-reads the project file") {
         tp.project(R"({ "start_screen": "settings", "screens": [ "screens/main.json" ] })");
         CHECK(p.build_screens() == 1);

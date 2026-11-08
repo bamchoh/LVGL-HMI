@@ -1259,6 +1259,30 @@ size_t Ui::screen_count() const
     return impl_->screens.size();
 }
 
+std::vector<std::string> Ui::history() const
+{
+    std::vector<std::string> out;
+    for(int idx : impl_->history) {
+        if(idx >= 0 && static_cast<size_t>(idx) < impl_->screens.size()) out.push_back(impl_->screens[static_cast<size_t>(idx)]->name);
+    }
+    return out;
+}
+
+void Ui::set_history(const std::vector<std::string>& names)
+{
+    Impl& m = *impl_;
+    m.history.clear();
+    for(const std::string& n : names) {
+        for(size_t i = 0; i < m.screens.size(); i++) {
+            if(m.screens[i]->name == n) {
+                if(m.history.size() == kHistoryLen) m.history.pop_front();
+                m.history.push_back(static_cast<int>(i));
+                break;
+            }
+        }
+    }
+}
+
 Ui& ui()
 {
     static Ui instance;

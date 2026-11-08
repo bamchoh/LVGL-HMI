@@ -188,6 +188,7 @@ int Project::start_drivers()
 int Project::build_screens()
 {
     std::string current = ui().current_screen().value_or("");
+    std::vector<std::string> history = ui().history();      // keep "Back" working across a reload
     ui().unload_all();
 
     // Re-read the project file too so that screen list / start screen edits are picked up.
@@ -231,6 +232,7 @@ int Project::build_screens()
 
     const std::string& show = !current.empty() ? current : (!info_.start_screen.empty() ? info_.start_screen : first);
     if(!ui().show_screen(show, "none")) ui().show_screen(first, "none");
+    ui().set_history(history);
     tags().dispatch(true);
     HML_INFO("%d screens built, showing '%s'", built, ui().current_screen().value_or("").c_str());
     return built;
