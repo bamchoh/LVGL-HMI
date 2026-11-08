@@ -60,12 +60,12 @@
       "flex": "row", "flex_main": "space_between", "flex_cross": "center",
       "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
       "children": [
-        { "type": "label", "style": { "text_color": "#9fb3c8", "font": 12 }, "text": "SIGHUP = reload" },
         { "type": "panel", "w": "content", "h": "content", "flex": "row", "scrollable": false,
           "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 6 },
           "children": [
             { "type": "button", "text": "Reload", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "reload" } },
             { "type": "button", "text": "Main", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "goto", "screen": "main", "anim": "slide_right" } },
+            { "type": "button", "text": "System", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#455a64" }, "on_click": { "action": "system" } },
             { "type": "button", "text": "Reboot", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#ef6c00" }, "on_click": { "action": "restart" } },
             { "type": "button", "text": "Exit", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#455a64" }, "on_click": { "action": "exit" } }
           ] }

@@ -97,6 +97,8 @@ const SCHEMA = {
     goto:   [{ k: 'screen', t: 'screen' }, { k: 'anim', t: 'anim' }],
     back:   [], reload: [], exit: [],
     restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
+    system: [{ k: 'anim', t: 'anim' }],
+    call:   [{ k: 'fn', t: 'text' }, { k: 'arg', t: 'text' }],
   },
 
   drivers: {

@@ -33,6 +33,9 @@ public:
     // Delete every screen built so far, free bindings, drop the UI tag subscriptions.
     void unload_all();
 
+    // Named actions for { "action": "call", "fn": "<name>", "arg": "..." }. Registering a name again replaces it.
+    void register_action(const std::string& name, std::function<void(const std::string& arg)> fn);
+
     bool show_screen(const std::string& name, const std::string& anim);
     bool back();
     std::optional<std::string> current_screen() const;

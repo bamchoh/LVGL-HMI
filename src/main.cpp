@@ -17,6 +17,7 @@
 #include "driver.hpp"
 #include "platform.hpp"
 #include "project.hpp"
+#include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
 #include "util.hpp"
@@ -115,6 +116,7 @@ int main(int argc, char** argv)
     hml::project().apply_theme(disp);
     hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; },
                                           [](hml::RestartTarget t) { s_restart = static_cast<int>(t); s_quit = true; } });
+    hml::system_settings().register_actions();
 
     hml::project().start_drivers();
     hml::project().build_screens();

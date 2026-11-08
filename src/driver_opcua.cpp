@@ -86,7 +86,10 @@ OpcUaServerDriver::OpcUaServerDriver(const json& cfg)
         }
     }
     else {
-        for(Tag* tag : tags().all()) nodes_.push_back(std::make_unique<Node>(Node{ tag, true }));
+        for(Tag* tag : tags().all()) {
+            if(tag->name().rfind("sys.", 0) == 0) continue;      // system settings: not for clients
+            nodes_.push_back(std::make_unique<Node>(Node{ tag, true }));
+        }
     }
     ok_ = true;
 }

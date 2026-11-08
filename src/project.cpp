@@ -1,5 +1,6 @@
 #include "project.hpp"
 #include "driver.hpp"
+#include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
 #include "util.hpp"
@@ -38,6 +39,53 @@ json parse_json_file(const std::string& path)
 
 } // namespace
 
+// project.local.json: { "drivers": { "<key>": { "host": "...", "enabled": false } } } written by the
+// system settings screens. Scalars override the matching driver object; the project file itself
+// is never modified.
+void Project::apply_local_overlay()
+{
+    std::string path = local_overlay_path();
+    std::ifstream probe(path, std::ios::binary);
+    if(!probe) return;
+    probe.close();
+    json overlay = parse_json_file(path);
+    if(!overlay.is_object()) return;
+    const json* od = jget(overlay, "drivers");
+    json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
+    if(!od || !od->is_object() || !drivers) return;
+    std::vector<std::string> keys = driver_keys(drivers);
+    int applied = 0;
+    for(size_t i = 0; i < keys.size(); i++) {
+        const json* o = jget(*od, keys[i].c_str());
+        if(!o || !o->is_object()) continue;
+        json& cfg = (*drivers)[i];
+        for(auto it = o->begin(); it != o->end(); ++it) {
+            if(it.value().is_object() || it.value().is_array()) continue;
+            cfg[it.key()] = it.value();
+            applied++;
+        }
+    }
+    if(applied) HML_INFO("project.local.json: %d driver setting(s) applied", applied);
+}
+
+const json* Project::driver_config(const std::string& key) const
+{
+    const json* drivers = jget(root_, "drivers");
+    std::vector<std::string> keys = driver_keys(drivers);
+    for(size_t i = 0; i < keys.size(); i++) if(keys[i] == key) return &(*drivers)[i];
+    return nullptr;
+}
+
+int Project::restart_drivers()
+{
+    drivers().stop_all();
+    json fresh = parse_json_file(info_.path);
+    if(!fresh.is_null()) root_ = std::move(fresh);
+    apply_local_overlay();
+    // (the system pages are not refreshed here: unsaved edits on other pages must survive an Apply)
+    return drivers().load(jget(root_, "drivers"));
+}
+
 std::string Project::resolve_path(const std::string& rel) const
 {
     if(rel.empty()) return rel;
@@ -54,6 +102,7 @@ bool Project::load(const std::string& path)
 
     root_ = parse_json_file(path);
     if(root_.is_null()) return false;
+    apply_local_overlay();
 
     info_.title = jstr(root_, "title", "HML Runtime");
     const json* disp = jget(root_, "display");
@@ -114,6 +163,11 @@ bool Project::load(const std::string& path)
         }
         HML_INFO("%d tags created", n);
     }
+
+    // built-in system settings pages (About, Network, one per driver) and their "sys.*" tags
+    register_builtin_pages(system_settings(), *this);
+    system_settings().create_tags();
+
     HML_INFO("project '%s' loaded (%dx%d)", info_.title.c_str(), info_.width, info_.height);
     return true;
 }
@@ -140,6 +194,7 @@ int Project::build_screens()
     json fresh = parse_json_file(info_.path);
     if(!fresh.is_null()) {
         root_ = std::move(fresh);
+        apply_local_overlay();
         info_.start_screen = jstr(root_, "start_screen", "");
     }
 
@@ -161,6 +216,11 @@ int Project::build_screens()
             }
         }
     }
+    // system settings screens (not counted: they are not part of the project)
+    for(const json& s : system_settings().screens(info_.width, info_.height)) {
+        if(!ui().build_screen(s, info_.dir)) HML_WARN("system screen '%s' could not be built", jstr(s, "name", "?").c_str());
+    }
+
     if(built == 0) {
         HML_ERROR("no screens could be built");
         lv_obj_t* l = lv_label_create(lv_screen_active());   // keep something visible

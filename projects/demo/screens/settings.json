@@ -70,6 +70,7 @@
           "children": [
             { "type": "button", "text": "Reload", "on_click": { "action": "reload" } },
             { "type": "button", "text": "Main", "on_click": { "action": "goto", "screen": "main", "anim": "slide_right" } },
+            { "type": "button", "text": "System", "style": { "bg_color": "#455a64" }, "on_click": { "action": "system" } },
             { "type": "button", "text": "Restart", "style": { "bg_color": "#ef6c00" }, "on_click": { "action": "restart" } },
             { "type": "button", "text": "Exit", "style": { "bg_color": "#455a64" }, "on_click": { "action": "exit" } }
           ] }

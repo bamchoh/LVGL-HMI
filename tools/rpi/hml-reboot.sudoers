@@ -1,4 +1,0 @@
-# Lets the HML runtime (running as user bamchoh under the hml systemd unit) reboot the Pi from the
-# "restart" action without a password.  Install with:
-#   sudo install -m 440 tools/rpi/hml-reboot.sudoers /etc/sudoers.d/hml-reboot
-bamchoh ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /bin/systemctl reboot

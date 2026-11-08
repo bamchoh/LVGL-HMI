@@ -34,6 +34,14 @@ public:
     // After LVGL and the display exist: apply the theme, start the drivers.
     void apply_theme(lv_display_t* disp);
     int  start_drivers();
+    // Stop every driver, re-read project.json + project.local.json and start them again
+    // (system settings "Apply"). Returns the number of drivers running.
+    int  restart_drivers();
+
+    // Driver configuration (overlay applied) by its overlay key, see driver_keys(). nullptr if unknown.
+    const json* driver_config(const std::string& key) const;
+    const json* drivers_config() const { return jget(root_, "drivers"); }
+    std::string local_overlay_path() const { return info_.dir + "/project.local.json"; }
 
     // Build (or rebuild) every screen from its JSON file and show the start screen
     // (or the previously shown one on a reload). Returns the number of screens built.
@@ -43,6 +51,7 @@ public:
 
 private:
     std::string resolve_path(const std::string& rel) const;
+    void apply_local_overlay();        // merge project.local.json into root_ (drivers only, for now)
 
     ProjectInfo info_;
     json        root_;

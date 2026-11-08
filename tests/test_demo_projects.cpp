@@ -4,6 +4,7 @@
 #include <doctest.h>
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
+#include "system_settings.hpp"
 #include "ui.hpp"
 
 #include <algorithm>
@@ -59,11 +60,13 @@ TEST_CASE("every shipped project loads and builds all of its screens")
         const json* screens = jget(raw, "screens");
         REQUIRE(screens);
         REQUIRE(screens->is_array());
-        CHECK(tags().count() == jget(raw, "tags")->size());
+        size_t user_tags = 0;
+        for(Tag* t : tags().all()) if(!SystemSettings::is_system_tag(t->name())) user_tags++;
+        CHECK(user_tags == jget(raw, "tags")->size());
 
         p.apply_theme(hmltest::Lvgl::get().disp);
         CHECK(p.build_screens() == static_cast<int>(screens->size()));
-        CHECK(ui().screen_count() == screens->size());
+        CHECK(ui().screen_count() - system_settings().page_count() - 1 == screens->size());
         CHECK(ui().current_screen() == std::optional<std::string>(p.info().start_screen));
 
         // every screen can be shown and rendered

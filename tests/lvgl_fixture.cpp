@@ -1,4 +1,5 @@
 #include "lvgl_fixture.hpp"
+#include "system_settings.hpp"
 #include "ui.hpp"
 
 namespace hmltest {
@@ -56,6 +57,8 @@ Runtime::Runtime()
     hml::tags().clear();
     hml::ui().init(nullptr, hml::AppCallbacks{ [this] { reload_requests++; }, [this] { exit_requests++; },
                                                [this](hml::RestartTarget t) { restart_requests++; last_restart = t; } });
+    hml::system_settings().clear();
+    hml::system_settings().register_actions();
     drivers.register_builtins();
 }
 

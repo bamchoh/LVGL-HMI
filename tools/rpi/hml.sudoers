@@ -1,0 +1,7 @@
+# Lets the HML runtime (running as user bamchoh under the hml systemd unit) do the privileged
+# things its screens offer, without a password:
+#   - "restart" action        -> systemctl reboot
+#   - System > Network > Apply -> nmcli connection modify / up
+# Install with:
+#   sudo install -m 440 ~/hml/tools/rpi/hml.sudoers /etc/sudoers.d/hml
+bamchoh ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /bin/systemctl reboot, /usr/bin/nmcli

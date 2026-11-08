@@ -362,6 +362,25 @@ python tools\opcua_client_test.py                       # Objects/HML 配下の�
 python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型はノードから自動判定）
 ```
 
+## システム設定画面
+
+ランタイムは project.json とは別に、組み込みの「System」メニュー画面（`__system`）と設定ページ画面
+（`__system_<id>`）を自動生成します。画面のボタンから `{ "action": "system" }` で開けます。
+
+| ページ | 内容 |
+|---|---|
+| About | ホスト名、IP アドレス、プロジェクト、表示バックエンド、ビルド情報（表示のみ） |
+| Network | NetworkManager (`nmcli`) のある Linux で、インターフェース、DHCP / 固定 IP、アドレス (CIDR)、ゲートウェイ、DNS を設定。Apply で `nmcli connection modify` + `up` を実行（一般ユーザーでは polkit が認証を求めるので `sudo -n` で再試行。`tools/rpi/hml.sudoers` を入れておく）。接続中の IP を変えると SSH が切れます。Windows では表示のみ |
+| Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
+
+設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
+`project.local.json` は project.json と同じ場所に書かれ、起動時に `drivers` のスカラー値を上書きします
+（project.json 自体は変更しません。OPC UA には `sys.*` タグは公開されません）。
+
+ページを追加するには `src/system_settings.hpp` の `SettingsPage`（`id` / `title` / `fields()` / `apply()`）を
+実装して `register_builtin_pages()` で登録するだけで、画面とタグは自動で作られます。フィールド型は
+Text / Number / Bool / Select / Info。
+
 ## 画面 JSON
 
 ```json
@@ -517,9 +536,13 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
   { "action": "back" },
   { "action": "reload" },
   { "action": "exit" },
-  { "action": "restart" }
+  { "action": "restart" },
+  { "action": "system" },
+  { "action": "call", "fn": "system.apply", "arg": "network" }
 ]
 ```
+
+`system` は組み込みのシステム設定画面（下記）を開きます。`call` はランタイムに登録された名前付きアクションを呼びます。
 
 `restart` は Raspberry Pi（fbdev / drm バックエンド）では OS を再起動し、PC（SDL バックエンド）ではアプリを
 再起動します。`"what": "app"` / `"system"` で明示もできます。OS の再起動は `systemctl reboot` を `sudo -n`
@@ -527,7 +550,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 （許可がない場合はアプリの再起動にフォールバックします）。
 
 ```
-sudo install -m 440 tools/rpi/hml-reboot.sudoers /etc/sudoers.d/hml-reboot
+sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 ```
 
 `anim`: `none` / `fade` / `slide_left` / `slide_right` / `slide_top` / `slide_bottom` / `over_left` / `over_right`

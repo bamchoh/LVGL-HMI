@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <deque>
+#include <map>
 #include <vector>
 
 namespace hml {
@@ -413,11 +414,12 @@ struct BindOpts {
     std::optional<double> vmin, vmax;
 };
 
-enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart };
+enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call };
 
 struct Action {
     ActionKind  kind = ActionKind::Back;
     std::string screen, anim;
+    std::string fn, arg;              // Call
     Tag*        tag = nullptr;
     Value       value;
     double      by = 1;
@@ -531,6 +533,7 @@ struct Ui::Impl {
     std::string   base_dir;
     Screen*       building = nullptr;
     BindOpts      bind_opts;          // for the widget currently being built
+    std::map<std::string, std::function<void(const std::string&)>> named_actions;
 
     Screen* find_screen(const std::string& name)
     {
@@ -743,6 +746,12 @@ void Ui::Impl::run_actions(const ActionList& list)
             case ActionKind::Reload: if(app.request_reload) app.request_reload(); break;
             case ActionKind::Exit:   if(app.request_exit) app.request_exit(); break;
             case ActionKind::Restart: if(app.request_restart) app.request_restart(a.restart); break;
+            case ActionKind::Call: {
+                auto it = named_actions.find(a.fn);
+                if(it == named_actions.end()) HML_WARN("call: unknown action '%s'", a.fn.c_str());
+                else it->second(a.arg);
+                break;
+            }
         }
     }
 }
@@ -766,6 +775,19 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
     if(iequals(*kind, "back")) { a.kind = ActionKind::Back; return a; }
     if(iequals(*kind, "reload")) { a.kind = ActionKind::Reload; return a; }
     if(iequals(*kind, "exit")) { a.kind = ActionKind::Exit; return a; }
+    if(iequals(*kind, "system")) {                       // open the built-in system settings menu
+        a.kind = ActionKind::Goto;
+        a.screen = "__system";
+        a.anim = jstr(j, "anim", "slide_left");
+        return a;
+    }
+    if(iequals(*kind, "call")) {
+        a.kind = ActionKind::Call;
+        a.fn = jstr(j, "fn", "");
+        a.arg = jstr(j, "arg", "");
+        if(a.fn.empty()) { HML_WARN("call action without \"fn\""); return std::nullopt; }
+        return a;
+    }
     if(iequals(*kind, "restart")) {
         a.kind = ActionKind::Restart;
         std::string what = jstr(j, "what", "");
@@ -1155,6 +1177,11 @@ void Ui::init(lv_indev_t* keyboard_indev, AppCallbacks cb)
         lv_group_set_default(m.group);
         if(m.kb_indev) lv_indev_set_group(m.kb_indev, m.group);
     }
+}
+
+void Ui::register_action(const std::string& name, std::function<void(const std::string& arg)> fn)
+{
+    impl_->named_actions[name] = std::move(fn);
 }
 
 lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)

@@ -1,6 +1,7 @@
 #include <doctest.h>
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
+#include "system_settings.hpp"
 #include "ui.hpp"
 
 #include <atomic>
@@ -47,6 +48,18 @@ std::string screen_json(const std::string& name)
 
 } // namespace
 
+namespace {
+// Project::load also creates the "sys.*" tags of the system settings pages; count only the project's own
+size_t user_tag_count()
+{
+    size_t n = 0;
+    for(Tag* t : tags().all()) if(!SystemSettings::is_system_tag(t->name())) n++;
+    return n;
+}
+// build_screens() also builds the system menu + one screen per settings page
+size_t user_screen_count() { return ui().screen_count() - system_settings().page_count() - 1; }
+} // namespace
+
 TEST_CASE("Project::load fails on a missing or malformed file")
 {
     Runtime rt;
@@ -55,7 +68,7 @@ TEST_CASE("Project::load fails on a missing or malformed file")
     CHECK_FALSE(p.load((tp.dir / "nope.json").generic_string()));
     CHECK_FALSE(p.load(tp.project("{ not json")));
     CHECK_FALSE(p.load(tp.project("")));
-    CHECK(tags().count() == 0);
+    CHECK(user_tag_count() == 0);
 }
 
 TEST_CASE("Project::load tolerates comments and a UTF-8 BOM")
@@ -94,7 +107,7 @@ TEST_CASE("Project::load applies defaults for everything that is missing")
     CHECK(lv_color_eq(i.primary, lv_palette_main(LV_PALETTE_BLUE)));
     CHECK(lv_color_eq(i.secondary, lv_palette_main(LV_PALETTE_RED)));
     CHECK(i.start_screen.empty());
-    CHECK(tags().count() == 0);
+    CHECK(user_tag_count() == 0);
 }
 
 TEST_CASE("Project::load reads display, touch and theme settings")
@@ -187,7 +200,7 @@ TEST_CASE("Project::load creates the tags with type, initial value and limits")
             { "name": "f", "type": "string", "init": "dup" }
         ]
     })")));
-    CHECK(tags().count() == 8);
+    CHECK(user_tag_count() == 8);
 
     Tag* f = tags().find("f");
     REQUIRE(f);
@@ -278,7 +291,7 @@ TEST_CASE("Project::build_screens builds file and inline screens and shows the s
     })")));
 
     CHECK(p.build_screens() == 4);
-    CHECK(ui().screen_count() == 4);
+    CHECK(user_screen_count() == 4);
     CHECK(ui().current_screen() == std::optional<std::string>("settings"));
 
     SUBCASE("the first screen is shown when start_screen is unknown and the current one is gone") {
@@ -294,7 +307,7 @@ TEST_CASE("Project::build_screens builds file and inline screens and shows the s
     SUBCASE("a rebuild re-reads the project file") {
         tp.project(R"({ "start_screen": "settings", "screens": [ "screens/main.json" ] })");
         CHECK(p.build_screens() == 1);
-        CHECK(ui().screen_count() == 1);
+        CHECK(user_screen_count() == 1);
         CHECK(ui().current_screen() == std::optional<std::string>("main"));
     }
 }
@@ -306,7 +319,7 @@ TEST_CASE("Project::build_screens with nothing buildable shows a fallback messag
     Project p;
     REQUIRE(p.load(tp.project(R"({ "screens": [ "screens/missing.json" ] })")));
     CHECK(p.build_screens() == 0);
-    CHECK(ui().screen_count() == 0);
+    CHECK(user_screen_count() == 0);
     CHECK_FALSE(ui().current_screen().has_value());
 
     lv_obj_t* scr = lv_screen_active();
