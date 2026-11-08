@@ -346,7 +346,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         out.push_back(json{
             { "name", page_screen(id) }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
             { "children", json::array({
-                header(p->title(), json{ { "action", "goto" }, { "screen", menu_screen() }, { "anim", "slide_right" } }),
+                header(p->title(), json{ { "action", "back" } }),   // pop the history: menu, then the caller
                 json{ { "type", "panel" }, { "x", 8 }, { "y", header_h + 8 }, { "w", width - 16 }, { "h", height - header_h - 16 },
                       { "flex", "column" }, { "flex_cross", "start" }, { "scrollbar", "auto" },
                       { "style", { { "bg_color", card }, { "radius", 8 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },

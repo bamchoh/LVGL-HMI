@@ -194,6 +194,21 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         CHECK(ui().current_screen() == std::optional<std::string>("__system"));
         CHECK(ui().back());
         CHECK(ui().current_screen() == std::optional<std::string>("home"));
+
+        // home -> System -> page -> Back -> Back must land on home again (no history loop)
+        lv_obj_send_event(lv_obj_get_child(home, 0), LV_EVENT_CLICKED, nullptr);
+        REQUIRE(ui().current_screen() == std::optional<std::string>("__system"));
+        lv_obj_t* menu = lv_screen_active();
+        lv_obj_send_event(lv_obj_get_child(nth(menu, 1), 0), LV_EVENT_CLICKED, nullptr);   // first page
+        REQUIRE(ui().current_screen() == std::optional<std::string>("__system_fake"));
+        rt.advance(400);
+        lv_obj_t* pg = lv_screen_active();
+        lv_obj_send_event(nth(nth(pg, 0), 0), LV_EVENT_CLICKED, nullptr);                  // page "< Back"
+        CHECK(ui().current_screen() == std::optional<std::string>("__system"));
+        rt.advance(400);
+        lv_obj_send_event(nth(nth(lv_screen_active(), 0), 0), LV_EVENT_CLICKED, nullptr);  // menu "< Back"
+        CHECK(ui().current_screen() == std::optional<std::string>("home"));
+        CHECK_FALSE(ui().back());                                                          // history fully unwound
     }
     SUBCASE("registering a page twice replaces it") {
         sys.add_page(std::make_unique<FakePage>());
