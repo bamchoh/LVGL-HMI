@@ -1,5 +1,7 @@
 # HML Runtime — LVGL 宣言型 HMI ランタイム
 
+[![CI](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml)
+
 JSON で書いた画面定義を LVGL (v9.4) で描画し、タグ（プロセス変数）とウィジェットを
 双方向にバインドする HMI ランタイムです。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
 Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作します。
@@ -38,6 +40,9 @@ ctest --test-dir build --output-on-failure   # CTest から実行する場合
 
 Linux では `./build.sh` のあとに `build-<backend>/bin/hml_tests` を実行してください。
 テストを組み込みたくない場合は `-DHML_TESTS=OFF` を付けます。
+
+GitHub Actions（`.github/workflows/ci.yml`）が push / PR ごとに Windows (MSVC, sdl) と Linux (gcc, fbdev) で
+テストを実行し、続けてランタイムとデザイナーのフルビルドも行います。
 
 ## ビルド（Raspberry Pi / Linux）
 
