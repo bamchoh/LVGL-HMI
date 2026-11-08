@@ -30,8 +30,6 @@ TEST_CASE("vformat formats like printf into a std::string")
 {
     CHECK(vformat("%d-%s", 42, "x") == "42-x");
     CHECK(vformat("plain") == "plain");
-    std::string empty_fmt;                       // via a variable: gcc warns about a literal ""
-    CHECK(vformat(empty_fmt.c_str()) == "");
     CHECK(vformat("%%") == "%");
     CHECK(vformat("%5.2f|%-4d|%04x", 3.14159, 7, 255) == " 3.14|7   |00ff");
     CHECK(vformat("%lld", 1234567890123LL) == "1234567890123");

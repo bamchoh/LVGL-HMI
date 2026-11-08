@@ -413,6 +413,7 @@ struct Ui::Impl {
     std::vector<std::unique_ptr<ActionList>> action_lists;
     std::vector<std::unique_ptr<ChartCtx>>   charts;
     std::vector<std::unique_ptr<std::vector<lv_point_precise_t>>> line_points;   // must outlive lv_line objects
+    std::vector<std::unique_ptr<std::string>>  owned_strings;  // textarea accepted_chars: LVGL stores the pointer only
     lv_group_t*   group = nullptr;
     lv_style_t    style_disabled{};   // visual feedback for LV_STATE_DISABLED (the theme has none for most widgets)
     lv_indev_t*   kb_indev = nullptr;
@@ -836,7 +837,10 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
         lv_textarea_set_password_mode(obj, jbool(w, "password", false));
         if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
-        if(auto acc = jstr_opt(w, "accepted_chars")) lv_textarea_set_accepted_chars(obj, acc->c_str());
+        if(auto acc = jstr_opt(w, "accepted_chars")) {
+            owned_strings.push_back(std::make_unique<std::string>(*acc));
+            lv_textarea_set_accepted_chars(obj, owned_strings.back()->c_str());
+        }
         if(group) lv_group_add_obj(group, obj);
         if(building) {
             for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL }) {
@@ -987,6 +991,7 @@ void Ui::unload_all()
     m.bindings.clear();
     m.action_lists.clear();
     m.line_points.clear();
+    m.owned_strings.clear();
     m.current = -1;
     m.history.clear();
 }

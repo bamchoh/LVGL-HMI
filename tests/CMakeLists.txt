@@ -21,6 +21,7 @@ add_executable(hml_tests
   test_driver_registry.cpp
   test_driver_sim.cpp
   test_project.cpp
+  test_ui.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})
