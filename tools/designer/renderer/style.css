@@ -127,6 +127,9 @@ details.sec[open] > summary { border-radius: 4px 4px 0 0; }
 .lv-textarea { display: inline-flex; align-items: flex-start; background: var(--lv-card); border: 1px solid var(--lv-border); border-radius: 6px; padding: 9px 12px; overflow: hidden; }
 .lv-textarea.lv-oneline { align-items: center; height: auto; }
 .lv-textarea .lv-placeholder { color: var(--lv-muted); }
+.lv-data { white-space: nowrap; }
+.lv-data.lv-readonly { border-style: dashed; }
+.lv-data .lv-num { text-align: right; font-variant-numeric: tabular-nums; }
 .lv-image img { display: block; transform-origin: center; }
 .lv-img-ph { border: 1px dashed var(--lv-muted); color: var(--lv-muted); padding: 8px 12px; font-size: 12px; white-space: nowrap; }
 .lv-chart { background: var(--lv-card); border: 1px solid var(--lv-border); border-radius: 6px; position: relative; overflow: hidden; }

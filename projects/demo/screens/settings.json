@@ -26,8 +26,8 @@
         { "type": "label", "text": "Maintenance mode is active!", "style": { "text_color": "#f44336" },
           "bind": { "visible": { "tag": "mode", "eq": 2 } } },
         { "type": "label", "text": "Operator name", "style": { "text_color": "#9fb3c8" } },
-        { "type": "textarea", "w": "100%", "placeholder": "type a name, Enter to confirm", "one_line": true, "max_length": 24,
-          "bind": "operator" },
+        { "type": "text_display", "w": "100%", "placeholder": "type a name, Enter to confirm", "max_length": 24,
+          "input": true, "bind": "operator" },
         { "type": "label", "text": "Alarm limit", "style": { "text_color": "#9fb3c8" } },
         { "type": "roller", "options": ["30 C", "35 C", "40 C", "45 C"], "visible_rows": 1, "w": "100%" }
       ]
@@ -40,8 +40,8 @@
         { "type": "label", "text": "Setpoint (holding reg 1)", "style": { "text_color": "#9fb3c8" } },
         { "type": "arc", "w": 150, "h": 150, "min": 0, "max": 100, "bind": "setpoint",
           "style_indicator": { "arc_color": "#2196f3" }, "style_knob": { "bg_color": "#2196f3" } },
-        { "type": "label", "style": { "font": 28, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "setpoint", "format": "%d %%" } } },
+        { "type": "numeric_display", "w": 140, "input": true, "min": 0, "max": 100, "unit": " %",
+          "style": { "font": 28, "text_color": "#ffffff" }, "bind": "setpoint" },
         { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
           "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
           "children": [

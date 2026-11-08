@@ -62,6 +62,9 @@ const Tree = {
       case 'dropdown': return '▾';
       case 'roller': return '☰';
       case 'textarea': return '✎';
+      case 'numeric_display': return '#';
+      case 'text_display': return '"';
+      case 'password_display': return '*';
       case 'image': return '▨';
       case 'chart': return '↗';
       case 'keyboard': return '⌨';

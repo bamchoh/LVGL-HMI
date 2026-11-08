@@ -406,11 +406,36 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | `led`                 | `color`, `on`                                                                                                             |
 | `dropdown` / `roller` | `options` (配列), `selected`, (`visible_rows`, `infinite`)                                                                |
 | `textarea`            | `text`, `placeholder`, `one_line`, `password`, `max_length`, `accepted_chars`                                             |
+| `numeric_display`     | 数値表示器: `input`, `decimals`, `format`, `unit`, `min`, `max`, `placeholder`, `accepted_chars`（下記「データ表示器」）  |
+| `text_display`        | 文字列表示器: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                   |
+| `password_display`    | パスワード入力器（常に伏せ字）: `input` (既定 true), `placeholder`, `max_length`, `accepted_chars`                         |
 | `image`               | `src` (project.json からの相対パス, PNG 対応), `zoom`, `rotation`                                                         |
 | `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
 | `spinner`             | `time`, `angle`                                                                                                           |
-| `keyboard`            | 画面に 1 つ置くと、textarea のフォーカス時に表示される                                                                    |
+| `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のフォーカス時に表示される（`numeric_display` ではテンキーに切り替わる）    |
 | `line`                | `points: [[x,y], ...]`                                                                                                    |
+
+#### データ表示器 (`numeric_display` / `text_display` / `password_display`)
+
+タグの値を 1 行の枠内に表示する、用途を限定したウィジェットです。既定では表示専用（クリック不可、カーソルなし）で、
+`"input": true` にすると入力欄になります（`password_display` は既定で入力可）。
+
+```json
+{ "type": "numeric_display", "bind": "setpoint", "decimals": 1, "unit": " rpm",
+  "input": true, "min": 0, "max": 100 },
+{ "type": "numeric_display", "bind": { "value": { "tag": "pressure", "scale": 10 } }, "format": "%04d" },
+{ "type": "text_display", "bind": "operator", "input": true, "max_length": 16 },
+{ "type": "password_display", "bind": "pin", "max_length": 4, "accepted_chars": "0123456789" }
+```
+
+| プロパティ | 意味 |
+|---|---|
+| `input` | true で入力可。確定（キーボードの OK / Enter、またはフォーカスが外れたとき）にタグへ書き込み、キャンセルで元の値に戻る。`textarea` と違い 1 文字ごとには書き込まない |
+| `decimals` / `format` / `unit` | 数値の表示形式。`decimals: 1` は `%.1f` と同じ。`format` を書くとそちらを優先。`unit` は末尾に付加（例 `" rpm"`）。`bind` 側の `format` があればそれが最優先 |
+| `min` / `max` | 入力値の範囲。範囲外の入力は丸められ、丸めた値が表示に反映される（タグ側の `min`/`max` も別途適用） |
+| `accepted_chars` | 入力できる文字。`numeric_display` の既定は `0123456789.-+` |
+
+短縮形 `"bind": "tag"` は `numeric_display` では `value`、`text_display` / `password_display` では `text` に結び付きます。
 
 ### 共通プロパティ
 
@@ -439,7 +464,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 ### `bind` — タグとウィジェットの接続
 
 短縮形 `"bind": "tagname"` は、ウィジェットに自然なプロパティへ結び付けます
-（switch/checkbox/button → `checked`、slider/arc/dropdown/roller/bar → `value`、label → `text`、led → `on`、textarea → `text`）。
+（switch/checkbox/button → `checked`、slider/arc/dropdown/roller/bar/numeric_display → `value`、label/textarea/text_display/password_display → `text`、led → `on`）。
 入力系ウィジェットは自動的に双方向になります。
 
 オブジェクト形式では複数のプロパティを指定できます。

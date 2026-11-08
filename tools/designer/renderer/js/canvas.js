@@ -98,6 +98,8 @@ const Canvas = {
       case 'chart': return [390, 260];
       case 'dropdown': return [130, null];
       case 'textarea': return [130, 130];
+      case 'numeric_display': return [120, null];
+      case 'text_display': case 'password_display': return [160, null];
       case 'keyboard': return ['100%', '50%'];
       default: return [null, null];
     }
@@ -297,6 +299,38 @@ const Canvas = {
     const txt = w.text ? String(w.text) : '';
     el.append(U.el('span', { class: txt ? '' : 'lv-placeholder' }, txt || w.placeholder || ''));
     if (w.one_line) el.classList.add('lv-oneline');
+  },
+  // data displays (textarea based): one line, dashed border while display-only
+  bindTag(w, kind) {
+    const b = w.bind;
+    if (typeof b === 'string') return b;
+    if (b && typeof b === 'object' && b[kind] !== undefined) return typeof b[kind] === 'string' ? b[kind] : (b[kind].tag || '');
+    return '';
+  },
+  fmtSample(fmt) {
+    return String(fmt).replace(/%%/g, '\u0000').replace(/%[-+ 0#]*\d*(?:\.\d+)?(hh|h|ll|l|L|z)?[diouxX]/g, '0')
+      .replace(/%[-+ 0#]*\d*(?:\.(\d+))?(hh|h|ll|l|L|z)?[fFeEgG]/g, (m, prec) => (0).toFixed(prec === undefined ? 1 : Number(prec)))
+      .replace(/%[-+ 0#]*\d*(?:\.\d+)?s/g, '0').replace(/\u0000/g, '%');
+  },
+  dataDisplay(el, w, body, input) {
+    el.classList.add('lv-textarea', 'lv-oneline', 'lv-data');
+    if (!input) el.classList.add('lv-readonly');
+    el.append(body);
+  },
+  w_numeric_display(el, w) {
+    const fmt = w.format || (w.decimals !== undefined ? '%.' + w.decimals + 'f' : '%s');
+    const tag = this.bindTag(w, 'value');
+    const text = (tag ? this.fmtSample(fmt) : (w.text || this.fmtSample(fmt))) + (w.unit || '');
+    this.dataDisplay(el, w, U.el('span', { class: 'lv-grow lv-num', title: tag ? '{' + tag + '}' : '' }, text), !!w.input);
+  },
+  w_text_display(el, w) {
+    const tag = this.bindTag(w, 'text');
+    const txt = w.text ? String(w.text) : (tag ? '{' + tag + '}' : '');
+    this.dataDisplay(el, w, U.el('span', { class: 'lv-grow' + (txt ? '' : ' lv-placeholder') }, txt || w.placeholder || ''), !!w.input);
+  },
+  w_password_display(el, w) {
+    const n = Math.min(U.num(w.max_length, 6) || 6, 12);
+    this.dataDisplay(el, w, U.el('span', { class: 'lv-grow' }, '\u2022'.repeat(n)), w.input !== false);
   },
   w_image(el, w) {
     if (w.src && M.st.dir) {

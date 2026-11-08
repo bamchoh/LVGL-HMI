@@ -34,6 +34,14 @@ const SCHEMA = {
     textarea: { label: 'Text area', def: { w: 200, one_line: true, placeholder: 'type here' },
                 props: [{ k: 'text', t: 'text' }, { k: 'placeholder', t: 'text' }, { k: 'one_line', t: 'bool' }, { k: 'password', t: 'bool' },
                         { k: 'max_length', t: 'number' }, { k: 'accepted_chars', t: 'text' }] },
+    numeric_display: { label: 'Numeric display', def: { w: 120, decimals: 1 },
+                props: [{ k: 'input', t: 'bool' }, { k: 'decimals', t: 'number' }, { k: 'format', t: 'text' }, { k: 'unit', t: 'text' },
+                        { k: 'min', t: 'number' }, { k: 'max', t: 'number' }, { k: 'placeholder', t: 'text' }, { k: 'accepted_chars', t: 'text' }] },
+    text_display: { label: 'Text display', def: { w: 160 },
+                props: [{ k: 'input', t: 'bool' }, { k: 'text', t: 'text' }, { k: 'placeholder', t: 'text' }, { k: 'max_length', t: 'number' },
+                        { k: 'accepted_chars', t: 'text' }, { k: 'one_line', t: 'bool' }] },
+    password_display: { label: 'Password input', def: { w: 160, max_length: 8 },
+                props: [{ k: 'input', t: 'bool' }, { k: 'placeholder', t: 'text' }, { k: 'max_length', t: 'number' }, { k: 'accepted_chars', t: 'text' }] },
     image:    { label: 'Image', def: {}, props: [{ k: 'src', t: 'image' }, { k: 'zoom', t: 'number' }, { k: 'rotation', t: 'number' }] },
     chart:    { label: 'Chart', def: { w: 300, h: 160, chart_type: 'line', points: 100, min: 0, max: 100, sample_ms: 500, hdiv: 3, vdiv: 5, series: [] },
                 props: [{ k: 'chart_type', t: 'select', o: ['line', 'bar', 'scatter'] }, { k: 'points', t: 'number' }, { k: 'min', t: 'number' },
@@ -77,7 +85,8 @@ const SCHEMA = {
   bindKinds: ['text', 'value', 'checked', 'on', 'visible', 'hidden', 'enabled', 'disabled', 'bg_color', 'text_color', 'options', 'src'],
   // the property a plain "bind": "tag" means for each widget type
   naturalBind: { switch: 'checked', checkbox: 'checked', button: 'checked', slider: 'value', arc: 'value', dropdown: 'value',
-                 roller: 'value', bar: 'value', label: 'text', led: 'on', textarea: 'text', image: 'src', spinner: 'visible', panel: 'visible' },
+                 roller: 'value', bar: 'value', label: 'text', led: 'on', textarea: 'text', image: 'src', spinner: 'visible', panel: 'visible',
+                 numeric_display: 'value', text_display: 'text', password_display: 'text' },
   bindOps: ['', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'],
 
   actions: {

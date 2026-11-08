@@ -137,6 +137,19 @@ lv_style_selector_t sel(lv_part_t part, lv_state_t state = LV_STATE_DEFAULT)
     return static_cast<lv_style_selector_t>(part) | static_cast<lv_style_selector_t>(state);
 }
 
+// Show text in a textarea bypassing the operator-input filters (accepted_chars / max_length),
+// which lv_textarea_set_text would otherwise apply to the displayed value too ("42.3 rpm").
+void ta_show(lv_obj_t* ta, const std::string& text)
+{
+    const char* accepted = lv_textarea_get_accepted_chars(ta);
+    uint32_t max_len = lv_textarea_get_max_length(ta);
+    lv_textarea_set_accepted_chars(ta, nullptr);
+    lv_textarea_set_max_length(ta, 0);
+    lv_textarea_set_text(ta, text.c_str());
+    lv_textarea_set_accepted_chars(ta, accepted);
+    lv_textarea_set_max_length(ta, max_len);
+}
+
 // ================================================================ styles
 
 void apply_style(lv_obj_t* obj, const json& st, lv_style_selector_t s)
@@ -233,6 +246,8 @@ struct Binding {
     std::optional<lv_color_t> default_color;
     lv_style_selector_t part = LV_PART_MAIN;
     bool        two_way = false;
+    std::optional<double> vmin, vmax;     // numeric_display "min"/"max": clamp what the operator typed
+    bool        commit_on_ready = false;  // data displays: write on READY / DEFOCUSED, revert on CANCEL
 
     bool condition(const Value& v) const;
     std::optional<lv_color_t> map_color(const Value& v) const;
@@ -283,7 +298,7 @@ void Binding::apply_value(double n)
         case Widget::Led:      lv_led_set_brightness(obj, static_cast<uint8_t>(iv < 0 ? 0 : iv > 255 ? 255 : iv)); break;
         default: {
             std::string text = Value::number(n * scale + offset).format(format);
-            if(wk == Widget::Textarea) lv_textarea_set_text(obj, text.c_str());
+            if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
             else lv_label_set_text(obj, text.c_str());
             break;
@@ -297,7 +312,7 @@ void Binding::on_tag_changed(const Value& v, const void* source)
     switch(kind) {
         case BindKind::Text: {
             std::string text = v.format(format);
-            if(wk == Widget::Textarea) lv_textarea_set_text(obj, text.c_str());
+            if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
             else if(wk == Widget::Image) lv_image_set_src(obj, text.c_str());
             else lv_label_set_text(obj, text.c_str());
@@ -340,6 +355,10 @@ void Binding::on_tag_changed(const Value& v, const void* source)
 // widget -> tag (two-way bindings)
 void Binding::on_widget_changed(lv_obj_t* target)
 {
+    if(commit_on_ready && wk == Widget::Textarea && lv_textarea_get_text(target)[0] == '\0') {
+        on_tag_changed(tag->get(), nullptr);    // the field was cleared on focus and nothing was typed
+        return;
+    }
     if(kind == BindKind::Checked) {
         bool on = lv_obj_has_state(target, LV_STATE_CHECKED);
         if(invert) on = !on;
@@ -348,7 +367,10 @@ void Binding::on_widget_changed(lv_obj_t* target)
         return;
     }
     if(kind == BindKind::Text) {
-        if(wk == Widget::Textarea) tag->set_string(lv_textarea_get_text(target), this);
+        if(wk == Widget::Textarea) {
+            tag->set_string(lv_textarea_get_text(target), this);
+            if(commit_on_ready) ta_show(target, tag->get().format(format));   // normalised echo
+        }
         return;
     }
     if(kind == BindKind::Value) {
@@ -361,9 +383,24 @@ void Binding::on_widget_changed(lv_obj_t* target)
             case Widget::Textarea: wv = std::atof(lv_textarea_get_text(target)); break;
             default: return;
         }
-        tag->set_number(scale != 0 ? (wv - offset) / scale : wv, this);
+        double tv = scale != 0 ? (wv - offset) / scale : wv;
+        if(vmin && tv < *vmin) tv = *vmin;
+        if(vmax && tv > *vmax) tv = *vmax;
+        tag->set_number(tv, this);
+        // show what was actually stored (clamped by min/max and the tag limits, formatted)
+        if(commit_on_ready) apply_value(tag->get_number());
     }
 }
+
+// Widget-level binding options set by build_widget() for the current widget (data displays).
+struct BindOpts {
+    bool        has_natural = false;      // overrides the per-widget default of "bind": "tag"
+    BindKind    natural = BindKind::Text;
+    bool        natural_two_way = false;  // also used for the "text" / "value" keys of the object form
+    bool        commit_on_ready = false;
+    std::string format;                   // default "format" when the bind spec has none
+    std::optional<double> vmin, vmax;
+};
 
 enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit };
 
@@ -420,6 +457,7 @@ struct Ui::Impl {
     AppCallbacks  app;
     std::string   base_dir;
     Screen*       building = nullptr;
+    BindOpts      bind_opts;          // for the widget currently being built
 
     Screen* find_screen(const std::string& name)
     {
@@ -432,6 +470,15 @@ struct Ui::Impl {
     {
         static_cast<Binding*>(lv_event_get_user_data(e))->on_widget_changed(lv_event_get_target_obj(e));
     }
+    static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
+    {
+        Binding* b = static_cast<Binding*>(lv_event_get_user_data(e));
+        b->on_tag_changed(b->tag->get(), nullptr);
+    }
+    static void on_widget_focus(lv_event_t* e)    // data display: start with an empty field
+    {
+        lv_textarea_set_text(lv_event_get_target_obj(e), "");
+    }
     static void on_action_event(lv_event_t* e);
     static void on_chart_timer(lv_timer_t* t) { static_cast<ChartCtx*>(lv_timer_get_user_data(t))->tick(); }
     static void on_textarea_event(lv_event_t* e)
@@ -442,6 +489,8 @@ struct Ui::Impl {
         lv_event_code_t code = lv_event_get_code(e);
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
             lv_keyboard_set_textarea(scr->keyboard, ta);
+            // numeric_display marks itself with USER_1: give it the number pad
+            lv_keyboard_set_mode(scr->keyboard, lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_1) ? LV_KEYBOARD_MODE_NUMBER : LV_KEYBOARD_MODE_TEXT_LOWER);
             lv_obj_remove_flag(scr->keyboard, LV_OBJ_FLAG_HIDDEN);
         }
         else if(code == LV_EVENT_DEFOCUSED || code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
@@ -505,8 +554,12 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
 
     auto b = std::make_unique<Binding>();
     b->obj = obj; b->wk = wk; b->kind = kind; b->tag = tag;
+    b->format = bind_opts.format;
+    b->vmin = bind_opts.vmin;
+    b->vmax = bind_opts.vmax;
+    b->commit_on_ready = bind_opts.commit_on_ready;
     if(spec.is_object()) {
-        b->format = jstr(spec, "format", "");
+        b->format = jstr(spec, "format", bind_opts.format);
         b->invert = jbool(spec, "invert", false);
         b->scale = jnum(spec, "scale", 1);
         b->offset = jnum(spec, "offset", 0);
@@ -532,7 +585,13 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     Binding* raw = b.get();
     bindings.push_back(std::move(b));
     tag->subscribe(SubGroup::UI, [raw](Tag&, const Value& v, const void* src) { raw->on_tag_changed(v, src); });
-    if(two_way) lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_VALUE_CHANGED, raw);
+    if(two_way && raw->commit_on_ready) {
+        lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_READY, raw);      // keyboard OK / Enter
+        lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_DEFOCUSED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_cancel, LV_EVENT_CANCEL, raw);
+    }
+    else if(two_way) lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_VALUE_CHANGED, raw);
 
     raw->on_tag_changed(tag->get(), nullptr);   // initial value
     return raw;
@@ -552,8 +611,10 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
     const json* bind = jget(w, "bind");
     if(!bind) return;
     lv_obj_t* tobj = text_obj ? text_obj : obj;
+    const bool ta_two_way = bind_opts.has_natural ? bind_opts.natural_two_way : true;   // textarea-based widgets
     if(bind->is_string()) {
         // "bind": "tag" - pick the natural property of the widget
+        if(bind_opts.has_natural) { add_binding(obj, wk, bind_opts.natural, *bind, bind_opts.natural_two_way); return; }
         switch(wk) {
             case Widget::Switch: case Widget::Checkbox: case Widget::Led: add_binding(obj, wk, BindKind::Checked, *bind, wk != Widget::Led); break;
             case Widget::Button: add_binding(obj, wk, BindKind::Checked, *bind, true); break;
@@ -568,8 +629,8 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
     for(auto it = bind->begin(); it != bind->end(); ++it) {
         const std::string& k = it.key();
         const json& spec = it.value();
-        if(iequals(k, "text")) add_binding(tobj, wk, BindKind::Text, spec, wk == Widget::Textarea);
-        else if(iequals(k, "value")) add_binding(obj, wk, BindKind::Value, spec, wk == Widget::Slider || wk == Widget::Arc || wk == Widget::Dropdown || wk == Widget::Roller || wk == Widget::Textarea);
+        if(iequals(k, "text")) add_binding(tobj, wk, BindKind::Text, spec, wk == Widget::Textarea && ta_two_way);
+        else if(iequals(k, "value")) add_binding(obj, wk, BindKind::Value, spec, wk == Widget::Slider || wk == Widget::Arc || wk == Widget::Dropdown || wk == Widget::Roller || (wk == Widget::Textarea && ta_two_way));
         else if(iequals(k, "checked") || iequals(k, "on")) add_binding(obj, wk, BindKind::Checked, spec, wk == Widget::Switch || wk == Widget::Checkbox || wk == Widget::Button);
         else if(iequals(k, "visible")) add_binding(obj, wk, BindKind::Visible, spec, false);
         else if(iequals(k, "hidden")) add_binding_inverted(obj, wk, BindKind::Visible, spec);
@@ -753,6 +814,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     lv_obj_t* obj = nullptr;
     lv_obj_t* text_obj = nullptr;
     Widget wk = Widget::Panel;
+    bind_opts = BindOpts{};
 
     if(iequals(type, "panel") || iequals(type, "container") || iequals(type, "obj")) {
         obj = lv_obj_create(parent);
@@ -849,6 +911,55 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         }
         text_obj = obj;
     }
+    else if(iequals(type, "numeric_display") || iequals(type, "text_display") || iequals(type, "password_display")) {
+        // Data displays: a one-line text box showing a tag; "input": true turns it into an input field
+        // that writes on confirmation (keyboard OK / Enter / focus lost) and reverts on cancel.
+        wk = Widget::Textarea;
+        const bool numeric = iequals(type, "numeric_display");
+        const bool password = iequals(type, "password_display");
+        const bool input = jbool(w, "input", password);       // a password field is for entering one
+        obj = lv_textarea_create(parent);
+        lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
+        lv_textarea_set_password_mode(obj, jbool(w, "password", password));
+        lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
+        if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, ph->c_str());
+        if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
+        std::string accepted = jstr(w, "accepted_chars", numeric ? "0123456789.-+" : "");
+        if(!accepted.empty()) {
+            owned_strings.push_back(std::make_unique<std::string>(accepted));
+            lv_textarea_set_accepted_chars(obj, owned_strings.back()->c_str());
+        }
+        bind_opts.has_natural = true;
+        bind_opts.natural = numeric ? BindKind::Value : BindKind::Text;
+        bind_opts.natural_two_way = input;
+        bind_opts.commit_on_ready = input;
+        if(numeric) {
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_USER_1);          // number pad, see on_textarea_event
+            std::string fmt = jstr(w, "format", "");
+            if(fmt.empty() && jhas(w, "decimals")) fmt = vformat("%%.%df", static_cast<int>(jnum(w, "decimals", 0)));
+            if(fmt.empty()) fmt = "%s";                       // default rendering of the tag type
+            std::string unit = jstr(w, "unit", "");            // literal text: "%" must become "%%"
+            for(size_t pos = 0; (pos = unit.find('%', pos)) != std::string::npos; pos += 2) unit.insert(pos, "%");
+            bind_opts.format = fmt + unit;
+            if(jhas(w, "min")) bind_opts.vmin = jnum(w, "min", 0);
+            if(jhas(w, "max")) bind_opts.vmax = jnum(w, "max", 0);
+        }
+        if(input) {
+            if(group) lv_group_add_obj(group, obj);
+            if(building) {
+                for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL }) {
+                    lv_obj_add_event_cb(obj, &Impl::on_textarea_event, code, building);
+                }
+            }
+        }
+        else {
+            lv_obj_remove_flag(obj, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_CLICK_FOCUSABLE));
+            lv_textarea_set_cursor_click_pos(obj, false);
+            lv_obj_set_style_opa(obj, LV_OPA_TRANSP, LV_PART_CURSOR);
+        }
+        text_obj = obj;
+    }
     else if(iequals(type, "image")) {
         wk = Widget::Image;
         obj = lv_image_create(parent);
@@ -873,6 +984,8 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "keyboard")) {
         wk = Widget::Keyboard;
         obj = lv_keyboard_create(parent);
+        lv_group_remove_obj(obj);                            // pointer-operated: keep it out of the focus group
+        lv_obj_remove_state(obj, LV_STATE_FOCUSED);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_READY, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_CANCEL, nullptr);
