@@ -471,6 +471,7 @@ struct Screen {
     std::string name;
     lv_obj_t*   obj = nullptr;
     lv_obj_t*   keyboard = nullptr;   // optional on-screen keyboard
+    lv_obj_t*   kb_echo = nullptr;    // shows the edited text next to the keyboard when it hides the field
 };
 
 // LVGL's stock keyboard closes through a key drawn as a keyboard icon. Operators look for an
@@ -609,6 +610,7 @@ struct Ui::Impl {
         Screen* scr = static_cast<Screen*>(lv_event_get_user_data(e));
         if(!scr->keyboard) return;
         lv_event_code_t code = lv_event_get_code(e);
+        if(code == LV_EVENT_VALUE_CHANGED) { update_echo(scr, ta); return; }
         if(code == LV_EVENT_FOCUSED && focus_comes_from_pointer()) return;   // wait for CLICKED: it may be a scroll
         if(code == LV_EVENT_CLICKED && !released_on(ta)) return;             // finger left the field before release
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
@@ -616,10 +618,70 @@ struct Ui::Impl {
             // numeric_display marks itself with USER_1: give it the number pad
             lv_keyboard_set_mode(scr->keyboard, lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_1) ? LV_KEYBOARD_MODE_NUMBER : LV_KEYBOARD_MODE_TEXT_LOWER);
             lv_obj_remove_flag(scr->keyboard, LV_OBJ_FLAG_HIDDEN);
+            place_keyboard(scr, ta);
         }
         else if(code == LV_EVENT_DEFOCUSED || code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
             lv_obj_add_flag(scr->keyboard, LV_OBJ_FLAG_HIDDEN);
+            if(scr->kb_echo) lv_obj_add_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN);
         }
+    }
+    // A keyboard aligned to the bottom (or top) edge moves to the opposite edge when it would hide
+    // the field being edited, so the operator can see what is typed. When the field is hidden either
+    // way (middle of a small screen) an "echo" bar next to the keyboard shows the text instead.
+    static void place_keyboard(Screen* scr, lv_obj_t* ta)
+    {
+        lv_obj_t* kb = scr->keyboard;
+        lv_align_t align = lv_obj_get_style_align(kb, LV_PART_MAIN);
+        bool edge = align == LV_ALIGN_BOTTOM_MID || align == LV_ALIGN_TOP_MID;
+        lv_obj_update_layout(scr->obj);
+        int32_t kb_h = lv_obj_get_height(kb);
+        int32_t scr_h = lv_obj_get_height(scr->obj);
+        lv_area_t a;
+        lv_obj_get_coords(ta, &a);
+        bool covered_at_bottom = a.y2 > scr_h - kb_h;
+        bool covered_at_top = a.y1 < kb_h;
+        bool covered;
+        if(edge) {
+            if(covered_at_bottom && !covered_at_top) align = LV_ALIGN_TOP_MID;
+            else if(covered_at_top && !covered_at_bottom) align = LV_ALIGN_BOTTOM_MID;
+            else align = LV_ALIGN_BOTTOM_MID;
+            lv_obj_set_align(kb, align);
+            covered = align == LV_ALIGN_BOTTOM_MID ? covered_at_bottom : covered_at_top;
+        }
+        else {
+            lv_obj_update_layout(scr->obj);
+            lv_area_t k;
+            lv_obj_get_coords(kb, &k);
+            covered = a.y2 >= k.y1 && a.y1 <= k.y2;
+        }
+
+        if(!covered) { if(scr->kb_echo) lv_obj_add_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN); return; }
+        if(!scr->kb_echo) {
+            lv_obj_t* echo = lv_label_create(scr->obj);
+            lv_obj_set_width(echo, lv_pct(100));
+            lv_label_set_long_mode(echo, LV_LABEL_LONG_MODE_CLIP);
+            lv_obj_set_style_bg_color(echo, lv_color_hex(0x1f2a38), LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(echo, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_text_color(echo, lv_color_white(), LV_PART_MAIN);
+            lv_obj_set_style_pad_all(echo, 8, LV_PART_MAIN);
+            lv_obj_set_style_text_align(echo, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+            lv_obj_remove_flag(echo, LV_OBJ_FLAG_CLICKABLE);
+            scr->kb_echo = echo;
+        }
+        lv_obj_set_style_text_font(scr->kb_echo, lv_obj_get_style_text_font(ta, LV_PART_MAIN), LV_PART_MAIN);
+        lv_obj_remove_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(scr->kb_echo);
+        update_echo(scr, ta);
+        lv_obj_update_layout(scr->obj);
+        lv_obj_align_to(scr->kb_echo, kb, edge && align == LV_ALIGN_TOP_MID ? LV_ALIGN_OUT_BOTTOM_MID : LV_ALIGN_OUT_TOP_MID, 0, 0);
+    }
+    static void update_echo(Screen* scr, lv_obj_t* ta)
+    {
+        if(!scr->kb_echo || lv_obj_has_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN)) return;
+        if(!scr->keyboard || lv_keyboard_get_textarea(scr->keyboard) != ta) return;
+        std::string text = lv_textarea_get_text(ta);
+        if(lv_textarea_get_password_mode(ta)) text = std::string(text.size(), '*');
+        lv_label_set_text(scr->kb_echo, (text + "|").c_str());
     }
     static void on_keyboard_done(lv_event_t* e)
     {
@@ -1070,7 +1132,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         }
         if(group) lv_group_add_obj(group, obj);
         if(building) {
-            for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL }) {
+            for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL, LV_EVENT_VALUE_CHANGED }) {
                 lv_obj_add_event_cb(obj, &Impl::on_textarea_event, code, building);
             }
         }
@@ -1113,7 +1175,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         if(input) {
             if(group) lv_group_add_obj(group, obj);
             if(building) {
-                for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL }) {
+                for(lv_event_code_t code : { LV_EVENT_FOCUSED, LV_EVENT_CLICKED, LV_EVENT_DEFOCUSED, LV_EVENT_READY, LV_EVENT_CANCEL, LV_EVENT_VALUE_CHANGED }) {
                     lv_obj_add_event_cb(obj, &Impl::on_textarea_event, code, building);
                 }
             }

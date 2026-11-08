@@ -263,7 +263,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
     const int header_h = compact ? 40 : 56;
     const int font = compact ? 12 : 14;
     const int title_font = compact ? 16 : 20;
-    const int kb_h = height * (compact ? 45 : 40) / 100;
+    const int kb_h = height * (compact ? 60 : 45) / 100;
     const char* bg = "#141a22";
     const char* card = "#1b2430";
     const char* muted = "#9fb3c8";
@@ -351,7 +351,8 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                       { "flex", "column" }, { "flex_cross", "start" }, { "scrollbar", "auto" },
                       { "style", { { "bg_color", card }, { "radius", 8 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
                       { "children", rows } },
-                json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", kb_h } },
+                json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", kb_h },
+                      { "style", { { "pad", compact ? 4 : 6 }, { "pad_gap", compact ? 4 : 6 } } }, { "style_items", { { "font", 18 } } } },
             }) },
         });
     }

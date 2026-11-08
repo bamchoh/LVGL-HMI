@@ -460,6 +460,76 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
     }
 }
 
+TEST_CASE("the keyboard moves to the top edge when it would cover the field")
+{
+    Runtime rt;
+    rt.tag("a", TagType::Float, 1);
+    rt.tag("b", TagType::Float, 2);
+    lv_obj_t* s = build_widgets(J(R"json([
+        { "type": "numeric_display", "bind": "a", "input": true, "x": 10, "y": 10, "w": 120, "h": 30 },
+        { "type": "numeric_display", "bind": "b", "input": true, "x": 10, "y": 200, "w": 120, "h": 30 },
+        { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 120 }
+    ])json"));
+    lv_obj_t* top_field = nth(s, 0);
+    lv_obj_t* bottom_field = nth(s, 1);
+    lv_obj_t* kb = nth(s, 2);
+    lv_obj_update_layout(s);
+
+    send(bottom_field, LV_EVENT_CLICKED);                      // display is 240 high: y 200..230 is under a 120 px keyboard
+    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_get_style_align(kb, LV_PART_MAIN) == LV_ALIGN_TOP_MID);
+    send(bottom_field, LV_EVENT_CANCEL);
+
+    send(top_field, LV_EVENT_CLICKED);                         // y 10..40 would be under a top keyboard: back to the bottom
+    CHECK(lv_obj_get_style_align(kb, LV_PART_MAIN) == LV_ALIGN_BOTTOM_MID);
+}
+
+TEST_CASE("a field hidden by the keyboard either way gets an echo of the typed text")
+{
+    Runtime rt;
+    rt.tag("t", std::string("abc"));
+    rt.tag("p", std::string(""));
+    lv_obj_t* s = build_widgets(J(R"json([
+        { "type": "text_display", "bind": "t", "input": true, "x": 10, "y": 100, "w": 200, "h": 40 },
+        { "type": "password_display", "bind": "p", "x": 10, "y": 100, "w": 200, "h": 40, "hidden": true },
+        { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 160 }
+    ])json"));
+    lv_obj_t* field = nth(s, 0);
+    lv_obj_t* kb = nth(s, 2);
+    lv_obj_update_layout(s);
+    uint32_t children_before = lv_obj_get_child_count(s);
+
+    send(field, LV_EVENT_FOCUSED);                             // a tap: focus, then click
+    send(field, LV_EVENT_CLICKED);                             // y 100..140 is covered by a 160 px keyboard at either edge
+    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    REQUIRE(lv_obj_get_child_count(s) == children_before + 1); // the echo label was created
+    lv_obj_t* echo = lv_obj_get_child(s, static_cast<int32_t>(children_before));
+    REQUIRE(lv_obj_check_type(echo, &lv_label_class));
+    CHECK_FALSE(lv_obj_has_flag(echo, LV_OBJ_FLAG_HIDDEN));
+    CHECK(std::string(lv_label_get_text(echo)) == "|");       // cleared on tap
+
+    lv_textarea_add_text(field, "xy");
+    CHECK(std::string(lv_label_get_text(echo)) == "xy|");
+    lv_area_t ke, ka;
+    lv_obj_update_layout(s);
+    lv_obj_get_coords(echo, &ke);
+    lv_obj_get_coords(kb, &ka);
+    CHECK(ke.y2 <= ka.y1);                                     // sits right above the bottom keyboard
+
+    send(field, LV_EVENT_READY);
+    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_has_flag(echo, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_get_child_count(s) == children_before + 1);  // reused, not recreated
+
+    // password fields echo bullets only
+    lv_obj_t* pw = nth(s, 1);
+    lv_obj_remove_flag(pw, LV_OBJ_FLAG_HIDDEN);
+    send(pw, LV_EVENT_FOCUSED);
+    send(pw, LV_EVENT_CLICKED);
+    lv_textarea_add_text(pw, "1234");
+    CHECK(std::string(lv_label_get_text(echo)) == "****|");
+}
+
 TEST_CASE("plain textarea keeps writing on every change")
 {
     Runtime rt;

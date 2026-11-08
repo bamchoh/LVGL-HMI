@@ -133,6 +133,6 @@
       ]
     },
 
-    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 200 }
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 220, "style_items": { "font": 18 } }
   ]
 }

@@ -119,6 +119,7 @@
       ]
     },
 
-    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 140 }
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 190,
+      "style": { "pad": 4, "pad_gap": 4 }, "style_items": { "font": 18 } }
   ]
 }
