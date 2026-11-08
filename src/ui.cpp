@@ -147,6 +147,19 @@ bool focus_comes_from_pointer()
     return indev && lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER;
 }
 
+// LVGL keeps the pressed object until the finger is lifted (PRESS_LOCK), so CLICKED also arrives
+// when the finger was dragged off the object before release. Treat that as "not a tap".
+bool released_on(lv_obj_t* obj)
+{
+    lv_indev_t* indev = lv_indev_active();
+    if(!indev || lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) return true;   // keypad / programmatic
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+    return p.x >= a.x1 && p.x <= a.x2 && p.y >= a.y1 && p.y <= a.y2;
+}
+
 // Show text in a textarea bypassing the operator-input filters (accepted_chars / max_length),
 // which lv_textarea_set_text would otherwise apply to the displayed value too ("42.3 rpm").
 void ta_show(lv_obj_t* ta, const std::string& text)
@@ -578,6 +591,7 @@ struct Ui::Impl {
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
         if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_2)) return;
+        if(!released_on(ta)) return;                              // dragged off the field: keep waiting for a real tap
         lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_2);
         lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_3);
         lv_textarea_set_text(ta, "");
@@ -596,6 +610,7 @@ struct Ui::Impl {
         if(!scr->keyboard) return;
         lv_event_code_t code = lv_event_get_code(e);
         if(code == LV_EVENT_FOCUSED && focus_comes_from_pointer()) return;   // wait for CLICKED: it may be a scroll
+        if(code == LV_EVENT_CLICKED && !released_on(ta)) return;             // finger left the field before release
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
             lv_keyboard_set_textarea(scr->keyboard, ta);
             // numeric_display marks itself with USER_1: give it the number pad
