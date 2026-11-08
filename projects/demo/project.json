@@ -12,14 +12,13 @@
     { "name": "speed_pv",    "type": "int",    "init": 0,   "min": 0, "max": 100 },
     { "name": "run",         "type": "bool",   "init": false },
     { "name": "auto_mode",   "type": "bool",   "init": true },
-    { "name": "alarm",       "type": "int",    "init": 0,   "min": 0, "max": 2 },
     { "name": "state_text",  "type": "string", "init": "Idle" },
     { "name": "mode",        "type": "int",    "init": 0,   "min": 0, "max": 2 },
     { "name": "setpoint",    "type": "int",    "init": 50,  "min": 0, "max": 100 },
     { "name": "operator",    "type": "string", "init": "" },
     { "name": "plc_online",  "type": "bool",   "init": false },
     { "name": "pin",         "type": "string", "init": "" },
-    { "name": "temp_lo",     "type": "float",  "init": 18.0, "min": 0, "max": 50 },
+    { "name": "temp_lo",     "type": "float",  "init": 20.0, "min": 0, "max": 50 },
     { "name": "temp_hi",     "type": "float",  "init": 30.0, "min": 0, "max": 50 },
     { "name": "blink",       "type": "bool",   "init": false }
   ],
@@ -31,7 +30,6 @@
         { "tag": "temp",       "mode": "sine",     "min": 18,  "max": 32,  "period_ms": 12000 },
         { "tag": "pressure",   "mode": "triangle", "min": 1.0, "max": 3.5, "period_ms": 7000 },
         { "tag": "level",      "mode": "ramp",     "min": 0,   "max": 100, "period_ms": 20000 },
-        { "tag": "alarm",      "mode": "counter",  "min": 0,   "max": 2,   "period_ms": 4000 },
         { "tag": "state_text", "mode": "cycle",    "values": ["Idle", "Starting", "Running", "Stopping"], "period_ms": 3000 },
         { "tag": "blink",      "mode": "square",   "period_ms": 1000 }
       ]

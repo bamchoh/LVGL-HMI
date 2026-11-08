@@ -476,6 +476,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
   "checked":    "run",
   "on":         "run",
   "visible":    { "tag": "alarm", "eq": 2 },
+  "visible":    { "tag": "temp", "gt": { "tag": "temp_hi" } },
   "hidden":     "maintenance",
   "enabled":    { "tag": "auto_mode", "invert": true },
   "bg_color":   { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828", "default": "#555" } },
@@ -490,7 +491,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | `format`                                | printf 形式（変換指定子は 1 つ）。`%d` `%x` → 整数、`%f` `%g` → 実数、`%s` → 文字列。`%%` で `%`                                            |
 | `scale` / `offset`                      | ウィジェット値 = タグ値 × scale + offset（双方向時は逆変換）                                                                                |
 | `invert`                                | 真偽を反転                                                                                                                                  |
-| `eq` / `ne` / `gt` / `lt` / `ge` / `le` | 条件付き真偽（`visible`, `enabled`, `checked`, `on` で使用）。`checked` に `eq` を付けると、ON 時にその値をタグへ書く（ラジオボタン的動作） |
+| `eq` / `ne` / `gt` / `lt` / `ge` / `le` | 条件付き真偽（`visible`, `enabled`, `checked`, `on` で使用）。比較対象は定数か、`{ "tag": "temp_hi" }` のように別のタグ（どちらのタグが変わっても再評価）。`checked` に `eq` を付けると、ON 時にその値をタグへ書く（ラジオボタン的動作） |
 | `map`                                   | 値 → 色 のマップ。`default` で既定色                                                                                                        |
 | `part`                                  | `bg_color` の対象パート: `main` (既定) / `indicator` / `knob`                                                                               |
 | `two_way`                               | 双方向の明示的な ON/OFF                                                                                                                     |

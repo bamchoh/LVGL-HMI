@@ -165,12 +165,13 @@ const Canvas = {
     let r;
     const c = typeof cfg === 'object' && cfg ? cfg : {};
     const num = x => typeof x === 'boolean' ? (x ? 1 : 0) : typeof x === 'string' ? (parseFloat(x) || 0) : x;
-    if (c.eq !== undefined) r = String(v) === String(c.eq) || num(v) === num(c.eq);
-    else if (c.ne !== undefined) r = !(String(v) === String(c.ne) || num(v) === num(c.ne));
-    else if (c.gt !== undefined) r = num(v) > num(c.gt);
-    else if (c.lt !== undefined) r = num(v) < num(c.lt);
-    else if (c.ge !== undefined) r = num(v) >= num(c.ge);
-    else if (c.le !== undefined) r = num(v) <= num(c.le);
+    const rhs = x => (x && typeof x === 'object') ? this.tagInit(x.tag) : x;   // { tag } compares with that tag's init value
+    if (c.eq !== undefined) r = String(v) === String(rhs(c.eq)) || num(v) === num(rhs(c.eq));
+    else if (c.ne !== undefined) r = !(String(v) === String(rhs(c.ne)) || num(v) === num(rhs(c.ne)));
+    else if (c.gt !== undefined) r = num(v) > num(rhs(c.gt));
+    else if (c.lt !== undefined) r = num(v) < num(rhs(c.lt));
+    else if (c.ge !== undefined) r = num(v) >= num(rhs(c.ge));
+    else if (c.le !== undefined) r = num(v) <= num(rhs(c.le));
     else r = typeof v === 'string' ? v !== '' : !!num(v);
     return c.invert ? !r : r;
   },

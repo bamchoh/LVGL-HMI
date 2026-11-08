@@ -241,6 +241,7 @@ struct Binding {
     double      cmp_num = 0;
     std::string cmp_str;
     bool        cmp_is_str = false;
+    Tag*        cmp_tag = nullptr;    // compare against another tag's live value instead of a constant
     double      scale = 1, offset = 0;    // widget = tag * scale + offset (Value)
     std::vector<std::pair<double, lv_color_t>> color_map;
     std::optional<lv_color_t> default_color;
@@ -256,26 +257,35 @@ struct Binding {
     void on_widget_changed(lv_obj_t* target);
 };
 
+static bool compare_numbers(Cmp cmp, double a, double b)
+{
+    switch(cmp) {
+        case Cmp::Eq: return a == b;
+        case Cmp::Ne: return a != b;
+        case Cmp::Gt: return a > b;
+        case Cmp::Lt: return a < b;
+        case Cmp::Ge: return a >= b;
+        case Cmp::Le: return a <= b;
+        default: return false;
+    }
+}
+
+static bool compare_strings(Cmp cmp, const std::string& a, const std::string& b)
+{
+    return (cmp == Cmp::Eq) ? a == b : (cmp == Cmp::Ne) ? a != b : false;
+}
+
 bool Binding::condition(const Value& v) const
 {
     bool r;
     if(cmp == Cmp::None) r = v.truthy();
-    else if(cmp_is_str) {
-        bool eq = (v.is_string() ? v.str : std::string()) == cmp_str;
-        r = (cmp == Cmp::Eq) ? eq : (cmp == Cmp::Ne) ? !eq : false;
+    else if(cmp_tag) {
+        Value other = cmp_tag->get();
+        if(v.is_string() && other.is_string()) r = compare_strings(cmp, v.str, other.str);
+        else r = compare_numbers(cmp, v.as_number(), other.as_number());
     }
-    else {
-        double n = v.as_number();
-        switch(cmp) {
-            case Cmp::Eq: r = n == cmp_num; break;
-            case Cmp::Ne: r = n != cmp_num; break;
-            case Cmp::Gt: r = n > cmp_num; break;
-            case Cmp::Lt: r = n < cmp_num; break;
-            case Cmp::Ge: r = n >= cmp_num; break;
-            case Cmp::Le: r = n <= cmp_num; break;
-            default: r = false;
-        }
-    }
+    else if(cmp_is_str) r = compare_strings(cmp, v.is_string() ? v.str : std::string(), cmp_str);
+    else r = compare_numbers(cmp, v.as_number(), cmp_num);
     return invert ? !r : r;
 }
 
@@ -362,7 +372,8 @@ void Binding::on_widget_changed(lv_obj_t* target)
     if(kind == BindKind::Checked) {
         bool on = lv_obj_has_state(target, LV_STATE_CHECKED);
         if(invert) on = !on;
-        if(cmp == Cmp::Eq && !cmp_is_str) { if(on) tag->set_number(cmp_num, this); }
+        if(cmp == Cmp::Eq && cmp_tag) { if(on) tag->set(cmp_tag->get(), this); }          // radio button: copy the compared tag
+        else if(cmp == Cmp::Eq && !cmp_is_str) { if(on) tag->set_number(cmp_num, this); }
         else tag->set_number(on ? 1 : 0, this);
         return;
     }
@@ -596,6 +607,13 @@ void Ui::Impl::parse_cmp(Binding& b, const json& spec)
         const json* v = jget(spec, t.k);
         if(!v) continue;
         b.cmp = t.c;
+        if(v->is_object()) {
+            // { "gt": { "tag": "temp_hi" } } - compare with another tag, re-evaluated when either changes
+            std::string other = jstr(*v, "tag", "");
+            b.cmp_tag = tags().find(other);
+            if(!b.cmp_tag) { HML_WARN("bind: unknown compare tag '%s'", other.c_str()); b.cmp = Cmp::None; }
+            return;
+        }
         if(v->is_string()) {
             b.cmp_is_str = true;
             b.cmp_str = v->get<std::string>();
@@ -646,6 +664,10 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     Binding* raw = b.get();
     bindings.push_back(std::move(b));
     tag->subscribe(SubGroup::UI, [raw](Tag&, const Value& v, const void* src) { raw->on_tag_changed(v, src); });
+    if(raw->cmp_tag) {
+        // the condition depends on a second tag: re-evaluate with the bound tag's current value
+        raw->cmp_tag->subscribe(SubGroup::UI, [raw](Tag&, const Value&, const void*) { raw->on_tag_changed(raw->tag->get(), nullptr); });
+    }
     if(two_way && raw->commit_on_ready) {
         lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_value_changed, LV_EVENT_READY, raw);      // keyboard OK / Enter

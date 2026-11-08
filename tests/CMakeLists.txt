@@ -27,6 +27,7 @@ add_executable(hml_tests
   test_project.cpp
   test_ui.cpp
   test_ui_data_display.cpp
+  test_ui_conditions.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})

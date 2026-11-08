@@ -160,8 +160,10 @@ const Props = {
         const op = U.el('select', { onchange: ev => { for (const o of SCHEMA.bindOps) if (o) delete cfg[o]; if (ev.target.value) cfg[ev.target.value] = cfg[ev.target.value] === undefined ? 0 : cfg[ev.target.value]; commit(); } });
         let curOp = SCHEMA.bindOps.find(o => o && cfg[o] !== undefined) || '';
         for (const o of SCHEMA.bindOps) op.append(U.el('option', { value: o, selected: o === curOp }, o === '' ? '(truthy)' : o));
-        const val = U.el('input', { type: 'text', value: curOp ? cfg[curOp] : '', disabled: !curOp, dataset: { fk: bfk + '.cond' },
-          onchange: ev => { const s = ev.target.value.trim(); cfg[curOp] = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s; commit(); } });
+        // a constant, or "{tag}" to compare with another tag ({ "tag": "name" } in the JSON)
+        const condText = v => (v && typeof v === 'object') ? '{' + (v.tag || '') + '}' : v;
+        const val = U.el('input', { type: 'text', value: curOp ? condText(cfg[curOp]) : '', disabled: !curOp, placeholder: 'value or {tag}', dataset: { fk: bfk + '.cond' },
+          onchange: ev => { const s = ev.target.value.trim(); const m = /^\{(.+)\}$/.exec(s); cfg[curOp] = m ? { tag: m[1].trim() } : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s; commit(); } });
         details.push(opt('condition', U.el('span', { class: 'inline' }, op, val)), opt('invert', chk('invert')));
       }
       if (e.kind === 'bg_color' || e.kind === 'text_color') {

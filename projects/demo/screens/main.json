@@ -27,8 +27,7 @@
       "children": [
         { "type": "label", "text": "Temperature", "style": { "text_color": "#9fb3c8" } },
         { "type": "label", "align": "center", "y": 4, "style": { "font": 40, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "temp", "format": "%.1f C" },
-                    "text_color": { "tag": "alarm", "map": { "0": "#ffffff", "1": "#ffc107", "2": "#f44336" } } } },
+          "bind": { "text": { "tag": "temp", "format": "%.1f C" } } },
         { "type": "bar", "align": "bottom_mid", "w": "100%", "h": 8, "min": 0, "max": 50,
           "style_indicator": { "bg_color": "#2196f3" },
           "bind": { "value": "temp" } }
@@ -64,17 +63,22 @@
               "style": { "font": 14, "pad": 6 } }
           ] },
         { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
-          "style": { "radius": 8, "border_width": 0 },
-          "bind": { "bg_color": { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828" } } },
+          "style": { "radius": 8, "border_width": 0, "bg_color": "#2e7d32" },
           "children": [
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "NORMAL",
-              "bind": { "visible": { "tag": "alarm", "eq": 0 } } },
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#000000" }, "text": "WARNING",
-              "bind": { "visible": { "tag": "alarm", "eq": 1 } } },
-            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "ALARM",
-              "bind": { "visible": { "tag": "alarm", "eq": 2 } } }
-          ]
-        }
+            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "NORMAL" }
+          ] },
+        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
+          "style": { "radius": 8, "border_width": 0, "bg_color": "#f9a825" },
+          "bind": { "visible": { "tag": "temp", "lt": { "tag": "temp_lo" } } },
+          "children": [
+            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#000000" }, "text": "LOW" }
+          ] },
+        { "type": "panel", "align": "top_mid", "y": 26, "w": "100%", "h": 50, "scrollable": false,
+          "style": { "radius": 8, "border_width": 0, "bg_color": "#c62828" },
+          "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } },
+          "children": [
+            { "type": "label", "align": "center", "style": { "font": 24, "text_color": "#ffffff" }, "text": "HIGH" }
+          ] }
       ]
     },
 
