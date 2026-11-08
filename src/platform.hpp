@@ -9,6 +9,7 @@
 #include <string>
 #include "lvgl.h"
 #include "project.hpp"
+#include "ui.hpp"
 
 namespace hml::platform {
 
@@ -28,6 +29,12 @@ void poll();
 void screenshot(lv_display_t* disp, const std::string& path);
 
 void deinit();
+
+// "restart" action, called after everything has been shut down. Default means: reboot the
+// machine on the Linux console backends (fbdev / drm), restart the application on the PC
+// (SDL) backend. argv is the original command line (for re-launching). Does not return on
+// success; returns false when nothing could be done.
+bool restart(RestartTarget what, int argc, char** argv);
 
 const char* name();
 const char* hint();   // human readable: how to reload / quit on this backend

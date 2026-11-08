@@ -1031,6 +1031,33 @@ TEST_CASE("actions on click")
     CHECK(cnt->get_number() == doctest::Approx(2));
 }
 
+TEST_CASE("restart action reports its target to the application")
+{
+    Runtime rt;
+    lv_obj_t* first = build_widgets(J(R"json([
+        { "type": "button", "on_click": { "action": "restart" } },
+        { "type": "button", "on_click": { "action": "restart", "what": "app" } },
+        { "type": "button", "on_click": { "action": "restart", "what": "SYSTEM" } },
+        { "type": "button", "on_click": { "action": "restart", "what": "reboot" } },
+        { "type": "button", "on_click": { "action": "restart", "what": "nonsense" } }
+    ])json"));
+    REQUIRE(first);
+    lv_obj_t* scr = lv_obj_get_parent(first);
+    click(nth(scr, 0));
+    CHECK(rt.restart_requests == 1);
+    CHECK(rt.last_restart == RestartTarget::Default);
+    click(nth(scr, 1));
+    CHECK(rt.last_restart == RestartTarget::App);
+    click(nth(scr, 2));
+    CHECK(rt.last_restart == RestartTarget::System);
+    click(nth(scr, 3));
+    CHECK(rt.last_restart == RestartTarget::System);
+    click(nth(scr, 4));
+    CHECK(rt.last_restart == RestartTarget::Default);      // unknown target: warned, default
+    CHECK(rt.restart_requests == 5);
+    CHECK(rt.exit_requests == 0);
+}
+
 TEST_CASE("actions on other events")
 {
     Runtime rt;

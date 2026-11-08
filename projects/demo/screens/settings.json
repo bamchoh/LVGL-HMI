@@ -64,12 +64,13 @@
       "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0 },
       "children": [
         { "type": "label", "style": { "text_color": "#9fb3c8", "font": 14 },
-          "text": "F5 reloads the screen JSON files while running. Esc quits." },
+          "text": "F5 = reload screens, Esc = quit" },
         { "type": "panel", "w": "content", "h": "content", "flex": "row", "scrollable": false,
           "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 8 },
           "children": [
             { "type": "button", "text": "Reload", "on_click": { "action": "reload" } },
             { "type": "button", "text": "Main", "on_click": { "action": "goto", "screen": "main", "anim": "slide_right" } },
+            { "type": "button", "text": "Restart", "style": { "bg_color": "#ef6c00" }, "on_click": { "action": "restart" } },
             { "type": "button", "text": "Exit", "style": { "bg_color": "#455a64" }, "on_click": { "action": "exit" } }
           ] }
       ]

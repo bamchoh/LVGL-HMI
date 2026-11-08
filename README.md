@@ -510,8 +510,18 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
   { "action": "goto",   "screen": "settings", "anim": "slide_left" },
   { "action": "back" },
   { "action": "reload" },
-  { "action": "exit" }
+  { "action": "exit" },
+  { "action": "restart" }
 ]
+```
+
+`restart` は Raspberry Pi（fbdev / drm バックエンド）では OS を再起動し、PC（SDL バックエンド）ではアプリを
+再起動します。`"what": "app"` / `"system"` で明示もできます。OS の再起動は `systemctl reboot` を `sudo -n`
+経由で呼ぶので、サービスを一般ユーザーで動かしている Pi では一度だけ次を実行してパスワードなしで許可してください
+（許可がない場合はアプリの再起動にフォールバックします）。
+
+```
+sudo install -m 440 tools/rpi/hml-reboot.sudoers /etc/sudoers.d/hml-reboot
 ```
 
 `anim`: `none` / `fade` / `slide_left` / `slide_right` / `slide_top` / `slide_bottom` / `over_left` / `over_right`

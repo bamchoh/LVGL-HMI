@@ -5,6 +5,12 @@
 #include "platform.hpp"
 #include "screenshot.hpp"
 #include "util.hpp"
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#endif
 
 namespace hml::platform {
 namespace {
@@ -50,6 +56,33 @@ void poll() {}
 void screenshot(lv_display_t* disp, const std::string& path) { save_screenshot_bmp(disp, path); }
 
 void deinit() { SDL_Quit(); }
+
+// PC: a reboot is never what the developer wants, so both targets restart the application.
+bool restart(RestartTarget what, int argc, char** argv)
+{
+    if(what == RestartTarget::System) HML_WARN("restart: system reboot is not supported on the SDL backend, restarting the app");
+    (void)argc;
+#ifdef _WIN32
+    (void)argv;
+    STARTUPINFOA si{};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi{};
+    std::string cmd = GetCommandLineA();                     // same executable, same arguments
+    if(!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+        HML_ERROR("restart: CreateProcess failed (%lu)", static_cast<unsigned long>(GetLastError()));
+        return false;
+    }
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    HML_INFO("restart: new instance started");
+    return true;                                             // caller exits
+#else
+    execv("/proc/self/exe", argv);
+    execv(argv[0], argv);
+    HML_ERROR("restart: execv failed: %s", std::strerror(errno));
+    return false;
+#endif
+}
 
 const char* name() { return "sdl"; }
 const char* hint() { return "F5 = reload screens, Esc = quit"; }

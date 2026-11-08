@@ -54,7 +54,8 @@ Runtime::Runtime()
 {
     Lvgl::get();
     hml::tags().clear();
-    hml::ui().init(nullptr, hml::AppCallbacks{ [this] { reload_requests++; }, [this] { exit_requests++; } });
+    hml::ui().init(nullptr, hml::AppCallbacks{ [this] { reload_requests++; }, [this] { exit_requests++; },
+                                               [this](hml::RestartTarget t) { restart_requests++; last_restart = t; } });
     drivers.register_builtins();
 }
 

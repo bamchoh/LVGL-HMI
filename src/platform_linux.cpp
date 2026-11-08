@@ -149,6 +149,28 @@ const char* name()
 
 const char* hint() { return "SIGHUP/SIGUSR1 = reload screens, SIGINT/SIGTERM (Ctrl-C) = quit"; }
 
+// Console backends: "restart" reboots the machine. The runtime normally runs as a plain user
+// (systemd unit), so the reboot goes through `sudo -n` (see tools/rpi/hml-reboot.sudoers) with
+// plain systemctl as a fallback. When neither is allowed the application restarts itself.
+bool restart(RestartTarget what, int argc, char** argv)
+{
+    (void)argc;
+    if(what != RestartTarget::App) {
+        HML_INFO("restart: rebooting the system");
+        std::fflush(stdout);
+        int rc = std::system("sudo -n systemctl reboot >/dev/null 2>&1 || systemctl reboot >/dev/null 2>&1");
+        if(rc == 0) return true;                            // the system is going down, caller exits
+        HML_ERROR("restart: reboot refused (install tools/rpi/hml-reboot.sudoers); restarting the app instead");
+        if(what == RestartTarget::System) return false;
+    }
+    HML_INFO("restart: re-executing %s", argv[0]);
+    std::fflush(stdout);
+    execv("/proc/self/exe", argv);
+    execv(argv[0], argv);
+    HML_ERROR("restart: execv failed: %s", std::strerror(errno));
+    return false;
+}
+
 } // namespace hml::platform
 
 #endif // HML_BACKEND_FBDEV || HML_BACKEND_DRM

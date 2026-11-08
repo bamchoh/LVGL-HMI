@@ -10,9 +10,14 @@
 
 namespace hml {
 
+// "restart" action: Default = reboot the machine on the Linux console backends, restart the
+// application on the PC (SDL) backend; App / System force one or the other.
+enum class RestartTarget { Default, App, System };
+
 struct AppCallbacks {
     std::function<void()> request_reload;
     std::function<void()> request_exit;
+    std::function<void(RestartTarget)> request_restart;
 };
 
 class Ui {

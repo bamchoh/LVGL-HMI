@@ -413,7 +413,7 @@ struct BindOpts {
     std::optional<double> vmin, vmax;
 };
 
-enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit };
+enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart };
 
 struct Action {
     ActionKind  kind = ActionKind::Back;
@@ -421,6 +421,7 @@ struct Action {
     Tag*        tag = nullptr;
     Value       value;
     double      by = 1;
+    RestartTarget restart = RestartTarget::Default;
 };
 
 struct ActionList {
@@ -741,6 +742,7 @@ void Ui::Impl::run_actions(const ActionList& list)
             case ActionKind::Dec:    a.tag->set_number(a.tag->get_number() - a.by, nullptr); break;
             case ActionKind::Reload: if(app.request_reload) app.request_reload(); break;
             case ActionKind::Exit:   if(app.request_exit) app.request_exit(); break;
+            case ActionKind::Restart: if(app.request_restart) app.request_restart(a.restart); break;
         }
     }
 }
@@ -764,6 +766,14 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
     if(iequals(*kind, "back")) { a.kind = ActionKind::Back; return a; }
     if(iequals(*kind, "reload")) { a.kind = ActionKind::Reload; return a; }
     if(iequals(*kind, "exit")) { a.kind = ActionKind::Exit; return a; }
+    if(iequals(*kind, "restart")) {
+        a.kind = ActionKind::Restart;
+        std::string what = jstr(j, "what", "");
+        if(iequals(what, "app")) a.restart = RestartTarget::App;
+        else if(iequals(what, "system") || iequals(what, "reboot")) a.restart = RestartTarget::System;
+        else if(!what.empty()) HML_WARN("restart: unknown target '%s' (app | system)", what.c_str());
+        return a;
+    }
 
     std::string tagname = jstr(j, "tag", "");
     a.tag = tags().find(tagname);

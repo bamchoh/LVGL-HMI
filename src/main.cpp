@@ -25,6 +25,7 @@ namespace {
 
 volatile bool s_quit = false;
 volatile bool s_reload = false;
+volatile int  s_restart = -1;      // -1 none, otherwise a hml::RestartTarget
 
 // ---- scripted pointer clicks (--click) ----
 struct Click { int32_t x, y; uint32_t at_ms; };
@@ -112,7 +113,8 @@ int main(int argc, char** argv)
     }
 
     hml::project().apply_theme(disp);
-    hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; } });
+    hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; },
+                                          [](hml::RestartTarget t) { s_restart = static_cast<int>(t); s_quit = true; } });
 
     hml::project().start_drivers();
     hml::project().build_screens();
@@ -159,5 +161,8 @@ int main(int argc, char** argv)
     lv_deinit();
     hml::tags().clear();
     hml::platform::deinit();
+    if(s_restart >= 0) {
+        if(!hml::platform::restart(static_cast<hml::RestartTarget>(s_restart), argc, argv)) return 4;
+    }
     return 0;
 }

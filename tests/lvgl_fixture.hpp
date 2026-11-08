@@ -9,6 +9,7 @@
 #include "lvgl.h"
 #include "driver.hpp"
 #include "tag.hpp"
+#include "ui.hpp"
 
 namespace hmltest {
 
@@ -39,8 +40,10 @@ struct Runtime {
     void pump() { hml::tags().dispatch(false); }
 
     hml::DriverRegistry drivers;        // builtins registered
-    int reload_requests = 0;            // AppCallbacks hits (actions "reload" / "exit")
+    int reload_requests = 0;            // AppCallbacks hits (actions "reload" / "exit" / "restart")
     int exit_requests = 0;
+    int restart_requests = 0;
+    hml::RestartTarget last_restart = hml::RestartTarget::Default;
 };
 
 } // namespace hmltest

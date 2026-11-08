@@ -96,6 +96,7 @@ const SCHEMA = {
     dec:    [{ k: 'tag', t: 'tag' }, { k: 'by', t: 'number' }],
     goto:   [{ k: 'screen', t: 'screen' }, { k: 'anim', t: 'anim' }],
     back:   [], reload: [], exit: [],
+    restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
   },
 
   drivers: {
