@@ -157,7 +157,7 @@ private:
     std::atomic<bool> running_{ false };
     sock_t            sock_ = kInvalidSock;
     uint16_t          tid_ = 0;
-    bool              online_ = false;
+    int               online_ = -1;       // -1 unknown, 0 offline, 1 online
     bool              ok_ = false;
 };
 
@@ -384,8 +384,10 @@ bool ModbusTcpDriver::write_item(const Item& it, double value)
 
 void ModbusTcpDriver::set_online(bool on)
 {
-    if(online_ == on) return;
-    online_ = on;
+    // online_ starts as "unknown" so that the status tag is written on the first attempt
+    // even when the server was never reachable.
+    if(online_ == (on ? 1 : 0)) return;
+    online_ = on ? 1 : 0;
     HML_INFO("modbus %s:%u %s", host_.c_str(), port_, on ? "connected" : "disconnected");
     if(status_tag_) status_tag_->set_number(on ? 1 : 0, this);
 }

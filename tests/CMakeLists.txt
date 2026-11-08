@@ -20,6 +20,7 @@ add_executable(hml_tests
   test_tag.cpp
   test_driver_registry.cpp
   test_driver_sim.cpp
+  test_driver_modbus.cpp
   test_project.cpp
   test_ui.cpp
   ${HML_TEST_RUNTIME_SOURCES}
