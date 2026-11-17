@@ -1,4 +1,5 @@
 #include "lvgl_fixture.hpp"
+#include "script.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
 
@@ -54,6 +55,7 @@ void Lvgl::render()
 Runtime::Runtime()
 {
     Lvgl::get();
+    hml::scripts().clear();
     hml::tags().clear();
     hml::ui().init(nullptr, hml::AppCallbacks{ [this] { reload_requests++; }, [this] { exit_requests++; },
                                                [this](hml::RestartTarget t) { restart_requests++; last_restart = t; } });
@@ -66,6 +68,7 @@ Runtime::~Runtime()
 {
     drivers.stop_all();
     hml::drivers().stop_all();
+    hml::scripts().clear();
     hml::ui().unload_all();
     hml::tags().clear();
 }

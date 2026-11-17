@@ -12,14 +12,15 @@ Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作
 ```
 project.json ──┬── tags      : 名前付き変数（bool/int/float/string）
                ├── drivers   : sim / modbus_tcp がタグを読み書き
-               └── screens   : screens/*.json → LVGL ウィジェットに展開
-                                 bind でタグ⇔ウィジェットを接続、on_click 等でアクション
+               ├── screens   : screens/*.json → LVGL ウィジェットに展開
+               │                 bind でタグ⇔ウィジェットを接続、on_click 等でアクション
+               └── scripts   : Lua スクリプト（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / イベント）
 ```
 
 ## ビルド（Windows / MSVC）
 
 必要なもの: Visual Studio 2022 以降 (C++ ツール), CMake 3.24+, Ninja, ネットワーク接続
-（初回に LVGL / SDL2 / nlohmann-json / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
+（初回に LVGL / SDL2 / nlohmann-json / Lua / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
 Python 3 も必要です（open62541 のコード生成に使用。不要なら `-DHML_OPCUA=OFF`）。
 
 ```
@@ -40,6 +41,7 @@ build.cmd Debug
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
+| `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
 | `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
 
@@ -226,6 +228,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
 | Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
 | Run                                    | 保存して `hml_runtime` を通常起動                                                                                                                                  |
+| 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
 | JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
 
 - キーボード: Ctrl+S 保存、Ctrl+Z / Ctrl+Y 取り消し / やり直し、Ctrl+D 複製、Delete 削除、Esc 選択解除。
@@ -552,9 +555,14 @@ Text / Number / Bool / Select / Info。
   { "action": "exit" },
   { "action": "restart" },
   { "action": "system" },
-  { "action": "call", "fn": "system.apply", "arg": "network" }
+  { "action": "call", "fn": "system.apply", "arg": "network" },
+  { "action": "script", "code": "if tag.temp > tag.temp_hi then tag.run = false end" },
+  { "action": "script", "name": "reset_counters" }
 ]
 ```
+
+`script` は Lua スクリプトを実行します。`code` にその場で書くか、`name` で project.json の `scripts` に
+定義したスクリプトを呼びます（下記「スクリプト (Lua)」）。
 
 `system` は組み込みのシステム設定画面（下記）を開きます。`call` はランタイムに登録された名前付きアクションを呼びます。
 
@@ -569,6 +577,63 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 
 `anim`: `none` / `fade` / `slide_left` / `slide_right` / `slide_top` / `slide_bottom` / `over_left` / `over_right`
 
+## スクリプト (Lua)
+
+固定のアクション（`set` / `inc` / `goto` …）では書けない条件分岐や計算は、Lua 5.4 のスクリプトで書けます。
+project.json の `scripts` に定義し、`trigger` で実行のタイミングを選びます。
+
+```json
+"scripts": [
+  { "name": "init",       "trigger": "startup",  "code": "total = 0" },
+  { "name": "totalizer",  "trigger": "interval", "interval_ms": 1000,
+    "code": "if tag.run then total = total + tag.flow / 3600  tag.total = total end" },
+  { "name": "temp_alarm", "trigger": "tag", "tags": ["temp", "temp_hi"],
+    "code": ["local high = tag.temp > tag.temp_hi",
+             "if high and not tag.alarm then log('temperature high: ' .. tag.temp) end",
+             "tag.alarm = high"] },
+  { "name": "enter_setup", "trigger": "screen_show", "screen": "settings", "code": "tag.pin = ''" },
+  { "name": "reset_counters", "code": "total = 0  tag.total = 0" },
+  { "name": "recipes", "trigger": "startup", "file": "scripts/recipes.lua" }
+]
+```
+
+| `trigger`                     | 実行されるとき                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `startup`                     | 起動時に 1 回（最初の画面を表示する前、定義順）。共通の関数や変数の定義に使う                                    |
+| `interval`                    | `interval_ms` ミリ秒ごと（既定 1000、最小 10）                                                                   |
+| `tag`                         | `tags`（配列）のどれかの値が変わったとき。`event.tag` / `event.value` で変化したタグが分かる                     |
+| `screen_show` / `screen_hide` | 画面が表示された / 別の画面に切り替わったとき。`screen` で画面を限定（省略時はすべての画面）。`event.screen` に画面名 |
+| `manual`（既定）              | 自動では実行しない。`{ "action": "script", "name": "..." }` や Lua の `run("...")` から呼ぶ                      |
+
+- コードは `code`（文字列、または行の配列）か `file`（project.json からの相対パスの `.lua` ファイル）で指定します。
+  `"enabled": false` で無効化できます。
+- スクリプトは画面と同じくメインスレッドで実行されます。全スクリプトが 1 つの Lua ステートを共有するので、
+  `startup` で定義したグローバル変数・関数を他のスクリプトから使えます。
+- ホットリロード（F5 / `SIGHUP`）でスクリプトも読み直されます。Lua のグローバル変数は初期化され、`startup`
+  スクリプトがもう一度実行されます（タグの値は維持されます）。
+- エラー（文法エラー、未定義のタグなど）はログに `[hml ERROR] script '<name>': <name>:<行>: ...` と出力され、
+  そのスクリプトの実行だけが中断されます。500 ms を超えて動き続けるスクリプト（無限ループなど）も打ち切られます。
+- `tag` トリガーのスクリプトが自分で書いたタグの変化では、自分自身は再実行されません（他のスクリプトは実行されます）。
+
+### Lua から使えるもの
+
+| API                                   | 内容                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `tag.name` / `tag["sys.about.host"]`  | タグの読み書き。bool タグは `true` / `false`、int は整数、float は実数、string は文字列。書き込みはタグの型に変換され、`min` / `max` も適用される。未定義のタグはエラー |
+| `goto_screen("name" [, "anim"])`      | 画面を切り替える（`anim` 省略時は `fade`）。画面がなければ `false` を返す                               |
+| `back()` / `current_screen()`         | 前の画面に戻る / 表示中の画面名                                                                         |
+| `run("name")`                         | 別のスクリプトを実行                                                                                    |
+| `call("fn" [, "arg"])`                | `call` アクションと同じ（ランタイムに登録された名前付きアクション）                                     |
+| `log(...)` / `print(...)`             | ログに出力（`[hml INFO ] [script] ...`）                                                                |
+| `millis()`                            | 起動からの経過ミリ秒                                                                                    |
+| `os.time()` / `os.date(fmt)` / `os.clock()` | 時刻（`os.date("%H:%M:%S")` など）                                                                |
+| `event`                               | 実行のきっかけ: `event.trigger`（`startup` / `interval` / `tag` / `screen_show` / `screen_hide` / `action`）、`event.tag`、`event.value`、`event.screen` |
+| 標準ライブラリ                        | `string` / `table` / `math` / `utf8` / `coroutine` と基本関数。ファイル・プロセス操作（`io`、`os.execute`、`require`、`load` など）は使えません |
+
+bool タグは Lua の真偽値です。`if tag.run then` と書いてください（`tag.run == 1` は常に偽になります）。
+
+デモプロジェクトの `auto_speed` スクリプト（Auto mode かつ Run のとき、温度に応じて速度設定値を動かす）が例です。
+
 ## ソース構成
 
 | ファイル                       | 役割                                                                                                |
@@ -579,6 +644,7 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 | `src/platform_linux.cpp`       | Linux fbdev / DRM + evdev バックエンド（Raspberry Pi）: シグナル制御、スナップショット              |
 | `src/tag.[ch]pp`               | `hml::Tag` / `hml::TagStore`: タグストア（スレッドセーフ、変更通知、書き込み元の追跡）              |
 | `src/ui.[ch]pp`                | `hml::Ui`: JSON → LVGL ウィジェット、バインディング、アクション、画面遷移                           |
+| `src/script.[ch]pp`            | `hml::ScriptEngine`: Lua スクリプト（トリガー、タグ / 画面 API、サンドボックス、タイムアウト）      |
 | `src/project.[ch]pp`           | `hml::Project`: project.json の読み込み、画面構築とホットリロード                                   |
 | `src/driver.[ch]pp`            | `hml::Driver` 基底クラスと `hml::DriverRegistry`（登録 / 起動 / 停止）                              |
 | `src/driver_sim.cpp`           | シミュレーションドライバ                                                                            |
@@ -600,7 +666,7 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 
 ### 組み込みターゲットへの移植
 
-ランタイム本体（tag / ui / project / driver）は LVGL、nlohmann/json と C++17 標準ライブラリ
+ランタイム本体（tag / ui / project / driver / script）は LVGL、nlohmann/json、Lua と C++17 標準ライブラリ
 （`std::thread` / `std::mutex` / `std::function`）にしか依存しません。
 Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動きます。それ以外の RTOS /
 ベアメタルへは、`platform.hpp` を実装するファイルを 1 つ追加して対象ボードの表示・入力
@@ -615,10 +681,12 @@ Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動
 - **ドライバを追加**: `hml::Driver` を継承したクラスを書き、`DriverRegistry::register_builtins()`
   にファクトリを登録します（`driver_sim.cpp` が最小の例です）。
 - **アクションを追加**: `ui.cpp` の `ActionKind` と `parse_action()` / `run_actions()` に追加します。
+- **Lua の関数を追加**: `script.cpp` の `ScriptEngine::Impl::ensure_state()` の `funcs` に登録します
+  （デザイナーの Scripts タブに出るヘルプは `panels.js` の `SCRIPT_HELP`）。
 
 ### スレッドモデル
 
-- LVGL と UI バインディングは常にメインスレッドで動作します。
+- LVGL と UI バインディング、Lua スクリプトは常にメインスレッドで動作します。
 - ドライバは任意のスレッドから `Tag::set_number()` / `set_string()` を呼べます。変更はメインループの
   `TagStore::dispatch()` で購読者（ウィジェット・ドライバ）に配信されます。
 - 各書き込みには「書き込み元」が付くため、スライダー自身の書き込みがスライダーに戻って

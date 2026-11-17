@@ -36,6 +36,7 @@ public:
 
     // Named actions for { "action": "call", "fn": "<name>", "arg": "..." }. Registering a name again replaces it.
     void register_action(const std::string& name, std::function<void(const std::string& arg)> fn);
+    bool call_action(const std::string& name, const std::string& arg);   // false if the name is unknown
 
     bool show_screen(const std::string& name, const std::string& anim);
     bool back();

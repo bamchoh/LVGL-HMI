@@ -400,3 +400,51 @@ test('M tags and drivers', () => {
   M.removeDriver(0);
   deq(M.st.project.drivers, [{ type: 'unknown' }]);
 });
+
+test('M scripts: add, rename (script actions follow), trigger keys, remove', () => {
+  const { M, SCHEMA } = load();
+  M.newProject('T');
+  assert.equal(M.st.project.scripts, undefined);              // no empty "scripts" array in projects without scripts
+  deq(M.scriptNames(), []);
+  assert.equal(M.addScript(), 0);
+  assert.equal(M.addScript(), 1);
+  deq(M.st.project.scripts, [{ name: 'script1', trigger: 'manual', code: '' }, { name: 'script2', trigger: 'manual', code: '' }]);
+  deq(M.scriptNames(), ['script1', 'script2']);
+
+  M.screen().children.push({ type: 'button', on_click: [{ action: 'script', name: 'script1' }, { action: 'script', code: 'tag.x = 1' }],
+    children: [{ type: 'button', on_press: { action: 'script', name: 'script1' } }] });
+  assert.equal(M.renameScript(0, 'script2'), false);           // already used
+  assert.equal(M.renameScript(0, '  '), false);
+  assert.equal(M.renameScript(5, 'x'), false);
+  assert.equal(M.renameScript(0, ' init '), true);
+  deq(M.scriptNames(), ['init', 'script2']);
+  const btn = M.screen().children[0];
+  deq(btn.on_click, [{ action: 'script', name: 'init' }, { action: 'script', code: 'tag.x = 1' }]);
+  assert.equal(btn.children[0].on_press.name, 'init');
+
+  const s = M.st.project.scripts[1];
+  M.setScriptTrigger(1, 'interval');
+  deq(s, { name: 'script2', trigger: 'interval', code: '', interval_ms: 1000 });
+  M.setScriptTrigger(1, 'tag');
+  deq(s, { name: 'script2', trigger: 'tag', code: '', tags: [] });
+  s.tags = ['a'];
+  M.setScriptTrigger(1, 'screen_show');
+  s.screen = 'main';
+  deq(s, { name: 'script2', trigger: 'screen_show', code: '', screen: 'main' });
+  M.renameScreen(0, 'home');                                  // screen triggers follow a screen rename
+  assert.equal(s.screen, 'home');
+  M.setScriptTrigger(1, 'manual');
+  deq(s, { name: 'script2', code: '' });
+  for (const t of ['startup', 'interval', 'tag', 'screen_show', 'screen_hide', 'manual']) assert.ok(SCHEMA.scriptTriggers.includes(t));
+  assert.ok(SCHEMA.actions.script);
+
+  M.addScript();
+  deq(M.scriptNames(), ['init', 'script2', 'script3']);
+  M.removeScript(0); M.removeScript(0);
+  deq(M.scriptNames(), ['script3']);
+  M.removeScript(0);
+  assert.equal(M.st.project.scripts, undefined);
+  M.undo();
+  deq(M.scriptNames(), ['script3']);
+  assert.ok(M.filesToWrite()[0].text.includes('"scripts"'));
+});

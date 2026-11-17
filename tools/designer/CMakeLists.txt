@@ -35,10 +35,13 @@ else()
   target_link_libraries(hml_designer PRIVATE Threads::Threads)
 endif()
 
-# the page is loaded from <exe dir>/designer (falls back to the source tree while developing)
-add_custom_command(TARGET hml_designer POST_BUILD
+# The page is loaded from <exe dir>/designer (falls back to the source tree while developing).
+# Copied on every build, not only when the host is relinked: most designer changes touch the
+# HTML / JS only.
+add_custom_target(hml_designer_renderer ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/renderer $<TARGET_FILE_DIR:hml_designer>/designer
   COMMENT "Copying designer renderer files")
+add_dependencies(hml_designer_renderer hml_designer)
 
 install(TARGETS hml_designer RUNTIME DESTINATION bin)
 install(DIRECTORY renderer/ DESTINATION bin/designer)

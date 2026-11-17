@@ -57,6 +57,7 @@ const M = {
 
   screen() { const s = this.st.screens[this.st.cur]; return s ? s.data : null; },
   screenNames() { return this.st.screens.map(s => s.data.name); },
+  scriptNames() { return ((this.st.project && this.st.project.scripts) || []).map(s => s && s.name).filter(Boolean); },
   tagNames() { return ((this.st.project && this.st.project.tags) || []).map(t => t.name).filter(Boolean); },
   display() { const d = (this.st.project && this.st.project.display) || {}; return { w: U.num(d.width, 800), h: U.num(d.height, 480) }; },
 
@@ -190,16 +191,21 @@ const M = {
       const s = this.st.screens[idx], old = s.data.name;
       s.data.name = name;
       if (this.st.project.start_screen === old) this.st.project.start_screen = name;
-      // keep goto actions pointing at the renamed screen
-      const fix = w => {
-        for (const ev of SCHEMA.events) {
-          const acts = w[ev]; if (!acts) continue;
-          for (const a of Array.isArray(acts) ? acts : [acts]) if (a && a.action === 'goto' && a.screen === old) a.screen = name;
-        }
-        (w.children || []).forEach(fix);
-      };
-      this.st.screens.forEach(sc => fix(sc.data));
+      // keep goto actions and screen_show / screen_hide scripts pointing at the renamed screen
+      this.eachAction(a => { if (a.action === 'goto' && a.screen === old) a.screen = name; });
+      for (const sc of this.st.project.scripts || []) if (sc && sc.screen === old) sc.screen = name;
     });
+  },
+  // every action object of every widget event on every screen
+  eachAction(fn) {
+    const walk = w => {
+      for (const ev of SCHEMA.events) {
+        const acts = w[ev]; if (!acts) continue;
+        for (const a of Array.isArray(acts) ? acts : [acts]) if (a && typeof a === 'object') fn(a);
+      }
+      (w.children || []).forEach(walk);
+    };
+    this.st.screens.forEach(sc => walk(sc.data));
   },
   selectScreen(idx) { this.st.cur = idx; this.st.sel = []; App.refresh(); },
 
@@ -220,4 +226,46 @@ const M = {
     });
   },
   removeDriver(i) { this.mutate(() => this.st.project.drivers.splice(i, 1)); },
+
+  // ---- scripts (Lua) -----------------------------------------------------
+  addScript() {
+    return this.mutate(() => {
+      const list = this.st.project.scripts = this.st.project.scripts || [];
+      let n = list.length + 1, name;
+      do { name = 'script' + n++; } while (list.some(s => s && s.name === name));
+      list.push({ name, trigger: 'manual', code: '' });
+      return list.length - 1;
+    });
+  },
+  removeScript(i) {
+    this.mutate(() => {
+      const list = this.st.project.scripts;
+      list.splice(i, 1);
+      if (!list.length) delete this.st.project.scripts;
+    });
+  },
+  // false if the name is empty or already used; script actions that call it follow the rename
+  renameScript(i, name) {
+    name = String(name || '').trim();
+    const list = (this.st.project && this.st.project.scripts) || [], s = list[i];
+    if (!s || !name || list.some((o, j) => j !== i && o && o.name === name)) return false;
+    if (s.name === name) return true;
+    this.mutate(() => {
+      const old = s.name;
+      s.name = name;
+      if (old) this.eachAction(a => { if (a.action === 'script' && a.name === old) a.name = name; });
+    });
+    return true;
+  },
+  // the keys each trigger uses; the others are dropped when the trigger changes
+  setScriptTrigger(i, trigger) {
+    const s = this.st.project.scripts[i];
+    this.mutate(() => {
+      if (!trigger || trigger === 'manual') delete s.trigger; else s.trigger = trigger;
+      if (trigger !== 'interval') delete s.interval_ms; else if (s.interval_ms === undefined) s.interval_ms = 1000;
+      if (trigger !== 'tag') { delete s.tags; delete s.tag; } else if (!Array.isArray(s.tags)) s.tags = s.tag ? [s.tag] : [];
+      if (trigger === 'tag') delete s.tag;
+      if (trigger !== 'screen_show' && trigger !== 'screen_hide') delete s.screen;
+    });
+  },
 };

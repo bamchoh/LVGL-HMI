@@ -21,6 +21,7 @@
 #include "driver.hpp"
 #include "platform.hpp"
 #include "project.hpp"
+#include "script.hpp"
 #include "splash.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
@@ -187,6 +188,7 @@ int main(int argc, char** argv)
 
     HML_INFO("shutting down");
     hml::drivers().stop_all();
+    hml::scripts().clear();
     hml::ui().unload_all();
     hml::project().unload();
     lv_deinit();

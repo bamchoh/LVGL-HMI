@@ -24,13 +24,16 @@ const Props = {
       case 'select': {
         const o = f.o || [];
         const s = U.el('select', Object.assign(attrs, { onchange: e => this.setVal(obj, k, e.target.value) }));
-        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? '(default)' : opt));
+        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? (f.empty || '(default)') : opt));
         if (v !== undefined && !o.map(String).includes(String(v))) s.append(U.el('option', { value: v, selected: true }, v));
         return s;
       }
       case 'font': return this.editor(obj, k, { t: 'select', o: [''].concat(SCHEMA.fonts) }, fk);
       case 'anim': return this.editor(obj, k, { t: 'select', o: [''].concat(SCHEMA.anims) }, fk);
       case 'screen': return this.editor(obj, k, { t: 'select', o: [''].concat(M.screenNames()) }, fk);
+      case 'script': return this.editor(obj, k, { t: 'select', o: [''].concat(M.scriptNames()), empty: '(inline code)' }, fk);
+      case 'code': return U.el('textarea', Object.assign(attrs, { rows: 3, class: 'mono code', spellcheck: false, placeholder: 'Lua, e.g.  tag.count = tag.count + 1',
+        value: Array.isArray(v) ? v.join('\n') : (v || ''), onkeydown: U.tabKey, onchange: e => this.setVal(obj, k, e.target.value) }));
       case 'tag': return U.el('input', Object.assign(attrs, { type: 'text', list: 'dl-tags', value: v === undefined ? '' : v, placeholder: 'tag',
         onchange: e => this.setVal(obj, k, e.target.value.trim()) }));
       case 'size': return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: 'px / 50% / content',

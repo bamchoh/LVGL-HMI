@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "script.hpp"
 #include "tag.hpp"
 #include "util.hpp"
 #include <algorithm>
@@ -482,12 +483,12 @@ struct BindOpts {
     std::optional<double> vmin, vmax;
 };
 
-enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call };
+enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call, Script };
 
 struct Action {
     ActionKind  kind = ActionKind::Back;
     std::string screen, anim;
-    std::string fn, arg;              // Call
+    std::string fn, arg;              // Call; Script: fn = script name, arg = inline code
     Tag*        tag = nullptr;
     Value       value;
     double      by = 1;
@@ -921,6 +922,10 @@ void Ui::Impl::run_actions(const ActionList& list)
                 else it->second(a.arg);
                 break;
             }
+            case ActionKind::Script:
+                if(!a.fn.empty()) scripts().run(a.fn);
+                else scripts().exec(a.arg, "action");
+                break;
         }
     }
 }
@@ -955,6 +960,18 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
         a.fn = jstr(j, "fn", "");
         a.arg = jstr(j, "arg", "");
         if(a.fn.empty()) { HML_WARN("call action without \"fn\""); return std::nullopt; }
+        return a;
+    }
+    if(iequals(*kind, "script")) {                       // { "name": "<project script>" } or { "code": "<Lua>" }
+        a.kind = ActionKind::Script;
+        a.fn = jstr(j, "name", "");
+        if(const json* code = jget(j, "code")) {
+            if(code->is_string()) a.arg = code->get<std::string>();
+            else if(code->is_array()) for(const json& line : *code) if(line.is_string()) a.arg += line.get<std::string>() + "\n";
+        }
+        if(a.fn.empty() && a.arg.empty()) { HML_WARN("script action without \"name\" or \"code\""); return std::nullopt; }
+        if(!a.fn.empty()) { if(!scripts().has(a.fn)) HML_WARN("script action: unknown script '%s'", a.fn.c_str()); }
+        else scripts().check(a.arg, "action");           // report syntax errors now, not at the first click
         return a;
     }
     if(iequals(*kind, "restart")) {
@@ -1322,14 +1339,20 @@ bool Ui::Impl::show_screen(const std::string& name, const std::string& anim)
     bool prev_is_ours = false;
     for(const auto& s : screens) if(s->obj == prev) prev_is_ours = true;
 
+    std::string left;
     if(current >= 0) {
         if(history.size() == kHistoryLen) history.pop_front();
         history.push_back(current);
+        left = screens[static_cast<size_t>(current)]->name;
     }
     current = idx;
     bool animated = !anim.empty() && !iequals(anim, "none");
     // The previous screen is deleted only when it is not one of ours (the blank screen from unload_all).
     lv_screen_load_anim(scr->obj, parse_anim(anim), animated ? 250 : 0, 0, !prev_is_ours);
+    // screen_hide / screen_show scripts; they may navigate again, so nothing of ours is touched after this
+    std::string shown = name;
+    if(!left.empty()) scripts().on_screen(left, false);
+    scripts().on_screen(shown, true);
     return true;
 }
 
@@ -1355,6 +1378,14 @@ void Ui::init(lv_indev_t* keyboard_indev, AppCallbacks cb)
 void Ui::register_action(const std::string& name, std::function<void(const std::string& arg)> fn)
 {
     impl_->named_actions[name] = std::move(fn);
+}
+
+bool Ui::call_action(const std::string& name, const std::string& arg)
+{
+    auto it = impl_->named_actions.find(name);
+    if(it == impl_->named_actions.end()) return false;
+    it->second(arg);
+    return true;
 }
 
 lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)
@@ -1415,8 +1446,12 @@ bool Ui::back()
     int idx = m.history.back();
     m.history.pop_back();
     if(idx < 0 || static_cast<size_t>(idx) >= m.screens.size()) return false;
+    std::string left = m.current >= 0 ? m.screens[static_cast<size_t>(m.current)]->name : std::string();
+    std::string shown = m.screens[static_cast<size_t>(idx)]->name;
     m.current = idx;
     lv_screen_load_anim(m.screens[static_cast<size_t>(idx)]->obj, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 250, 0, false);
+    if(!left.empty()) scripts().on_screen(left, false);
+    scripts().on_screen(shown, true);
     return true;
 }
 
