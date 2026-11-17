@@ -1,5 +1,6 @@
 #include "project.hpp"
 #include "driver.hpp"
+#include "script.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
@@ -201,6 +202,9 @@ int Project::build_screens()
         apply_local_overlay();
         info_.start_screen = jstr(root_, "start_screen", "");
     }
+    // Scripts are reloaded with the screens (fresh Lua state). They come first so that
+    // { "action": "script" } can be checked against them while the screens are built.
+    scripts().load(jget(root_, "scripts"), info_.dir);
 
     int built = 0;
     std::string first;
@@ -233,8 +237,13 @@ int Project::build_screens()
         return 0;
     }
 
-    const std::string& show = !current.empty() ? current : (!info_.start_screen.empty() ? info_.start_screen : first);
-    if(!ui().show_screen(show, "none")) ui().show_screen(first, "none");
+    // Startup scripts run before the first screen is shown (so screen_show scripts can rely on
+    // them); if one of them navigates, its choice wins.
+    scripts().run_startup();
+    if(!ui().current_screen()) {
+        const std::string& show = !current.empty() ? current : (!info_.start_screen.empty() ? info_.start_screen : first);
+        if(!ui().show_screen(show, "none")) ui().show_screen(first, "none");
+    }
     ui().set_history(history);
     tags().dispatch(true);
     HML_INFO("%d screens built, showing '%s'", built, ui().current_screen().value_or("").c_str());

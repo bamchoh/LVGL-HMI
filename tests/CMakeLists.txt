@@ -30,11 +30,12 @@ add_executable(hml_tests
   test_ui_conditions.cpp
   test_system_settings.cpp
   test_splash.cpp
+  test_script.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})
 target_compile_definitions(hml_tests PRIVATE HML_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(hml_tests PRIVATE lvgl hml_json)
+target_link_libraries(hml_tests PRIVATE lvgl hml_json hml_lua)
 if(HML_OPCUA)
   target_link_libraries(hml_tests PRIVATE open62541)
   target_compile_definitions(hml_tests PRIVATE HML_WITH_OPCUA=1)

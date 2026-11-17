@@ -105,5 +105,15 @@ const U = {
 
   esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); },
 
+  // keydown handler for code textareas: Tab inserts two spaces instead of leaving the field
+  tabKey(e) {
+    if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.altKey) return;
+    e.preventDefault();
+    const t = e.target, a = t.selectionStart, b = t.selectionEnd;
+    t.value = t.value.slice(0, a) + '  ' + t.value.slice(b);
+    t.selectionStart = t.selectionEnd = a + 2;
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+
   debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
 };

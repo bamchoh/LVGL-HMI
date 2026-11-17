@@ -173,3 +173,12 @@ details.sec[open] > summary { border-radius: 4px 4px 0 0; }
 .lv.hd-selected { outline: 2px solid var(--sel) !important; outline-offset: 0; z-index: 5; }
 .lv:hover:not(.hd-selected) { outline: 1px dashed rgba(255,179,0,.6); }
 .hd-rs { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: var(--sel); border: 1px solid #000; cursor: nwse-resize; z-index: 6; border-radius: 2px; }
+
+/* scripts (Lua) */
+.script-main { display: flex; flex-direction: column; }
+.script-main > * { flex: none; }
+.script-main textarea.script-code { flex: 1; min-height: 180px; width: 100%; margin: 8px 0; padding: 8px 10px; resize: none; white-space: pre; tab-size: 2; font-size: 13px; line-height: 1.45; }
+.script-help { margin: 0; padding: 6px 8px; white-space: pre-wrap; color: var(--dim); }
+.row.act textarea.code { width: 100%; white-space: pre; resize: vertical; }
+.row.act > .inline:has(textarea.code) { flex-basis: 100%; flex-direction: column; align-items: stretch; }
+.row.act .inline select[data-fk$=".name"] { width: 130px; }

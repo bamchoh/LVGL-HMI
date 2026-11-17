@@ -3,14 +3,14 @@
 'use strict';
 
 const Panels = {
-  tab: 'widgets', view: 'screen', driverSel: 0, tagFilter: '',
+  tab: 'widgets', view: 'screen', driverSel: 0, scriptSel: 0, tagFilter: '',
 
   init() {
     document.querySelectorAll('#left-tabs button').forEach(b => b.addEventListener('click', () => this.show(b.dataset.tab)));
     document.querySelectorAll('#center-tabs button').forEach(b => b.addEventListener('click', () => this.showView(b.dataset.view)));
     this.show('widgets');
   },
-  // center area: 'screen' (canvas), 'tags' or 'drivers'
+  // center area: 'screen' (canvas), 'tags', 'drivers' or 'scripts'
   showView(v) {
     if (this.view === v) return;
     this.view = v;
@@ -18,6 +18,7 @@ const Panels = {
     document.getElementById('canvas-wrap').hidden = v !== 'screen';
     document.getElementById('view-tags').hidden = v !== 'tags';
     document.getElementById('view-drivers').hidden = v !== 'drivers';
+    document.getElementById('view-scripts').hidden = v !== 'scripts';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
     App.refresh();
   },
@@ -33,6 +34,7 @@ const Panels = {
     this.renderScreens();
     this.renderTags();
     this.renderDrivers();
+    this.renderScripts();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
     for (const t of M.tagNames()) dl.append(U.el('option', { value: t }));
@@ -141,6 +143,79 @@ const Panels = {
     if (d.type === 'opcua_server') return 'port ' + (d.port || 4840);
     return '';
   },
+
+  // ---- scripts (Lua): list on the left, the selected script's trigger and code on the right
+  scriptSummary(s) {
+    const t = s.trigger || 'manual';
+    if (t === 'interval') return 'every ' + U.num(s.interval_ms, 1000) + ' ms';
+    if (t === 'tag') return 'on ' + ((Array.isArray(s.tags) ? s.tags : [s.tags || s.tag]).filter(Boolean).join(', ') || '(no tag)');
+    if (t === 'screen_show' || t === 'screen_hide') return t + ' ' + (s.screen || '(any)');
+    return t;
+  },
+  renderScripts() {
+    const page = document.getElementById('view-scripts'); page.innerHTML = '';
+    if (!M.st.project) return;
+    const scripts = M.st.project.scripts || [];
+    if (this.scriptSel >= scripts.length) this.scriptSel = Math.max(0, scripts.length - 1);
+    const side = U.el('div', { class: 'drv-side' }, U.el('h3', { style: { marginTop: 0 } }, 'Scripts'));
+    const el = U.el('div', { class: 'drv-main script-main' });
+    page.append(side, el);
+    const list = U.el('div', { class: 'list' });
+    scripts.forEach((s, i) => {
+      list.append(U.el('div', { class: 'item' + (i === this.scriptSel ? ' sel' : ''), onclick: () => { this.scriptSel = i; this.renderScripts(); } },
+        U.el('input', { type: 'checkbox', checked: s.enabled !== false, title: 'enabled', onclick: e => e.stopPropagation(), onchange: e => M.mutate(() => { if (e.target.checked) delete s.enabled; else s.enabled = false; }) }),
+        U.el('span', { class: 'grow' }, s.name || '?', U.el('span', { class: 'dim' }, '  ' + this.scriptSummary(s))),
+        U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (confirm('Delete script "' + (s.name || '') + '"?')) M.removeScript(i); } }, '×')));
+    });
+    side.append(list, U.el('div', { class: 'row' }, U.el('button', { class: 'primary', onclick: () => { this.scriptSel = M.addScript(); } }, '+ Add script')));
+    side.append(U.el('div', { class: 'hint' }, 'Lua 5.4. All scripts share one Lua state: a function or variable defined by a startup script can be used by the others.'));
+
+    const s = scripts[this.scriptSel];
+    if (!s) { el.append(U.el('div', { class: 'hint' }, 'No scripts. Add one on the left; it can run at startup, periodically, when a tag changes, when a screen is shown / hidden, or from a widget event (action "script").')); return; }
+    const i = this.scriptSel, fk = 'scr.' + i, trig = s.trigger || 'manual';
+    const name = U.el('input', { type: 'text', value: s.name || '', dataset: { fk: fk + '.name' }, onchange: e => { if (!M.renameScript(i, e.target.value)) { App.toast('name is empty or already used'); e.target.value = s.name || ''; } } });
+    const trigSel = U.el('select', { dataset: { fk: fk + '.trigger' }, onchange: e => M.setScriptTrigger(i, e.target.value) });
+    for (const t of SCHEMA.scriptTriggers) trigSel.append(U.el('option', { value: t, selected: t === trig }, t));
+    if (!SCHEMA.scriptTriggers.includes(trig)) trigSel.append(U.el('option', { value: trig, selected: true }, trig));
+    const rows = [Props.row('name', name), Props.row('trigger', trigSel, 'when the script runs')];
+    if (trig === 'interval') rows.push(Props.row('interval_ms', Props.editor(s, 'interval_ms', { t: 'number' }, fk), 'period in milliseconds (minimum 10)'));
+    if (trig === 'tag') rows.push(Props.row('tags', Props.editor(s, 'tags', { t: 'csv' }, fk), 'comma separated tag names; the script runs when any of them changes'));
+    if (trig === 'screen_show' || trig === 'screen_hide') rows.push(Props.row('screen', Props.editor(s, 'screen', { t: 'select', o: [''].concat(M.screenNames()), empty: '(any screen)' }, fk)));
+    el.append(U.el('div', { class: 'drv-fields' }, ...rows));
+    if (trig === 'tag') {
+      const unknown = (Array.isArray(s.tags) ? s.tags : []).filter(t => !M.tagNames().includes(t));
+      if (unknown.length) el.append(U.el('div', { class: 'warn' }, 'unknown tags: ' + unknown.join(', ')));
+    }
+
+    if (typeof s.file === 'string' && s.code === undefined) {
+      el.append(U.el('div', { class: 'drv-fields' }, Props.row('file', Props.editor(s, 'file', { t: 'text' }, fk), 'Lua file, relative to project.json')),
+        U.el('div', { class: 'hint' }, 'The code of this script is in an external file; edit it with a text editor (F5 in the runtime reloads it).'));
+    } else {
+      // typing updates the model directly (no re-render, so the caret stays put); one undo step per focus
+      let undoPushed = false;
+      const code = U.el('textarea', { class: 'mono script-code', spellcheck: false, dataset: { fk: fk + '.code' }, placeholder: '-- Lua\nif tag.temp > tag.temp_hi then\n  tag.alarm = true\nend',
+        value: Array.isArray(s.code) ? s.code.join('\n') : (s.code || ''), onkeydown: U.tabKey,
+        oninput: e => { if (!undoPushed) { M.pushUndo(); undoPushed = true; } s.code = e.target.value; if (!M.st.dirty) { M.st.dirty = true; App.toolbar(); } } });
+      el.append(code);
+    }
+    el.append(U.el('details', { class: 'sec' }, U.el('summary', null, 'Lua API'), U.el('pre', { class: 'mono script-help' }, this.SCRIPT_HELP)));
+  },
+  SCRIPT_HELP: [
+    'tag.name / tag["sys.name"]      read or write a tag (bool tags are true / false)',
+    'goto_screen("name" [, "anim"])  show a screen (anim: none, fade, slide_left, ...); returns false if unknown',
+    'back()                          go back to the previous screen',
+    'current_screen()                name of the screen being shown',
+    'run("script")                   run another project script',
+    'call("fn" [, "arg"])            run a named runtime action (same as the "call" action)',
+    'log(...) / print(...)           write to the runtime log',
+    'millis()                        milliseconds since start',
+    'os.time()  os.date("%H:%M:%S")  os.clock()',
+    'event.trigger                   "startup" | "interval" | "tag" | "screen_show" | "screen_hide" | "action"',
+    'event.tag, event.value          the tag that changed (trigger "tag")',
+    'event.screen                    the screen shown / hidden',
+    'Libraries: string, table, math, utf8, coroutine. No file or process access.',
+    'A script is stopped with an error if it runs longer than 500 ms.',
+  ].join('\n'),
 
   // generic array-of-objects editor (driver items / register map / published tags)
   tableEditor(obj, tdef, fk) {

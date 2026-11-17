@@ -4,6 +4,7 @@
 #include <doctest.h>
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
+#include "script.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
 
@@ -77,7 +78,23 @@ TEST_CASE("every shipped project loads and builds all of its screens")
             CHECK(ui().show_screen(name, "none"));
             hmltest::Lvgl::get().render();
         }
-        rt.advance(1000);                               // chart timers, animations
+        rt.advance(1000);                               // chart timers, animations, interval scripts
+
+        // the shipped scripts compile and run cleanly; auto_speed drives the setpoint from the temperature
+        if(const json* sc = jget(raw, "scripts")) CHECK(scripts().count() == sc->size());
+        CHECK(scripts().error_count() == 0);
+        if(scripts().has("auto_speed")) {
+            tags().find("auto_mode")->set_number(1, nullptr);
+            tags().find("run")->set_number(1, nullptr);
+            tags().find("temp")->set_number(25, nullptr);
+            rt.advance(600);
+            CHECK(tags().find("speed_sp")->get_number() == 50);
+            tags().find("auto_mode")->set_number(0, nullptr);
+            tags().find("temp")->set_number(32, nullptr);
+            rt.advance(600);
+            CHECK(tags().find("speed_sp")->get_number() == 50);
+            CHECK(scripts().error_count() == 0);
+        }
     }
 }
 

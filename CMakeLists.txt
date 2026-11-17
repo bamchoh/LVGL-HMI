@@ -81,6 +81,13 @@ FetchContent_Declare(lvgl
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+# ---------------------------------------------------------------- Lua 5.4 (scripts, MIT)
+# The release tarball has no CMake project: the sources are compiled below as hml_lua.
+FetchContent_Declare(lua
+  URL https://www.lua.org/ftp/lua-5.4.8.tar.gz
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
 # ---------------------------------------------------------------- open62541 (OPC UA, MPL-2.0)
 # Built from the release source tarball with the reduced namespace zero (no git submodules
 # needed). Needs Python 3 on the build host for the nodeset compiler.
@@ -107,7 +114,23 @@ if(HML_OPCUA)
   )
 endif()
 
-FetchContent_MakeAvailable(${_hml_fetch_targets} nlohmann_json lvgl)
+FetchContent_MakeAvailable(${_hml_fetch_targets} nlohmann_json lvgl lua)
+
+# Lua core + the sandbox-safe standard libraries (no io / os / package / debug). Compiled as C++
+# so that Lua errors are exceptions and unwind the runtime's C++ frames properly.
+set(_hml_lua_sources "")
+foreach(_f lapi lcode lctype ldebug ldo ldump lfunc lgc llex lmem lobject lopcodes lparser lstate lstring ltable ltm
+           lundump lvm lzio lauxlib lbaselib lcorolib lmathlib lstrlib ltablib lutf8lib)
+  list(APPEND _hml_lua_sources ${lua_SOURCE_DIR}/src/${_f}.c)
+endforeach()
+set_source_files_properties(${_hml_lua_sources} PROPERTIES LANGUAGE CXX)
+add_library(hml_lua STATIC ${_hml_lua_sources})
+target_include_directories(hml_lua PUBLIC ${lua_SOURCE_DIR}/src)
+if(MSVC)
+  target_compile_options(hml_lua PRIVATE /W0)
+else()
+  target_compile_options(hml_lua PRIVATE -w)
+endif()
 
 if(HML_OPCUA)
   # open62541's CMake appends its own warning flags to CMAKE_C_FLAGS *in the cache*; configure it
@@ -162,7 +185,7 @@ endif()
 file(GLOB HML_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(hml_runtime ${HML_SOURCES})
 target_include_directories(hml_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(hml_runtime PRIVATE lvgl hml_json)
+target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua)
 if(HML_OPCUA)
   target_link_libraries(hml_runtime PRIVATE open62541)
   target_compile_definitions(hml_runtime PRIVATE HML_WITH_OPCUA=1)

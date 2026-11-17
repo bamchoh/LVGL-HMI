@@ -55,5 +55,13 @@
     }
   ],
 
+  "scripts": [
+    {
+      "name": "auto_speed",
+      "trigger": "interval",
+      "code": "-- Auto mode: while the pump runs, the speed setpoint follows the temperature\n-- (18 C -> 0 %, 32 C -> 100 %). Switch \"Auto mode\" off to use the slider.\nif tag.auto_mode and tag.run then\n  local pct = (tag.temp - 18) / (32 - 18) * 100\n  tag.speed_sp = math.floor(math.max(0, math.min(100, pct)) + 0.5)\nend\n",
+      "interval_ms": 500
+    }
+  ],
   "screens": [ "screens/main.json", "screens/settings.json" ]
 }

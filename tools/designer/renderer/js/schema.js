@@ -8,6 +8,8 @@ const SCHEMA = {
   fonts: [12, 14, 16, 18, 20, 24, 28, 32, 40, 48],
   events: ['on_click', 'on_press', 'on_release', 'on_long_press', 'on_long_press_repeat', 'on_change', 'on_ready'],
   tagTypes: ['bool', 'int', 'float', 'string'],
+  // project scripts (Lua, src/script.cpp): when a script runs. 'manual' = only from a script action / run()
+  scriptTriggers: ['manual', 'startup', 'interval', 'tag', 'screen_show', 'screen_hide'],
 
   // widget types: def = values written when the widget is created, props = type specific fields
   types: {
@@ -99,6 +101,7 @@ const SCHEMA = {
     restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
     system: [{ k: 'anim', t: 'anim' }],
     call:   [{ k: 'fn', t: 'text' }, { k: 'arg', t: 'text' }],
+    script: [{ k: 'name', t: 'script' }, { k: 'code', t: 'code' }],   // a project script by name, or inline Lua
   },
 
   drivers: {
