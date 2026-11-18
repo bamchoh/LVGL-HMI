@@ -38,6 +38,7 @@
 #include "splash.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
+#include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
 #include "util.hpp"
@@ -79,10 +80,11 @@ int usage(const char* argv0)
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
                          "       [--stats <seconds>]\n"
+                         "       %s --list-serial-ports\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
                          "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
                          "       %s --export-data-log <file.csv> <project.json> [--group <name>]\n"
-                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0);
+                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0, argv0);
     return 1;
 }
 
@@ -110,6 +112,13 @@ int run_splash(lv_display_t* disp, const hml::ProjectInfo& info, const std::stri
 
 int main(int argc, char** argv)
 {
+    // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
+    //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
+    if(argc >= 2 && std::string(argv[1]) == "--list-serial-ports") {
+        for(const hml::SerialPortInfo& p : hml::list_serial_ports())
+            std::printf("%s\t%s\t%s\n", p.device.c_str(), p.stable.c_str(), p.description.c_str());
+        return 0;
+    }
     std::string project_path, screenshot, screen, export_log, export_level = "info";
     std::string export_kind, export_file, export_group;      // --export-data-log / -alarm-log / -operation-log
     uint32_t exit_after = 0, reload_after = 0, stats_s = 0;

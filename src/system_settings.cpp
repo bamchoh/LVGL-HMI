@@ -1,5 +1,6 @@
 #include "system_settings.hpp"
 #include "project.hpp"
+#include "serial_ports.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -217,7 +218,14 @@ void SystemSettings::refresh(const std::string& page_id)
     for(const auto& p : pages_) {
         if(!page_id.empty() && p->id() != page_id) continue;
         std::vector<SettingField> fields = p->fields();
-        for(const SettingField& f : fields) set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
+        for(const SettingField& f : fields) {
+            if(f.type == SettingField::Type::Select && f.live_options) {       // first the options, then the selection
+                std::string joined;
+                for(const std::string& o : f.options) joined += (joined.empty() ? "" : "\n") + o;
+                set_tag(tag_name(p->id(), f.key + "__options"), TagType::String, Value::string(joined));
+            }
+            set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
+        }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
         fields_[p->id()] = std::move(fields);
     }
@@ -306,7 +314,10 @@ std::vector<json> SystemSettings::screens(int width, int height) const
     for(const auto& p : pages_) {
         menu_items.push_back(json{ { "type", "button" }, { "text", p->title() }, { "w", "100%" }, { "h", compact ? 34 : 44 },
                                    { "style_label", { { "font", font + 2 } } },
-                                   { "on_click", { { "action", "goto" }, { "screen", page_screen(p->id()) }, { "anim", "slide_left" } } } });
+                                   { "on_click", json::array({
+                                       // what the page shows is read when it is opened (ports plugged in since startup ...)
+                                       { { "action", "call" }, { "fn", "system.refresh" }, { "arg", p->id() } },
+                                       { { "action", "goto" }, { "screen", page_screen(p->id()) }, { "anim", "slide_left" } } }) } });
     }
     // with user management the whole of the system settings asks for a level ("users.system_level")
     const int level = users().system_level();
@@ -345,6 +356,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                     break;
                 case SettingField::Type::Select:
                     widget = json{ { "type", "dropdown" }, { "options", f.options }, { "flex_grow", 1 }, { "bind", tag }, { "style", { { "font", font } } } };
+                    if(f.live_options) widget["bind"] = { { "value", tag }, { "options", tag + "__options" } };
                     break;
                 default:   // Info
                     widget = json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag } } },
@@ -576,6 +588,28 @@ public:
             SettingField f;
             f.key = k;
             f.label = k;
+            if(k == "device" && v.is_string()) {
+                // a serial port: nobody should have to type /dev/serial/by-id/usb-... on a touch keyboard
+                f.type = SettingField::Type::Select;
+                f.live_options = true;
+                f.value = v.get<std::string>();
+                std::string found;
+                for(const SerialPortInfo& p : list_serial_ports()) {
+                    f.options.push_back(p.device);
+                    if(!p.stable.empty()) f.options.push_back(p.stable);
+                    // (the description may be in the language of the OS; the built-in fonts only have Latin letters)
+                    std::string desc;
+                    for(unsigned char c : p.description) if(c >= 0x20 && c < 0x7f && !(c == ' ' && !desc.empty() && desc.back() == ' ')) desc += static_cast<char>(c);
+                    found += (found.empty() ? "" : "\n") + p.device + (desc.empty() ? "" : "  " + desc);
+                }
+                if(std::find(f.options.begin(), f.options.end(), f.value) == f.options.end()) f.options.insert(f.options.begin(), f.value);   // what is set now, even if not found
+                out.push_back(f);
+                SettingField info;
+                info.key = "device_ports"; info.label = "ports found"; info.type = SettingField::Type::Info;
+                info.value = found.empty() ? "none" : found;
+                out.push_back(info);
+                continue;
+            }
             if(v.is_boolean()) { f.type = SettingField::Type::Bool; f.value = v.get<bool>() ? "1" : "0"; }
             else if(v.is_number()) {
                 f.type = SettingField::Type::Number;

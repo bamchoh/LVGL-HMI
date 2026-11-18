@@ -226,6 +226,29 @@ const M = {
     });
   },
   removeDriver(i) { this.mutate(() => this.st.project.drivers.splice(i, 1)); },
+  // How project.local.json names a driver: its "name", else its "type"; "#2", "#3" for repeats
+  // (the same rule as driver_keys() in the runtime).
+  driverKey(i) {
+    const d = (this.st.project && this.st.project.drivers) || [], seen = {};
+    let key = '';
+    for (let k = 0; k <= i && k < d.length; k++) {
+      const base = (d[k] && (typeof d[k].name === 'string' ? d[k].name : typeof d[k].type === 'string' ? d[k].type : '')) || 'driver';
+      seen[base] = (seen[base] || 0) + 1;
+      key = seen[base] > 1 ? base + '#' + seen[base] : base;
+    }
+    return key;
+  },
+  // A copy of local settings (project.local.json) with one driver setting set, or removed when
+  // value is empty; objects that become empty are dropped.
+  withLocalDriverSetting(local, driverKey, name, value) {
+    const out = U.clone(local && typeof local === 'object' ? local : {}) || {};
+    const drivers = (out.drivers && typeof out.drivers === 'object') ? out.drivers : (out.drivers = {});
+    const d = (drivers[driverKey] && typeof drivers[driverKey] === 'object') ? drivers[driverKey] : (drivers[driverKey] = {});
+    if (value === undefined || value === null || value === '') delete d[name]; else d[name] = value;
+    if (!Object.keys(d).length) delete drivers[driverKey];
+    if (!Object.keys(drivers).length) delete out.drivers;
+    return out;
+  },
 
   // ---- users ("users" in project.json): levels, users with a PIN, login behaviour -------
   usersOn() { return this.logOn('users'); },

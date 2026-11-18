@@ -568,3 +568,23 @@ test('schema: login / logout actions and the access properties exist', () => {
   deq(SCHEMA.actions.logout, []);
   deq(SCHEMA.access.map(f => f.k), ['level', 'level_deny']);
 });
+
+// ---------------------------------------------------------------- local settings (per machine)
+test('M.driverKey names drivers like the runtime does; local driver settings are set and pruned', () => {
+  const { M } = load();
+  M.newProject('t', 480, 320);
+  M.mutate(() => { M.st.project.drivers = [{ type: 'sim' }, { type: 'modbus_rtu', name: 'PLC' }, { type: 'sim' }, { type: 'modbus_rtu' }, {}]; });
+  deq([0, 1, 2, 3, 4].map(i => M.driverKey(i)), ['sim', 'PLC', 'sim#2', 'modbus_rtu', 'driver']);
+
+  let local = M.withLocalDriverSetting({}, 'PLC', 'device', 'COM4');
+  deq(local, { drivers: { PLC: { device: 'COM4' } } });
+  const before = JSON.stringify(local);
+  let next = M.withLocalDriverSetting(local, 'modbus_rtu', 'device', 'COM7');
+  assert.equal(JSON.stringify(local), before);                  // the input is not changed
+  deq(next, { drivers: { PLC: { device: 'COM4' }, modbus_rtu: { device: 'COM7' } } });
+  // other local settings (users edited on a device, other driver values) are kept
+  next = M.withLocalDriverSetting({ users: { list: [] }, drivers: { PLC: { device: 'COM4', host: 'x' } } }, 'PLC', 'device', '');
+  deq(next, { users: { list: [] }, drivers: { PLC: { host: 'x' } } });
+  deq(M.withLocalDriverSetting({ drivers: { PLC: { device: 'COM4' } } }, 'PLC', 'device', ''), {});
+  deq(M.withLocalDriverSetting(null, 'PLC', 'device', ''), {});
+});

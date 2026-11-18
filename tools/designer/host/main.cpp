@@ -975,6 +975,70 @@ struct Host {
         return err(answer.rfind("ERROR ", 0) == 0 ? "the target refused the key: " + answer.substr(6) : "unexpected answer: " + answer);
     }
 
+    // "<device> TAB <stable name> TAB <description>" lines (hml_runtime --list-serial-ports), or
+    // bare device names (the fallback listing), as [{ device, stable, description }]
+    static json parse_ports(const std::string& text)
+    {
+        json out = json::array();
+        std::istringstream lines(text);
+        for(std::string line; std::getline(lines, line);) {
+            while(!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+            if(line.empty()) continue;
+            std::vector<std::string> cols;
+            size_t from = 0;
+            for(size_t tab; (tab = line.find('\t', from)) != std::string::npos; from = tab + 1) cols.push_back(line.substr(from, tab - from));
+            cols.push_back(line.substr(from));
+            cols.resize(3);
+            if(cols[0].empty() || cols[0].find(' ') != std::string::npos) continue;     // not a device name: some message
+            out.push_back({ { "device", cols[0] }, { "stable", cols[1] }, { "description", cols[2] } });
+        }
+        return out;
+    }
+
+    // The serial ports of this PC and, with connection settings (the Deploy dialog's), of the
+    // target: what can be written into "device" of a serial driver on either machine.
+    // Returns { ok, local: [...], target: [...] | null, targetName, targetError }.
+    json serial_ports(const json& o)
+    {
+        json res{ { "ok", true }, { "local", json::array() }, { "target", nullptr }, { "targetName", "" }, { "targetError", "" } };
+        if(!runtime.empty()) {
+            ProcResult pr = run_capture(runtime, { "--list-serial-ports" }, {}, {}, 10000);
+            if(pr.error.empty() && pr.code == 0) res["local"] = parse_ports(pr.output);
+        }
+        if(opt_str(o, "host").empty() || opt_str(o, "user").empty()) return res;
+        Target t = target_of(o);
+        if(!t.error.empty()) { res["targetError"] = t.error; return res; }
+        res["targetName"] = t.dest();
+        std::vector<std::string> a = t.ssh_options();
+        // the runtime knows best (descriptions, stable names); a target with an older runtime
+        // still has the device files
+        a.insert(a.end(), { "-p", std::to_string(t.port), t.dest(),
+            t.remote + "/hml_runtime --list-serial-ports 2>/dev/null || ls -1 /dev/serial/by-id/* /dev/ttyUSB* /dev/ttyACM* /dev/ttyAMA* 2>/dev/null; true" });
+        ProcResult pr = run_capture(ssh_tool("ssh"), a, {}, {}, 25000);
+        std::string failure = ssh_failure(pr, "connect", t.host);
+        if(!failure.empty()) { res["targetError"] = failure; return res; }
+        res["target"] = parse_ports(pr.output);
+        return res;
+    }
+
+    // project.local.json next to a project: the settings of this machine (not deployed).
+    // With `set` (an object) it is written first; an empty object removes the file.
+    json local_settings(const std::string& project, const json* set)
+    {
+        fs::path p = upath(project).parent_path() / "project.local.json";
+        std::error_code ec;
+        if(project.empty()) return err("save the project first");
+        if(set && set->is_object()) {
+            if(set->empty()) fs::remove(p, ec);
+            else if(!write_text(p, set->dump(2) + "\n")) return err("cannot write " + ustr(p));
+        }
+        bool ok = false;
+        std::string text = read_text(p, &ok);
+        json j = ok ? json::parse(text, nullptr, false, true) : json::object();
+        if(!j.is_object()) j = json::object();
+        return json{ { "ok", true }, { "settings", j } };
+    }
+
     void check_async(const std::string& id, const json& opts)
     {
         std::thread([this, id, opts] {
@@ -1182,6 +1246,18 @@ struct Host {
                 w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
             }).detach();
         }, nullptr);
+        w->bind("hml_serialPorts", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            json opts = a.size() > 0 && a[0].is_object() ? a[0] : json::object();
+            std::thread([this, id, opts] {
+                std::string dump = serial_ports(opts).dump(-1, ' ', false, json::error_handler_t::replace);
+                w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+            }).detach();
+        }, nullptr);
+        w->bind("hml_localSettings", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return local_settings(str(a, 0), a.size() > 1 && a[1].is_object() ? &a[1] : nullptr).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
         w->bind("hml_deployCheck", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             check_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());

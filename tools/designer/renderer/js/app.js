@@ -18,6 +18,8 @@ const host = {
   launch: p => host.call('hml_launch', p),
   deploy: o => host.call('hml_deploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
+  serialPorts: o => host.call('hml_serialPorts', o || {}),
+  localSettings: (p, o) => host.call('hml_localSettings', p || '', o || null),
   keyInfo: o => host.call('hml_keyInfo', o),
   keySend: o => host.call('hml_keySend', o),
   setTitle: t => host.call('hml_setTitle', t),
@@ -157,6 +159,7 @@ const App = {
     const r = await host.readProject(path);
     if (!r || !r.ok) { this.toast('open failed: ' + (r && r.error)); return; }
     try { M.loadFromHost(r); } catch (e) { this.toast('parse error: ' + e.message, 6000); return; }
+    await this.loadLocal();
     this.refresh();
     setTimeout(() => this.zoomFit(), 50);
   },
@@ -171,6 +174,7 @@ const App = {
     const r = await host.writeFiles(st.dir, M.filesToWrite());
     if (!r || !r.ok) { this.toast('save failed: ' + (r && r.error), 6000); return false; }
     st.dirty = false;
+    if (as) await this.loadLocal();
     this.refresh();
     this.toast('saved ' + st.path, 1500);
     return true;
@@ -198,6 +202,61 @@ const App = {
       body.append(U.el('div', { class: 'warn' }, 'Preview failed: ' + ((r && r.error) || 'unknown error')), U.el('pre', null, (r && r.log) || ''));
     }
   },
+  // ---- this PC's own settings for the project (project.local.json next to it) -----------
+  // Things that differ per machine, like the name of a serial port: used when the project runs
+  // here (Run / Preview), never deployed. The target has its own such file.
+  local: {},
+  async loadLocal() {
+    this.local = {};
+    if (!M.st.path) return;
+    const r = await host.localSettings(M.st.path);
+    if (r && r.ok && r.settings) this.local = r.settings;
+  },
+  localDriverSetting(i, name) {
+    const d = this.local && this.local.drivers && this.local.drivers[M.driverKey(i)];
+    return d && d[name] !== undefined ? d[name] : '';
+  },
+  async setLocalDriverSetting(i, name, value) {
+    if (!M.st.path) { this.toast('save the project first'); return; }
+    const next = M.withLocalDriverSetting(this.local, M.driverKey(i), name, value);
+    const r = await host.localSettings(M.st.path, next);
+    if (!r || !r.ok) { this.toast('cannot save the local settings: ' + (r && r.error), 6000); return; }
+    this.local = r.settings || {};
+    this.refresh();
+  },
+  // Pick a serial port: those of the target (asked over SSH with the Deploy connection settings)
+  // go into the project, those of this PC into this PC's local settings.
+  async serialPortDialog(i) {
+    const d = M.st.project.drivers[i];
+    const saved = (await host.settings()) || {};
+    const dep = (saved.deploy && M.st.path && saved.deploy[M.st.path]) || null;
+    const body = U.el('div', { class: 'deploy' }, U.el('div', { class: 'hint' }, 'Looking for serial ports …'));
+    const close = this.modal({ title: 'Serial ports', body, buttons: [{ label: 'Close' }] });
+    const r = await host.serialPorts(dep ? Object.assign({}, dep, { project: M.st.path }) : {});
+    body.innerHTML = '';
+    const list = (ports, onPick) => {
+      if (!ports.length) return U.el('div', { class: 'hint' }, 'No serial port was found.');
+      const tbl = U.el('table', { class: 'grid' });
+      for (const p of ports) {
+        const pick = name => U.el('button', { class: 'mini', onclick: () => { onPick(name); close(); } }, name);
+        tbl.append(U.el('tr', null, U.el('td', null, pick(p.device)), U.el('td', null, p.description || ''),
+          U.el('td', null, p.stable ? pick(p.stable) : '')));
+      }
+      return tbl;
+    };
+    body.append(U.el('h4', null, 'On the target' + (r && r.targetName ? ' (' + r.targetName + ')' : '')),
+      U.el('div', { class: 'hint' }, 'Goes into the project ("device"): the name the port has where the project will run.'));
+    if (r && Array.isArray(r.target)) {
+      body.append(list(r.target, name => M.mutate(() => { d.device = name; })));
+      if (r.target.some(p => p.stable)) body.append(U.el('div', { class: 'hint' }, 'The long name on the right stays the same when adapters are plugged in another order; /dev/ttyUSB0 may become /dev/ttyUSB1.'));
+    }
+    else body.append(U.el('div', { class: r && r.targetError ? 'warn' : 'hint' }, r && r.targetError ? 'Cannot ask the target: ' + r.targetError
+      : 'The target is not known yet: enter its address once in the Deploy dialog (and deploy), then its ports are listed here.'));
+    body.append(U.el('h4', null, 'On this PC'),
+      U.el('div', { class: 'hint' }, 'For running the project here (Run / Preview). Stored on this PC only (project.local.json), not deployed.'),
+      list((r && r.local) || [], name => this.setLocalDriverSetting(i, 'device', name)));
+  },
+
   // ---- deploy to a target over SSH ----------------------------------------
   // The connection settings are kept per project in the designer's own settings file (they
   // describe this PC and its network, not the project); '*' holds the last ones used.
