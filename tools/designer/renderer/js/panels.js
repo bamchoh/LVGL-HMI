@@ -10,7 +10,7 @@ const Panels = {
     document.querySelectorAll('#center-tabs button').forEach(b => b.addEventListener('click', () => this.showView(b.dataset.view)));
     this.show('widgets');
   },
-  // center area: 'screen' (canvas), 'tags', 'drivers' or 'scripts'
+  // center area: 'screen' (canvas), 'tags', 'drivers', 'scripts' or 'logs'
   showView(v) {
     if (this.view === v) return;
     this.view = v;
@@ -19,6 +19,7 @@ const Panels = {
     document.getElementById('view-tags').hidden = v !== 'tags';
     document.getElementById('view-drivers').hidden = v !== 'drivers';
     document.getElementById('view-scripts').hidden = v !== 'scripts';
+    document.getElementById('view-logs').hidden = v !== 'logs';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
     App.refresh();
   },
@@ -35,6 +36,7 @@ const Panels = {
     this.renderTags();
     this.renderDrivers();
     this.renderScripts();
+    this.renderLogs();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
     for (const t of M.tagNames()) dl.append(U.el('option', { value: t }));
@@ -207,7 +209,11 @@ const Panels = {
     'current_screen()                name of the screen being shown',
     'run("script")                   run another project script',
     'call("fn" [, "arg"])            run a named runtime action (same as the "call" action)',
-    'log(...) / print(...)           write to the runtime log',
+    'log(...) / print(...)           write to the runtime log (level info)',
+    'warn(...)                       write a warning to the runtime log',
+    'call("system_log.export" [, "file"])   export the system log as CSV (Logs tab)',
+    'call("data_log.sample", "group")        record a data log group now;  call("data_log.export", "group[,file]")',
+    'call("alarm_log.export" [, "file"])     call("operation_log.export" [, "file"])',
     'millis()                        milliseconds since start',
     'os.time()  os.date("%H:%M:%S")  os.clock()',
     'event.trigger                   "startup" | "interval" | "tag" | "screen_show" | "screen_hide" | "action"',
@@ -231,10 +237,49 @@ const Panels = {
     });
     const add = U.el('button', { class: 'mini', onclick: () => M.mutate(() => {
       const it = {};
-      for (const c of tdef.columns) if (c.t === 'tag') it[c.k] = M.tagNames()[0] || ''; else if (c.t === 'select' && c.o && c.o[0]) it[c.k] = c.o[0];
+      for (const c of tdef.columns) if (c.opt) continue; else if (c.t === 'tag') it[c.k] = M.tagNames()[0] || ''; else if (c.t === 'select' && c.o && c.o[0]) it[c.k] = c.o[0];
       items.push(it);
     }) }, '+ row');
     return U.el('div', null, U.el('h4', null, tdef.label), tbl, U.el('div', { class: 'row' }, add));
+  },
+
+  // ---- logs: data log (tag values), alarms, operation log, system log. Each is recorded in its
+  // own SQLite database on the device, only while its section exists in project.json.
+  LOG_DB_FIELDS(path, rows) {
+    return [{ k: 'path', t: 'text', hint: 'database file, relative to project.json (default ' + path + ')' },
+      { k: 'retention_days', t: 'number', hint: 'rows older than this are deleted (default 30, 0 = keep forever)' },
+      { k: 'max_rows', t: 'number', hint: 'oldest rows are deleted above this (default ' + rows + ', 0 = unlimited)' }];
+  },
+  renderLogs() {
+    const page = document.getElementById('view-logs'); page.innerHTML = '';
+    const p = M.st.project; if (!p) return;
+    const section = (key, title, about, body) => {
+      const on = M.logOn(key), fk = 'log.' + key;
+      const head = U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, title),
+        U.el('label', { class: 'log-on' }, U.el('input', { type: 'checkbox', checked: on, dataset: { fk: fk + '.on' }, onchange: e => M.setLog(key, e.target.checked) }), ' record'));
+      const box = U.el('div', { class: 'log-sec' }, head, U.el('div', { class: 'hint' }, about));
+      if (on) box.append(...body(p[key], fk));
+      page.append(box);
+    };
+    section('data_log', 'Data log', 'Tag values over time, in groups. A group is recorded periodically (interval), when one of its tags changes (change; interval_ms = minimum time between samples), when trigger_tag turns on (tag), or only on request (manual: call "data_log.sample"). Export: hml_runtime --export-data-log out.csv project.json --group <name>, or call "data_log.export" (arg = group or group,file).',
+      (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, this.LOG_DB_FIELDS('logs/data.db', 1000000), fk)),
+        this.tableEditor(o, { key: 'groups', label: 'Groups', columns: [{ k: 'name', t: 'text' }, { k: 'trigger', t: 'select', o: SCHEMA.dataLogTriggers },
+          { k: 'interval_ms', t: 'number', opt: true }, { k: 'tags', t: 'csv', opt: true }, { k: 'trigger_tag', t: 'tag', opt: true }] }, fk)]);
+    section('alarms', 'Alarms', 'A condition on a tag; every raise and clear is recorded. condition "true" = the tag is on / non-zero; the others compare the tag with value, or with value_tag if given. Export: hml_runtime --export-alarm-log out.csv project.json, or call "alarm_log.export".',
+      (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, this.LOG_DB_FIELDS('logs/alarm.db', 100000), fk)),
+        this.tableEditor(o, { key: 'items', label: 'Alarms', columns: [{ k: 'name', t: 'text' }, { k: 'tag', t: 'tag' }, { k: 'condition', t: 'select', o: SCHEMA.alarmConditions },
+          { k: 'value', t: 'text', opt: true }, { k: 'value_tag', t: 'tag', opt: true }, { k: 'severity', t: 'select', o: SCHEMA.alarmSeverities }, { k: 'message', t: 'text', opt: true }] }, fk)]);
+    section('operation_log', 'Operation log', 'What the operator did on the screens: values written from widgets and by set / toggle / inc / dec actions (old and new value), screen changes, scripts and calls started from widget events. Text typed into a password field is never stored. Export: hml_runtime --export-operation-log out.csv project.json, or call "operation_log.export".',
+      (o, fk) => [U.el('div', { class: 'drv-fields' }, Props.row('user_tag', Props.editor(o, 'user_tag', { t: 'tag' }, fk), 'string tag holding the current operator; its value is stored with every row'),
+        ...Props.fields(o, this.LOG_DB_FIELDS('logs/operation.db', 100000), fk))]);
+    section('system_log', 'System log', 'Runtime messages: script errors, driver connects / disconnects, project load messages, Lua log() / warn(). Export: hml_runtime --export-system-log out.csv project.json, or call "system_log.export".',
+      (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, [{ k: 'level', t: 'select', o: ['', 'info', 'warn', 'error'], empty: 'info', hint: 'minimum level that is recorded' }]
+        .concat(this.LOG_DB_FIELDS('logs/system.db', 100000)), fk))]);
+    const names = M.tagNames(), unknown = new Set();
+    for (const g of (p.data_log && p.data_log.groups) || []) for (const t of [].concat(g.tags || [], g.trigger_tag || [])) if (!names.includes(t)) unknown.add(t);
+    for (const a of (p.alarms && p.alarms.items) || []) for (const t of [].concat(a.tag || [], a.value_tag || [])) if (!names.includes(t)) unknown.add(t);
+    if (p.operation_log && p.operation_log.user_tag && !names.includes(p.operation_log.user_tag)) unknown.add(p.operation_log.user_tag);
+    if (unknown.size) page.append(U.el('div', { class: 'warn' }, 'unknown tags: ' + [...unknown].join(', ')));
   },
 
   renderProject() {

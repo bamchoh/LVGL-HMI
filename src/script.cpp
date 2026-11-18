@@ -121,6 +121,11 @@ struct ScriptEngine::Impl {
         HML_INFO("[script] %s", join_args(L).c_str());
         return 0;
     }
+    static int l_warn(lua_State* L)
+    {
+        HML_WARN("[script] %s", join_args(L).c_str());
+        return 0;
+    }
     static int l_goto_screen(lua_State* L)
     {
         std::string name = luaL_checkstring(L, 1), anim = luaL_optstring(L, 2, "fade");
@@ -208,7 +213,7 @@ struct ScriptEngine::Impl {
         }
 
         static const luaL_Reg funcs[] = {
-            { "print", l_print }, { "log", l_print }, { "goto_screen", l_goto_screen }, { "back", l_back },
+            { "print", l_print }, { "log", l_print }, { "warn", l_warn }, { "goto_screen", l_goto_screen }, { "back", l_back },
             { "current_screen", l_current_screen }, { "call", l_call }, { "run", l_run }, { "millis", l_millis },
         };
         for(const luaL_Reg& f : funcs) lua_register(L, f.name, f.func);

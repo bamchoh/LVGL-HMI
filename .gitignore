@@ -6,6 +6,8 @@ _deps/
 # test artifacts
 *.bmp
 *.log
+# system log databases written by the runtime ("system_log" in project.json)
+projects/*/logs/
 __pycache__/
 
 # editor / IDE

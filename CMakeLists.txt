@@ -88,6 +88,13 @@ FetchContent_Declare(lua
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+# ---------------------------------------------------------------- SQLite (system log, public domain)
+# The amalgamation (one C file) is compiled below as hml_sqlite.
+FetchContent_Declare(sqlite
+  URL https://www.sqlite.org/2025/sqlite-amalgamation-3500400.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
 # ---------------------------------------------------------------- open62541 (OPC UA, MPL-2.0)
 # Built from the release source tarball with the reduced namespace zero (no git submodules
 # needed). Needs Python 3 on the build host for the nodeset compiler.
@@ -114,7 +121,7 @@ if(HML_OPCUA)
   )
 endif()
 
-FetchContent_MakeAvailable(${_hml_fetch_targets} nlohmann_json lvgl lua)
+FetchContent_MakeAvailable(${_hml_fetch_targets} nlohmann_json lvgl lua sqlite)
 
 # Lua core + the sandbox-safe standard libraries (no io / os / package / debug). Compiled as C++
 # so that Lua errors are exceptions and unwind the runtime's C++ frames properly.
@@ -130,6 +137,19 @@ if(MSVC)
   target_compile_options(hml_lua PRIVATE /W0)
 else()
   target_compile_options(hml_lua PRIVATE -w)
+endif()
+
+add_library(hml_sqlite STATIC ${sqlite_SOURCE_DIR}/sqlite3.c)
+target_include_directories(hml_sqlite PUBLIC ${sqlite_SOURCE_DIR})
+target_compile_definitions(hml_sqlite PRIVATE
+  SQLITE_THREADSAFE=1 SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_DEPRECATED SQLITE_OMIT_SHARED_CACHE
+  SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_DQS=0 SQLITE_MAX_EXPR_DEPTH=0)
+if(MSVC)
+  target_compile_options(hml_sqlite PRIVATE /W0)
+else()
+  target_compile_options(hml_sqlite PRIVATE -w)
+  find_package(Threads REQUIRED)
+  target_link_libraries(hml_sqlite PUBLIC Threads::Threads)
 endif()
 
 if(HML_OPCUA)
@@ -185,7 +205,7 @@ endif()
 file(GLOB HML_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(hml_runtime ${HML_SOURCES})
 target_include_directories(hml_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua)
+target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite)
 if(HML_OPCUA)
   target_link_libraries(hml_runtime PRIVATE open62541)
   target_compile_definitions(hml_runtime PRIVATE HML_WITH_OPCUA=1)

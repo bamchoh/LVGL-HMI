@@ -9,6 +9,9 @@ const SCHEMA = {
   events: ['on_click', 'on_press', 'on_release', 'on_long_press', 'on_long_press_repeat', 'on_change', 'on_ready'],
   tagTypes: ['bool', 'int', 'float', 'string'],
   // project scripts (Lua, src/script.cpp): when a script runs. 'manual' = only from a script action / run()
+  dataLogTriggers: ['interval', 'change', 'tag', 'manual'],
+  alarmConditions: ['true', 'false', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'],
+  alarmSeverities: ['warning', 'critical', 'info'],
   scriptTriggers: ['manual', 'startup', 'interval', 'tag', 'screen_show', 'screen_hide'],
 
   // widget types: def = values written when the widget is created, props = type specific fields

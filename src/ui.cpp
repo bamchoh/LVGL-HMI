@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
 #include "util.hpp"
@@ -324,6 +325,7 @@ struct Binding {
     void apply_value(double n);
     void on_tag_changed(const Value& v, const void* source);
     void on_widget_changed(lv_obj_t* target);
+    void write_from_widget(lv_obj_t* target);
 };
 
 static bool compare_numbers(Cmp cmp, double a, double b)
@@ -433,6 +435,18 @@ void Binding::on_tag_changed(const Value& v, const void* source)
 
 // widget -> tag (two-way bindings)
 void Binding::on_widget_changed(lv_obj_t* target)
+{
+    if(!operation_log().enabled()) { write_from_widget(target); return; }
+    const Value before = tag->get();
+    write_from_widget(target);
+    const Value after = tag->get();
+    if(before.num == after.num && before.str == after.str) return;
+    // never store what was typed into a password field
+    const bool secret = wk == Widget::Textarea && lv_textarea_get_password_mode(target);
+    operation_log().record("write", tag->name(), secret ? "***" : before.format(), secret ? "***" : after.format());
+}
+
+void Binding::write_from_widget(lv_obj_t* target)
 {
     if(commit_on_ready) end_edit_session(target);   // edit session over
     if(commit_on_ready && wk == Widget::Textarea && lv_textarea_get_text(target)[0] == '\0') {
@@ -905,24 +919,37 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
 
 void Ui::Impl::run_actions(const ActionList& list)
 {
+    OperationLog& oplog = operation_log();
     for(const Action& a : list.actions) {
         switch(a.kind) {
-            case ActionKind::Goto:   show_screen(a.screen, a.anim); break;
-            case ActionKind::Back:   ui().back(); break;
-            case ActionKind::Set:    a.tag->set(a.value, nullptr); break;
-            case ActionKind::Toggle: a.tag->set_number(a.tag->get_number() != 0 ? 0 : 1, nullptr); break;
-            case ActionKind::Inc:    a.tag->set_number(a.tag->get_number() + a.by, nullptr); break;
-            case ActionKind::Dec:    a.tag->set_number(a.tag->get_number() - a.by, nullptr); break;
-            case ActionKind::Reload: if(app.request_reload) app.request_reload(); break;
-            case ActionKind::Exit:   if(app.request_exit) app.request_exit(); break;
-            case ActionKind::Restart: if(app.request_restart) app.request_restart(a.restart); break;
+            case ActionKind::Goto:   oplog.record("screen", a.screen); show_screen(a.screen, a.anim); break;
+            case ActionKind::Back:   oplog.record("screen", "(back)"); ui().back(); break;
+            case ActionKind::Set:
+            case ActionKind::Toggle:
+            case ActionKind::Inc:
+            case ActionKind::Dec: {
+                const Value before = a.tag->get();
+                if(a.kind == ActionKind::Set) a.tag->set(a.value, nullptr);
+                else if(a.kind == ActionKind::Toggle) a.tag->set_number(a.tag->get_number() != 0 ? 0 : 1, nullptr);
+                else a.tag->set_number(a.tag->get_number() + (a.kind == ActionKind::Inc ? a.by : -a.by), nullptr);
+                if(oplog.enabled()) {
+                    const Value after = a.tag->get();
+                    if(before.num != after.num || before.str != after.str) oplog.record("write", a.tag->name(), before.format(), after.format());
+                }
+                break;
+            }
+            case ActionKind::Reload: oplog.record("system", "reload"); if(app.request_reload) app.request_reload(); break;
+            case ActionKind::Exit:   oplog.record("system", "exit"); if(app.request_exit) app.request_exit(); break;
+            case ActionKind::Restart: oplog.record("system", "restart"); if(app.request_restart) app.request_restart(a.restart); break;
             case ActionKind::Call: {
+                oplog.record("call", a.fn, "", a.arg);
                 auto it = named_actions.find(a.fn);
                 if(it == named_actions.end()) HML_WARN("call: unknown action '%s'", a.fn.c_str());
                 else it->second(a.arg);
                 break;
             }
             case ActionKind::Script:
+                oplog.record("script", a.fn.empty() ? "(inline)" : a.fn);
                 if(!a.fn.empty()) scripts().run(a.fn);
                 else scripts().exec(a.arg, "action");
                 break;

@@ -20,7 +20,7 @@ project.json ──┬── tags      : 名前付き変数（bool/int/float/str
 ## ビルド（Windows / MSVC）
 
 必要なもの: Visual Studio 2022 以降 (C++ ツール), CMake 3.24+, Ninja, ネットワーク接続
-（初回に LVGL / SDL2 / nlohmann-json / Lua / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
+（初回に LVGL / SDL2 / nlohmann-json / Lua / SQLite / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
 Python 3 も必要です（open62541 のコード生成に使用。不要なら `-DHML_OPCUA=OFF`）。
 
 ```
@@ -41,6 +41,8 @@ build.cmd Debug
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
+| `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
+| `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
 | `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
@@ -197,6 +199,8 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `--screenshot <file.bmp>`   | 起動後にスクリーンショットを保存（`tools/bmp2png.py` で PNG 化できます）                                          |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
 | `--reload-after <ms>`       | 指定時間後にホットリロードを実行（テスト用）                                                                      |
+| `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
+| `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
 | `--click <x>,<y>,<ms>`      | 起動から `ms` 後に座標 (x,y) をクリック（複数指定可、UI 自動テスト用）                                            |
 | `--shot-at <ms>,<file.bmp>` | 指定時刻にスクリーンショットを保存（複数指定可）                                                                  |
 
@@ -228,6 +232,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
 | Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
 | Run                                    | 保存して `hml_runtime` を通常起動                                                                                                                                  |
+| 中央: Logs タブ                        | 変数ロギング（グループ）、アラーム、操作ログ、システムログの設定。チェックを入れたものだけ記録される     |
 | 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
 | JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
 
@@ -625,6 +630,7 @@ project.json の `scripts` に定義し、`trigger` で実行のタイミング�
 | `run("name")`                         | 別のスクリプトを実行                                                                                    |
 | `call("fn" [, "arg"])`                | `call` アクションと同じ（ランタイムに登録された名前付きアクション）                                     |
 | `log(...)` / `print(...)`             | ログに出力（`[hml INFO ] [script] ...`）                                                                |
+| `warn(...)`                           | 警告としてログに出力（`[hml WARN ] [script] ...`）                                                      |
 | `millis()`                            | 起動からの経過ミリ秒                                                                                    |
 | `os.time()` / `os.date(fmt)` / `os.clock()` | 時刻（`os.date("%H:%M:%S")` など）                                                                |
 | `event`                               | 実行のきっかけ: `event.trigger`（`startup` / `interval` / `tag` / `screen_show` / `screen_hide` / `action`）、`event.tag`、`event.value`、`event.screen` |
@@ -633,6 +639,163 @@ project.json の `scripts` に定義し、`trigger` で実行のタイミング�
 bool タグは Lua の真偽値です。`if tag.run then` と書いてください（`tag.run == 1` は常に偽になります）。
 
 デモプロジェクトの `auto_speed` スクリプト（Auto mode かつ Run のとき、温度に応じて速度設定値を動かす）が例です。
+
+## ロギング
+
+変数（タグ値）、アラーム、オペレーターの操作を記録できます。どれも project.json に設定を書いたものだけが
+有効になり、それぞれ別の SQLite データベース（`logs/` フォルダ）に記録され、CSV で取り出せます。
+ランタイム自身のメッセージ（スクリプトのエラーなど）の記録は、次の「システムログ」です。
+
+共通の設定キー:
+
+| キー             | 既定値                                   | 内容                                         |
+| ---------------- | ---------------------------------------- | -------------------------------------------- |
+| `enabled`        | `true`                                   | `false` で設定を残したまま記録を止める       |
+| `path`           | `logs/data.db` / `alarm.db` / `operation.db` | データベースファイル（project.json からの相対） |
+| `retention_days` | `30`                                     | これより古い行を削除（`0` = 無期限）         |
+| `max_rows`       | 変数 `1000000`、ほかは `100000`          | これを超えたら古い行から削除（`0` = 無制限） |
+
+書き込みは約 1 秒ごとにバックグラウンドでまとめて行います（電源断で直前の約 1 秒分が失われることがあります）。
+設定の変更はランタイムの再起動で反映されます。
+
+### 変数ロギング (`data_log`)
+
+タグをグループにまとめ、グループごとに記録のタイミングを決めます。1 回の記録（サンプル）には、その時点の
+グループ内の全タグの値が入ります。
+
+```json
+"data_log": {
+  "groups": [
+    { "name": "process", "trigger": "interval", "interval_ms": 1000, "tags": ["temp", "pressure", "level"] },
+    { "name": "state",   "trigger": "change", "tags": ["run", "mode"] },
+    { "name": "batch",   "trigger": "tag", "trigger_tag": "batch_done", "tags": ["total", "recipe"] },
+    { "name": "report",  "trigger": "manual", "tags": ["total"] }
+  ]
+}
+```
+
+| `trigger`          | 記録されるとき                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `interval`（既定） | `interval_ms` ミリ秒ごと（既定 1000、最小 100）                                                  |
+| `change`           | グループ内のタグのどれかが変化したとき。`interval_ms` を付けると、その時間内は 1 回にまとめる    |
+| `tag`              | `trigger_tag` がオフ（0 / 空）からオン（0 以外）になったとき                                     |
+| `manual`           | `{ "action": "call", "fn": "data_log.sample", "arg": "report" }`（Lua: `call("data_log.sample", "report")`）で記録 |
+
+CSV はグループごとに、時刻 + タグごとの列になります（bool は 1 / 0）。
+
+```
+hml_runtime --export-data-log process.csv projects/demo/project.json --group process
+```
+
+画面からは `{ "action": "call", "fn": "data_log.export", "arg": "process" }`（`arg` は `グループ` または
+`グループ,出力先`。出力先を省くとデータベースと同じフォルダ、`arg` が空なら全グループ）。
+
+### アラーム (`alarms`)
+
+タグに対する条件を定義します。条件が成立したとき（発生 `raised`）と成立しなくなったとき（復帰 `cleared`）に
+1 行ずつ記録されます。
+
+```json
+"alarms": {
+  "items": [
+    { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi",
+      "severity": "warning", "message": "Temperature high" },
+    { "name": "level_low", "tag": "level", "condition": "lt", "value": 10, "message": "Tank level low" },
+    { "name": "estop", "tag": "estop", "severity": "critical", "message": "Emergency stop" }
+  ]
+}
+```
+
+| キー                  | 内容                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `name` / `tag`        | アラーム名（一意）と、監視するタグ                                                                 |
+| `condition`           | `true`（既定: タグがオン / 0 以外）、`false`、`eq` `ne` `gt` `lt` `ge` `le`（`==` `!=` `>` `<` `>=` `<=` も可） |
+| `value` / `value_tag` | 比較する値。`value_tag` を書くと、別のタグの現在値と比較する（設定値タグをしきい値にできる）       |
+| `severity`            | `warning`（既定）/ `critical` / `info` など。記録されるだけで、動作は変わらない                    |
+| `message`             | 記録するメッセージ（省略時はアラーム名）                                                           |
+
+- 起動時にすでに成立しているアラームは、起動時刻で発生として記録されます。
+- 記録される列は、時刻、名前、`raised` / `cleared`、重要度、メッセージ、そのときのタグ値です。
+- 確認（アクノリッジ）と、画面上のアラーム一覧はまだありません。
+
+```
+hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
+```
+
+画面からは `{ "action": "call", "fn": "alarm_log.export" }`（`arg` で出力先を指定可）。
+
+### 操作ログ (`operation_log`)
+
+オペレーターが画面で行った操作を記録します。
+
+```json
+"operation_log": { "user_tag": "operator" }
+```
+
+| 記録される操作（`kind`）        | 内容                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `write`                         | スイッチ・スライダー・入力欄などからのタグ書き込みと、`set` / `toggle` / `inc` / `dec` アクション。変更前と変更後の値 |
+| `screen`                        | `goto` / `back` アクションによる画面切り替え                                                  |
+| `script` / `call` / `system`    | イベントから実行したスクリプト、`call` アクション、`reload` / `exit` / `restart`              |
+
+- `user_tag` に文字列タグ（ログイン中のオペレーター名など）を指定すると、その値が各行に記録されます。
+  各行には、操作した画面の名前も入ります。
+- 同じタグへの書き込みが 1 秒以内に続いたとき（スライダーのドラッグ、+ ボタンの連打）は 1 行にまとめ、
+  最初の変更前の値と最後の変更後の値を記録します。
+- パスワード入力欄に入力した内容は記録しません（`***` になります）。
+- 値が変わらなかった書き込み、スクリプトの中でのタグ書き込み、ドライバ（PLC）からの変化は記録しません。
+
+```
+hml_runtime --export-operation-log operations.csv projects/demo/project.json
+```
+
+画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+
+## システムログ
+
+スクリプトのエラー、ドライバの接続・切断、プロジェクトの読み込み結果など、ランタイムがコンソールに出す
+メッセージ（`[hml INFO ]` / `[hml WARN ]` / `[hml ERROR]`）を SQLite データベースに記録し、あとから CSV で
+取り出せます。project.json に `system_log` を書くと有効になります（書かなければ記録しません）。
+
+```json
+"system_log": { "path": "logs/system.db", "level": "info", "retention_days": 30, "max_rows": 100000 }
+```
+
+| キー             | 既定値        | 内容                                                                      |
+| ---------------- | ------------- | ------------------------------------------------------------------------- |
+| `enabled`        | `true`        | `false` で設定を残したまま記録を止める                                    |
+| `path`           | `logs/system.db` | データベースファイル（project.json からの相対パス。フォルダは自動で作成） |
+| `level`          | `info`        | 記録する最低レベル: `info` / `warn` / `error`                             |
+| `retention_days` | `30`          | これより古い行を削除（`0` = 無期限）                                      |
+| `max_rows`       | `100000`      | これを超えたら古い行から削除（`0` = 無制限）                              |
+
+記録される列は、時刻、レベル、種別（`source`: `script` / `driver` / `system`）、メッセージ、回数です。
+
+- 同じメッセージが連続したとき（周期スクリプトが毎回同じエラーになる、など）は 1 行にまとめ、回数と最後の時刻を
+  更新します。
+- 書き込みは約 1 秒ごとにバックグラウンドでまとめて行います（画面の動作を止めず、SD カードへの書き込み回数も
+  抑えます）。電源断でファイルが壊れることはありませんが、直前の約 1 秒分は失われることがあります。
+- Lua の `log(...)` / `warn(...)` と、スクリプトのエラーも記録されます。
+- 設定の変更はランタイムの再起動で反映されます（ホットリロードでは反映されません）。
+- OPC UA ライブラリ（open62541）が直接コンソールに出すメッセージは記録されません。
+
+### CSV に取り出す
+
+```
+hml_runtime --export-system-log out.csv projects/demo/project.json
+hml_runtime --export-system-log errors.csv projects/demo/project.json --log-level warn
+```
+
+HMI の実行中でも別プロセスとして実行できます。HMI の画面から取り出すには `call` アクションの `system_log.export` を
+使います（`arg` が出力先。省略するとデータベースと同じフォルダに `system-log-日付-時刻.csv`）。
+
+```json
+"on_click": { "action": "call", "fn": "system_log.export", "arg": "/media/usb/system-log.csv" }
+```
+
+Lua からは `call("system_log.export", "/media/usb/system-log.csv")` です。CSV は UTF-8（BOM 付き）で、Excel でそのまま
+開けます。列は `time,level,source,message,count,last_time` です。データベースは SQLite なので、`sqlite3` コマンドや
+DB Browser for SQLite でも直接見られます（テーブル `log`）。
 
 ## ソース構成
 
@@ -644,6 +807,11 @@ bool タグは Lua の真偽値です。`if tag.run then` と書いてくださ�
 | `src/platform_linux.cpp`       | Linux fbdev / DRM + evdev バックエンド（Raspberry Pi）: シグナル制御、スナップショット              |
 | `src/tag.[ch]pp`               | `hml::Tag` / `hml::TagStore`: タグストア（スレッドセーフ、変更通知、書き込み元の追跡）              |
 | `src/ui.[ch]pp`                | `hml::Ui`: JSON → LVGL ウィジェット、バインディング、アクション、画面遷移                           |
+| `src/system_log.[ch]pp`        | `hml::SystemLog`: システムログ（SQLite への記録、検索、CSV エクスポート）                            |
+| `src/logdb.[ch]pp`             | `hml::LogDb`: ロギング共通の SQLite 記録（バックグラウンド書き込み、保持日数・件数、CSV 出力）      |
+| `src/data_log.[ch]pp`          | `hml::DataLog`: 変数ロギング（グループ、周期 / 変化 / タグ / 手動トリガー）                         |
+| `src/alarm.[ch]pp`             | `hml::Alarms`: アラームの判定と発生・復帰の記録                                                     |
+| `src/operation_log.[ch]pp`     | `hml::OperationLog`: 操作ログ（ウィジェットからの書き込み、イベントのアクション）                   |
 | `src/script.[ch]pp`            | `hml::ScriptEngine`: Lua スクリプト（トリガー、タグ / 画面 API、サンドボックス、タイムアウト）      |
 | `src/project.[ch]pp`           | `hml::Project`: project.json の読み込み、画面構築とホットリロード                                   |
 | `src/driver.[ch]pp`            | `hml::Driver` 基底クラスと `hml::DriverRegistry`（登録 / 起動 / 停止）                              |
@@ -666,7 +834,7 @@ bool タグは Lua の真偽値です。`if tag.run then` と書いてくださ�
 
 ### 組み込みターゲットへの移植
 
-ランタイム本体（tag / ui / project / driver / script）は LVGL、nlohmann/json、Lua と C++17 標準ライブラリ
+ランタイム本体（tag / ui / project / driver / script / ロギング）は LVGL、nlohmann/json、Lua、SQLite と C++17 標準ライブラリ
 （`std::thread` / `std::mutex` / `std::function`）にしか依存しません。
 Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動きます。それ以外の RTOS /
 ベアメタルへは、`platform.hpp` を実装するファイルを 1 つ追加して対象ボードの表示・入力
