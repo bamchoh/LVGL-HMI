@@ -301,8 +301,12 @@ enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Le
 enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options };
 enum class Cmp { None, Eq, Ne, Gt, Lt, Ge, Le };
 
+struct Screen;
+
 struct Binding {
     lv_obj_t*   obj = nullptr;        // the widget (for buttons with text: the inner label for Text)
+    Screen*     screen = nullptr;     // the screen the widget is on
+    bool        stale = false;        // the tag changed while that screen was not shown
     Widget      wk = Widget::Panel;
     BindKind    kind = BindKind::Text;
     Tag*        tag = nullptr;
@@ -325,6 +329,10 @@ struct Binding {
     std::optional<lv_color_t> map_color(const Value& v) const;
     void apply_value(double n);
     void on_tag_changed(const Value& v, const void* source);
+    // A tag notification. Widgets of a screen that is not shown are not touched: with many
+    // screens most notifications would go to widgets nobody sees. They are brought up to date
+    // when their screen is shown (Impl::refresh_stale).
+    void tag_event(const Value& v, const void* source);
     void on_widget_changed(lv_obj_t* target);
     void write_from_widget(lv_obj_t* target);
 };
@@ -540,11 +548,23 @@ struct ChartCtx {
 
 struct Screen {
     std::string name;
+    bool        shown = false;        // the screen on the display right now
+    std::vector<Binding*> bindings;   // of the widgets on this screen
     int         level = 0;            // "level": minimum user level to see the screen
     lv_obj_t*   obj = nullptr;
     lv_obj_t*   keyboard = nullptr;   // optional on-screen keyboard
     lv_obj_t*   kb_echo = nullptr;    // shows the edited text next to the keyboard when it hides the field
 };
+
+// While no screen is shown at all (screens built for a test, or between unload and the first
+// show) every widget is kept up to date.
+static bool s_some_screen_shown = false;
+
+void Binding::tag_event(const Value& v, const void* source)
+{
+    if(screen && !screen->shown && s_some_screen_shown) { if(source != this) stale = true; return; }
+    on_tag_changed(v, source);
+}
 
 // LVGL's stock keyboard closes through a key drawn as a keyboard icon. Operators look for an
 // "x", so the lower-case, symbol and number layouts are replaced with copies that show
@@ -667,6 +687,21 @@ struct Ui::Impl {
         if(r->deny == AccessRule::Deny::Login) users().request_login(r->level);
     }
     void parse_access(lv_obj_t* obj, const json& w);
+    // The screen at `idx` becomes the one on the display: bring its widgets up to date with the
+    // tags that changed while it was not shown.
+    void set_shown(int idx)
+    {
+        for(auto& sc : screens) sc->shown = false;
+        if(idx < 0 || static_cast<size_t>(idx) >= screens.size()) { s_some_screen_shown = false; return; }
+        Screen& scr = *screens[static_cast<size_t>(idx)];
+        scr.shown = true;
+        s_some_screen_shown = true;
+        for(Binding* b : scr.bindings) {
+            if(!b->stale) continue;
+            b->stale = false;
+            b->on_tag_changed(b->tag->get(), nullptr);
+        }
+    }
     void apply_access(const AccessRule& r);
     static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
     {
@@ -884,11 +919,13 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     b->two_way = two_way;
 
     Binding* raw = b.get();
+    raw->screen = building;
+    if(building) building->bindings.push_back(raw);
     bindings.push_back(std::move(b));
-    tag->subscribe(SubGroup::UI, [raw](Tag&, const Value& v, const void* src) { raw->on_tag_changed(v, src); });
+    tag->subscribe(SubGroup::UI, [raw](Tag&, const Value& v, const void* src) { raw->tag_event(v, src); });
     if(raw->cmp_tag) {
         // the condition depends on a second tag: re-evaluate with the bound tag's current value
-        raw->cmp_tag->subscribe(SubGroup::UI, [raw](Tag&, const Value&, const void*) { raw->on_tag_changed(raw->tag->get(), nullptr); });
+        raw->cmp_tag->subscribe(SubGroup::UI, [raw](Tag&, const Value&, const void*) { raw->tag_event(raw->tag->get(), nullptr); });
     }
     if(two_way && raw->commit_on_ready) {
         lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
@@ -1456,6 +1493,7 @@ bool Ui::Impl::show_screen(const std::string& name, const std::string& anim, boo
         left = screens[static_cast<size_t>(current)]->name;
     }
     current = idx;
+    set_shown(idx);                                          // before it is drawn
     bool animated = !anim.empty() && !iequals(anim, "none");
     // The previous screen is deleted only when it is not one of ours (the blank screen from unload_all).
     lv_screen_load_anim(scr->obj, parse_anim(anim), animated ? 250 : 0, 0, !prev_is_ours);
@@ -1537,6 +1575,7 @@ void Ui::unload_all()
     lv_screen_load(blank);
     for(auto& s : m.screens) if(s->obj) lv_obj_delete(s->obj);
     m.screens.clear();
+    s_some_screen_shown = false;
     m.bindings.clear();
     m.action_lists.clear();
     m.access_rules.clear();
@@ -1580,6 +1619,7 @@ bool Ui::back()
     std::string left = m.current >= 0 ? m.screens[static_cast<size_t>(m.current)]->name : std::string();
     std::string shown = m.screens[static_cast<size_t>(idx)]->name;
     m.current = idx;
+    m.set_shown(idx);
     lv_screen_load_anim(m.screens[static_cast<size_t>(idx)]->obj, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 250, 0, false);
     if(!left.empty()) scripts().on_screen(left, false);
     scripts().on_screen(shown, true);
