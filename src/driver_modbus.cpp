@@ -1,4 +1,4 @@
-// Modbus TCP client driver.
+// Modbus client drivers: Modbus TCP, Modbus RTU and Modbus ASCII.
 //
 // {
 //   "type": "modbus_tcp",
@@ -11,9 +11,20 @@
 //     { "tag": "flow",  "area": "holding", "addr": 20, "dtype": "float", "swap_words": false },
 //     { "tag": "run",   "area": "coil",    "addr": 0 },
 //     { "tag": "fault", "area": "discrete","addr": 3 },
-//     { "tag": "cmd",   "area": "holding", "addr": 5, "access": "wo" }   // write only, never polled
+//     { "tag": "cmd",   "area": "holding", "addr": 5, "access": "wo" },  // write only, never polled
+//     { "tag": "temp2", "area": "input",   "addr": 10, "unit_id": 2 }    // another unit on the same line
 //   ]
 // }
+//
+// {
+//   "type": "modbus_rtu",                  // or "modbus_ascii"
+//   "device": "/dev/ttyUSB0",              // serial port ("COM4" on Windows)
+//   "baud": 9600, "data_bits": 8, "parity": "none", "stop_bits": 1,
+//   "unit_id": 1, "poll_ms": 200, "timeout_ms": 500, "status_tag": "plc_online",
+//   "map": [ ... ]                         // as above
+// }
+//   Defaults: modbus_rtu 9600 8N1, modbus_ascii 9600 7E1. Instead of "device", "host" + "port"
+//   send the same frames through a TCP connection (serial-to-Ethernet gateway).
 //
 // area:   coil (FC1/FC5) | discrete (FC2) | holding (FC3/FC6/FC16) | input (FC4)
 // dtype:  bool | u16 | s16 | u32 | s32 | float   (32-bit types occupy two registers, big-endian
@@ -21,32 +32,17 @@
 // access: "rw" (default for coil/holding) | "ro" | "wo"
 //
 // Reads run on a worker thread; UI writes to a mapped tag are queued and sent by the same thread.
-#ifdef _WIN32
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-using sock_t = SOCKET;
-static const sock_t kInvalidSock = INVALID_SOCKET;
-static void sock_close(sock_t s) { closesocket(s); }
-static int  sock_errno() { return WSAGetLastError(); }
-#else
-#  include <arpa/inet.h>
-#  include <errno.h>
-#  include <netdb.h>
-#  include <netinet/in.h>
-#  include <netinet/tcp.h>
-#  include <sys/socket.h>
-#  include <sys/time.h>
-#  include <unistd.h>
-using sock_t = int;
-static const sock_t kInvalidSock = -1;
-static void sock_close(sock_t s) { close(s); }
-static int  sock_errno() { return errno; }
-#endif
-
+//
+// Online state: Modbus TCP is online while the connection is up (an I/O error or a timeout
+// closes it and it is opened again). A serial line has no connection: it is online while at
+// least one unit answers. A unit that does not answer costs one timeout per poll cycle, the
+// other units on the line keep being polled.
 #include "driver.hpp"
+#include "modbus_link.hpp"
 #include "tag.hpp"
 #include "util.hpp"
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <deque>
@@ -58,62 +54,20 @@ namespace hml {
 namespace {
 
 constexpr size_t kWriteQueueLen = 64;
+enum class Framing { Tcp, Rtu, Ascii };
 
-bool sockets_startup()
-{
-#ifdef _WIN32
-    static bool done = false;
-    if(!done) {
-        WSADATA wsa;
-        if(WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
-        done = true;
-    }
-#endif
-    return true;
-}
+// transact() results below zero
+constexpr int kFatal = -1;       // the link is broken: close it and open it again
+constexpr int kException = -2;   // the unit answered with an exception
+constexpr int kNoAnswer = -3;    // timeout or a damaged frame (serial framings)
 
-void set_timeout(sock_t s, uint32_t ms)
-{
-#ifdef _WIN32
-    DWORD tv = ms;
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
-    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
-#else
-    timeval tv;
-    tv.tv_sec = ms / 1000;
-    tv.tv_usec = static_cast<suseconds_t>((ms % 1000) * 1000);
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-#endif
-}
-
-bool send_all(sock_t s, const uint8_t* buf, int len)
-{
-    while(len > 0) {
-        int n = static_cast<int>(send(s, reinterpret_cast<const char*>(buf), len, 0));
-        if(n <= 0) return false;
-        buf += n; len -= n;
-    }
-    return true;
-}
-
-bool recv_all(sock_t s, uint8_t* buf, int len)
-{
-    while(len > 0) {
-        int n = static_cast<int>(recv(s, reinterpret_cast<char*>(buf), len, 0));
-        if(n <= 0) return false;
-        buf += n; len -= n;
-    }
-    return true;
-}
-
-class ModbusTcpDriver final : public Driver {
+class ModbusDriver final : public Driver {
 public:
-    explicit ModbusTcpDriver(const json& cfg);
-    ~ModbusTcpDriver() override { stop(); }
+    ModbusDriver(const json& cfg, Framing framing);
+    ~ModbusDriver() override { stop(); }
     bool ok() const { return ok_; }
 
-    const char* type() const override { return "modbus_tcp"; }
+    const char* type() const override { return framing_ == Framing::Tcp ? "modbus_tcp" : framing_ == Framing::Rtu ? "modbus_rtu" : "modbus_ascii"; }
     bool start() override;
     void stop() override;
 
@@ -125,6 +79,7 @@ private:
         Tag*     tag = nullptr;
         Area     area = Area::Holding;
         DType    dtype = DType::U16;
+        uint8_t  unit = 1;
         uint16_t addr = 0;
         double   scale = 1, offset = 0;
         bool     readable = true, writable = false, swap_words = false;
@@ -133,19 +88,25 @@ private:
     };
     struct Write { size_t item; double value; };
 
-    bool connect();
-    void disconnect();
-    int  transact(const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max);   // response PDU length, -1 I/O error, -2 exception
-    bool read_item(Item& it);
-    bool write_item(const Item& it, double value);
+    // Response PDU length (>= 1), or kFatal / kException / kNoAnswer.
+    int  transact(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max);
+    int  transact_tcp(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max);
+    int  transact_rtu(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max);
+    int  transact_ascii(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max);
+    int  read_exact(uint8_t* buf, int n, std::chrono::steady_clock::time_point deadline);   // 1 ok, 0 timeout, -1 error
+    int  read_item(Item& it);                       // 1 answered, kNoAnswer, kFatal
+    int  write_item(const Item& it, double value);
     static double decode(const Item& it, const uint8_t* b);
     static void   encode(const Item& it, double raw, uint8_t* b);
     void set_online(bool on);
+    void note_unit(uint8_t unit, bool answers);
     void thread_main();
     void on_tag_changed(Tag& tag, const Value& v, const void* source);
 
-    std::string host_;
-    uint16_t    port_ = 502;
+    Framing     framing_;
+    bool        serial_ = false;      // a serial port (not RTU / ASCII through TCP)
+    SerialSettings serial_cfg_;
+    std::unique_ptr<ModbusStream> stream_;
     uint8_t     unit_ = 1;
     uint32_t    poll_ms_ = 200, timeout_ms_ = 1000;
     Tag*        status_tag_ = nullptr;
@@ -155,33 +116,54 @@ private:
     std::deque<Write> queue_;
     std::thread       thread_;
     std::atomic<bool> running_{ false };
-    sock_t            sock_ = kInvalidSock;
     uint16_t          tid_ = 0;
     int               online_ = -1;       // -1 unknown, 0 offline, 1 online
+    int8_t            unit_state_[256];   // -1 unknown, 0 silent, 1 answers (serial framings: for the log)
+    bool              open_failed_logged_ = false;
     bool              ok_ = false;
 };
 
 // ---------------------------------------------------------------- construction
 
-ModbusTcpDriver::ModbusTcpDriver(const json& cfg)
+ModbusDriver::ModbusDriver(const json& cfg, Framing framing) : framing_(framing)
 {
-    if(!sockets_startup()) { HML_ERROR("modbus: socket init failed"); return; }
+    std::memset(unit_state_, -1, sizeof(unit_state_));
     const json* map = jget(cfg, "map");
-    if(!map || !map->is_array()) { HML_WARN("modbus: \"map\" array missing"); return; }
+    if(!map || !map->is_array()) { HML_WARN("%s: \"map\" array missing", type()); return; }
 
-    host_ = jstr(cfg, "host", "127.0.0.1");
-    port_ = static_cast<uint16_t>(jnum(cfg, "port", 502));
     unit_ = static_cast<uint8_t>(jnum(cfg, "unit_id", 1));
     poll_ms_ = static_cast<uint32_t>(jnum(cfg, "poll_ms", 200));
-    timeout_ms_ = static_cast<uint32_t>(jnum(cfg, "timeout_ms", 1000));
+    timeout_ms_ = static_cast<uint32_t>(jnum(cfg, "timeout_ms", framing == Framing::Tcp ? 1000 : 500));
+    if(timeout_ms_ < 10) timeout_ms_ = 10;
     if(auto st = jstr_opt(cfg, "status_tag")) status_tag_ = tags().find(*st);
+
+    const std::string device = jstr(cfg, "device", "");
+    if(framing == Framing::Tcp || device.empty()) {
+        // Modbus TCP, or RTU / ASCII frames through a TCP connection (a serial gateway)
+        if(framing != Framing::Tcp && !jhas(cfg, "host")) { HML_ERROR("%s: \"device\" (serial port) or \"host\" is needed", type()); return; }
+        stream_ = make_tcp_stream(jstr(cfg, "host", "127.0.0.1"), static_cast<uint16_t>(jnum(cfg, "port", 502)), timeout_ms_);
+    }
+    else {
+        serial_ = true;
+        serial_cfg_.device = device;
+        serial_cfg_.baud = static_cast<int>(jnum(cfg, "baud", 9600));
+        serial_cfg_.data_bits = static_cast<int>(jnum(cfg, "data_bits", framing == Framing::Ascii ? 7 : 8));
+        std::string parity = jstr(cfg, "parity", framing == Framing::Ascii ? "even" : "none");
+        serial_cfg_.parity = iequals(parity, "even") || iequals(parity, "e") ? 'E' : iequals(parity, "odd") || iequals(parity, "o") ? 'O' : 'N';
+        if(serial_cfg_.parity == 'N' && !iequals(parity, "none") && !iequals(parity, "n")) HML_WARN("%s: unknown parity '%s' (none | even | odd), using none", type(), parity.c_str());
+        serial_cfg_.stop_bits = static_cast<int>(jnum(cfg, "stop_bits", 1)) == 2 ? 2 : 1;
+        if(serial_cfg_.data_bits != 7 && serial_cfg_.data_bits != 8) { HML_WARN("%s: data_bits must be 7 or 8, using 8", type()); serial_cfg_.data_bits = 8; }
+        if(framing == Framing::Rtu && serial_cfg_.data_bits != 8) { HML_WARN("modbus_rtu needs 8 data bits, using 8"); serial_cfg_.data_bits = 8; }
+        stream_ = make_serial_stream(serial_cfg_);
+    }
 
     for(const json& m : *map) {
         std::string tagname = jstr(m, "tag", "");
         Tag* tag = tags().find(tagname);
-        if(!tag) { HML_WARN("modbus: unknown tag '%s'", tagname.c_str()); continue; }
+        if(!tag) { HML_WARN("%s: unknown tag '%s'", type(), tagname.c_str()); continue; }
         Item it;
         it.tag = tag;
+        it.unit = static_cast<uint8_t>(jnum(m, "unit_id", unit_));
         std::string area = jstr(m, "area", "holding");
         if(iequals(area, "coil")) it.area = Area::Coil;
         else if(iequals(area, "discrete") || iequals(area, "di")) it.area = Area::Discrete;
@@ -195,7 +177,7 @@ ModbusTcpDriver::ModbusTcpDriver(const json& cfg)
         else if(iequals(*dt, "u32") || iequals(*dt, "uint32")) it.dtype = DType::U32;
         else if(iequals(*dt, "s32") || iequals(*dt, "int32")) it.dtype = DType::S32;
         else if(iequals(*dt, "float") || iequals(*dt, "f32") || iequals(*dt, "real")) it.dtype = DType::Float;
-        else { HML_WARN("modbus: unknown dtype '%s'", dt->c_str()); it.dtype = DType::U16; }
+        else { HML_WARN("%s: unknown dtype '%s'", type(), dt->c_str()); it.dtype = DType::U16; }
 
         it.addr = static_cast<uint16_t>(jnum(m, "addr", 0));
         it.scale = jnum(m, "scale", 1);
@@ -210,7 +192,7 @@ ModbusTcpDriver::ModbusTcpDriver(const json& cfg)
     ok_ = true;
 }
 
-bool ModbusTcpDriver::start()
+bool ModbusDriver::start()
 {
     for(auto& it : items_) {
         if(it.writable) {
@@ -222,73 +204,128 @@ bool ModbusTcpDriver::start()
     return true;
 }
 
-void ModbusTcpDriver::stop()
+void ModbusDriver::stop()
 {
     if(!running_) return;
     running_ = false;
     if(thread_.joinable()) thread_.join();
 }
 
-// ---------------------------------------------------------------- sockets
+// ---------------------------------------------------------------- frames
 
-bool ModbusTcpDriver::connect()
+int ModbusDriver::read_exact(uint8_t* buf, int n, std::chrono::steady_clock::time_point deadline)
 {
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    addrinfo* res = nullptr;
-    std::string port = std::to_string(port_);
-    if(getaddrinfo(host_.c_str(), port.c_str(), &hints, &res) != 0 || !res) return false;
-
-    sock_t s = kInvalidSock;
-    for(addrinfo* ai = res; ai; ai = ai->ai_next) {
-        s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if(s == kInvalidSock) continue;
-        set_timeout(s, timeout_ms_);
-        if(::connect(s, ai->ai_addr, static_cast<int>(ai->ai_addrlen)) == 0) break;
-        sock_close(s);
-        s = kInvalidSock;
+    int have = 0;
+    while(have < n) {
+        auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+        if(left <= 0 || !running_) return 0;
+        int r = stream_->read(buf + have, n - have, static_cast<uint32_t>(left > 50 ? 50 : left));   // short waits: stop() stays quick
+        if(r < 0) return -1;
+        have += r;
     }
-    freeaddrinfo(res);
-    if(s == kInvalidSock) return false;
-    int one = 1;
-    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof(one));
-    sock_ = s;
-    return true;
+    return 1;
 }
 
-void ModbusTcpDriver::disconnect()
+int ModbusDriver::transact(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max)
 {
-    if(sock_ != kInvalidSock) { sock_close(sock_); sock_ = kInvalidSock; }
+    int n = framing_ == Framing::Tcp ? transact_tcp(unit, pdu, pdu_len, resp, resp_max)
+          : framing_ == Framing::Rtu ? transact_rtu(unit, pdu, pdu_len, resp, resp_max)
+                                     : transact_ascii(unit, pdu, pdu_len, resp, resp_max);
+    if(n >= 1 && (resp[0] & 0x80)) {
+        HML_WARN("%s: unit %d: exception fc=0x%02x code=%d", type(), unit, resp[0] & 0x7F, n > 1 ? resp[1] : 0);
+        return kException;
+    }
+    // a serial line is shared: leave the silent time between frames before the next request
+    if(serial_ && framing_ == Framing::Rtu) {
+        uint32_t us = serial_cfg_.char_time_us(3.5);
+        sleep_ms(us < 2000 ? 2 : (us + 999) / 1000);
+    }
+    return n;
 }
 
-int ModbusTcpDriver::transact(const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max)
+int ModbusDriver::transact_tcp(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max)
 {
     uint8_t frame[7 + 260];
     uint16_t tid = ++tid_;
     frame[0] = static_cast<uint8_t>(tid >> 8); frame[1] = static_cast<uint8_t>(tid & 0xFF);
     frame[2] = 0; frame[3] = 0;
     frame[4] = static_cast<uint8_t>((pdu_len + 1) >> 8); frame[5] = static_cast<uint8_t>((pdu_len + 1) & 0xFF);
-    frame[6] = unit_;
+    frame[6] = unit;
     std::memcpy(frame + 7, pdu, static_cast<size_t>(pdu_len));
-    if(!send_all(sock_, frame, 7 + pdu_len)) return -1;
+    if(!stream_->write(frame, 7 + pdu_len)) return kFatal;
 
+    // On a connection every failure (also a timeout) means: start over with a new one.
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms_);
     uint8_t hdr[7];
-    if(!recv_all(sock_, hdr, 7)) return -1;
+    if(read_exact(hdr, 7, deadline) != 1) return kFatal;
     int len = ((hdr[4] << 8) | hdr[5]) - 1;
-    if(len < 1 || len > resp_max) return -1;
-    if(!recv_all(sock_, resp, len)) return -1;
-    if(((hdr[0] << 8) | hdr[1]) != tid) return -1;
-    if(resp[0] & 0x80) {
-        HML_WARN("modbus: exception fc=0x%02x code=%d", resp[0] & 0x7F, len > 1 ? resp[1] : 0);
-        return -2;
-    }
+    if(len < 1 || len > resp_max) return kFatal;
+    if(read_exact(resp, len, deadline) != 1) return kFatal;
+    if(((hdr[0] << 8) | hdr[1]) != tid) return kFatal;
     return len;
+}
+
+int ModbusDriver::transact_rtu(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max)
+{
+    uint8_t adu[1 + 253];
+    adu[0] = unit;
+    std::memcpy(adu + 1, pdu, static_cast<size_t>(pdu_len));
+    std::vector<uint8_t> frame = modbus_rtu_frame(adu, static_cast<size_t>(pdu_len) + 1);
+    stream_->discard_input();                                   // a late answer to an earlier request
+    if(!stream_->write(frame.data(), static_cast<int>(frame.size()))) return kFatal;
+
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms_);
+    uint8_t buf[260];
+    int have = 0, total = 0;
+    while(total == 0 || have < total) {
+        int want = total ? total - have : (have < 2 ? 2 - have : 1);
+        int r = read_exact(buf + have, want, deadline);
+        if(r < 0) return kFatal;
+        if(r == 0) return kNoAnswer;
+        have += want;
+        if(total == 0) {
+            total = modbus_rtu_response_len(buf, have);
+            if(total < 0 || total > static_cast<int>(sizeof(buf))) return kNoAnswer;      // not a frame we know: resynchronise next time
+        }
+    }
+    int adu_len = modbus_rtu_check(buf, total);
+    if(adu_len < 2 || buf[0] != unit || (buf[1] & 0x7F) != pdu[0]) return kNoAnswer;      // damaged, or somebody else's frame
+    if(adu_len - 1 > resp_max) return kNoAnswer;
+    std::memcpy(resp, buf + 1, static_cast<size_t>(adu_len - 1));
+    return adu_len - 1;
+}
+
+int ModbusDriver::transact_ascii(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_t* resp, int resp_max)
+{
+    uint8_t adu[1 + 253];
+    adu[0] = unit;
+    std::memcpy(adu + 1, pdu, static_cast<size_t>(pdu_len));
+    std::string frame = modbus_ascii_frame(adu, static_cast<size_t>(pdu_len) + 1);
+    stream_->discard_input();
+    if(!stream_->write(reinterpret_cast<const uint8_t*>(frame.data()), static_cast<int>(frame.size()))) return kFatal;
+
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms_);
+    std::string line;
+    for(;;) {
+        uint8_t c;
+        int r = read_exact(&c, 1, deadline);
+        if(r < 0) return kFatal;
+        if(r == 0) return kNoAnswer;
+        if(c == ':') line.clear();                              // a frame starts (again)
+        line += static_cast<char>(c);
+        if(c == '\n') break;
+        if(line.size() > 600) return kNoAnswer;
+    }
+    std::vector<uint8_t> in;
+    if(!modbus_ascii_decode(line, in) || in.size() < 2 || in[0] != unit || (in[1] & 0x7F) != pdu[0]) return kNoAnswer;
+    if(static_cast<int>(in.size()) - 1 > resp_max) return kNoAnswer;
+    std::memcpy(resp, in.data() + 1, in.size() - 1);
+    return static_cast<int>(in.size()) - 1;
 }
 
 // ---------------------------------------------------------------- encode / decode
 
-double ModbusTcpDriver::decode(const Item& it, const uint8_t* b)
+double ModbusDriver::decode(const Item& it, const uint8_t* b)
 {
     uint16_t w0 = static_cast<uint16_t>((b[0] << 8) | b[1]);
     uint16_t w1 = static_cast<uint16_t>((b[2] << 8) | b[3]);
@@ -304,7 +341,7 @@ double ModbusTcpDriver::decode(const Item& it, const uint8_t* b)
     }
 }
 
-void ModbusTcpDriver::encode(const Item& it, double raw, uint8_t* b)
+void ModbusDriver::encode(const Item& it, double raw, uint8_t* b)
 {
     uint32_t u32 = 0;
     switch(it.dtype) {
@@ -327,7 +364,7 @@ void ModbusTcpDriver::encode(const Item& it, double raw, uint8_t* b)
 
 // ---------------------------------------------------------------- read / write
 
-bool ModbusTcpDriver::read_item(Item& it)
+int ModbusDriver::read_item(Item& it)
 {
     uint8_t pdu[5], resp[260];
     bool skip_update;
@@ -340,111 +377,160 @@ bool ModbusTcpDriver::read_item(Item& it)
     if(it.area == Area::Coil || it.area == Area::Discrete) {
         pdu[0] = it.area == Area::Coil ? 0x01 : 0x02;
         pdu[4] = 1;
-        int n = transact(pdu, 5, resp, sizeof(resp));
-        if(n == -1) return false;
+        int n = transact(it.unit, pdu, 5, resp, sizeof(resp));
+        if(n == kFatal || n == kNoAnswer) return n;
         if(n >= 3 && !skip_update) it.tag->set_number((resp[2] & 1) ? 1 : 0, this);
-        return true;
+        return 1;
     }
     int nregs = it.regs();
     pdu[0] = it.area == Area::Holding ? 0x03 : 0x04;
     pdu[4] = static_cast<uint8_t>(nregs);
-    int n = transact(pdu, 5, resp, sizeof(resp));
-    if(n == -1) return false;
+    int n = transact(it.unit, pdu, 5, resp, sizeof(resp));
+    if(n == kFatal || n == kNoAnswer) return n;
     if(n >= 2 + nregs * 2 && !skip_update) {
         uint8_t b[4] = { 0, 0, 0, 0 };
         std::memcpy(b, resp + 2, static_cast<size_t>(nregs) * 2);
         it.tag->set_number_from_device(decode(it, b) * it.scale + it.offset, this);
     }
-    return true;
+    return 1;
 }
 
-bool ModbusTcpDriver::write_item(const Item& it, double value)
+int ModbusDriver::write_item(const Item& it, double value)
 {
     uint8_t pdu[16], resp[260];
+    int n;
     pdu[1] = static_cast<uint8_t>(it.addr >> 8); pdu[2] = static_cast<uint8_t>(it.addr & 0xFF);
     if(it.area == Area::Coil) {
         pdu[0] = 0x05;
         pdu[3] = value != 0 ? 0xFF : 0x00; pdu[4] = 0x00;
-        return transact(pdu, 5, resp, sizeof(resp)) != -1;
+        n = transact(it.unit, pdu, 5, resp, sizeof(resp));
     }
-    if(it.area != Area::Holding) return true;
-    double raw = it.scale != 0 ? (value - it.offset) / it.scale : value;
-    uint8_t b[4];
-    encode(it, raw, b);
-    if(it.regs() == 1) {
-        pdu[0] = 0x06;
-        pdu[3] = b[0]; pdu[4] = b[1];
-        return transact(pdu, 5, resp, sizeof(resp)) != -1;
+    else if(it.area != Area::Holding) return 1;
+    else {
+        double raw = it.scale != 0 ? (value - it.offset) / it.scale : value;
+        uint8_t b[4];
+        encode(it, raw, b);
+        if(it.regs() == 1) {
+            pdu[0] = 0x06;
+            pdu[3] = b[0]; pdu[4] = b[1];
+            n = transact(it.unit, pdu, 5, resp, sizeof(resp));
+        }
+        else {
+            pdu[0] = 0x10;
+            pdu[3] = 0; pdu[4] = 2; pdu[5] = 4;
+            std::memcpy(pdu + 6, b, 4);
+            n = transact(it.unit, pdu, 10, resp, sizeof(resp));
+        }
     }
-    pdu[0] = 0x10;
-    pdu[3] = 0; pdu[4] = 2; pdu[5] = 4;
-    std::memcpy(pdu + 6, b, 4);
-    return transact(pdu, 10, resp, sizeof(resp)) != -1;
+    return (n == kFatal || n == kNoAnswer) ? n : 1;
 }
 
-void ModbusTcpDriver::set_online(bool on)
+void ModbusDriver::set_online(bool on)
 {
     // online_ starts as "unknown" so that the status tag is written on the first attempt
     // even when the server was never reachable.
     if(online_ == (on ? 1 : 0)) return;
     online_ = on ? 1 : 0;
-    HML_INFO("modbus %s:%u %s", host_.c_str(), port_, on ? "connected" : "disconnected");
+    if(framing_ == Framing::Tcp) HML_INFO("modbus %s %s", stream_->describe().c_str(), on ? "connected" : "disconnected");
+    else HML_INFO("%s %s: %s", type(), stream_->describe().c_str(), on ? "online" : "offline");
     if(status_tag_) status_tag_->set_number(on ? 1 : 0, this);
 }
 
-void ModbusTcpDriver::thread_main()
+// serial framings: say once when a unit stops or starts answering
+void ModbusDriver::note_unit(uint8_t unit, bool answers)
+{
+    int8_t s = answers ? 1 : 0;
+    if(unit_state_[unit] == s) return;
+    if(!answers) HML_WARN("%s: unit %d does not answer", type(), unit);
+    else if(unit_state_[unit] == 0) HML_INFO("%s: unit %d answers again", type(), unit);
+    unit_state_[unit] = s;
+}
+
+void ModbusDriver::thread_main()
 {
     uint32_t backoff = 500;
+    auto wait = [this](uint32_t ms) { for(uint32_t t = 0; t < ms && running_; t += 50) sleep_ms(50); };   // responsive to stop()
     while(running_) {
-        if(sock_ == kInvalidSock) {
-            if(!connect()) {
+        if(!stream_->is_open()) {
+            if(!stream_->open()) {
+                if(framing_ != Framing::Tcp && !open_failed_logged_) {
+                    HML_WARN("%s: %s", type(), stream_->last_error().c_str());
+                    open_failed_logged_ = true;
+                }
                 set_online(false);
-                for(uint32_t t = 0; t < backoff && running_; t += 50) sleep_ms(50);   // responsive to stop()
+                wait(backoff);
                 if(backoff < 5000) backoff *= 2;
                 continue;
             }
-            backoff = 500;
-            set_online(true);
+            open_failed_logged_ = false;
+            if(framing_ == Framing::Tcp) { backoff = 500; set_online(true); }
         }
 
         uint32_t cycle_start = millis();
-        bool ok = true;
+        bool link_ok = true;
+        int answered = 0, silent = 0;
+        bool unit_silent[256] = {};                              // this cycle: do not wait for a silent unit again
 
         // pending writes first so operator actions feel immediate
         for(;;) {
             Write w;
             {
                 std::lock_guard<std::mutex> lock(qlock_);
-                if(queue_.empty() || !ok) break;
+                if(queue_.empty() || !link_ok) break;
                 w = queue_.front();
                 queue_.pop_front();
             }
-            ok = write_item(items_[w.item], w.value);
+            const Item& it = items_[w.item];
+            int r = write_item(it, w.value);
+            if(r == kFatal) link_ok = false;
+            else if(r == kNoAnswer) {
+                HML_WARN("%s: unit %d did not answer a write to '%s'", type(), it.unit, it.tag->name().c_str());
+                unit_silent[it.unit] = true;
+                silent++;
+            }
+            else answered++;
             std::lock_guard<std::mutex> lock(qlock_);
             items_[w.item].pending_writes--;
         }
 
-        for(size_t i = 0; ok && i < items_.size() && running_; i++) {
-            if(items_[i].readable) ok = read_item(items_[i]);
+        for(size_t i = 0; link_ok && i < items_.size() && running_; i++) {
+            Item& it = items_[i];
+            if(!it.readable || unit_silent[it.unit]) continue;
+            int r = read_item(it);
+            if(r == kFatal) link_ok = false;
+            else if(r == kNoAnswer) { unit_silent[it.unit] = true; silent++; note_unit(it.unit, false); }
+            else { answered++; note_unit(it.unit, true); }
         }
 
-        if(!ok) {
-            HML_WARN("modbus: communication error (%d), reconnecting", sock_errno());
-            disconnect();
+        if(!link_ok) {
+            if(framing_ == Framing::Tcp) HML_WARN("modbus: communication error (%s), reconnecting", stream_->last_error().empty() ? "timeout" : stream_->last_error().c_str());
+            else HML_WARN("%s: %s", type(), stream_->last_error().empty() ? "the link was lost" : stream_->last_error().c_str());
+            stream_->close();
             set_online(false);
+            if(framing_ != Framing::Tcp) wait(500);
             continue;
+        }
+        if(framing_ != Framing::Tcp) {
+            // no connection to tell us: online = somebody answers (or there is nothing to ask)
+            if(answered > 0 || silent == 0) { set_online(true); backoff = 500; }
+            else {
+                set_online(false);
+                wait(backoff);                                    // nobody there: ask less often
+                if(backoff < 5000) backoff *= 2;
+                continue;
+            }
         }
 
         uint32_t elapsed = millis() - cycle_start;
-        uint32_t wait = elapsed < poll_ms_ ? poll_ms_ - elapsed : 0;
-        for(uint32_t t = 0; t < wait && running_; t += 10) sleep_ms(wait - t < 10 ? wait - t : 10);
+        uint32_t rest = elapsed < poll_ms_ ? poll_ms_ - elapsed : 0;
+        for(uint32_t t = 0; t < rest && running_; t += 10) sleep_ms(rest - t < 10 ? rest - t : 10);
     }
-    disconnect();
+    stream_->close();
     set_online(false);
 }
 
 // UI thread: a mapped tag changed. Queue a write unless we caused it.
-void ModbusTcpDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
+void ModbusDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
 {
     if(source == this) return;
     for(size_t i = 0; i < items_.size(); i++) {
@@ -455,17 +541,21 @@ void ModbusTcpDriver::on_tag_changed(Tag& tag, const Value& v, const void* sourc
             queue_.push_back({ i, v.as_number() });
             it.pending_writes++;
         }
-        else HML_WARN("modbus: write queue full, dropping write to '%s'", tag.name().c_str());
+        else HML_WARN("%s: write queue full, dropping write to '%s'", type(), tag.name().c_str());
     }
+}
+
+std::unique_ptr<Driver> make(const json& cfg, Framing framing)
+{
+    auto d = std::make_unique<ModbusDriver>(cfg, framing);
+    if(!d->ok()) return nullptr;
+    return d;
 }
 
 } // namespace
 
-std::unique_ptr<Driver> make_modbus_tcp_driver(const json& cfg)
-{
-    auto d = std::make_unique<ModbusTcpDriver>(cfg);
-    if(!d->ok()) return nullptr;
-    return d;
-}
+std::unique_ptr<Driver> make_modbus_tcp_driver(const json& cfg) { return make(cfg, Framing::Tcp); }
+std::unique_ptr<Driver> make_modbus_rtu_driver(const json& cfg) { return make(cfg, Framing::Rtu); }
+std::unique_ptr<Driver> make_modbus_ascii_driver(const json& cfg) { return make(cfg, Framing::Ascii); }
 
 } // namespace hml

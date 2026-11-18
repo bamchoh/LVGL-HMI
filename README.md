@@ -11,7 +11,7 @@ Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作
 
 ```
 project.json ──┬── tags      : 名前付き変数（bool/int/float/string）
-               ├── drivers   : sim / modbus_tcp がタグを読み書き
+               ├── drivers   : sim / modbus_tcp / modbus_rtu / modbus_ascii がタグを読み書き
                ├── screens   : screens/*.json → LVGL ウィジェットに展開
                │                 bind でタグ⇔ウィジェットを接続、on_click 等でアクション
                └── scripts   : Lua スクリプト（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / イベント）
@@ -40,6 +40,7 @@ build.cmd Debug
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
+| `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
@@ -263,7 +264,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | 場所                                   | 内容                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 左: Widgets                            | パレット。クリックすると選択中のパネル（または画面）に追加                                                                                                         |
-| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバ設定（sim / modbus_tcp / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正                          |
+| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバ設定（sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正                          |
 | 中央: キャンバス                       | ドラッグで移動、右下のハンドルでサイズ変更、矢印キーで 1 px（Shift で 10 px）移動。flex レイアウトの子は親の設定に従うので移動不可                                 |
 | 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
 | Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
@@ -439,6 +440,44 @@ hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
 - 読み出しはワーカースレッドで周期実行。UI からの書き込みはキューに積まれ、同じスレッドが送信します。
 - 起動時にタグの初期値を PLC に書き込むことはありません（PLC 側の値が優先されます）。
 - 切断時は指数バックオフ（0.5s → 5s）で再接続します。
+
+### ドライバ: modbus_rtu / modbus_ascii（シリアル）
+
+シリアルポート（RS-232 / RS-485、USB シリアル変換を含む）で Modbus RTU または Modbus ASCII のクライアント（マスター）として
+通信します。`map` の書き方やデータ型は `modbus_tcp` と同じです。
+
+```json
+{
+  "type": "modbus_rtu",
+  "device": "/dev/ttyUSB0",
+  "baud": 9600, "data_bits": 8, "parity": "none", "stop_bits": 1,
+  "unit_id": 1, "poll_ms": 200, "timeout_ms": 500,
+  "status_tag": "plc_online",
+  "map": [
+    { "tag": "speed", "area": "holding", "addr": 0 },
+    { "tag": "temp2", "area": "input",   "addr": 10, "dtype": "s16", "scale": 0.1, "unit_id": 2 }
+  ]
+}
+```
+
+| キー                    | 既定値                                  | 内容                                                                    |
+| ----------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
+| `device`                |                                         | シリアルポート。Linux は `/dev/ttyUSB0` など、Windows は `COM4` など    |
+| `baud`                  | `9600`                                  | 1200 / 2400 / 4800 / 9600 / 19200 / 38400 / 57600 / 115200 / 230400     |
+| `data_bits`             | RTU `8`、ASCII `7`                      | RTU は 8 のみ                                                           |
+| `parity`                | RTU `none`、ASCII `even`                | `none` / `even` / `odd`                                                 |
+| `stop_bits`             | `1`                                     | `1` / `2`                                                               |
+| `unit_id`               | `1`                                     | 相手のユニット（スレーブ）番号。`map` の行ごとに `unit_id` で上書きできる |
+| `timeout_ms`            | `500`                                   | 応答を待つ時間                                                          |
+| `host` / `port`         |                                         | `device` を書かずにこちらを書くと、同じフレームを TCP で送る（シリアル–イーサネット変換器） |
+
+- 通信条件（ボーレート、データ長、パリティ、ストップビット）は相手の機器に合わせてください。
+- **1 本の回線に複数のユニットをつなげます**（RS-485）。`map` の行に `unit_id` を書くと、そのユニットに問い合わせます。
+  応答しないユニットがあっても、ほかのユニットとの通信は続きます（応答しないユニットは 1 周につき 1 回だけ待ちます）。
+- シリアル回線には「接続」がないので、`status_tag` は「どれか 1 つでもユニットが応答している」あいだオンになります。
+  どのユニットも応答しなくなるとオフになり、間隔を空けながら（最大 5 秒）問い合わせを続けます。
+- Linux では、ランタイムを動かすユーザーがシリアルポートに読み書きできる必要があります（通常は `dialout` グループ）。
+- 応答のチェックサム（RTU は CRC-16、ASCII は LRC）が合わないフレームは捨てます。
 
 ### ドライバ: opcua_server（OPC UA サーバー）
 
@@ -1065,6 +1104,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/driver.[ch]pp`            | `hml::Driver` 基底クラスと `hml::DriverRegistry`（登録 / 起動 / 停止）                              |
 | `src/driver_sim.cpp`           | シミュレーションドライバ                                                                            |
 | `src/driver_modbus.cpp`        | Modbus TCP クライアント（std::thread で別スレッド）                                                 |
+| `src/modbus_link.[ch]pp`       | Modbus の通信路（TCP / シリアルポート）とフレーム（MBAP / RTU の CRC-16 / ASCII の LRC）          |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |

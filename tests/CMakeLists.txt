@@ -21,6 +21,7 @@ add_executable(hml_tests
   test_driver_registry.cpp
   test_driver_sim.cpp
   test_driver_modbus.cpp
+  test_driver_modbus_serial.cpp
   test_driver_opcua.cpp
   test_screenshot.cpp
   test_demo_projects.cpp
