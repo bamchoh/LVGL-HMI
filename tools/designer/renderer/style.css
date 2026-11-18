@@ -126,6 +126,15 @@ details.sec[open] > summary { border-radius: 4px 4px 0 0; }
 .deploy .row > input.short { flex: none; width: 80px; }
 .deploy pre { max-height: 220px; white-space: pre-wrap; word-break: break-all; }
 .deploy .ok { color: #81c784; font-size: 12px; margin: 6px 0; }
+.deploy .check { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; font-size: 12px; }
+.deploy .check h4 { margin: 8px 0 3px; }
+.deploy .check table { border-collapse: collapse; width: 100%; }
+.deploy .check th, .deploy .check td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--line); font-weight: normal; }
+.deploy .check th { color: var(--dim); }
+.deploy .check td.val { font-family: Consolas, monospace; word-break: break-all; }
+.deploy .check td.diff { color: #ffb74d; }
+.deploy .check .gone td { text-decoration: line-through; color: var(--dim); }
+.deploy .check ul { margin: 2px 0; padding-left: 18px; }
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 14px; border-radius: 6px; z-index: 60; box-shadow: 0 4px 16px #000; }
 #toast[hidden] { display: none; }
 

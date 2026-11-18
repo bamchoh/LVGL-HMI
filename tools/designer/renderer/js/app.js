@@ -17,6 +17,7 @@ const host = {
   preview: (p, s) => host.call('hml_preview', p, s),
   launch: p => host.call('hml_launch', p),
   deploy: o => host.call('hml_deploy', o),
+  deployCheck: o => host.call('hml_deployCheck', o),
   setTitle: t => host.call('hml_setTitle', t),
   settings: o => host.call('hml_settings', o || null),
 };
@@ -217,8 +218,59 @@ const App = {
     };
     const row = (label, ...c) => U.el('div', { class: 'row' }, U.el('label', null, label), ...c);
     const browse = (kind, inp) => U.el('button', { class: 'mini', onclick: async () => { const p = await host.openDialog(kind, U.dirname(inp.value || '')); if (p) { inp.value = p; update(); } } }, '…');
+    f.clearLocal = check(false);                     // never remembered: it removes settings made on the target
     const dest = U.el('div', { class: 'hint' });
     const out = U.el('div');
+    const info = U.el('div', { class: 'check' });   // what the target has now (Check)
+    let last = null;                                 // the last check result
+    const show = v => (typeof v === 'string' ? JSON.stringify(v) : v === null || v === undefined ? '(not set)' : String(v));
+    // The settings saved on the target (system settings screens -> project.local.json) win over
+    // project.json there: show them next to what the project says, before anything is sent.
+    const renderCheck = () => {
+      info.innerHTML = '';
+      const r = last;
+      if (!r) return;
+      if (!r.ok) { info.append(U.el('div', { class: 'warn' }, 'Check failed: ' + (r.error || 'unknown error'))); return; }
+      const state = !r.exists ? 'This project has not been deployed to ' + r.target + ' yet.'
+        : !r.running ? 'hml_runtime is not running on the target.'
+        : r.runsThis ? 'The target is running this project.'
+        : 'The target is running another project: ' + r.running;
+      info.append(U.el('div', { class: r.exists && r.running && !r.runsThis ? 'warn' : 'hint' }, state));
+      if (!r.exists) return;
+      const diff = r.local.filter(x => !x.same), same = r.local.length - diff.length;
+      info.append(U.el('h4', null, 'Local settings on the target'));
+      if (!r.local.length) info.append(U.el('div', { class: 'hint' }, 'None: every driver setting comes from this project.'));
+      else {
+        if (diff.length) {
+          info.append(U.el('div', { class: f.clearLocal.checked ? 'hint' : 'warn' }, f.clearLocal.checked
+            ? 'These will be removed by this deploy; the project\'s values take effect.'
+            : 'These were changed on the target and stay in effect after a deploy (the project\'s values are not used):'));
+          info.append(U.el('table', { class: f.clearLocal.checked ? 'gone' : '' },
+            U.el('tr', null, U.el('th', null, 'driver'), U.el('th', null, 'setting'), U.el('th', null, 'on the target'), U.el('th', null, 'in this project')),
+            ...diff.map(x => U.el('tr', null, U.el('td', null, x.driver), U.el('td', null, x.key),
+              U.el('td', { class: 'val diff' }, show(x.target)), U.el('td', { class: 'val' }, x.unknown ? '(no such driver)' : show(x.project))))));
+        }
+        if (same) info.append(U.el('div', { class: 'hint' }, (diff.length ? 'Also ' : '') + same + ' setting(s) saved on the target with the same value as this project'
+          + (diff.length ? '.' : ': nothing differs, but they would not follow a change made here.')));
+      }
+      const fl = r.files, n = fl.changed.length + fl.added.length;
+      info.append(U.el('h4', null, 'Files'));
+      if (!n && !fl.extra.length) info.append(U.el('div', { class: 'hint' }, 'The target has the same files as this project' + (st.dirty ? ' (as last saved).' : '.')));
+      else {
+        const list = (title, names) => names.length ? [U.el('div', { class: 'hint' }, title), U.el('ul', null, ...names.slice(0, 12).map(x => U.el('li', null, x)),
+          names.length > 12 ? U.el('li', null, '… ' + (names.length - 12) + ' more') : null)] : [];
+        info.append(...list('Changed (' + fl.changed.length + '):', fl.changed), ...list('New (' + fl.added.length + '):', fl.added),
+          ...list('Only on the target, not removed by a deploy (' + fl.extra.length + '):', fl.extra));
+      }
+      if (st.dirty) info.append(U.el('div', { class: 'hint' }, 'Unsaved changes are not part of this comparison (Deploy saves first).'));
+    };
+    const runCheck = async () => {
+      const v = values();
+      if (!v.host || !v.user || !st.path) { last = null; renderCheck(); return; }
+      info.innerHTML = ''; info.append(U.el('div', { class: 'hint' }, 'Checking ' + v.user + '@' + v.host + ' …'));
+      last = await host.deployCheck(Object.assign({}, v, { project: st.path }));
+      renderCheck();
+    };
     const name = () => (st.path ? U.basename(U.dirname(st.path)) : '(unsaved)');
     const update = () => {
       const dir = (f.remoteDir.value.trim() || 'hml').replace(/\/+$/, '');
@@ -233,16 +285,21 @@ const App = {
       row('remote folder', f.remoteDir),
       row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
       row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing')),
+      row('local settings', f.clearLocal, U.el('span', { class: 'dim' }, 'remove the settings changed on the target (project.local.json)')),
       dest,
-      U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ and project.local.json on the target are kept.'),
-      out);
+      U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.'),
+      out, info);
+    f.clearLocal.addEventListener('input', renderCheck);
     update();
     const values = () => ({
       host: f.host.value.trim(), user: f.user.value.trim(), port: Number(f.port.value) || 22, key: f.key.value.trim(),
       remoteDir: f.remoteDir.value.trim() || 'hml', runtime: f.runtime.value.trim(), sendRuntime: f.sendRuntime.checked, restart: f.restart.checked,
     });
     let busy = false;
-    this.modal({ title: 'Deploy to target', body, buttons: [{ label: 'Close', onclick: () => !busy }, { label: 'Deploy', primary: true, onclick: async () => {
+    runCheck();                                      // with remembered settings: look at the target right away
+    this.modal({ title: 'Deploy to target', body, buttons: [{ label: 'Close', onclick: () => !busy },
+      { label: 'Check', onclick: async () => { if (!busy) { busy = true; out.innerHTML = ''; await runCheck(); busy = false; } return false; } },
+      { label: 'Deploy', primary: true, onclick: async () => {
       if (busy) return false;
       const v = values();
       out.innerHTML = '';
@@ -252,8 +309,10 @@ const App = {
       all['*'] = v; all[st.path] = v;
       host.settings({ deploy: all });
       busy = true;
+      info.innerHTML = '';
       out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.user + '@' + v.host + ' …'));
-      const r = await host.deploy(Object.assign({}, v, { project: st.path, runtime: v.sendRuntime ? v.runtime : '' }));
+      const r = await host.deploy(Object.assign({}, v, { project: st.path, runtime: v.sendRuntime ? v.runtime : '', clearLocal: f.clearLocal.checked }));
+      if (r && r.ok) { f.clearLocal.checked = false; await runCheck(); }   // what the target has now
       busy = false;
       out.innerHTML = '';
       if (r && r.ok) out.append(U.el('div', { class: r.warning ? 'warn' : 'ok' }, r.warning ? 'Deployed, but: ' + r.warning : 'Deployed.'));

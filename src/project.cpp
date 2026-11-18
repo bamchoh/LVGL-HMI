@@ -48,6 +48,7 @@ json parse_json_file(const std::string& path)
 // is never modified.
 void Project::apply_local_overlay()
 {
+    base_drivers_ = root_.is_object() && root_.contains("drivers") ? root_["drivers"] : json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
@@ -77,6 +78,13 @@ const json* Project::driver_config(const std::string& key) const
     const json* drivers = jget(root_, "drivers");
     std::vector<std::string> keys = driver_keys(drivers);
     for(size_t i = 0; i < keys.size(); i++) if(keys[i] == key) return &(*drivers)[i];
+    return nullptr;
+}
+
+const json* Project::driver_base_config(const std::string& key) const
+{
+    std::vector<std::string> keys = driver_keys(&base_drivers_);
+    for(size_t i = 0; i < keys.size(); i++) if(keys[i] == key) return &base_drivers_[i];
     return nullptr;
 }
 

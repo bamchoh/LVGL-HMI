@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -581,20 +582,47 @@ public:
                 if(!overlay.is_object()) overlay = json::object();
             }
         }
+        // Only what differs from project.json is kept: a setting that was not changed here must
+        // keep following the project (a later deploy of a new project.json takes effect).
+        const json* base = proj_.driver_base_config(key_);
+        if(!overlay["drivers"].is_object()) overlay["drivers"] = json::object();
         json& d = overlay["drivers"][key_];
         if(!d.is_object()) d = json::object();
         for(const auto& [k, text] : values) {
-            if(k == "enabled") { d[k] = (text == "1"); continue; }
-            const json* orig = jget(*cfg, k.c_str());
-            if(!orig) continue;
-            if(orig->is_boolean()) d[k] = (text == "1");
-            else if(orig->is_number()) d[k] = std::atof(text.c_str());
-            else d[k] = text;
+            json v;
+            bool same = false;
+            if(k == "enabled") {
+                v = (text == "1");
+                same = base && jbool(*base, "enabled", true) == v.get<bool>();
+            }
+            else {
+                const json* orig = jget(*cfg, k.c_str());
+                if(!orig) continue;
+                const json* b = base ? jget(*base, k.c_str()) : nullptr;
+                if(orig->is_boolean()) { v = (text == "1"); same = b && b->is_boolean() && *b == v; }
+                else if(orig->is_number()) {
+                    v = std::atof(text.c_str());
+                    // the field shows the number with %g: the same text means "not changed"
+                    same = b && b->is_number() && (*b == v || vformat("%g", b->get<double>()) == text);
+                }
+                else { v = text; same = b && b->is_string() && *b == v; }
+            }
+            if(same) d.erase(k);
+            else d[k] = v;
         }
-        std::ofstream f(overlay_, std::ios::binary | std::ios::trunc);
-        if(!f) return "cannot write " + overlay_;
-        f << overlay.dump(2) << "\n";
-        f.close();
+        if(d.empty()) overlay["drivers"].erase(key_);
+        if(overlay["drivers"].empty()) overlay.erase("drivers");
+        if(overlay.empty()) {
+            std::error_code ec;
+            std::filesystem::remove(std::filesystem::u8path(overlay_), ec);
+            if(ec) return "cannot remove " + overlay_;
+        }
+        else {
+            std::ofstream f(overlay_, std::ios::binary | std::ios::trunc);
+            if(!f) return "cannot write " + overlay_;
+            f << overlay.dump(2) << "\n";
+            f.close();
+        }
 
         int running = proj_.restart_drivers();
         HML_INFO("system: driver settings saved to %s, %d driver(s) running", overlay_.c_str(), running);

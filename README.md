@@ -250,6 +250,17 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | remote folder   | ターゲット上の配置先（既定 `hml` = ホームの `hml/`）                                                   |
 | send runtime    | チェックすると、指定したターゲット用の `hml_runtime`（Linux 用のビルド）も送って入れ替える             |
 | restart runtime | 配置後にターゲットのランタイムを再起動する（`SIGUSR2`）                                                |
+| local settings  | チェックすると、ターゲットの画面で変更された設定（`project.local.json`）を削除する。毎回オフで始まる   |
+
+ダイアログを開いたとき（接続先が入力済みの場合）と **Check** を押したときに、何も送らずにターゲットの状態を調べて表示します。
+
+- **ターゲットで動いているプロジェクト**（このプロジェクトか、別のプロジェクトか、ランタイムが動いていないか）
+- **ターゲットのローカル設定**: ターゲットのシステム設定画面で変更されたドライバ設定は `project.local.json` に保存され、
+  デプロイしてもそちらが優先されます。該当する項目を「ターゲットでの値」と「このプロジェクトの値」を並べた表で表示します。
+  プロジェクトの値に戻したいときは「local settings」にチェックを入れてデプロイします。
+- **ファイルの差分**: 変更されたファイル、新しいファイル、ターゲットにだけ残っているファイルの一覧（ファイル単位）
+
+デプロイが終わると、同じ内容を調べ直して表示します。
 
 ターゲット上の配置は次のとおりです。systemd のユニットなどは、この `project.json` を指すようにしておきます。
 
@@ -261,7 +272,8 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 - PC 側は OS 付属の OpenSSH（`ssh` / `scp`）を使います。**鍵認証のみ**で、パスワードは聞きません。
   あらかじめ公開鍵をターゲットの `~/.ssh/authorized_keys` に登録しておいてください。
 - 初めて接続するターゲットのホスト鍵は、自動的に `known_hosts` に登録されます。
-- ターゲットにだけあるファイル（`logs/`、システム設定画面が書く `project.local.json`）は残ります。
+- ターゲットにだけあるファイル（`logs/`、システム設定画面が書く `project.local.json`）は残ります
+  （`project.local.json` は「local settings」にチェックしたときだけ削除します）。
   PC 側の `logs/` と `project.local.json` は送りません。プロジェクトから削除したファイルは、ターゲットからは消えません。
 - ランタイムが動いていなければ、ファイルの配置だけを行います（結果にその旨が表示されます）。
   ターゲットが別のプロジェクトを実行している場合も、結果に表示されます。
@@ -273,8 +285,10 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 
 ```
 hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
-    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart]
+    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart] [--clear-local]
 ```
+
+`--check` を付けると何も送らず、ターゲットの状態（上の Check と同じ内容）を JSON で表示します。
 
 - キーボード: Ctrl+S 保存、Ctrl+Z / Ctrl+Y 取り消し / やり直し、Ctrl+D 複製、Delete 削除、Esc 選択解除。
 - 画面 JSON のコメントは読み込めますが、保存時には整形された JSON（コメントなし）になります。
@@ -440,6 +454,8 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
 `project.local.json` は project.json と同じ場所に書かれ、起動時に `drivers` のスカラー値を上書きします
 （project.json 自体は変更しません。OPC UA には `sys.*` タグは公開されません）。
+保存されるのは project.json と値が違う項目だけです。project.json と同じ値に戻して Apply するとその項目は消え、
+何も残らなければファイルごと削除されます（変更していない項目は、あとから project.json を書き換えれば反映されます）。
 
 ページを追加するには `src/system_settings.hpp` の `SettingsPage`（`id` / `title` / `fields()` / `apply()`）を
 実装して `register_builtin_pages()` で登録するだけで、画面とタグは自動で作られます。フィールド型は
