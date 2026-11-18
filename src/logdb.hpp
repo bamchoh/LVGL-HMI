@@ -38,9 +38,13 @@ struct LogDbConfig {
     std::string path;                   // resolved against the project directory
     int         retention_days = 30;    // 0 = keep forever
     int         max_rows = 100000;      // 0 = unlimited
+    // Size of the database in MB (0 = unlimited). Rows can be of any size (a data log group
+    // with many tags), so a number of rows alone does not bound the disk space. When the data
+    // grows beyond this, the oldest rows are removed until it fits again.
+    int         max_size_mb = 1000;
 };
 
-// { "enabled": true, "path": "...", "retention_days": 30, "max_rows": 100000 } - enabled unless
+// { "enabled": true, "path": "...", "retention_days": 30, "max_rows": 100000, "max_size_mb": 1000 } - enabled unless
 // the section is missing or says "enabled": false.
 LogDbConfig parse_log_config(const json* section, const std::string& base_dir, const std::string& default_path, int default_max_rows);
 

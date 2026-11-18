@@ -17,6 +17,7 @@ namespace {
 
 constexpr size_t  kMaxQueue = 20000;        // rows kept in memory while the disk is stalled
 constexpr int64_t kPruneEveryMs = 3600 * 1000;
+constexpr int64_t kSizeCheckEveryMs = 60 * 1000;     // a big log can grow by many MB a minute
 
 std::string parent_dir(const std::string& path)
 {
@@ -80,8 +81,10 @@ LogDbConfig parse_log_config(const json* section, const std::string& base_dir, c
     c.path = absolute ? rel : base_dir + "/" + rel;
     c.retention_days = static_cast<int>(jnum(*section, "retention_days", 30));
     c.max_rows = static_cast<int>(jnum(*section, "max_rows", default_max_rows));
+    c.max_size_mb = static_cast<int>(jnum(*section, "max_size_mb", 1000));
     if(c.retention_days < 0) c.retention_days = 0;
     if(c.max_rows < 0) c.max_rows = 0;
+    if(c.max_size_mb < 0) c.max_size_mb = 0;
     return c;
 }
 
@@ -100,6 +103,7 @@ struct LogDb::Impl {
     LogDbConfig   cfg;
     std::atomic<bool> opened{ false };
     int64_t       last_prune = 0;
+    int64_t       last_size_check = 0;
 
     std::thread             writer;
     std::mutex              wmu;
@@ -113,6 +117,36 @@ struct LogDb::Impl {
         HML_ERROR("%s: %s (%s)", label.c_str(), err ? err : "sqlite error", sql.c_str());
         sqlite3_free(err);
         return false;
+    }
+
+    int64_t pragma(const char* name)
+    {
+        int64_t v = 0;
+        sqlite3_stmt* st = nullptr;
+        if(sqlite3_prepare_v2(db, (std::string("PRAGMA ") + name).c_str(), -1, &st, nullptr) == SQLITE_OK && sqlite3_step(st) == SQLITE_ROW)
+            v = sqlite3_column_int64(st, 0);
+        sqlite3_finalize(st);
+        return v;
+    }
+
+    // Bytes the data occupies. Pages freed by a delete are reused before the file grows, so
+    // this (not the file size, which never shrinks) is what has to stay below the limit.
+    int64_t used_bytes() { return (pragma("page_count") - pragma("freelist_count")) * pragma("page_size"); }
+
+    // max_size_mb: drop the oldest tenth of the rows until the data fits again.
+    void limit_size()
+    {
+        last_size_check = LogDb::now_ms();
+        if(cfg.max_size_mb <= 0) return;
+        const int64_t limit = static_cast<int64_t>(cfg.max_size_mb) * 1024 * 1024;
+        int64_t before = used_bytes(), used = before;
+        for(int round = 0; round < 60 && used > limit; round++) {
+            if(!exec("DELETE FROM " + table + " WHERE id <= (SELECT MIN(id) + (MAX(id) - MIN(id)) / 10 FROM " + table + ")")) break;
+            if(sqlite3_changes(db) == 0) break;
+            used = used_bytes();
+        }
+        if(used < before) HML_INFO("%s: larger than %d MB, the oldest rows were removed (%.1f MB -> %.1f MB)", label.c_str(), cfg.max_size_mb,
+                                   before / 1048576.0, used / 1048576.0);
     }
 
     void prune()
@@ -135,6 +169,7 @@ struct LogDb::Impl {
             }
             sqlite3_finalize(st);
         }
+        limit_size();
     }
 
     void write_pending()
@@ -160,6 +195,7 @@ struct LogDb::Impl {
             write_failed = !ok;
         }
         if(LogDb::now_ms() - last_prune > kPruneEveryMs) prune();
+        else if(LogDb::now_ms() - last_size_check > kSizeCheckEveryMs) limit_size();
     }
 };
 

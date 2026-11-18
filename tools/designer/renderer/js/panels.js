@@ -293,7 +293,8 @@ const Panels = {
   LOG_DB_FIELDS(path, rows) {
     return [{ k: 'path', t: 'text', hint: 'database file, relative to project.json (default ' + path + ')' },
       { k: 'retention_days', t: 'number', hint: 'rows older than this are deleted (default 30, 0 = keep forever)' },
-      { k: 'max_rows', t: 'number', hint: 'oldest rows are deleted above this (default ' + rows + ', 0 = unlimited)' }];
+      { k: 'max_rows', t: 'number', hint: 'oldest rows are deleted above this (default ' + rows + ', 0 = unlimited)' },
+      { k: 'max_size_mb', t: 'number', hint: 'size of the database in MB; the oldest rows are deleted above this (default 1000, 0 = unlimited)' }];
   },
   renderLogs() {
     const page = document.getElementById('view-logs'); page.innerHTML = '';
