@@ -117,6 +117,40 @@ TEST_CASE("logdb: rows, filters, limits and a second reader")
     CHECK(db.query().empty());
 }
 
+TEST_CASE("logdb: max_size_mb removes the oldest rows when the data outgrows it")
+{
+    TempDir tmp;
+    LogDbConfig cfg;
+    cfg.enabled = true;
+    cfg.path = (tmp.dir / "size.db").generic_string();
+    cfg.retention_days = 0;
+    cfg.max_rows = 0;
+    cfg.max_size_mb = 0;                                // no limit while filling
+    LogDb db("test log", "t", { { "name", "TEXT NOT NULL" }, { "n", "INTEGER NOT NULL" } }, "");
+    REQUIRE(db.open(cfg));
+    const std::string kilobyte(1000, 'x');
+    for(int i = 1; i <= 4000; i++) db.add({ kilobyte, i });   // about 4 MB
+    db.flush();
+    CHECK(db.query().size() == 4000);
+    db.close();
+    CHECK(std::filesystem::file_size(cfg.path) > 3500000);
+
+    cfg.max_size_mb = 1;                                // applied when the database is opened (and then every minute)
+    REQUIRE(db.open(cfg));
+    std::vector<LogRow> rows = db.query();
+    CHECK(rows.size() < 1100);                          // fits into 1 MB now
+    CHECK(rows.size() > 500);                           // ... without throwing away more than needed (a tenth at a time)
+    REQUIRE(!rows.empty());
+    CHECK(rows.back()[3].i == 4000);                    // the newest rows are the ones that stay
+    CHECK(rows.front()[3].i == 4000 - static_cast<int64_t>(rows.size()) + 1);
+    // the freed space is used again: writing as much as was removed does not grow the file
+    const auto size_before = std::filesystem::file_size(cfg.path);
+    for(int i = 4001; i <= 4400; i++) db.add({ kilobyte, i });
+    db.flush();
+    db.close();
+    CHECK(std::filesystem::file_size(cfg.path) <= size_before);
+}
+
 TEST_CASE("logdb: parse_log_config and write_csv")
 {
     CHECK_FALSE(parse_log_config(nullptr, "/p", "logs/x.db", 500).enabled);
@@ -126,6 +160,7 @@ TEST_CASE("logdb: parse_log_config and write_csv")
     CHECK(c.path == "/p/logs/x.db");
     CHECK(c.retention_days == 30);
     CHECK(c.max_rows == 500);
+    CHECK(c.max_size_mb == 1000);
     j = J(R"~({ "enabled": false, "path": "/abs/y.db", "retention_days": 7, "max_rows": -1 })~");
     c = parse_log_config(&j, "/p", "logs/x.db", 500);
     CHECK_FALSE(c.enabled);
