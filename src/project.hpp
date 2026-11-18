@@ -52,6 +52,8 @@ public:
 
     // Driver configuration (overlay applied) by its overlay key, see driver_keys(). nullptr if unknown.
     const json* driver_config(const std::string& key) const;
+    // The same driver as project.json has it (before project.local.json is applied).
+    const json* driver_base_config(const std::string& key) const;
     const json* drivers_config() const { return jget(root_, "drivers"); }
     std::string local_overlay_path() const { return info_.dir + "/project.local.json"; }
 
@@ -67,6 +69,7 @@ private:
 
     ProjectInfo info_;
     json        root_;
+    json        base_drivers_;         // "drivers" of project.json before the overlay
 };
 
 Project& project();

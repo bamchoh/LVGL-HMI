@@ -344,6 +344,71 @@ bool safe_token(const std::string& s, const char* extra)
     return true;
 }
 
+// The checksum of POSIX cksum(1): what the target computes for its files with a tool that is
+// always there. Returns "<crc> <size>", the first two columns of cksum's output.
+std::string posix_cksum(const fs::path& p, bool* ok)
+{
+    static uint32_t tab[256];
+    static bool init = false;
+    if(!init) {
+        for(uint32_t i = 0; i < 256; i++) {
+            uint32_t c = i << 24;
+            for(int k = 0; k < 8; k++) c = (c & 0x80000000u) ? (c << 1) ^ 0x04C11DB7u : c << 1;
+            tab[i] = c;
+        }
+        init = true;
+    }
+    std::ifstream f(p, std::ios::binary);
+    if(ok) *ok = static_cast<bool>(f);
+    uint32_t crc = 0;
+    uintmax_t size = 0;
+    char buf[65536];
+    while(f) {
+        f.read(buf, sizeof(buf));
+        std::streamsize n = f.gcount();
+        for(std::streamsize i = 0; i < n; i++) crc = (crc << 8) ^ tab[((crc >> 24) ^ static_cast<unsigned char>(buf[i])) & 0xFF];
+        size += static_cast<uintmax_t>(n);
+    }
+    for(uintmax_t n = size; n != 0; n >>= 8) crc = (crc << 8) ^ tab[((crc >> 24) ^ (n & 0xFF)) & 0xFF];
+    return std::to_string(~crc) + " " + std::to_string(size);
+}
+
+// The files of a project folder that a deploy sends: everything except what belongs to the
+// machine it runs on (the recorded logs, the local settings). <file, path relative to dir>
+std::vector<std::pair<fs::path, std::string>> project_files(const fs::path& dir)
+{
+    std::vector<std::pair<fs::path, std::string>> out;
+    std::error_code ec;
+    for(auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        std::string rel = ustr(fs::relative(it->path(), dir, ec));
+        if(rel == "logs" || rel == ".git") { it.disable_recursion_pending(); continue; }
+        if(rel == "project.local.json" || !it->is_regular_file(ec)) continue;
+        out.emplace_back(it->path(), rel);
+    }
+    std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+    return out;
+}
+
+// How project.local.json names a driver: its "name", else its "type"; "#2", "#3" for repeats
+// (the same rule as driver_keys() in the runtime).
+std::vector<std::string> driver_keys(const json& drivers)
+{
+    std::vector<std::string> keys;
+    if(!drivers.is_array()) return keys;
+    std::vector<std::pair<std::string, int>> seen;
+    for(const json& cfg : drivers) {
+        std::string key = "driver";
+        if(cfg.is_object() && cfg.contains("name") && cfg["name"].is_string()) key = cfg["name"].get<std::string>();
+        else if(cfg.is_object() && cfg.contains("type") && cfg["type"].is_string()) key = cfg["type"].get<std::string>();
+        int n = 0;
+        for(auto& s : seen) if(s.first == key) n = ++s.second;
+        if(n == 0) { seen.emplace_back(key, 1); n = 1; }
+        if(n > 1) key += "#" + std::to_string(n);
+        keys.push_back(key);
+    }
+    return keys;
+}
+
 // ssh / scp: on Windows the OpenSSH client that ships with the OS (not whatever PATH has first)
 fs::path ssh_tool(const char* name)
 {
@@ -600,39 +665,178 @@ struct Host {
     // the runtime there. Options: project, host, user, port, key, remoteDir, runtime, restart.
     // Layout on the target: <remoteDir>/hml_runtime, <remoteDir>/projects/<project folder>/.
     // Blocking (call it from a worker thread). Returns { ok, log, error? }.
+    // Where a deploy goes, from the options of the Deploy dialog (validated: every part that
+    // reaches the remote shell is a safe token).
+    struct Target {
+        std::string host, user, key, remote, pname, error;
+        int port = 22;
+        fs::path proj, dir;
+        std::string dest() const { return user + "@" + host; }
+        std::string pdir() const { return "projects/" + pname; }
+        // does this hml_runtime command line run the project deployed here?
+        bool runs_here(const std::string& cmdline) const
+        {
+            std::string path = (remote == "." ? "" : remote) + "/" + pdir() + "/project.json";
+            if(path[0] != '/') path = "/" + path;              // relative to the home folder
+            return cmdline.find(path) != std::string::npos;
+        }
+        std::vector<std::string> ssh_options() const
+        {
+            std::vector<std::string> a{ "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new" };
+            if(!key.empty()) { a.push_back("-i"); a.push_back(key); a.push_back("-o"); a.push_back("IdentitiesOnly=yes"); }
+            return a;
+        }
+    };
+
+    static std::string opt_str(const json& o, const char* k, const char* def = "")
+    {
+        auto it = o.find(k);
+        return trimmed(it != o.end() && it->is_string() ? it->get<std::string>() : std::string(def));
+    }
+
+    static Target target_of(const json& o)
+    {
+        Target t;
+        t.host = opt_str(o, "host"); t.user = opt_str(o, "user"); t.key = opt_str(o, "key"); t.remote = opt_str(o, "remoteDir", "hml");
+        if(auto it = o.find("port"); it != o.end()) {
+            if(it->is_number()) t.port = it->get<int>();
+            else if(it->is_string() && !trimmed(it->get<std::string>()).empty()) t.port = std::atoi(it->get<std::string>().c_str());
+        }
+        t.proj = upath(opt_str(o, "project"));
+        std::error_code ec;
+        if(!fs::is_regular_file(t.proj, ec)) { t.error = "project.json not found (save the project first)"; return t; }
+        t.dir = t.proj.parent_path();
+        t.pname = ustr(t.dir.filename());
+        if(t.remote.rfind("~/", 0) == 0) t.remote = t.remote.substr(2);
+        while(t.remote.size() > 1 && t.remote.back() == '/') t.remote.pop_back();
+        if(t.remote.empty() || t.remote == "~") t.remote = ".";
+        if(!safe_token(t.host, ".-:_")) t.error = "host: enter the target's address or host name";
+        else if(!safe_token(t.user, "._-")) t.error = "user: enter the login name on the target";
+        else if(t.port < 1 || t.port > 65535) t.error = "port: must be 1..65535";
+        else if(!safe_token(t.remote, "._-/") || t.remote[0] == '-') t.error = "remote folder: only letters, digits and . _ - / are allowed";
+        else if(!safe_token(t.pname, "._-") || t.pname[0] == '-' || t.pname[0] == '.')
+            t.error = "the project folder name '" + t.pname + "' cannot be used on the target (only letters, digits and . _ - are allowed)";
+        else if(!t.key.empty() && !fs::is_regular_file(upath(t.key), ec)) t.error = "private key file not found: " + t.key;
+        return t;
+    }
+
+    // What ssh / scp said, as a message for the user ("" = it worked).
+    static std::string ssh_failure(const ProcResult& pr, const std::string& what, const std::string& host, bool with_output = true)
+    {
+        if(!pr.error.empty()) return what + ": " + pr.error + " (is the OpenSSH client installed?)";
+        if(pr.timed_out) return what + ": timed out";
+        if(pr.code == 0) return {};
+        std::string m = what + " failed (exit code " + std::to_string(pr.code) + ")";
+        if(pr.output.find("Permission denied") != std::string::npos)
+            m += ": the target refused the login. Deploy uses key authentication (no password prompt): choose the private key, or add your public key to ~/.ssh/authorized_keys on the target";
+        else if(pr.output.find("REMOTE HOST IDENTIFICATION HAS CHANGED") != std::string::npos)
+            m += ": the target's host key changed (reinstalled?). Remove the old entry with: ssh-keygen -R " + host;
+        else if(with_output && !trimmed(pr.output).empty()) m += ": " + trimmed(pr.output);
+        return m;
+    }
+
+    // Look at the target without changing it (the Deploy dialog shows this before sending):
+    //   running   command line of hml_runtime there ("" = not running)
+    //   local     settings in the target's project.local.json: [{ driver, key, target, project, same }]
+    //             (target = the value in effect there, project = what project.json says)
+    //   files     { changed, added, extra } against the project folder on this PC
+    //   exists    false when the project was never deployed there
+    json check(const json& o)
+    {
+        Target t = target_of(o);
+        if(!t.error.empty()) return err(t.error);
+        std::vector<std::string> a = t.ssh_options();
+        std::string rdir = t.remote + "/" + t.pdir();
+        a.insert(a.end(), { "-p", std::to_string(t.port), t.dest(),
+            "echo HML_PS; ps -o args= -C hml_runtime | head -n 1; echo HML_END;"
+            " cd " + rdir + " 2>/dev/null || { echo HML_NO_PROJECT; exit 0; };"
+            " echo HML_LOCAL; cat project.local.json 2>/dev/null; echo; echo HML_END;"
+            " echo HML_SUMS; find . -path ./logs -prune -o -type f ! -name project.local.json -exec cksum {} +; echo HML_END" });
+        ProcResult pr = run_capture(ssh_tool("ssh"), a, {}, {}, 30000);
+        std::string failure = ssh_failure(pr, "connect", t.host);
+        if(!failure.empty()) return err(failure);
+
+        auto section = [&](const std::string& mark) {
+            size_t b = pr.output.find(mark + "\n");
+            if(b == std::string::npos) return std::string();
+            b += mark.size() + 1;
+            size_t e = pr.output.find("HML_END", b);
+            return pr.output.substr(b, e == std::string::npos ? std::string::npos : e - b);
+        };
+        json res{ { "ok", true }, { "target", t.dest() + ":" + rdir }, { "running", trimmed(section("HML_PS")) },
+                  { "exists", pr.output.find("HML_NO_PROJECT") == std::string::npos }, { "local", json::array() },
+                  { "files", { { "changed", json::array() }, { "added", json::array() }, { "extra", json::array() } } } };
+        res["runsThis"] = t.runs_here(res["running"].get<std::string>());
+
+        // ---- local settings against project.json
+        bool ok = false;
+        json proj = json::parse(read_text(t.proj, &ok), nullptr, false, true);
+        json drivers = proj.is_object() && proj.contains("drivers") ? proj["drivers"] : json::array();
+        std::vector<std::string> keys = driver_keys(drivers);
+        json overlay = json::parse(section("HML_LOCAL"), nullptr, false, true);
+        if(overlay.is_object() && overlay.contains("drivers") && overlay["drivers"].is_object()) {
+            for(auto& [dkey, entries] : overlay["drivers"].items()) {
+                if(!entries.is_object()) continue;
+                const json* cfg = nullptr;
+                for(size_t i = 0; i < keys.size(); i++) if(keys[i] == dkey) cfg = &drivers[i];
+                for(auto& [k, v] : entries.items()) {
+                    if(v.is_object() || v.is_array()) continue;
+                    json pv = cfg && cfg->contains(k) ? (*cfg)[k] : json(nullptr);
+                    if(k == "enabled" && cfg && pv.is_null()) pv = true;              // the default
+                    res["local"].push_back({ { "driver", dkey }, { "key", k }, { "target", v }, { "project", pv },
+                                             { "same", cfg && pv == v }, { "unknown", cfg == nullptr } });
+                }
+            }
+        }
+
+        // ---- files
+        std::vector<std::pair<std::string, std::string>> remote_sums;   // <path, "crc size">
+        std::istringstream lines(section("HML_SUMS"));
+        for(std::string line; std::getline(lines, line);) {
+            line = trimmed(line);
+            size_t s1 = line.find(' '), s2 = s1 == std::string::npos ? s1 : line.find(' ', s1 + 1);
+            if(s2 == std::string::npos) continue;
+            std::string name = line.substr(s2 + 1);
+            if(name.rfind("./", 0) == 0) name = name.substr(2);
+            remote_sums.emplace_back(name, line.substr(0, s2));
+        }
+        for(const auto& [file, rel] : project_files(t.dir)) {
+            auto it = std::find_if(remote_sums.begin(), remote_sums.end(), [&](const auto& r) { return r.first == rel; });
+            if(it == remote_sums.end()) { res["files"]["added"].push_back(rel); continue; }
+            if(it->second != posix_cksum(file, nullptr)) res["files"]["changed"].push_back(rel);
+            it->first.clear();                                           // seen
+        }
+        for(const auto& r : remote_sums) if(!r.first.empty()) res["files"]["extra"].push_back(r.first);
+        return res;
+    }
+
+    void check_async(const std::string& id, const json& opts)
+    {
+        std::thread([this, id, opts] {
+            std::string dump = check(opts).dump(-1, ' ', false, json::error_handler_t::replace);
+            w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+        }).detach();
+    }
+
     json deploy(const json& o)
     {
-        auto S = [&](const char* k, const char* def = "") {
-            auto it = o.find(k);
-            return trimmed(it != o.end() && it->is_string() ? it->get<std::string>() : std::string(def));
-        };
+        auto S = [&](const char* k, const char* def = "") { return opt_str(o, k, def); };
         std::string log;
         auto fail = [&](const std::string& m) { json r = err(m); r["log"] = log; return r; };
         auto step = [&](const std::string& m) { log += "> " + m + "\n"; };
 
-        std::string hostn = S("host"), user = S("user"), key = S("key"), remote = S("remoteDir", "hml"), rt = S("runtime");
-        int port = 22;
-        if(auto it = o.find("port"); it != o.end()) {
-            if(it->is_number()) port = it->get<int>();
-            else if(it->is_string() && !trimmed(it->get<std::string>()).empty()) port = std::atoi(it->get<std::string>().c_str());
-        }
+        Target t = target_of(o);
+        if(!t.error.empty()) return fail(t.error);
+        const std::string& hostn = t.host;
+        const std::string& remote = t.remote;
+        const std::string& pname = t.pname;
+        const fs::path& dir = t.dir;
+        int port = t.port;
+        std::string rt = S("runtime");
         bool restart = !(o.contains("restart") && o["restart"].is_boolean() && !o["restart"].get<bool>());
-        fs::path proj = upath(S("project"));
+        bool clear_local = o.contains("clearLocal") && o["clearLocal"].is_boolean() && o["clearLocal"].get<bool>();
         std::error_code ec;
-        if(!fs::is_regular_file(proj, ec)) return fail("project.json not found (save the project first)");
-        fs::path dir = proj.parent_path();
-        std::string pname = ustr(dir.filename());
-
-        if(remote.rfind("~/", 0) == 0) remote = remote.substr(2);
-        while(remote.size() > 1 && remote.back() == '/') remote.pop_back();
-        if(remote.empty() || remote == "~") remote = ".";
-        if(!safe_token(hostn, ".-:_")) return fail("host: enter the target's address or host name");
-        if(!safe_token(user, "._-")) return fail("user: enter the login name on the target");
-        if(port < 1 || port > 65535) return fail("port: must be 1..65535");
-        if(!safe_token(remote, "._-/") || remote[0] == '-') return fail("remote folder: only letters, digits and . _ - / are allowed");
-        if(!safe_token(pname, "._-") || pname[0] == '-' || pname[0] == '.')
-            return fail("the project folder name '" + pname + "' cannot be used on the target (only letters, digits and . _ - are allowed)");
-        if(!key.empty() && !fs::is_regular_file(upath(key), ec)) return fail("private key file not found: " + key);
+        (void)pname;
         fs::path rtp;
         if(!rt.empty()) {
             rtp = upath(rt);
@@ -648,35 +852,22 @@ struct Host {
         {
             TarWriter tw(tar);
             if(!tw.f) return fail("cannot create " + ustr(tar));
-            for(auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
-                std::string rel = ustr(fs::relative(it->path(), dir, ec));
-                if(rel == "logs" || rel == ".git") { it.disable_recursion_pending(); continue; }
-                if(rel == "project.local.json" || !it->is_regular_file(ec)) continue;
-                if(!tw.add_file(it->path(), rel)) return fail("cannot read " + ustr(it->path()));
-            }
+            for(const auto& [file, rel] : project_files(dir))
+                if(!tw.add_file(file, rel)) return fail("cannot read " + ustr(file));
             if(!tw.finish()) return fail("cannot write " + ustr(tar));
             step("packed " + std::to_string(tw.files) + " files (" + std::to_string((tw.bytes + 1023) / 1024) + " KB) from " + ustr(dir));
             for(const auto& n : tw.skipped) step("skipped (path too long): " + n);
         }
 
         // ---- ssh / scp
-        std::string dest = user + "@" + hostn;
-        std::vector<std::string> common{ "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new" };
-        if(!key.empty()) { common.push_back("-i"); common.push_back(key); common.push_back("-o"); common.push_back("IdentitiesOnly=yes"); }
+        std::string dest = t.dest();
+        std::vector<std::string> common = t.ssh_options();
         std::string failure;
         auto run = [&](const fs::path& tool, std::vector<std::string> args, const fs::path& cwd, int timeout_ms, const std::string& what) {
             ProcResult pr = run_capture(tool, args, {}, cwd, timeout_ms);
             std::string out = trimmed(pr.output);
             if(!out.empty()) log += out + "\n";
-            if(!pr.error.empty()) failure = what + ": " + pr.error + " (is the OpenSSH client installed?)";
-            else if(pr.timed_out) failure = what + ": timed out";
-            else if(pr.code != 0) {
-                failure = what + " failed (exit code " + std::to_string(pr.code) + ")";
-                if(out.find("Permission denied") != std::string::npos)
-                    failure += ": the target refused the login. Deploy uses key authentication (no password prompt): choose the private key, or add your public key to ~/.ssh/authorized_keys on the target";
-                else if(out.find("REMOTE HOST IDENTIFICATION HAS CHANGED") != std::string::npos)
-                    failure += ": the target's host key changed (reinstalled?). Remove the old entry with: ssh-keygen -R " + hostn;
-            }
+            failure = ssh_failure(pr, what, hostn, false);     // (the output is already in the log)
             return failure.empty() ? out : std::string();
         };
         auto ssh = [&](const std::string& cmd, int timeout_ms, const std::string& what) {
@@ -692,7 +883,7 @@ struct Host {
             run(ssh_tool("scp"), a, file.parent_path(), 180000, what);
         };
 
-        std::string pdir = "projects/" + pname;
+        std::string pdir = t.pdir();
         step("connecting to " + dest + (port != 22 ? " port " + std::to_string(port) : ""));
         ssh("mkdir -p " + remote + "/" + pdir + " && uname -sm", 25000, "connect");
         if(!failure.empty()) return fail(failure);
@@ -709,6 +900,8 @@ struct Host {
         // install: unpack over the project folder (files only on the target, such as logs/ and
         // project.local.json, stay), then rename the new runtime over the old one.
         std::string cmd = "cd " + remote + " && tar -xf .hml_deploy.tar -C " + pdir + " && rm -f .hml_deploy.tar";
+        // the settings changed on the target's own screens: back to what the project says
+        if(clear_local) { cmd += " && rm -f " + pdir + "/project.local.json"; step("removing the target's local settings (project.local.json)"); }
         if(!rtp.empty()) cmd += " && chmod +x hml_runtime.new && mv -f hml_runtime.new hml_runtime";
         cmd += " && echo HML_INSTALLED";
         // SIGUSR2 = restart (older runtimes are terminated by it and restarted by systemd)
@@ -734,7 +927,7 @@ struct Host {
                 note = "hml_runtime is not running on the target: the files were installed, start the runtime there.";
             else if(out.find("HML_STOPPED") != std::string::npos)
                 note = "hml_runtime did not come back after the restart: check the log on the target.";
-            else if(out.find(pdir + "/project.json") == std::string::npos)
+            else if(!t.runs_here(out))
                 note = "The runtime on the target was restarted, but it runs a different project (see the command line above). "
                        "Point it at " + remote + "/" + pdir + "/project.json.";
         }
@@ -808,6 +1001,10 @@ struct Host {
             json a = args_of(req);
             deploy_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
         }, nullptr);
+        w->bind("hml_deployCheck", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            check_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
+        }, nullptr);
         w->bind("hml_preview", [this, args_of, str](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             preview_async(id, str(a, 0), str(a, 1));
@@ -821,6 +1018,7 @@ int app_main(const std::vector<std::string>& args)
     h.exe = exe_dir();
     bool debug = false;
     std::string renderer_override, deploy_project;
+    bool deploy_check = false;
     json deploy_opts = json::object();
     for(size_t i = 1; i < args.size(); i++) {
         auto opt = [&](const char* flag, const char* key) {
@@ -833,6 +1031,8 @@ int app_main(const std::vector<std::string>& args)
         else if(opt("--host", "host") || opt("--user", "user") || opt("--port", "port") || opt("--key", "key") ||
                 opt("--remote-dir", "remoteDir") || opt("--runtime", "runtime")) {}
         else if(args[i] == "--no-restart") deploy_opts["restart"] = false;
+        else if(args[i] == "--clear-local") deploy_opts["clearLocal"] = true;
+        else if(args[i] == "--check") deploy_check = true;
         else if(args[i] == "--renderer" && i + 1 < args.size()) renderer_override = args[++i];
         else if(!args[i].empty() && args[i][0] != '-') h.argv_project = ustr(fs::absolute(upath(args[i])));
     }
@@ -841,7 +1041,8 @@ int app_main(const std::vector<std::string>& args)
 #endif
 
     // hml_designer --deploy <project.json> [--host <h> --user <u> --port <n> --key <file>
-    //   --remote-dir <dir> --runtime <file> --no-restart]: deploy without opening the window.
+    //   --remote-dir <dir> --runtime <file> --no-restart --clear-local]: deploy without opening
+    //   the window. With --check nothing is sent: the state of the target is printed.
     // Options left out come from what the Deploy dialog last used for this project.
     if(!deploy_project.empty()) {
         h.settings_path = config_dir() / "settings.json";
@@ -854,6 +1055,13 @@ int app_main(const std::vector<std::string>& args)
         }
         for(auto& [k, v] : deploy_opts.items()) o[k] = v;
         o["project"] = deploy_project;
+        if(!deploy_opts.contains("clearLocal")) o.erase("clearLocal");     // never from a remembered tick
+        if(deploy_check) {                                                 // --check: look only, print the result as JSON
+            json c = h.check(o);
+            std::fputs((c.dump(2, ' ', false, json::error_handler_t::replace) + "\n").c_str(), stdout);
+            std::fflush(stdout);
+            return c.value("ok", false) ? 0 : 1;
+        }
         json r = h.deploy(o);
         std::string text = r.value("log", std::string());
         if(!r.value("ok", false)) text += "error: " + r.value("error", std::string("failed")) + "\n";

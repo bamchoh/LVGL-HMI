@@ -288,9 +288,10 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
 
         std::ifstream of(tp.dir / "project.local.json");
         json overlay = json::parse(of);
+        of.close();
         CHECK(overlay["drivers"]["PLC"]["host"] == "192.168.0.9");
         CHECK(overlay["drivers"]["PLC"]["port"] == 5020.0);
-        CHECK(overlay["drivers"]["PLC"]["enabled"] == false);
+        CHECK(overlay["drivers"]["PLC"].size() == 2);          // only what differs from project.json is kept
         CHECK(overlay["drivers"]["sim"]["enabled"] == false);
         CHECK(overlay["drivers"].contains("sim#2") == false);
 
@@ -307,6 +308,20 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
         std::ifstream rf(tp.dir / "project.json");
         json raw = json::parse(rf);
         CHECK(jstr(raw["drivers"][1], "host", "") == "10.0.0.5");
+
+        // setting everything back to the project's values removes the entries, then the file
+        tags().find("sys.driver_plc.host")->set_string("10.0.0.5", nullptr);
+        tags().find("sys.driver_plc.port")->set_number(502, nullptr);
+        CHECK(sys.apply("driver_plc") == "");
+        {
+            std::ifstream of2(tp.dir / "project.local.json");
+            json o2 = json::parse(of2);
+            CHECK(o2["drivers"].contains("PLC") == false);
+            CHECK(o2["drivers"]["sim"]["enabled"] == false);
+        }
+        tags().find("sys.driver_sim.enabled")->set_number(1, nullptr);
+        CHECK(sys.apply("driver_sim") == "");
+        CHECK_FALSE(std::filesystem::exists(tp.dir / "project.local.json"));
         drivers().stop_all();
     }
     SUBCASE("a broken overlay file is ignored") {
