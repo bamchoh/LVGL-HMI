@@ -36,4 +36,47 @@ string(FIND "${out}" "reloading screens" reload_pos)
 if(reload_pos EQUAL -1)
   message(FATAL_ERROR "runtime log does not show the scripted reload\n--- stdout ---\n${out}")
 endif()
-message(STATUS "smoke test passed: ${shot} (${size} bytes)")
+
+# The demo project has "system_log" enabled: export the system log from a second process.
+set(csv "${OUT}/smoke-log.csv")
+file(REMOVE "${csv}")
+execute_process(COMMAND "${EXE}" "${PROJECT}" --export-system-log "${csv}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 60)
+if(NOT rc EQUAL 0 OR NOT EXISTS "${csv}")
+  message(FATAL_ERROR "--export-system-log failed (${rc})\n--- stdout ---\n${out}\n--- stderr ---\n${err}")
+endif()
+file(READ "${csv}" log_text)
+string(FIND "${log_text}" "screens built" log_pos)
+if(log_pos EQUAL -1)
+  message(FATAL_ERROR "exported log does not contain the runtime's messages\n${log_text}")
+endif()
+
+# ... and the data log (group "process" samples once a second), the alarm log and the operation log.
+foreach(kind data alarm operation)
+  set(out_csv "${OUT}/smoke-${kind}.csv")
+  file(REMOVE "${out_csv}")
+  set(extra "")
+  if(kind STREQUAL "data")
+    set(extra --group process)
+  endif()
+  execute_process(COMMAND "${EXE}" "${PROJECT}" --export-${kind}-log "${out_csv}" ${extra} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 60)
+  if(NOT rc EQUAL 0 OR NOT EXISTS "${out_csv}")
+    message(FATAL_ERROR "--export-${kind}-log failed (${rc})
+--- stdout ---
+${out}
+--- stderr ---
+${err}")
+  endif()
+endforeach()
+file(READ "${OUT}/smoke-data.csv" data_text)
+string(FIND "${data_text}" "time,temp,pressure" data_pos)
+if(data_pos EQUAL -1)
+  message(FATAL_ERROR "exported data log has no header
+${data_text}")
+endif()
+file(STRINGS "${OUT}/smoke-data.csv" data_lines)
+list(LENGTH data_lines data_n)
+if(data_n LESS 2)
+  message(FATAL_ERROR "exported data log has no samples
+${data_text}")
+endif()
+message(STATUS "smoke test passed: ${shot} (${size} bytes), log exported to ${csv}")

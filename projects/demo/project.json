@@ -210,6 +210,25 @@
       ]
     }
   ],
+  "data_log": {
+    "groups": [
+      { "name": "process", "trigger": "interval", "interval_ms": 1000, "tags": ["temp", "pressure", "level", "speed_sp", "speed_pv"] },
+      { "name": "state", "trigger": "change", "tags": ["run", "auto_mode", "mode"] }
+    ]
+  },
+  "alarms": {
+    "items": [
+      { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi", "severity": "warning", "message": "Temperature high" },
+      { "name": "temp_low", "tag": "temp", "condition": "lt", "value_tag": "temp_lo", "severity": "warning", "message": "Temperature low" }
+    ]
+  },
+  "operation_log": {
+    "user_tag": "operator"
+  },
+  "system_log": {
+    "retention_days": 30,
+    "max_rows": 100000
+  },
   "scripts": [
     {
       "name": "auto_speed",

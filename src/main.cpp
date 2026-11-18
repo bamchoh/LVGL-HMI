@@ -4,7 +4,13 @@
 //   hml_runtime [project.json] [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]
 //               [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...
 //   hml_runtime --splash [project.json] [--screenshot <file.bmp>] [--exit-after <ms>]
+//   hml_runtime --export-system-log <file.csv> [project.json] [--log-level info|warn|error]
+//   hml_runtime --export-data-log <file.csv> [project.json] [--group <name>]
+//   hml_runtime --export-alarm-log <file.csv> [project.json]
+//   hml_runtime --export-operation-log <file.csv> [project.json]
 //
+// --export-system-log writes the system log ("system_log" in project.json) as CSV and exits; it can be
+// used while the HMI is running.
 // --splash draws the boot splash (display.splash image, or the title) and exits at once, leaving
 // the frame on the framebuffer and the console VT in graphics mode until the HMI starts
 // (tools/rpi/hml-splash.service). On the SDL backend the window stays open for --exit-after ms.
@@ -18,7 +24,11 @@
 #include <string>
 #include <vector>
 #include "lvgl.h"
+#include "alarm.hpp"
+#include "data_log.hpp"
 #include "driver.hpp"
+#include "operation_log.hpp"
+#include "system_log.hpp"
 #include "platform.hpp"
 #include "project.hpp"
 #include "script.hpp"
@@ -64,7 +74,10 @@ int usage(const char* argv0)
 {
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
-                         "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n", argv0, argv0);
+                         "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
+                         "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
+                         "       %s --export-data-log <file.csv> <project.json> [--group <name>]\n"
+                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0);
     return 1;
 }
 
@@ -92,7 +105,8 @@ int run_splash(lv_display_t* disp, const hml::ProjectInfo& info, const std::stri
 
 int main(int argc, char** argv)
 {
-    std::string project_path, screenshot, screen;
+    std::string project_path, screenshot, screen, export_log, export_level = "info";
+    std::string export_kind, export_file, export_group;      // --export-data-log / -alarm-log / -operation-log
     uint32_t exit_after = 0, reload_after = 0;
     bool splash = false;
 
@@ -103,6 +117,15 @@ int main(int argc, char** argv)
         else if(a == "--reload-after") { const char* v = next(); if(!v) return usage(argv[0]); reload_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
         else if(a == "--splash") splash = true;
+        else if(a == "--export-system-log") { const char* v = next(); if(!v) return usage(argv[0]); export_log = v; }
+        else if(a == "--export-data-log" || a == "--export-alarm-log" || a == "--export-operation-log") {
+            const char* v = next();
+            if(!v) return usage(argv[0]);
+            export_kind = a.substr(9);
+            export_file = v;
+        }
+        else if(a == "--group") { const char* v = next(); if(!v) return usage(argv[0]); export_group = v; }
+        else if(a == "--log-level") { const char* v = next(); if(!v) return usage(argv[0]); export_level = v; }
         else if(a == "--screen") { const char* v = next(); if(!v) return usage(argv[0]); screen = v; }
         else if(a == "--click") {
             const char* v = next();
@@ -127,9 +150,44 @@ int main(int argc, char** argv)
     }
     if(project_path.empty()) return usage(argv[0]);
 
+    // Capture the log from the first line on; it is written once the database is open.
+    if(!splash && export_log.empty() && export_kind.empty()) hml::system_log().attach();
     hml::drivers().register_builtins();
     if(!hml::project().load(project_path)) return 2;
     const hml::ProjectInfo& info = hml::project().info();
+
+    if(!export_log.empty()) {
+        hml::SystemLogQuery q;
+        q.min_level = hml::log_level_from_name(export_level, hml::LogLevel::Info);
+        if(!hml::system_log().open(info.system_log, true)) { std::fprintf(stderr, "no system log: \"system_log\" is not enabled in %s, or nothing was recorded yet\n", project_path.c_str()); return 5; }
+        int64_t n = hml::system_log().export_csv(export_log, q);
+        hml::system_log().close();
+        if(n < 0) return 5;
+        std::printf("%lld log rows exported to %s\n", static_cast<long long>(n), export_log.c_str());
+        return 0;
+    }
+    if(!export_kind.empty()) {
+        hml::project().start_logs(true);
+        int64_t n = -1;
+        if(export_kind == "data-log") {
+            std::vector<std::string> groups = hml::data_log().groups();
+            if(export_group.empty() && groups.size() == 1) export_group = groups[0];
+            if(export_group.empty()) {
+                std::fprintf(stderr, "--group <name> is needed; groups:");
+                for(const std::string& g : groups) std::fprintf(stderr, " %s", g.c_str());
+                std::fprintf(stderr, "\n");
+            }
+            else n = hml::data_log().export_csv(export_group, export_file);
+        }
+        else if(export_kind == "alarm-log") n = hml::alarms().export_csv(export_file);
+        else n = hml::operation_log().export_csv(export_file);
+        hml::project().stop_logs();
+        if(n < 0) return 5;
+        std::printf("%lld rows exported to %s\n", static_cast<long long>(n), export_file.c_str());
+        return 0;
+    }
+    // (not for --splash: it runs as root before the HMI and must not create the database)
+    if(!splash) hml::system_log().open(info.system_log);
 
     lv_init();
     hml::platform::Callbacks pcb{ [] { s_reload = true; }, [] { s_quit = true; } };
@@ -147,8 +205,15 @@ int main(int argc, char** argv)
     hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; },
                                           [](hml::RestartTarget t) { s_restart = static_cast<int>(t); s_quit = true; } });
     hml::system_settings().register_actions();
+    // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
+    hml::ui().register_action("system_log.export", [](const std::string& arg) {
+        std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;
+        int64_t n = hml::system_log().export_csv(path);
+        if(n >= 0) HML_INFO("system log: %lld rows exported to '%s'", static_cast<long long>(n), path.c_str());
+    });
 
     hml::project().start_drivers();
+    hml::project().start_logs();
     hml::project().build_screens();
     if(!screen.empty()) hml::ui().show_screen(screen, "none");
     HML_INFO("running (%s backend). %s", hml::platform::name(), hml::platform::hint());
@@ -189,11 +254,13 @@ int main(int argc, char** argv)
     HML_INFO("shutting down");
     hml::drivers().stop_all();
     hml::scripts().clear();
+    hml::project().stop_logs();
     hml::ui().unload_all();
     hml::project().unload();
     lv_deinit();
     hml::tags().clear();
     hml::platform::deinit();
+    hml::system_log().close();
     if(s_restart >= 0) {
         if(!hml::platform::restart(static_cast<hml::RestartTarget>(s_restart), argc, argv)) return 4;
     }

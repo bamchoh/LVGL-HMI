@@ -448,3 +448,53 @@ test('M scripts: add, rename (script actions follow), trigger keys, remove', () 
   deq(M.scriptNames(), ['script3']);
   assert.ok(M.filesToWrite()[0].text.includes('"scripts"'));
 });
+
+test('M system log: section exists only while enabled or customised', () => {
+  const { M } = load();
+  M.newProject('T');
+  assert.equal(M.st.project.system_log, undefined);              // off by default: no section
+  assert.equal(M.systemLogOn(), false);
+  M.setSystemLog(true);
+  deq(M.st.project.system_log, {});
+  assert.equal(M.systemLogOn(), true);
+  assert.ok(M.filesToWrite()[0].text.includes('"system_log"'));
+  M.setSystemLog(false);                                        // nothing customised: the section goes away
+  assert.equal(M.st.project.system_log, undefined);
+  M.setSystemLog(true);
+  M.st.project.system_log.retention_days = 7;
+  M.setSystemLog(false);                                        // settings are kept while switched off
+  deq(M.st.project.system_log, { retention_days: 7, enabled: false });
+  assert.equal(M.systemLogOn(), false);
+  M.setSystemLog(true);
+  deq(M.st.project.system_log, { retention_days: 7 });
+  M.undo();
+  assert.equal(M.systemLogOn(), false);
+});
+
+test('M logs: data log / alarms / operation log sections', () => {
+  const { M, SCHEMA } = load();
+  M.newProject('T');
+  for (const key of ['data_log', 'alarms', 'operation_log']) {
+    assert.equal(M.logOn(key), false);
+    M.setLog(key, true);
+    deq(M.st.project[key], {});
+    assert.equal(M.logOn(key), true);
+    M.setLog(key, false);
+    assert.equal(M.st.project[key], undefined);
+  }
+  M.setLog('data_log', true);
+  M.st.project.data_log.groups = [];                          // an empty table is not worth keeping
+  M.setLog('data_log', false);
+  assert.equal(M.st.project.data_log, undefined);
+  M.setLog('alarms', true);
+  M.st.project.alarms.items = [{ name: 'hot', tag: 'temp', condition: 'gt', value: '30' }];
+  M.setLog('alarms', false);                                  // definitions are kept while switched off
+  assert.equal(M.st.project.alarms.enabled, false);
+  assert.equal(M.st.project.alarms.items.length, 1);
+  assert.equal(M.logOn('alarms'), false);
+  M.setLog('alarms', true);
+  assert.equal(M.st.project.alarms.enabled, undefined);
+  assert.ok(M.filesToWrite()[0].text.includes('"alarms"'));
+  for (const t of ['interval', 'change', 'tag', 'manual']) assert.ok(SCHEMA.dataLogTriggers.includes(t));
+  for (const c of ['true', 'false', 'eq', 'ne', 'gt', 'lt', 'ge', 'le']) assert.ok(SCHEMA.alarmConditions.includes(c));
+});

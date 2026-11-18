@@ -1,5 +1,8 @@
 #include "project.hpp"
+#include "alarm.hpp"
+#include "data_log.hpp"
 #include "driver.hpp"
+#include "operation_log.hpp"
 #include "script.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
@@ -147,6 +150,19 @@ bool Project::load(const std::string& path)
     info_.secondary = parse_color(jstr(t, "secondary", ""), lv_palette_main(LV_PALETTE_RED));
     info_.start_screen = jstr(root_, "start_screen", "");
 
+    // system log ("system_log"): off unless the section exists
+    if(const json* lg = jget(root_, "system_log"); lg && lg->is_object()) {
+        info_.system_log.enabled = jbool(*lg, "enabled", true);
+        info_.system_log.path = resolve_path(jstr(*lg, "path", "logs/system.db"));
+        std::string level = jstr(*lg, "level", "info");
+        info_.system_log.level = log_level_from_name(level, LogLevel::Info);
+        if(!iequals(level, log_level_name(info_.system_log.level))) HML_WARN("system_log.level must be info, warn or error (got '%s'); using info", level.c_str());
+        info_.system_log.retention_days = static_cast<int>(jnum(*lg, "retention_days", 30));
+        info_.system_log.max_rows = static_cast<int>(jnum(*lg, "max_rows", 100000));
+        if(info_.system_log.retention_days < 0) info_.system_log.retention_days = 0;
+        if(info_.system_log.max_rows < 0) info_.system_log.max_rows = 0;
+    }
+
     // tags
     const json* tag_list = jget(root_, "tags");
     if(!tag_list || !tag_list->is_array()) HML_WARN("project has no \"tags\" array");
@@ -187,6 +203,42 @@ void Project::apply_theme(lv_display_t* disp)
 int Project::start_drivers()
 {
     return drivers().load(jget(root_, "drivers"));
+}
+
+void Project::start_logs(bool read_only)
+{
+    data_log().load(jget(root_, "data_log"), info_.dir, read_only);
+    alarms().load(jget(root_, "alarms"), info_.dir, read_only);
+    operation_log().load(jget(root_, "operation_log"), info_.dir, read_only);
+    if(read_only) return;
+
+    // { "action": "call", "fn": "data_log.export", "arg": "<group>" } or "<group>,<file.csv>";
+    // without a file the CSV goes next to the database. The other two take the file (or nothing).
+    ui().register_action("data_log.export", [](const std::string& arg) {
+        size_t comma = arg.find(',');
+        std::string group = arg.substr(0, comma), path = comma == std::string::npos ? "" : arg.substr(comma + 1);
+        std::vector<std::string> groups = group.empty() ? data_log().groups() : std::vector<std::string>{ group };
+        for(const std::string& g : groups) {
+            int64_t n = data_log().export_csv(g, path);
+            if(n >= 0) HML_INFO("data log: %lld rows of group '%s' exported", static_cast<long long>(n), g.c_str());
+        }
+    });
+    ui().register_action("data_log.sample", [](const std::string& arg) { data_log().sample(arg); });
+    ui().register_action("alarm_log.export", [](const std::string& arg) {
+        int64_t n = alarms().export_csv(arg);
+        if(n >= 0) HML_INFO("alarm log: %lld rows exported", static_cast<long long>(n));
+    });
+    ui().register_action("operation_log.export", [](const std::string& arg) {
+        int64_t n = operation_log().export_csv(arg);
+        if(n >= 0) HML_INFO("operation log: %lld rows exported", static_cast<long long>(n));
+    });
+}
+
+void Project::stop_logs()
+{
+    data_log().clear();
+    alarms().clear();
+    operation_log().clear();
 }
 
 int Project::build_screens()

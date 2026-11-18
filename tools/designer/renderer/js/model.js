@@ -228,6 +228,21 @@ const M = {
   removeDriver(i) { this.mutate(() => this.st.project.drivers.splice(i, 1)); },
 
   // ---- scripts (Lua) -----------------------------------------------------
+  // ---- system log ("system_log" in project.json): recorded only while the section exists and is enabled
+  systemLogOn() { return this.logOn('system_log'); },
+  setSystemLog(on) { this.setLog('system_log', on); },
+  // The other logs work the same way; key = 'system_log' | 'data_log' | 'alarms' | 'operation_log'.
+  logOn(key) { const lg = this.st.project && this.st.project[key]; return !!lg && typeof lg === 'object' && lg.enabled !== false; },
+  setLog(key, on) {
+    this.mutate(() => {
+      const p = this.st.project;
+      const empty = o => !Object.keys(o).some(k => k !== 'enabled' && !(Array.isArray(o[k]) && !o[k].length));
+      if (on) { p[key] = (p[key] && typeof p[key] === 'object') ? p[key] : {}; delete p[key].enabled; }
+      else if (p[key] && !empty(p[key])) p[key].enabled = false;   // keep the settings
+      else delete p[key];
+    });
+  },
+
   addScript() {
     return this.mutate(() => {
       const list = this.st.project.scripts = this.st.project.scripts || [];

@@ -12,6 +12,10 @@ void     sleep_ms(uint32_t ms);
 
 enum class LogLevel { Info, Warn, Error };
 void log(LogLevel level, const std::string& msg);
+// Everything passed to log() also goes to the sink (the system log, see system_log.hpp).
+// log() may be called from any thread, so the sink must be thread-safe. nullptr = none.
+using LogSink = void (*)(LogLevel level, const std::string& msg);
+void set_log_sink(LogSink sink);
 
 #if defined(__GNUC__)
 __attribute__((format(printf, 1, 2)))

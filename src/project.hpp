@@ -3,6 +3,7 @@
 #include <string>
 #include "lvgl.h"
 #include "jsonutil.hpp"
+#include "system_log.hpp"
 
 namespace hml {
 
@@ -27,6 +28,7 @@ struct ProjectInfo {
     bool dark = true;
     lv_color_t  primary{}, secondary{};
     std::string start_screen;
+    SystemLogConfig system_log;              // "system_log": system log database (opened by main, not by load())
 };
 
 class Project {
@@ -41,6 +43,12 @@ public:
     // Stop every driver, re-read project.json + project.local.json and start them again
     // (system settings "Apply"). Returns the number of drivers running.
     int  restart_drivers();
+    // Data log, alarms and operation log ("data_log" / "alarms" / "operation_log"): open the
+    // databases and start recording; also registers their call actions (data_log.export ...).
+    // With read_only nothing is recorded (export from a second process). Needs the tags, and
+    // LVGL unless read_only. stop_logs() must run before the tags are cleared.
+    void start_logs(bool read_only = false);
+    void stop_logs();
 
     // Driver configuration (overlay applied) by its overlay key, see driver_keys(). nullptr if unknown.
     const json* driver_config(const std::string& key) const;

@@ -1,4 +1,5 @@
 #include "util.hpp"
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdarg>
@@ -28,11 +29,21 @@ void sleep_ms(uint32_t ms)
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
+namespace {
+std::atomic<LogSink> s_log_sink{ nullptr };
+}
+
+void set_log_sink(LogSink sink)
+{
+    s_log_sink = sink;
+}
+
 void log(LogLevel level, const std::string& msg)
 {
     const char* name = level == LogLevel::Info ? "INFO" : level == LogLevel::Warn ? "WARN" : "ERROR";
     std::printf("[hml %-5s] %s\n", name, msg.c_str());
     std::fflush(stdout);
+    if(LogSink sink = s_log_sink.load()) sink(level, msg);
 }
 
 std::string vformat(const char* fmt, ...)
