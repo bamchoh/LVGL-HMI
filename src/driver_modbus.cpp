@@ -367,11 +367,9 @@ void ModbusDriver::encode(const Item& it, double raw, uint8_t* b)
 int ModbusDriver::read_item(Item& it)
 {
     uint8_t pdu[5], resp[260];
-    bool skip_update;
-    {
-        std::lock_guard<std::mutex> lock(qlock_);
-        skip_update = it.pending_writes > 0;
-    }
+    // Asked after the answer is in, not before the request goes out: the operator may write
+    // the tag while this read is on the wire, and the value read is older than that write.
+    auto write_pending = [&] { std::lock_guard<std::mutex> lock(qlock_); return it.pending_writes > 0; };
     pdu[1] = static_cast<uint8_t>(it.addr >> 8); pdu[2] = static_cast<uint8_t>(it.addr & 0xFF);
     pdu[3] = 0;
     if(it.area == Area::Coil || it.area == Area::Discrete) {
@@ -379,7 +377,7 @@ int ModbusDriver::read_item(Item& it)
         pdu[4] = 1;
         int n = transact(it.unit, pdu, 5, resp, sizeof(resp));
         if(n == kFatal || n == kNoAnswer) return n;
-        if(n >= 3 && !skip_update) it.tag->set_number((resp[2] & 1) ? 1 : 0, this);
+        if(n >= 3 && !write_pending()) it.tag->set_number((resp[2] & 1) ? 1 : 0, this);
         return 1;
     }
     int nregs = it.regs();
@@ -387,7 +385,7 @@ int ModbusDriver::read_item(Item& it)
     pdu[4] = static_cast<uint8_t>(nregs);
     int n = transact(it.unit, pdu, 5, resp, sizeof(resp));
     if(n == kFatal || n == kNoAnswer) return n;
-    if(n >= 2 + nregs * 2 && !skip_update) {
+    if(n >= 2 + nregs * 2 && !write_pending()) {
         uint8_t b[4] = { 0, 0, 0, 0 };
         std::memcpy(b, resp + 2, static_cast<size_t>(nregs) * 2);
         it.tag->set_number_from_device(decode(it, b) * it.scale + it.offset, this);
