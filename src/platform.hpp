@@ -16,6 +16,7 @@ namespace hml::platform {
 struct Callbacks {
     std::function<void()> reload;
     std::function<void()> quit;
+    std::function<void()> restart;   // restart the application (SIGUSR2: a new version was deployed)
 };
 
 // Create the display and the input devices. *kb_out receives the keyboard indev when

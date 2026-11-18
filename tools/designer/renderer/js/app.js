@@ -16,6 +16,7 @@ const host = {
   pickImage: dir => host.call('hml_pickImage', dir || ''),
   preview: (p, s) => host.call('hml_preview', p, s),
   launch: p => host.call('hml_launch', p),
+  deploy: o => host.call('hml_deploy', o),
   setTitle: t => host.call('hml_setTitle', t),
   settings: o => host.call('hml_settings', o || null),
 };
@@ -38,6 +39,7 @@ const App = {
     q('b-json').onclick = () => this.jsonDialog();
     q('b-preview').onclick = () => this.preview();
     q('b-run').onclick = () => this.run();
+    q('b-deploy').onclick = () => this.deployDialog();
     q('sel-screen').onchange = e => { Panels.showView('screen'); M.selectScreen(Number(e.target.value)); };
     q('t-dup').onclick = () => M.duplicateWidget(M.st.sel);
     q('t-del').onclick = () => M.deleteWidget(M.st.sel);
@@ -192,6 +194,73 @@ const App = {
     } else {
       body.append(U.el('div', { class: 'warn' }, 'Preview failed: ' + ((r && r.error) || 'unknown error')), U.el('pre', null, (r && r.log) || ''));
     }
+  },
+  // ---- deploy to a target over SSH ----------------------------------------
+  // The connection settings are kept per project in the designer's own settings file (they
+  // describe this PC and its network, not the project); '*' holds the last ones used.
+  async deployDialog() {
+    const st = M.st;
+    if (!st.project) return;
+    const saved = (await host.settings()) || {};
+    const all = (saved.deploy && typeof saved.deploy === 'object' && !Array.isArray(saved.deploy)) ? saved.deploy : {};
+    const rts = this.info.targetRuntimes || [];
+    const found = rts.find(p => /aarch64|arm/i.test(p)) || rts[0] || '';   // a Raspberry Pi build first
+    const d = Object.assign({ host: '', user: '', port: 22, key: '', remoteDir: 'hml', runtime: '', sendRuntime: false, restart: true },
+      all['*'] || {}, (st.path && all[st.path]) || {});
+    const text = (v, ph, cls) => U.el('input', { type: 'text', value: v || '', placeholder: ph || '', class: cls || '', spellcheck: false });
+    const check = v => U.el('input', { type: 'checkbox', checked: !!v });
+    const f = {
+      host: text(d.host, '192.168.0.10 or raspberrypi.local'), user: text(d.user, 'pi'),
+      port: U.el('input', { type: 'number', value: d.port || 22, min: 1, max: 65535, class: 'short' }),
+      key: text(d.key, 'default key (~/.ssh/id_*)'), remoteDir: text(d.remoteDir, 'hml'),
+      sendRuntime: check(d.sendRuntime), runtime: text(d.runtime || found, 'hml_runtime built for the target (Linux)'), restart: check(d.restart !== false),
+    };
+    const row = (label, ...c) => U.el('div', { class: 'row' }, U.el('label', null, label), ...c);
+    const browse = (kind, inp) => U.el('button', { class: 'mini', onclick: async () => { const p = await host.openDialog(kind, U.dirname(inp.value || '')); if (p) { inp.value = p; update(); } } }, '…');
+    const dest = U.el('div', { class: 'hint' });
+    const out = U.el('div');
+    const name = () => (st.path ? U.basename(U.dirname(st.path)) : '(unsaved)');
+    const update = () => {
+      const dir = (f.remoteDir.value.trim() || 'hml').replace(/\/+$/, '');
+      dest.textContent = 'Project → ' + (f.user.value.trim() || 'user') + '@' + (f.host.value.trim() || 'host') + ':' + dir + '/projects/' + name() + '/'
+        + (f.sendRuntime.checked ? ',  runtime → ' + dir + '/hml_runtime' : '');
+      f.runtime.disabled = !f.sendRuntime.checked;
+    };
+    for (const k of Object.keys(f)) f[k].addEventListener('input', update);
+    const body = U.el('div', { class: 'deploy' },
+      row('target (host)', f.host), row('user', f.user), row('port', f.port),
+      row('private key', f.key, browse('key', f.key)),
+      row('remote folder', f.remoteDir),
+      row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
+      row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing')),
+      dest,
+      U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ and project.local.json on the target are kept.'),
+      out);
+    update();
+    const values = () => ({
+      host: f.host.value.trim(), user: f.user.value.trim(), port: Number(f.port.value) || 22, key: f.key.value.trim(),
+      remoteDir: f.remoteDir.value.trim() || 'hml', runtime: f.runtime.value.trim(), sendRuntime: f.sendRuntime.checked, restart: f.restart.checked,
+    });
+    let busy = false;
+    this.modal({ title: 'Deploy to target', body, buttons: [{ label: 'Close', onclick: () => !busy }, { label: 'Deploy', primary: true, onclick: async () => {
+      if (busy) return false;
+      const v = values();
+      out.innerHTML = '';
+      if (!v.host || !v.user) { out.append(U.el('div', { class: 'warn' }, 'Enter the target (host) and the user.')); return false; }
+      if (!(await this.save(false))) return false;
+      update();
+      all['*'] = v; all[st.path] = v;
+      host.settings({ deploy: all });
+      busy = true;
+      out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.user + '@' + v.host + ' …'));
+      const r = await host.deploy(Object.assign({}, v, { project: st.path, runtime: v.sendRuntime ? v.runtime : '' }));
+      busy = false;
+      out.innerHTML = '';
+      if (r && r.ok) out.append(U.el('div', { class: r.warning ? 'warn' : 'ok' }, r.warning ? 'Deployed, but: ' + r.warning : 'Deployed.'));
+      else out.append(U.el('div', { class: 'warn' }, 'Deploy failed: ' + ((r && r.error) || 'unknown error')));
+      if (r && r.log) out.append(U.el('pre', null, r.log));
+      return false;
+    } }] });
   },
   async run() {
     if (!(await this.save(false))) return;

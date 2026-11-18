@@ -4,7 +4,8 @@
 //           "display": { "fbdev": ..., "drm": ... } in project.json or HML_FBDEV / HML_DRM env.
 // Input   : "display": { "input": "/dev/input/event0" } or HML_INPUT env; when empty every
 //           /dev/input/event* device is auto-discovered (touch, mouse, keyboard).
-// Control : SIGHUP / SIGUSR1 = reload screens, SIGINT / SIGTERM = quit.
+// Control : SIGHUP / SIGUSR1 = reload screens, SIGUSR2 = restart the application,
+//           SIGINT / SIGTERM = quit.
 #if defined(HML_BACKEND_FBDEV) || defined(HML_BACKEND_DRM)
 
 #include <cerrno>
@@ -26,11 +27,13 @@ namespace {
 Callbacks s_cb;
 volatile sig_atomic_t s_sig_reload = 0;
 volatile sig_atomic_t s_sig_quit = 0;
+volatile sig_atomic_t s_sig_restart = 0;
 const ProjectInfo* s_info = nullptr;
 
 void on_signal(int sig)
 {
     if(sig == SIGINT || sig == SIGTERM) s_sig_quit = 1;
+    else if(sig == SIGUSR2) s_sig_restart = 1;
     else s_sig_reload = 1;
 }
 
@@ -173,12 +176,14 @@ lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
     std::signal(SIGTERM, on_signal);
     std::signal(SIGHUP, on_signal);
     std::signal(SIGUSR1, on_signal);
+    std::signal(SIGUSR2, on_signal);
     return disp;
 }
 
 void poll()
 {
     if(s_sig_quit) { s_sig_quit = 0; if(s_cb.quit) s_cb.quit(); }
+    if(s_sig_restart) { s_sig_restart = 0; if(s_cb.restart) s_cb.restart(); }
     if(s_sig_reload) { s_sig_reload = 0; if(s_cb.reload) s_cb.reload(); }
 }
 
@@ -200,7 +205,7 @@ const char* name()
 #endif
 }
 
-const char* hint() { return "SIGHUP/SIGUSR1 = reload screens, SIGINT/SIGTERM (Ctrl-C) = quit"; }
+const char* hint() { return "SIGHUP/SIGUSR1 = reload screens, SIGUSR2 = restart, SIGINT/SIGTERM (Ctrl-C) = quit"; }
 
 // Console backends: "restart" reboots the machine. The runtime normally runs as a plain user
 // (systemd unit), so the reboot goes through `sudo -n` (see tools/rpi/hml.sudoers) with
@@ -218,6 +223,9 @@ bool restart(RestartTarget what, int argc, char** argv)
     }
     HML_INFO("restart: re-executing %s", argv[0]);
     std::fflush(stdout);
+    // The path first: when the program file was replaced (a deploy renames a new one over it),
+    // /proc/self/exe still names the old, deleted file.
+    if(std::strchr(argv[0], '/')) execv(argv[0], argv);
     execv("/proc/self/exe", argv);
     execv(argv[0], argv);
     HML_ERROR("restart: execv failed: %s", std::strerror(errno));
