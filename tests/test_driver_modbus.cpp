@@ -346,6 +346,23 @@ TEST_CASE("modbus: writes from the UI are sent with the right function code and 
     CHECK(srv.count(0x05) == 1);
 }
 
+TEST_CASE("modbus: a value outside the tag's limits is shown as the device holds it, writes are clamped")
+{
+    Runtime rt;
+    FakeModbusServer srv;
+    { auto g = srv.lock(); srv.holding[0] = 1234; }
+    rt.tag("online", TagType::Bool);
+    Tag* sp = tags().create("sp", TagType::Int, nullptr, true, 0, 100);
+    REQUIRE(start_modbus(rt, modbus_cfg(srv, json::parse(R"([{ "tag": "sp", "area": "holding", "addr": 0 }])"), 10)) == 1);
+    REQUIRE(wait_for([] { return tagv("sp") == 1234; }));      // not clamped to 100
+    sleep_ms(60);
+    { auto g = srv.lock(); CHECK(srv.holding[0] == 1234); CHECK(srv.count(0x06) == 0); }   // and nothing is written back
+
+    sp->set_number(500, nullptr);                              // the operator's write is limited to 100
+    REQUIRE(wait_for([&] { auto g = srv.lock(); return srv.holding[0] == 100; }));
+    CHECK(sp->get_number() == doctest::Approx(100));
+}
+
 TEST_CASE("modbus: written values are not overwritten by a stale poll")
 {
     Runtime rt;

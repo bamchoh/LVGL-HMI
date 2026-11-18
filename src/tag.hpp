@@ -4,6 +4,7 @@
 //  - Subscribers run on the UI thread, from TagStore::dispatch().
 //  - Every write carries a "source" pointer so a writer can ignore its own echo.
 #pragma once
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -53,8 +54,14 @@ public:
     double get_number() const;
 
     // Set and mark dirty. The value is coerced to the tag's type and clamped to its limits.
-    // Returns true if the stored value changed.
+    // Returns true if the stored value changed. This is the write path of everything on the
+    // HMI side: widgets, actions, scripts, clients of the OPC UA server.
     bool set(const Value& v, const void* source);
+    // A value read from a device (PLC): coerced to the tag's type but NOT clamped, so that the
+    // HMI shows what the device really holds. The limits only restrict what the HMI writes.
+    // The first value outside the limits is reported once per tag (warning in the log).
+    bool set_from_device(const Value& v, const void* source);
+    bool set_number_from_device(double n, const void* source) { return set_from_device(Value::number(n), source); }
     bool set_number(double n, const void* source) { return set(Value::number(n), source); }
     bool set_string(const std::string& s, const void* source) { return set(Value::string(s), source); }
 
@@ -65,7 +72,8 @@ private:
     struct Subscriber { SubGroup group; Callback cb; };
 
     Tag(TagStore& store, std::string name, TagType type, bool has_limits, double min, double max);
-    Value coerce(const Value& in) const;
+    Value coerce(const Value& in, bool clamp = true) const;
+    bool  store(Value nv, const void* source);
 
     TagStore&   store_;
     std::string name_;
@@ -73,6 +81,7 @@ private:
     Value       value_;
     bool        has_limits_;
     double      min_, max_;
+    std::atomic<bool> range_reported_{ false };   // set_from_device: out-of-limits warning given
     bool        dirty_ = false;          // initial values are pulled by the UI, never pushed to drivers
     const void* last_source_ = nullptr;
     std::vector<Subscriber> subs_;

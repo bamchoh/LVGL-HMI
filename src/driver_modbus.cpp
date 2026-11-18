@@ -353,7 +353,7 @@ bool ModbusTcpDriver::read_item(Item& it)
     if(n >= 2 + nregs * 2 && !skip_update) {
         uint8_t b[4] = { 0, 0, 0, 0 };
         std::memcpy(b, resp + 2, static_cast<size_t>(nregs) * 2);
-        it.tag->set_number(decode(it, b) * it.scale + it.offset, this);
+        it.tag->set_number_from_device(decode(it, b) * it.scale + it.offset, this);
     }
     return true;
 }

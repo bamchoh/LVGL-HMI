@@ -131,7 +131,7 @@ Tag::Tag(TagStore& store, std::string name, TagType type, bool has_limits, doubl
     value_.type = type;
 }
 
-Value Tag::coerce(const Value& in) const
+Value Tag::coerce(const Value& in, bool clamp) const
 {
     Value out;
     out.type = type_;
@@ -146,7 +146,7 @@ Value Tag::coerce(const Value& in) const
         case TagType::Int:
         case TagType::Float: {
             double n = in.as_number();
-            if(has_limits_) {
+            if(has_limits_ && clamp) {
                 if(n < min_) n = min_;
                 if(n > max_) n = max_;
             }
@@ -170,9 +170,22 @@ double Tag::get_number() const
     return value_.as_number();
 }
 
-bool Tag::set(const Value& v, const void* source)
+bool Tag::set(const Value& v, const void* source) { return store(coerce(v, true), source); }
+
+bool Tag::set_from_device(const Value& v, const void* source)
 {
-    Value nv = coerce(v);
+    Value nv = coerce(v, false);
+    bool numeric = type_ == TagType::Int || type_ == TagType::Float;
+    if(numeric && has_limits_ && (nv.num < min_ || nv.num > max_) && !range_reported_.exchange(true)) {
+        HML_WARN("tag '%s': the device holds %s, outside the tag's limits %s..%s (shown as it is; the limits only apply to "
+                 "values written from the HMI)",
+                 name_.c_str(), nv.format().c_str(), Value::number(min_).format().c_str(), Value::number(max_).format().c_str());
+    }
+    return store(std::move(nv), source);
+}
+
+bool Tag::store(Value nv, const void* source)
+{
     std::lock_guard<std::mutex> lock(store_.mutex_);
     bool changed = (type_ == TagType::String) ? value_.str != nv.str : value_.num != nv.num;
     if(changed) {
