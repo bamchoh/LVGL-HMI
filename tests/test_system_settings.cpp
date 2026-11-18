@@ -246,6 +246,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
     Project p;
     REQUIRE(p.load(tp.write("project.json", R"json({
         "tags": [ { "name": "x" } ],
+        "key_management": { "enabled": false },
         "drivers": [
             { "type": "sim", "items": [ { "tag": "x", "mode": "square", "min": 0, "max": 1, "period_ms": 3600000 } ] },
             { "type": "modbus_tcp", "name": "PLC", "host": "10.0.0.5", "port": 502, "poll_ms": 200, "enabled": false, "map": [] },

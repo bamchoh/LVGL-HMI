@@ -7,6 +7,7 @@
 // Arguments arrive as a JSON array, results are JSON objects.
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -23,10 +24,17 @@
 #include "webview/webview.h"
 
 #ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <commdlg.h>
 #include <shellapi.h>
 #else
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <sys/select.h>
+#include <sys/socket.h>
 #include <gtk/gtk.h>
 #include <signal.h>
 #include <spawn.h>
@@ -407,6 +415,92 @@ std::vector<std::string> driver_keys(const json& drivers)
         keys.push_back(key);
     }
     return keys;
+}
+
+std::string trimmed(std::string s);
+
+// Offer a public key to a target in key management mode (the runtime's KeyService: "HML-KEY 1",
+// the key line; answers PENDING <fingerprint>, then ACCEPTED / REJECTED / TIMEOUT, or at once
+// ALREADY / ERROR). Blocks until the operator has decided on the target's screen.
+// Returns the last answer line; "" with *error set when there was no conversation.
+std::string offer_key(const std::string& host, int port, const std::string& key_line, const std::string& fingerprint,
+                      int wait_ms, std::string* error)
+{
+#ifdef _WIN32
+    using sock_t = SOCKET;
+    const sock_t bad = INVALID_SOCKET;
+    auto sclose = [](sock_t s) { closesocket(s); };
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
+#else
+    using sock_t = int;
+    const sock_t bad = -1;
+    auto sclose = [](sock_t s) { close(s); };
+#endif
+    addrinfo hints{}, *res = nullptr;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if(getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0 || !res) { *error = "cannot resolve " + host; return {}; }
+    sock_t s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if(s == bad) { freeaddrinfo(res); *error = "cannot create a socket"; return {}; }
+    // connect with a timeout: non-blocking, then wait until writable
+#ifdef _WIN32
+    u_long nb = 1;
+    ioctlsocket(s, FIONBIO, &nb);
+#else
+    fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) | O_NONBLOCK);
+#endif
+    connect(s, res->ai_addr, static_cast<int>(res->ai_addrlen));
+    freeaddrinfo(res);
+    fd_set wr, ex;
+    FD_ZERO(&wr); FD_SET(s, &wr);
+    FD_ZERO(&ex); FD_SET(s, &ex);
+    timeval tv{ 5, 0 };
+    int so_err = 0;
+#ifdef _WIN32
+    int len = sizeof(so_err);
+#else
+    socklen_t len = sizeof(so_err);
+#endif
+    bool connected = select(static_cast<int>(s) + 1, nullptr, &wr, &ex, &tv) > 0 && FD_ISSET(s, &wr) &&
+                     getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&so_err), &len) == 0 && so_err == 0;
+    if(!connected) {
+        sclose(s);
+        *error = "nothing answers on " + host + " port " + std::to_string(port) +
+                 ": turn on Key management on the target's screen (System > Keys) and try again";
+        return {};
+    }
+    std::string out = "HML-KEY 1\n" + key_line + "\n";
+    send(s, out.data(), static_cast<int>(out.size()), 0);
+
+    std::string buf, last;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(wait_ms);
+    bool pending = false;
+    for(;;) {
+        size_t nl = buf.find('\n');
+        if(nl != std::string::npos) {
+            last = trimmed(buf.substr(0, nl));
+            buf.erase(0, nl + 1);
+            if(last.rfind("PENDING ", 0) == 0) {
+                // the target must be talking about the key we sent
+                if(last.substr(8) != fingerprint) { last = "ERROR the target answered with another fingerprint: " + last.substr(8); break; }
+                pending = true;
+                continue;
+            }
+            break;
+        }
+        if(std::chrono::steady_clock::now() > deadline) { last = pending ? "TIMEOUT" : ""; if(!pending) *error = "the target did not answer"; break; }
+        fd_set rd;
+        FD_ZERO(&rd); FD_SET(s, &rd);
+        timeval t2{ 0, 200000 };
+        if(select(static_cast<int>(s) + 1, &rd, nullptr, nullptr, &t2) <= 0) continue;
+        char b[512];
+        int n = static_cast<int>(recv(s, b, sizeof(b), 0));
+        if(n <= 0) { last.clear(); *error = pending ? "the target closed the connection (key management was switched off?)" : "the target closed the connection"; break; }
+        buf.append(b, static_cast<size_t>(n));
+    }
+    sclose(s);
+    return last;
 }
 
 // ssh / scp: on Windows the OpenSSH client that ships with the OS (not whatever PATH has first)
@@ -810,6 +904,72 @@ struct Host {
         return res;
     }
 
+    // The public key that belongs to the Deploy dialog's private key, ready to be registered on
+    // a target. Without a key (empty field, or the file is not there) a new one is created:
+    // ~/.ssh/hml_deploy_ed25519, no passphrase. Returns { ok, key, pub, fingerprint, created }.
+    json key_info(const json& o)
+    {
+        std::string key = opt_str(o, "key");
+        std::error_code ec;
+        bool created = false;
+        if(key.empty()) {
+#ifdef _WIN32
+            const char* home = std::getenv("USERPROFILE");
+#else
+            const char* home = std::getenv("HOME");
+#endif
+            if(!home) return err("cannot find the home folder: choose a private key file");
+            key = ustr(upath(home) / ".ssh" / "hml_deploy_ed25519");
+        }
+        fs::path kp = upath(key), pubp = kp;
+        pubp += ".pub";
+        if(!fs::exists(kp, ec)) {
+            fs::create_directories(kp.parent_path(), ec);
+            ProcResult pr = run_capture(ssh_tool("ssh-keygen"), { "-q", "-t", "ed25519", "-N", "", "-C", "hml-designer", "-f", ustr(kp) }, {}, {}, 20000);
+            if(!pr.error.empty() || pr.code != 0 || !fs::exists(pubp, ec))
+                return err("cannot create a key with ssh-keygen: " + (pr.error.empty() ? trimmed(pr.output) : pr.error));
+            created = true;
+        }
+        std::string pub;
+        bool ok = false;
+        if(fs::exists(pubp, ec)) pub = trimmed(read_text(pubp, &ok));
+        if(pub.empty()) {                                    // no .pub next to it: derive it (fails for a key with a passphrase)
+            ProcResult pr = run_capture(ssh_tool("ssh-keygen"), { "-y", "-f", ustr(kp) }, {}, {}, 10000);
+            if(pr.code != 0 || pr.timed_out) return err("cannot read the public key of " + key + " (put its .pub file next to it)");
+            pub = trimmed(pr.output);
+        }
+        if(pub.find('\n') != std::string::npos) pub = trimmed(pub.substr(0, pub.find('\n')));
+        // the fingerprint as ssh-keygen prints it: "256 SHA256:... comment (ED25519)"
+        fs::path tmp = fs::temp_directory_path(ec) / ("hml_key_" + std::to_string(static_cast<long long>(std::time(nullptr))) + ".pub");
+        write_text(tmp, pub + "\n");
+        ProcResult fp = run_capture(ssh_tool("ssh-keygen"), { "-l", "-f", ustr(tmp) }, {}, {}, 10000);
+        fs::remove(tmp, ec);
+        std::string fingerprint;
+        size_t at = fp.output.find("SHA256:");
+        if(fp.code == 0 && at != std::string::npos) fingerprint = fp.output.substr(at, fp.output.find(' ', at) - at);
+        if(fingerprint.empty()) return err("'" + ustr(pubp) + "' is not a public key ssh-keygen understands");
+        return json{ { "ok", true }, { "key", ustr(kp) }, { "pub", pub }, { "fingerprint", fingerprint }, { "created", created } };
+    }
+
+    // Offer the key to the target and wait for the operator there. Options: host, keyPort, pub,
+    // fingerprint (from key_info). Returns { ok, result: accepted | already | rejected | timeout, error? }.
+    json key_send(const json& o)
+    {
+        std::string hostn = opt_str(o, "host"), pub = opt_str(o, "pub"), fingerprint = opt_str(o, "fingerprint");
+        int port = 4855;
+        if(auto it = o.find("keyPort"); it != o.end() && it->is_number()) port = it->get<int>();
+        if(!safe_token(hostn, ".-:_")) return err("host: enter the target's address or host name");
+        if(pub.empty() || fingerprint.empty()) return err("no key to send");
+        std::string e;
+        std::string answer = offer_key(hostn, port, pub, fingerprint, 150000, &e);
+        if(answer.empty()) return err(e.empty() ? "no answer from the target" : e);
+        if(answer == "ACCEPTED") return json{ { "ok", true }, { "result", "accepted" } };
+        if(answer.rfind("ALREADY", 0) == 0) return json{ { "ok", true }, { "result", "already" } };
+        if(answer == "REJECTED") return json{ { "ok", false }, { "result", "rejected" }, { "error", "the key was rejected on the target" } };
+        if(answer == "TIMEOUT") return json{ { "ok", false }, { "result", "timeout" }, { "error", "nobody answered on the target's screen in time" } };
+        return err(answer.rfind("ERROR ", 0) == 0 ? "the target refused the key: " + answer.substr(6) : "unexpected answer: " + answer);
+    }
+
     void check_async(const std::string& id, const json& opts)
     {
         std::thread([this, id, opts] {
@@ -1001,6 +1161,22 @@ struct Host {
             json a = args_of(req);
             deploy_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
         }, nullptr);
+        w->bind("hml_keyInfo", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            json opts = a.size() > 0 && a[0].is_object() ? a[0] : json::object();
+            std::thread([this, id, opts] {
+                std::string dump = key_info(opts).dump(-1, ' ', false, json::error_handler_t::replace);
+                w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+            }).detach();
+        }, nullptr);
+        w->bind("hml_keySend", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            json opts = a.size() > 0 && a[0].is_object() ? a[0] : json::object();
+            std::thread([this, id, opts] {
+                std::string dump = key_send(opts).dump(-1, ' ', false, json::error_handler_t::replace);
+                w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+            }).detach();
+        }, nullptr);
         w->bind("hml_deployCheck", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             check_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
@@ -1019,6 +1195,8 @@ int app_main(const std::vector<std::string>& args)
     bool debug = false;
     std::string renderer_override, deploy_project;
     bool deploy_check = false;
+    std::string send_key_host;
+    int send_key_port = 4855;
     json deploy_opts = json::object();
     for(size_t i = 1; i < args.size(); i++) {
         auto opt = [&](const char* flag, const char* key) {
@@ -1033,12 +1211,29 @@ int app_main(const std::vector<std::string>& args)
         else if(args[i] == "--no-restart") deploy_opts["restart"] = false;
         else if(args[i] == "--clear-local") deploy_opts["clearLocal"] = true;
         else if(args[i] == "--check") deploy_check = true;
+        else if(args[i] == "--send-key" && i + 1 < args.size()) send_key_host = args[++i];
+        else if(args[i] == "--key-port" && i + 1 < args.size()) send_key_port = std::atoi(args[++i].c_str());
         else if(args[i] == "--renderer" && i + 1 < args.size()) renderer_override = args[++i];
         else if(!args[i].empty() && args[i][0] != '-') h.argv_project = ustr(fs::absolute(upath(args[i])));
     }
 #ifdef _DEBUG
     debug = true;
 #endif
+
+    // hml_designer --send-key <host> [--key <private key>] [--key-port <n>]: offer the public key
+    // to a target whose screen is in key management mode (System > Keys) and wait for the answer.
+    if(!send_key_host.empty()) {
+        json info = h.key_info(deploy_opts);
+        if(!info.value("ok", false)) { std::fprintf(stdout, "error: %s\n", info.value("error", std::string()).c_str()); return 1; }
+        if(info.value("created", false)) std::fprintf(stdout, "created a new key: %s\n", info.value("key", std::string()).c_str());
+        std::fprintf(stdout, "sending %s to %s port %d\naccept it on the target's screen if the fingerprint there is the same\n",
+                     info.value("fingerprint", std::string()).c_str(), send_key_host.c_str(), send_key_port);
+        std::fflush(stdout);
+        json r = h.key_send(json{ { "host", send_key_host }, { "keyPort", send_key_port }, { "pub", info["pub"] }, { "fingerprint", info["fingerprint"] } });
+        std::fprintf(stdout, "%s\n", r.value("ok", false) ? r.value("result", std::string()).c_str() : ("error: " + r.value("error", std::string())).c_str());
+        std::fflush(stdout);
+        return r.value("ok", false) ? 0 : 1;
+    }
 
     // hml_designer --deploy <project.json> [--host <h> --user <u> --port <n> --key <file>
     //   --remote-dir <dir> --runtime <file> --no-restart --clear-local]: deploy without opening

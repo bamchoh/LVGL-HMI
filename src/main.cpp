@@ -211,6 +211,7 @@ int main(int argc, char** argv)
     hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; },
                                           [](hml::RestartTarget t) { s_restart = static_cast<int>(t); s_quit = true; } });
     hml::system_settings().register_actions();
+    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); }, 250, nullptr);   // pages that follow outside events
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
     hml::ui().register_action("system_log.export", [](const std::string& arg) {
         std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;
