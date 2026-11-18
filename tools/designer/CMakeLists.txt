@@ -28,7 +28,7 @@ target_compile_definitions(hml_designer PRIVATE
 if(MSVC)
   target_compile_definitions(hml_designer PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
   target_compile_options(hml_designer PRIVATE /W4 /EHsc /wd4996)
-  target_link_libraries(hml_designer PRIVATE comdlg32 shell32 ole32)
+  target_link_libraries(hml_designer PRIVATE comdlg32 shell32 ole32 ws2_32)
 else()
   target_compile_options(hml_designer PRIVATE -Wall -Wextra -Wno-unused-parameter)
   find_package(Threads REQUIRED)

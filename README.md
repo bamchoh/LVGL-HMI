@@ -43,6 +43,7 @@ build.cmd Debug
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
+| `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
 | `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
@@ -270,7 +271,8 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 ```
 
 - PC 側は OS 付属の OpenSSH（`ssh` / `scp`）を使います。**鍵認証のみ**で、パスワードは聞きません。
-  あらかじめ公開鍵をターゲットの `~/.ssh/authorized_keys` に登録しておいてください。
+  公開鍵は、ターゲットの画面（System > Keys）を鍵管理モードにして private key の右の **Register…** を押すと登録できます
+  （→「鍵の管理」）。手作業でターゲットの `~/.ssh/authorized_keys` に追加してもかまいません。
 - 初めて接続するターゲットのホスト鍵は、自動的に `known_hosts` に登録されます。
 - ターゲットにだけあるファイル（`logs/`、システム設定画面が書く `project.local.json`）は残ります
   （`project.local.json` は「local settings」にチェックしたときだけ削除します）。
@@ -449,6 +451,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 |---|---|
 | About | ホスト名、IP アドレス、プロジェクト、表示バックエンド、ビルド情報（表示のみ） |
 | Network | NetworkManager (`nmcli`) のある Linux で、インターフェース、DHCP / 固定 IP、アドレス (CIDR)、ゲートウェイ、DNS を設定。Apply で `nmcli connection modify` + `up` を実行（一般ユーザーでは polkit が認証を求めるので `sudo -n` で再試行。`tools/rpi/hml.sudoers` を入れておく）。接続中の IP を変えると SSH が切れます。Windows では表示のみ |
+| Keys | SSH の鍵の管理（Linux の fbdev / drm バックエンドで表示）。デプロイに使う鍵の登録・削除 →「鍵の管理」 |
 | Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
 
 設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
@@ -457,9 +460,53 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 保存されるのは project.json と値が違う項目だけです。project.json と同じ値に戻して Apply するとその項目は消え、
 何も残らなければファイルごと削除されます（変更していない項目は、あとから project.json を書き換えれば反映されます）。
 
+### 鍵の管理（Keys ページ）
+
+デザイナーからのデプロイは SSH の鍵でログインします。Keys ページでは、この装置にログインできる鍵
+（ランタイムを実行しているユーザーの `~/.ssh/authorized_keys`）を、装置の画面から管理できます。
+新しい PC からデプロイしたいときや、鍵をなくしたときに、SSH で入らなくても鍵を登録できます。
+
+**新しい鍵を登録する**
+
+1. 装置の画面で System > Keys を開き、**Key management** をオンにします（鍵管理モード）。
+   画面に、この装置の IP アドレスとポート番号が表示されます。
+2. PC のデザイナーで Deploy ダイアログを開き、private key の右の **Register…** を押します。
+   private key が空（またはファイルがない）ときは、新しい鍵（`~/.ssh/hml_deploy_ed25519`）を作ります。
+   デザイナーに、送った鍵のフィンガープリント（`SHA256:...`）が表示されます。
+3. 装置の画面に、送信元のアドレス、鍵のフィンガープリント、コメントが表示されます。
+   **デザイナーに表示されたフィンガープリントと同じことを確かめてから** Accept を押します。Reject で拒否できます。
+
+- 鍵管理モードがオフのあいだは、受付用のポートは閉じていて、外部から鍵を送ることはできません。
+  モードは 5 分で自動的にオフになります（ランタイムを再起動したときもオフに戻ります）。
+- 送られてきた鍵は、画面で Accept を押すまで登録されません。別の画面を表示していても、鍵が届くと Keys ページに切り替わります。
+  2 分以内に答えなければ、その申し出は取り消されます。
+- 受け付けるのは、形式の正しい公開鍵（ed25519 / rsa / ecdsa）だけです。
+- 通信は暗号化していません（公開鍵は秘密の情報ではありません）。他人の鍵を登録してしまわないことは、
+  画面でのフィンガープリントの確認が保証します。
+
+**登録済みの鍵を削除する**
+
+登録済みの鍵が、種類・フィンガープリント・コメントで一覧表示されます（8 個まで）。Delete を押すと確認が出て、
+もう一度 Delete で削除します。最後の 1 個も削除できますが、新しい鍵を登録するまで鍵でのログイン（デプロイ）はできなくなります。
+`authorized_keys` のコメント行や、オプション付きの行（`command="..."` など）は、そのまま残します。
+
+```json
+"key_management": { "enabled": true, "port": 4855, "file": "" }
+```
+
+| キー      | 既定値                                    | 内容                                                                  |
+| --------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| `enabled` | fbdev / drm では `true`、SDL では `false` | Keys ページを出すかどうか（PC では開発者自身の鍵ファイルを編集してしまうので既定でオフ） |
+| `port`    | `4855`                                    | 鍵管理モードのあいだだけ開く TCP ポート                               |
+| `file`    | `~/.ssh/authorized_keys`                  | 管理する鍵ファイル（相対パスは project.json から）                    |
+
+コマンドラインからは `hml_designer --send-key <ホスト> [--key <秘密鍵>] [--key-port 4855]` で鍵を送れます。
+
 ページを追加するには `src/system_settings.hpp` の `SettingsPage`（`id` / `title` / `fields()` / `apply()`）を
 実装して `register_builtin_pages()` で登録するだけで、画面とタグは自動で作られます。フィールド型は
-Text / Number / Bool / Select / Info。
+Text / Number / Bool / Select / Info。フォーム以外の画面が必要なページは、`custom_rows()`（ウィジェットを自分で並べる）、
+`command()`（`{ "action": "call", "fn": "system.do", "arg": "<page>:<command>" }` で呼ばれる）、`poll()`（定期的に呼ばれる）を
+実装します（例: `src/system_keys.cpp`）。
 
 ## 画面 JSON
 
@@ -866,6 +913,8 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/tag.[ch]pp`               | `hml::Tag` / `hml::TagStore`: タグストア（スレッドセーフ、変更通知、書き込み元の追跡）              |
 | `src/ui.[ch]pp`                | `hml::Ui`: JSON → LVGL ウィジェット、バインディング、アクション、画面遷移                           |
 | `src/system_log.[ch]pp`        | `hml::SystemLog`: システムログ（SQLite への記録、検索、CSV エクスポート）                            |
+| `src/key_service.[ch]pp`       | `hml::KeyService`: SSH の鍵の管理（authorized_keys の一覧・追加・削除、鍵管理モードでの受付）        |
+| `src/system_keys.cpp`          | システム設定の Keys ページ（`KeyService` の画面）                                                    |
 | `src/logdb.[ch]pp`             | `hml::LogDb`: ロギング共通の SQLite 記録（バックグラウンド書き込み、保持日数・件数、CSV 出力）      |
 | `src/data_log.[ch]pp`          | `hml::DataLog`: 変数ロギング（グループ、周期 / 変化 / タグ / 手動トリガー）                         |
 | `src/alarm.[ch]pp`             | `hml::Alarms`: アラームの判定と発生・復帰の記録                                                     |

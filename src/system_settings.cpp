@@ -256,6 +256,24 @@ void SystemSettings::register_actions()
 {
     ui().register_action("system.apply", [this](const std::string& arg) { apply(arg); });
     ui().register_action("system.refresh", [this](const std::string& arg) { refresh(arg); });
+    ui().register_action("system.do", [this](const std::string& arg) {
+        size_t a = arg.find(':'), b = a == std::string::npos ? a : arg.find(':', a + 1);
+        if(a == std::string::npos) { HML_WARN("system.do: expected \"<page>:<command>\", got '%s'", arg.c_str()); return; }
+        command(arg.substr(0, a), arg.substr(a + 1, b == std::string::npos ? b : b - a - 1), b == std::string::npos ? "" : arg.substr(b + 1));
+    });
+}
+
+void SystemSettings::command(const std::string& page_id, const std::string& cmd, const std::string& arg)
+{
+    SettingsPage* p = page(page_id);
+    if(!p) { HML_WARN("system: unknown page '%s'", page_id.c_str()); return; }
+    p->command(cmd, arg);
+    refresh(page_id);
+}
+
+void SystemSettings::poll()
+{
+    for(const auto& p : pages_) if(p->poll()) refresh(p->id());
 }
 
 std::vector<json> SystemSettings::screens(int width, int height) const
@@ -305,6 +323,8 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         json rows = json::array();
         auto it = fields_.find(id);
         std::vector<SettingField> fields = it != fields_.end() ? it->second : p->fields();
+        json custom = p->custom_rows(compact, font);
+        if(custom.is_array()) { rows = std::move(custom); fields.clear(); }
         for(const SettingField& f : fields) {
             const std::string tag = tag_name(id, f.key);
             json widget;
@@ -655,6 +675,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     s.clear();
     s.add_page(make_about_page(proj));
     s.add_page(make_network_page());
+    if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
 }
 

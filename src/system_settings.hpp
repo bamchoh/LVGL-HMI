@@ -43,6 +43,16 @@ public:
     // Return "" on success, otherwise a message shown on the page.
     virtual std::string apply(const std::map<std::string, std::string>& values) = 0;
     virtual bool has_apply() const { return true; }
+
+    // ---- pages that are more than a form (optional)
+    // The rows of the page body, as widgets bound to the page's tags. null = one row per field.
+    virtual json custom_rows(bool compact, int font) const { (void)compact; (void)font; return nullptr; }
+    // { "action": "call", "fn": "system.do", "arg": "<page>:<command>[:<arg>]" } from a widget of
+    // the page. The page's tags are refreshed afterwards.
+    virtual void command(const std::string& cmd, const std::string& arg) { (void)cmd; (void)arg; }
+    // Called a few times a second on the UI thread. Return true when fields() would now give
+    // other values (the tags are refreshed then).
+    virtual bool poll() { return false; }
 };
 
 class SystemSettings {
@@ -68,8 +78,14 @@ public:
     static const char* menu_screen() { return "__system"; }
     static std::string page_screen(const std::string& id) { return "__system_" + id; }
 
-    // "system.apply" / "system.refresh" actions (arg = page id) for ui().
+    // "system.apply" / "system.refresh" actions (arg = page id) and "system.do"
+    // (arg = "<page>:<command>[:<arg>]") for ui().
     void register_actions();
+    // Run a page command and refresh the page (what "system.do" does).
+    void command(const std::string& page_id, const std::string& cmd, const std::string& arg = "");
+    // Let the pages follow what happens outside the UI (see SettingsPage::poll). Called by a
+    // timer that register_actions() starts.
+    void poll();
 
 private:
     std::vector<std::unique_ptr<SettingsPage>> pages_;
@@ -82,6 +98,9 @@ SystemSettings& system_settings();
 // driver configuration and the overlay path (project.local.json) from that Project.
 std::unique_ptr<SettingsPage> make_about_page(Project& proj);
 std::unique_ptr<SettingsPage> make_network_page();
+// SSH key management (system_keys.cpp): "key_management": { "enabled", "port", "file" } in
+// project.json. Shown by default on the Linux console backends only.
+std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
 void add_driver_pages(SystemSettings& s, Project& proj);
 void register_builtin_pages(SystemSettings& s, Project& proj);
 

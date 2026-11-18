@@ -55,6 +55,7 @@ public:
     // The same driver as project.json has it (before project.local.json is applied).
     const json* driver_base_config(const std::string& key) const;
     const json* drivers_config() const { return jget(root_, "drivers"); }
+    const json* section(const char* name) const { return jget(root_, name); }   // any top-level object of project.json
     std::string local_overlay_path() const { return info_.dir + "/project.local.json"; }
 
     // Build (or rebuild) every screen from its JSON file and show the start screen

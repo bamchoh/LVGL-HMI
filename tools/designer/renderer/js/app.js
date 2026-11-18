@@ -18,6 +18,8 @@ const host = {
   launch: p => host.call('hml_launch', p),
   deploy: o => host.call('hml_deploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
+  keyInfo: o => host.call('hml_keyInfo', o),
+  keySend: o => host.call('hml_keySend', o),
   setTitle: t => host.call('hml_setTitle', t),
   settings: o => host.call('hml_settings', o || null),
 };
@@ -281,7 +283,8 @@ const App = {
     for (const k of Object.keys(f)) f[k].addEventListener('input', update);
     const body = U.el('div', { class: 'deploy' },
       row('target (host)', f.host), row('user', f.user), row('port', f.port),
-      row('private key', f.key, browse('key', f.key)),
+      row('private key', f.key, browse('key', f.key),
+        U.el('button', { class: 'mini', title: 'Register this key on the target (the target\'s screen must be in key management mode: System > Keys)', onclick: () => registerKey() }, 'Register…')),
       row('remote folder', f.remoteDir),
       row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
       row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing')),
@@ -296,6 +299,30 @@ const App = {
       remoteDir: f.remoteDir.value.trim() || 'hml', runtime: f.runtime.value.trim(), sendRuntime: f.sendRuntime.checked, restart: f.restart.checked,
     });
     let busy = false;
+    // Register the key on a target that does not know it yet (a new PC, a lost key): the target
+    // accepts keys only while its screen is in key management mode, and its operator confirms.
+    const registerKey = async () => {
+      if (busy) return;
+      const v = values();
+      out.innerHTML = '';
+      if (!v.host) { out.append(U.el('div', { class: 'warn' }, 'Enter the target (host) first.')); return; }
+      busy = true;
+      const k = await host.keyInfo({ key: v.key });
+      if (!k || !k.ok) { busy = false; out.append(U.el('div', { class: 'warn' }, 'Register key: ' + ((k && k.error) || 'failed'))); return; }
+      if (k.key && k.key !== v.key) { f.key.value = k.key; update(); }
+      const keyPort = Number(st.project && st.project.key_management && st.project.key_management.port) || 4855;
+      if (k.created) out.append(U.el('div', { class: 'hint' }, 'A new key was created: ' + k.key));
+      out.append(
+        U.el('div', { class: 'hint' }, 'Sending the key to ' + v.host + ' (port ' + keyPort + '). On the target\'s screen open System > Keys, turn Key management on, and accept the key if it shows this fingerprint:'),
+        U.el('pre', null, k.fingerprint),
+        U.el('div', { class: 'hint' }, 'Waiting for the answer on the target …'));
+      const r = await host.keySend({ host: v.host, keyPort, pub: k.pub, fingerprint: k.fingerprint });
+      busy = false;
+      out.lastChild.remove();
+      if (r && r.ok) out.append(U.el('div', { class: 'ok' }, r.result === 'already' ? 'The target already has this key.' : 'The key was accepted on the target.'));
+      else out.append(U.el('div', { class: 'warn' }, 'Register key: ' + ((r && r.error) || 'failed')));
+      if (r && r.ok) runCheck();
+    };
     runCheck();                                      // with remembered settings: look at the target right away
     this.modal({ title: 'Deploy to target', body, buttons: [{ label: 'Close', onclick: () => !busy },
       { label: 'Check', onclick: async () => { if (!busy) { busy = true; out.innerHTML = ''; await runCheck(); busy = false; } return false; } },
