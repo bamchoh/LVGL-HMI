@@ -195,6 +195,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `F5`                        | 画面 JSON をホットリロード（タグ・ドライバは維持、表示中の画面を保つ）。Linux fbdev/drm では `SIGHUP` / `SIGUSR1` |
 | `Esc`                       | 終了。Linux fbdev/drm では `Ctrl-C` (`SIGINT` / `SIGTERM`)                                                        |
+| `SIGUSR2`（Linux fbdev/drm）| ランタイムを再起動（終了処理をしてから同じコマンドラインで起動し直す）。デザイナーの Deploy が使う                |
 | `--screen <name>`           | 起動時に表示する画面を指定                                                                                        |
 | `--screenshot <file.bmp>`   | 起動後にスクリーンショットを保存（`tools/bmp2png.py` で PNG 化できます）                                          |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
@@ -232,9 +233,48 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
 | Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
 | Run                                    | 保存して `hml_runtime` を通常起動                                                                                                                                  |
+| Deploy                                 | 保存して、プロジェクト（と任意でランタイム）を SSH でターゲット（Raspberry Pi など）へ送り、ランタイムを再起動 →「ターゲットへのデプロイ」                        |
 | 中央: Logs タブ                        | 変数ロギング（グループ）、アラーム、操作ログ、システムログの設定。チェックを入れたものだけ記録される     |
 | 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
 | JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
+
+### ターゲットへのデプロイ
+
+ツールバーの **Deploy** で、開いているプロジェクトを Raspberry Pi などのターゲットへ送ります。
+
+| 項目            | 内容                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| target (host)   | ターゲットの IP アドレスまたはホスト名                                                                 |
+| user / port     | ログインするユーザー名と SSH のポート（既定 22）                                                       |
+| private key     | SSH の秘密鍵ファイル。空なら既定の鍵（`~/.ssh/id_*`）                                                  |
+| remote folder   | ターゲット上の配置先（既定 `hml` = ホームの `hml/`）                                                   |
+| send runtime    | チェックすると、指定したターゲット用の `hml_runtime`（Linux 用のビルド）も送って入れ替える             |
+| restart runtime | 配置後にターゲットのランタイムを再起動する（`SIGUSR2`）                                                |
+
+ターゲット上の配置は次のとおりです。systemd のユニットなどは、この `project.json` を指すようにしておきます。
+
+```
+<remote folder>/hml_runtime
+<remote folder>/projects/<プロジェクトのフォルダ名>/project.json, screens/, assets/ ...
+```
+
+- PC 側は OS 付属の OpenSSH（`ssh` / `scp`）を使います。**鍵認証のみ**で、パスワードは聞きません。
+  あらかじめ公開鍵をターゲットの `~/.ssh/authorized_keys` に登録しておいてください。
+- 初めて接続するターゲットのホスト鍵は、自動的に `known_hosts` に登録されます。
+- ターゲットにだけあるファイル（`logs/`、システム設定画面が書く `project.local.json`）は残ります。
+  PC 側の `logs/` と `project.local.json` は送りません。プロジェクトから削除したファイルは、ターゲットからは消えません。
+- ランタイムが動いていなければ、ファイルの配置だけを行います（結果にその旨が表示されます）。
+  ターゲットが別のプロジェクトを実行している場合も、結果に表示されます。
+- 接続先の設定は、プロジェクトではなくデザイナーの設定ファイル（Windows: `%APPDATA%\hml_designer\settings.json`）に、
+  プロジェクトごとに保存されます。
+
+ウィンドウを開かずにコマンドラインからもデプロイできます。省略したオプションには、Deploy ダイアログで
+そのプロジェクトに最後に使った値が使われます。
+
+```
+hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
+    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart]
+```
 
 - キーボード: Ctrl+S 保存、Ctrl+Z / Ctrl+Y 取り消し / やり直し、Ctrl+D 複製、Delete 削除、Esc 選択解除。
 - 画面 JSON のコメントは読み込めますが、保存時には整形された JSON（コメントなし）になります。

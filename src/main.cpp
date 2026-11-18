@@ -17,7 +17,8 @@
 // --click injects a pointer click at (x,y) <ms> after start (UI test automation);
 // --shot-at saves a screenshot at the given time. Both may be repeated.
 //
-// SDL: F5 = reload screens, Esc = quit.  Linux fbdev/drm: SIGHUP/SIGUSR1 = reload, SIGINT/SIGTERM = quit.
+// SDL: F5 = reload screens, Esc = quit.  Linux fbdev/drm: SIGHUP/SIGUSR1 = reload, SIGUSR2 = restart,
+// SIGINT/SIGTERM = quit.
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -190,7 +191,12 @@ int main(int argc, char** argv)
     if(!splash) hml::system_log().open(info.system_log);
 
     lv_init();
-    hml::platform::Callbacks pcb{ [] { s_reload = true; }, [] { s_quit = true; } };
+    hml::platform::Callbacks pcb{ [] { s_reload = true; }, [] { s_quit = true; },
+                                  [] {
+                                      HML_INFO("restart requested (SIGUSR2)");
+                                      s_restart = static_cast<int>(hml::RestartTarget::App);
+                                      s_quit = true;
+                                  } };
     lv_indev_t* kb = nullptr;
     lv_display_t* disp = hml::platform::init(info, pcb, &kb);
     if(!disp) { HML_ERROR("cannot initialise the '%s' display backend", hml::platform::name()); return 3; }
