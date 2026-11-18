@@ -445,7 +445,12 @@ TEST_CASE("users: the system settings need system_level; users can be edited on 
     CHECK(stored["users"]["list"][3]["level"] == 2);
     CHECK(stored["users"]["list"][3].contains("pin") == false);
     CHECK(stored["users"]["list"][3]["pin_hash"].get<std::string>().find('$') != std::string::npos);
-    CHECK(stored.dump().find("4444") == std::string::npos);
+    // nothing but the hash is kept of the PIN. (Not checked by searching the file for "4444":
+    // the random salt and the hash are hex digits and contain such a run now and then.)
+    for(const json& u : stored["users"]["list"]) {
+        CHECK(u.size() == 3);                                    // name, level, pin_hash
+        CHECK(u["pin_hash"].get<std::string>().size() == 16 + 1 + 64);
+    }
 
     // ---- change: Edit fills the form; an empty PIN keeps the old one
     sys.command("users", "edit", "4");
