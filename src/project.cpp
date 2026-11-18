@@ -326,7 +326,10 @@ int Project::build_screens()
     // screen is still reported shortly after startup, not when somebody first opens it.
     if(ui().build_pending(0) > 0) {
         lv_timer_create([](lv_timer_t* t) {
-            if(ui().build_pending(1) == 0) lv_timer_delete(t);
+            if(ui().build_pending(1) == 0) { lv_timer_delete(t); return; }
+            // Building a screen can take longer than the period. Count the pause from now, or
+            // LVGL would call this again at once, screen after screen, and nothing else would run.
+            lv_timer_reset(t);
         }, 20, nullptr);
     }
     return built;

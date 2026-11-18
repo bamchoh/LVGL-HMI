@@ -215,16 +215,15 @@ Tag* TagStore::create(const std::string& name, TagType type, const Value* init, 
     if(init) t->value_ = t->coerce(*init);
     std::lock_guard<std::mutex> lock(mutex_);
     tags_.push_back(std::move(t));
+    index_[name] = tags_.back().get();
     return tags_.back().get();
 }
 
 Tag* TagStore::find(const std::string& name) const
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    for(const auto& t : tags_) {
-        if(t->name_ == name) return t.get();
-    }
-    return nullptr;
+    auto it = index_.find(name);
+    return it == index_.end() ? nullptr : it->second;
 }
 
 size_t TagStore::count() const
@@ -288,6 +287,7 @@ void TagStore::clear()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     tags_.clear();
+    index_.clear();
 }
 
 TagStore& tags()
