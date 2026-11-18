@@ -896,7 +896,8 @@ struct Host {
         a.insert(a.end(), { "-p", std::to_string(t.port), t.dest(),
             "echo HML_PS; ps -o args= -C hml_runtime | head -n 1; echo HML_END;"
             " echo HML_ACTIVE; cat " + t.remote + "/active_project 2>/dev/null; echo; echo HML_END;"
-            " echo HML_RUNPROJ; cat " + t.remote + "/running_project 2>/dev/null; echo; echo HML_END;"
+            // (only if written by the process that runs now: a file left behind by another runtime says nothing)
+            " echo HML_RUNPROJ; P=$(pgrep -x hml_runtime | head -n 1); test ${P:-0} -gt 0 && test " + t.remote + "/running_project -nt /proc/$P && cat " + t.remote + "/running_project 2>/dev/null; echo; echo HML_END;"
             " cd " + rdir + " 2>/dev/null || { echo HML_NO_PROJECT; exit 0; };"
             " echo HML_LOCAL; cat project.local.json 2>/dev/null; echo; echo HML_END;"
             " echo HML_SUMS; find . -path ./logs -prune -o -type f ! -name project.local.json -exec cksum {} +; echo HML_END" });
