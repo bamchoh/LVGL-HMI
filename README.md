@@ -151,6 +151,11 @@ sudo cp ~/hml/lcd/hml.service /etc/systemd/system/ && sudo systemctl enable --no
 - 既定は vc4 オーバーレイなし（firmware が `hdmi_cvt` で 480x320 を出し、`/dev/fb0` は simple-framebuffer）。
   `vc4-fkms-v3d` はカーネル 6.18 では `Cannot find any crtc or sizes` で失敗し fb0 が消えるため使いません。
 - タッチの向きを調べるには `python3 tools/rpi/touch_raw.py /dev/input/event0 60` で生の座標を見ます。
+- 画面に触らずにタッチ操作を試すには `tools/rpi/tap.py` を使います。入力デバイスにタッチのイベントを書き込むので、
+  ランタイムには本物のタッチとして届きます（実行するユーザーが `input` グループに入っている必要があります）。
+  座標は画面上の位置で、表示サイズとタッチ補正は `--project` で指定した project.json から読みます。
+  `python3 tools/rpi/tap.py --project projects/lcd35/project.json 440,20,900 95,70`
+  （`X,Y,待ち時間ms` を並べる）。結果は `cat /dev/fb0 > shot.raw` で画面を取得して確認できます。
 
 Linux 用の `display` 設定:
 
