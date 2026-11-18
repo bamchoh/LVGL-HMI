@@ -7,6 +7,7 @@
 #include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 #include "util.hpp"
 #include <fstream>
 #include <sstream>
@@ -49,12 +50,14 @@ json parse_json_file(const std::string& path)
 void Project::apply_local_overlay()
 {
     base_drivers_ = root_.is_object() && root_.contains("drivers") ? root_["drivers"] : json();
+    local_users_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
     probe.close();
     json overlay = parse_json_file(path);
     if(!overlay.is_object()) return;
+    if(const json* lu = jget(overlay, "users")) local_users_ = *lu;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
     if(!od || !od->is_object() || !drivers) return;
@@ -192,6 +195,9 @@ bool Project::load(const std::string& path)
         HML_INFO("%d tags created", n);
     }
 
+    // users and levels ("users"); a list edited on the device comes from project.local.json
+    users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());
+
     // built-in system settings pages (About, Network, one per driver) and their "sys.*" tags
     register_builtin_pages(system_settings(), *this);
     system_settings().create_tags();
@@ -288,6 +294,12 @@ int Project::build_screens()
     for(const json& s : system_settings().screens(info_.width, info_.height)) {
         if(!ui().build_screen(s, info_.dir)) HML_WARN("system screen '%s' could not be built", jstr(s, "name", "?").c_str());
     }
+    // the login screen (with "users")
+    for(const json& s : login_screens(info_.width, info_.height)) {
+        if(!ui().build_screen(s, info_.dir)) HML_WARN("screen '%s' could not be built", jstr(s, "name", "?").c_str());
+    }
+    users().set_home(!info_.start_screen.empty() ? info_.start_screen : first);
+    ui().refresh_access();
 
     if(built == 0) {
         HML_ERROR("no screens could be built");
@@ -302,7 +314,8 @@ int Project::build_screens()
     scripts().run_startup();
     if(!ui().current_screen()) {
         const std::string& show = !current.empty() ? current : (!info_.start_screen.empty() ? info_.start_screen : first);
-        if(!ui().show_screen(show, "none")) ui().show_screen(first, "none");
+        // (a start screen that needs a login leaves the login screen up: that is not a failure)
+        if(!ui().show_screen(show, "none") && !ui().current_screen()) ui().show_screen(first, "none");
     }
     ui().set_history(history);
     tags().dispatch(true);

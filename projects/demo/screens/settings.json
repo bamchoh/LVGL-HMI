@@ -1,5 +1,6 @@
 {
   "name": "settings",
+  "level": 2,
   "scrollable": false,
   "style": {
     "bg_color": "#141a22",
@@ -47,10 +48,9 @@
             "text_color": "#9fb3c8",
             "font": 14
           },
-          "bind": {
+          "clickable": true, "on_click": { "action": "login" }, "bind": {
             "text": {
-              "tag": "operator",
-              "format": "Operator: %s"
+              "tag": "sys.user.name", "format": "User: %s"
             }
           }
         }

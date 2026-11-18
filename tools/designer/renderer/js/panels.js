@@ -20,6 +20,7 @@ const Panels = {
     document.getElementById('view-drivers').hidden = v !== 'drivers';
     document.getElementById('view-scripts').hidden = v !== 'scripts';
     document.getElementById('view-logs').hidden = v !== 'logs';
+    document.getElementById('view-users').hidden = v !== 'users';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
     App.refresh();
   },
@@ -37,6 +38,7 @@ const Panels = {
     this.renderDrivers();
     this.renderScripts();
     this.renderLogs();
+    this.renderUsers();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
     for (const t of M.tagNames()) dl.append(U.el('option', { value: t }));
@@ -241,6 +243,49 @@ const Panels = {
       items.push(it);
     }) }, '+ row');
     return U.el('div', null, U.el('h4', null, tdef.label), tbl, U.el('div', { class: 'row' }, add));
+  },
+
+  // ---- users: who may log in on the device, with which level. Screens and widgets ask for a
+  // minimum level ("level" in their properties); the system settings ask for system_level.
+  renderUsers() {
+    const page = document.getElementById('view-users'); page.innerHTML = '';
+    const p = M.st.project; if (!p) return;
+    const on = M.usersOn(), fk = 'users';
+    const head = U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, 'Users'),
+      U.el('label', { class: 'log-on' }, U.el('input', { type: 'checkbox', checked: on, dataset: { fk: fk + '.on' }, onchange: e => M.setUsers(e.target.checked) }), ' user management'));
+    const box = U.el('div', { class: 'log-sec' }, head, U.el('div', { class: 'hint' },
+      'Users log in on the device with a PIN (the built-in login screen: action "login", or automatically when something needs a level). '
+      + 'Give screens and widgets a minimum level in their properties (Screen > level, Access > level). Level 0 = nobody logged in. '
+      + 'Tags for your screens: sys.user.name, sys.user.level, sys.user.level_name, sys.user.logged_in.'));
+    page.append(box);
+    if (!on) return;
+    const u = p.users, levels = M.userLevels();
+    box.append(U.el('div', { class: 'drv-fields' }, ...Props.fields(u, [
+      { k: 'levels', t: 'csv', hint: 'names of level 1, 2, 3 ... (default: Operator, Maintenance, Admin)' },
+      { k: 'system_level', t: 'number', hint: 'level needed to open the system settings on the device (default: the highest level; 0 = no restriction)' },
+      { k: 'auto_logout_s', t: 'number', hint: 'log out after this many seconds without input (default 300, 0 = never)' },
+      { k: 'max_failures', t: 'number', hint: 'wrong PINs in a row before the user is locked (default 5)' },
+      { k: 'lock_s', t: 'number', hint: 'how long a locked user must wait, in seconds (default 60)' }], fk)));
+    if (!Array.isArray(u.list)) u.list = [];
+    const tbl = U.el('table', { class: 'grid' });
+    tbl.append(U.el('tr', null, ...['name', 'level', 'PIN', ''].map(h => U.el('th', null, h))));
+    u.list.forEach((x, i) => {
+      const lf = fk + '.list.' + i;
+      const level = U.el('select', { dataset: { fk: lf + '.level' }, onchange: e => M.mutate(() => { x.level = Number(e.target.value); }) },
+        ...levels.map((n, li) => U.el('option', { value: li + 1, selected: Number(x.level) === li + 1 }, (li + 1) + '  ' + n)));
+      const hasPin = !!x.pin_hash || M.validPin(x.pin === undefined ? '' : x.pin);
+      const pin = U.el('input', { type: 'password', value: '', placeholder: hasPin ? 'set (type a new one to change)' : 'not set: 4 to 8 digits', autocomplete: 'new-password',
+        dataset: { fk: lf + '.pin' }, onchange: e => { const v = e.target.value.trim(); if (v === '') return; if (!M.setUserPin(i, v)) { App.toast('PIN: 4 to 8 digits'); e.target.value = ''; } } });
+      tbl.append(U.el('tr', null,
+        U.el('td', null, Props.editor(x, 'name', { t: 'text' }, lf)), U.el('td', null, level), U.el('td', null, pin),
+        U.el('td', null, U.el('button', { class: 'mini danger', onclick: () => M.removeUser(i) }, '×'))));
+    });
+    box.append(U.el('h4', null, 'Users'), tbl, U.el('div', { class: 'row' }, U.el('button', { class: 'mini', onclick: () => M.addUser() }, '+ user')));
+    for (const w of M.userProblems()) box.append(U.el('div', { class: 'warn' }, w));
+    box.append(U.el('div', { class: 'hint' },
+      'PINs are stored as salted hashes, not as text. A PIN is short, so this only keeps it from being read by accident; anyone who has the project file can still try all combinations. '
+      + 'Users can also be added, changed and removed on the device (System > Users). Once that was done, the device keeps its own list (project.local.json) and a deploy does not replace it; '
+      + 'the Deploy dialog shows this and can remove the device\'s list.'));
   },
 
   // ---- logs: data log (tag values), alarms, operation log, system log. Each is recorded in its

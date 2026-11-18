@@ -76,7 +76,8 @@ const Props = {
     if (isRoot) {
       const name = U.el('input', { type: 'text', value: w.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.renameScreen(M.st.cur, e.target.value) });
       el.append(U.el('div', { class: 'props-head' }, 'Screen'));
-      el.append(this.section('Screen', true, this.row('name', name), ...this.fields(w, [{ k: 'scrollable', t: 'bool' }], fk)));
+      el.append(this.section('Screen', true, this.row('name', name), ...this.fields(w, [{ k: 'scrollable', t: 'bool' },
+        { k: 'level', t: 'number', hint: 'minimum user level to open this screen (0 / empty = everybody); the login screen is shown first. Needs users (Users tab)' }], fk)));
       el.append(this.section('Layout (flex)', false, ...this.fields(w, SCHEMA.flex.filter(f => f.k !== 'flex_grow'), fk)));
       el.append(this.styleSection(w, fk));
       return;
@@ -91,6 +92,7 @@ const Props = {
     const layout = this.fields(w, M.isContainer(w) ? SCHEMA.flex : SCHEMA.flex.filter(f => f.k === 'flex_grow'), fk);
     el.append(this.section('Layout', !!w.flex, ...layout));
     el.append(this.section('Flags', false, ...this.fields(w, SCHEMA.flags, fk)));
+    el.append(this.section('Access (users)', w.level !== undefined, ...this.fields(w, SCHEMA.access, fk)));
     el.append(this.styleSection(w, fk));
     el.append(this.bindSection(w, fk));
     el.append(this.eventSection(w, fk));

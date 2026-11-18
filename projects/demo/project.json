@@ -222,6 +222,15 @@
       { "name": "temp_low", "tag": "temp", "condition": "lt", "value_tag": "temp_lo", "severity": "warning", "message": "Temperature low" }
     ]
   },
+  "users": {
+    "levels": ["Operator", "Maintenance", "Admin"],
+    "list": [
+      { "name": "operator", "level": 1, "pin": "1111" },
+      { "name": "maint", "level": 2, "pin": "2222" },
+      { "name": "admin", "level": 3, "pin": "0000" }
+    ],
+    "auto_logout_s": 300
+  },
   "operation_log": {
     "user_tag": "operator"
   },

@@ -2,6 +2,7 @@
 #include "lvgl.h"
 #include "tag.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 #include "util.hpp"
 
 namespace hml {
@@ -81,7 +82,8 @@ void OperationLog::record(const std::string& kind, const std::string& target, co
     m.commit();
     Operation op;
     op.ts_ms = now;
-    op.user = m.user_tag ? m.user_tag->get().format() : std::string();
+    // with user management: who is logged in; otherwise the project's "user_tag"
+    op.user = users().enabled() ? users().name() : m.user_tag ? m.user_tag->get().format() : std::string();
     op.screen = ui().current_screen().value_or("");
     op.kind = kind;
     op.target = target;

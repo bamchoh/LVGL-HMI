@@ -7,6 +7,7 @@
 #include "script.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -67,9 +68,16 @@ TEST_CASE("every shipped project loads and builds all of its screens")
 
         p.apply_theme(hmltest::Lvgl::get().disp);
         CHECK(p.build_screens() == static_cast<int>(screens->size()));
-        CHECK(ui().screen_count() - system_settings().page_count() - 1 == screens->size());
+        // besides the project's screens: the system menu, one screen per page, and the login screen
+        const size_t builtin = system_settings().page_count() + 1 + (users().enabled() ? 1 : 0);
+        CHECK(ui().screen_count() - builtin == screens->size());
         CHECK(ui().current_screen() == std::optional<std::string>(p.info().start_screen));
 
+        // with user management some screens need a level: log in as the highest one first
+        if(users().enabled()) {
+            REQUIRE(users().login("admin", "0000") == Users::LoginResult::Ok);
+            CHECK(users().level() == users().max_level());
+        }
         // every screen can be shown and rendered
         for(const json& s : *screens) {
             fs::path sp = s.is_string() ? fs::path(p.info().dir) / s.get<std::string>() : fs::path();

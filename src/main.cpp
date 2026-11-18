@@ -37,6 +37,7 @@
 #include "system_settings.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 #include "util.hpp"
 
 namespace {
@@ -211,7 +212,9 @@ int main(int argc, char** argv)
     hml::ui().init(kb, hml::AppCallbacks{ [] { s_reload = true; }, [] { s_quit = true; },
                                           [](hml::RestartTarget t) { s_restart = static_cast<int>(t); s_quit = true; } });
     hml::system_settings().register_actions();
-    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); }, 250, nullptr);   // pages that follow outside events
+    hml::register_user_actions();
+    // pages that follow outside events; auto logout
+    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); }, 250, nullptr);
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
     hml::ui().register_action("system_log.export", [](const std::string& arg) {
         std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;

@@ -227,6 +227,61 @@ const M = {
   },
   removeDriver(i) { this.mutate(() => this.st.project.drivers.splice(i, 1)); },
 
+  // ---- users ("users" in project.json): levels, users with a PIN, login behaviour -------
+  usersOn() { return this.logOn('users'); },
+  setUsers(on) {
+    this.mutate(() => {
+      const p = this.st.project;
+      if (on) {
+        if (!p.users || typeof p.users !== 'object') p.users = { levels: ['Operator', 'Maintenance', 'Admin'], list: [] };
+        delete p.users.enabled;
+      }
+      else if (p.users && ((p.users.list || []).length || Object.keys(p.users).some(k => !['enabled', 'levels', 'list'].includes(k)))) p.users.enabled = false;
+      else delete p.users;
+    });
+  },
+  userLevels() { const u = this.st.project && this.st.project.users; return (u && Array.isArray(u.levels) && u.levels.length) ? u.levels : ['Operator', 'Maintenance', 'Admin']; },
+  validPin(pin) { return /^[0-9]{4,8}$/.test(String(pin)); },
+  // "<salt>$<sha256(salt:pin)>": what the runtime reads as "pin_hash"
+  hashPin(pin, salt) {
+    if (!salt) { salt = ''; for (let i = 0; i < 16; i++) salt += Math.floor(Math.random() * 16).toString(16); }
+    return salt + '$' + U.sha256hex(salt + ':' + pin);
+  },
+  addUser() {
+    this.mutate(() => {
+      const u = this.st.project.users;
+      if (!Array.isArray(u.list)) u.list = [];
+      const names = u.list.map(x => x.name);
+      let n = 1; while (names.includes('user' + n)) n++;
+      u.list.push({ name: 'user' + n, level: 1 });
+    });
+  },
+  setUserPin(i, pin) {
+    if (!this.validPin(pin)) return false;
+    this.mutate(() => { const x = this.st.project.users.list[i]; x.pin_hash = this.hashPin(pin); delete x.pin; });
+    return true;
+  },
+  removeUser(i) { this.mutate(() => this.st.project.users.list.splice(i, 1)); },
+  // problems worth a warning on the Users tab
+  userProblems() {
+    const u = this.st.project && this.st.project.users;
+    if (!u || u.enabled === false) return [];
+    const out = [], list = Array.isArray(u.list) ? u.list : [], max = this.userLevels().length;
+    const sys = u.system_level === undefined || u.system_level === '' ? max : Number(u.system_level);
+    const seen = new Set();
+    for (const x of list) {
+      const name = String(x.name || '');
+      if (!/^[A-Za-z0-9_.-][A-Za-z0-9_. -]{0,15}$/.test(name) || name.endsWith(' ')) out.push('"' + name + '": a name is 1 to 16 letters, digits, _ - . or spaces');
+      if (seen.has(name.toLowerCase())) out.push('"' + name + '" is defined twice');
+      seen.add(name.toLowerCase());
+      if (!x.pin_hash && !this.validPin(x.pin === undefined ? '' : x.pin)) out.push('"' + name + '" has no PIN (4 to 8 digits)');
+      if (!(Number(x.level) >= 1 && Number(x.level) <= max)) out.push('"' + name + '": the level must be 1 to ' + max);
+    }
+    if (!list.length) out.push('no user is defined: nobody can log in');
+    else if (sys > 0 && !list.some(x => Number(x.level) >= sys)) out.push('no user has level ' + sys + ': nobody can open the system settings on the device');
+    return out;
+  },
+
   // ---- scripts (Lua) -----------------------------------------------------
   // ---- system log ("system_log" in project.json): recorded only while the section exists and is enabled
   systemLogOn() { return this.logOn('system_log'); },

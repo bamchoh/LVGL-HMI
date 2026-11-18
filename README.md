@@ -44,6 +44,7 @@ build.cmd Debug
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
+| `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
 | `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
@@ -236,6 +237,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | Run                                    | 保存して `hml_runtime` を通常起動                                                                                                                                  |
 | Deploy                                 | 保存して、プロジェクト（と任意でランタイム）を SSH でターゲット（Raspberry Pi など）へ送り、ランタイムを再起動 →「ターゲットへのデプロイ」                        |
 | 中央: Logs タブ                        | 変数ロギング（グループ）、アラーム、操作ログ、システムログの設定。チェックを入れたものだけ記録される     |
+| 中央: Users タブ                       | ユーザー管理: レベル名、ユーザー（名前・レベル・PIN）、自動ログアウトやロックの設定 →「ユーザー管理」   |
 | 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
 | JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
 
@@ -442,6 +444,101 @@ python tools\opcua_client_test.py                       # Objects/HML 配下の�
 python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型はノードから自動判定）
 ```
 
+## ユーザー管理
+
+ユーザーごとにレベルを決め、レベルが足りないユーザーには画面やウィジェットを操作させないようにできます。
+project.json に `users` を書いたときだけ有効で、書かなければ今までどおり何も制限されません。
+
+```json
+"users": {
+  "levels": ["Operator", "Maintenance", "Admin"],
+  "list": [
+    { "name": "operator", "level": 1, "pin": "1111" },
+    { "name": "maint",    "level": 2, "pin": "2222" },
+    { "name": "admin",    "level": 3, "pin_hash": "<salt>$<sha256>" }
+  ],
+  "auto_logout_s": 300,
+  "max_failures": 5,
+  "lock_s": 60,
+  "system_level": 3
+}
+```
+
+| キー            | 既定値                          | 内容                                                                              |
+| --------------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| `levels`        | Operator / Maintenance / Admin  | レベル 1, 2, 3 … の名前（最大 9）。レベル 0 は「誰もログインしていない」          |
+| `list`          |                                 | ユーザー（最大 16）。`name`（16 文字まで）、`level`、`pin`（4〜8 桁の数字）       |
+| `auto_logout_s` | `300`                           | この秒数だけ操作がないと自動でログアウト（`0` = しない）                          |
+| `max_failures`  | `5`                             | PIN を続けてこの回数まちがえると、そのユーザーをロック                            |
+| `lock_s`        | `60`                            | ロックの時間（秒）                                                                |
+| `system_level`  | いちばん高いレベル              | システム設定画面を開くのに必要なレベル（`0` = 制限なし）                          |
+| `enabled`       | `true`                          | `false` で設定を残したまま無効にする                                              |
+
+**レベルの指定**
+
+画面とウィジェットに `level`（必要な最低レベル）を書きます。
+
+```json
+{ "name": "settings", "level": 2, "children": [ ... ] }
+
+{ "type": "button", "text": "Start", "level": 1, "on_click": { "action": "set", "tag": "run", "value": true } }
+{ "type": "button", "text": "Reset", "level": 3, "level_deny": "hide", "on_click": { ... } }
+{ "type": "numeric_display", "input": true, "bind": "setpoint", "level": 2, "level_deny": "login" }
+```
+
+- **画面の `level`**: レベルが足りないユーザーがその画面へ移動しようとすると、ログイン画面が出ます。
+  十分なレベルでログインすると、そのまま目的の画面へ進みます。ログアウトしたとき（自動ログアウトを含む）に
+  表示中の画面が見られなくなった場合は、開始画面へ戻ります。
+- **ウィジェットの `level`**: レベルが足りないあいだの扱いを `level_deny` で選びます。
+
+  | `level_deny`       | レベルが足りないとき                                               |
+  | ------------------ | ------------------------------------------------------------------ |
+  | `disable`（既定）  | 無効表示（薄くなる）になり、操作できない                           |
+  | `hide`             | 表示しない                                                         |
+  | `login`            | 見た目は通常どおり。触るとログイン画面が出る（操作は行われない）   |
+
+  `level` はそのウィジェット自身にかかります。パネルに付けた場合、`hide` は中身ごと隠れますが、
+  `disable` は中のウィジェットには及ばないので、操作させたくないウィジェットそれぞれに付けてください。
+- **システム設定画面**は `system_level` 以上でないと開けません（鍵の管理やドライバ設定を含む全ページ）。
+
+**ログイン**
+
+ログイン画面は組み込みです。左の一覧からユーザーを選び、テンキーで PIN を入れて OK を押します。
+`{ "action": "login" }` で開けるほか、レベルが必要な操作をしたときに自動で出ます。ログイン中は右上に
+Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトできます。
+
+画面からは次のタグを使えます（OPC UA には公開されません）。
+
+| タグ                  | 内容                                          |
+| --------------------- | --------------------------------------------- |
+| `sys.user.name`       | ログイン中のユーザー名（いなければ空）        |
+| `sys.user.level`      | レベル（`0` = ログインしていない）            |
+| `sys.user.level_name` | レベルの名前                                  |
+| `sys.user.logged_in`  | ログイン中なら true                           |
+
+たとえば `"bind": { "visible": { "tag": "sys.user.level", "ge": 2 } }` で、表示だけを切り替えることもできます。
+
+**装置の画面でユーザーを編集する**
+
+システム設定の Users ページで、ユーザーの追加・変更（レベル、PIN）・削除ができます。
+
+- 追加: Name・Level・PIN を入れて Save。変更: 一覧の Edit で Name と Level が入るので、直して Save
+  （PIN を空のままにすると、今の PIN のまま）。削除: Delete を押し、確認でもう一度 Delete。
+- システム設定を開けるユーザー（`system_level` 以上）の最後の 1 人は、削除もレベルを下げることもできません。
+- 装置で編集すると、その装置は自分のユーザー一覧（`project.local.json` の `users`）を使うようになり、
+  **project.json の `list` は使われなくなります**。デプロイしても装置の一覧は残ります。デザイナーの Deploy
+  ダイアログにその旨が表示され、「local settings」にチェックを入れてデプロイすると project.json の一覧に戻せます。
+
+**PIN の保存について**
+
+- デザイナーと装置の画面で設定した PIN は、ソルト付きの SHA-256 ハッシュ（`pin_hash`）で保存され、
+  ファイルに数字は残りません。手で書くときは `"pin": "1234"` と平文で書くこともできます。
+- PIN は桁数が少ないので、ハッシュは「うっかり読めてしまう」ことを防ぐ程度のものです。プロジェクトの
+  ファイルを手に入れた人は総当たりで PIN を割り出せます。強い秘密を守る仕組みではありません。
+- ログイン画面で押したキーは操作ログに記録されません。
+
+レベルや `auto_logout_s` などの設定の変更は、ランタイムの再起動で反映されます。
+
 ## システム設定画面
 
 ランタイムは project.json とは別に、組み込みの「System」メニュー画面（`__system`）と設定ページ画面
@@ -452,6 +549,7 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 | About | ホスト名、IP アドレス、プロジェクト、表示バックエンド、ビルド情報（表示のみ） |
 | Network | NetworkManager (`nmcli`) のある Linux で、インターフェース、DHCP / 固定 IP、アドレス (CIDR)、ゲートウェイ、DNS を設定。Apply で `nmcli connection modify` + `up` を実行（一般ユーザーでは polkit が認証を求めるので `sudo -n` で再試行。`tools/rpi/hml.sudoers` を入れておく）。接続中の IP を変えると SSH が切れます。Windows では表示のみ |
 | Keys | SSH の鍵の管理（Linux の fbdev / drm バックエンドで表示）。デプロイに使う鍵の登録・削除 →「鍵の管理」 |
+| Users | ユーザーの追加・変更・削除（project.json に `users` があるとき）→「ユーザー管理」 |
 | Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
 
 設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
@@ -597,6 +695,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `w`, `h`                                                                | 数値 (px) / `"50%"` / `"content"` / `"full"`                                                                                                                                        |
 | `align`                                                                 | `center`, `top_left`, `top_mid`, `top_right`, `left_mid`, `right_mid`, `bottom_left`, `bottom_mid`, `bottom_right`                                                                  |
 | `hidden`, `disabled`, `checked`, `clickable`, `scrollable`, `checkable` | フラグ / 状態                                                                                                                                                                       |
+| `level`, `level_deny`                                                   | 操作に必要なユーザーレベルと、足りないときの扱い（`disable` / `hide` / `login`）→「ユーザー管理」                          |
 | `scrollbar`                                                             | `off` / `on` / `auto` / `active`                                                                                                                                                    |
 | `flex`                                                                  | `row` / `column` / `row_wrap` / `column_wrap`。`flex_main` / `flex_cross` / `flex_track` に `start`/`center`/`end`/`space_between`/`space_around`/`space_evenly`                    |
 | `flex_grow`                                                             | flex 子要素の伸長率                                                                                                                                                                 |
@@ -665,6 +764,8 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
   { "action": "exit" },
   { "action": "restart" },
   { "action": "system" },
+  { "action": "login" },
+  { "action": "logout" },
   { "action": "call", "fn": "system.apply", "arg": "network" },
   { "action": "script", "code": "if tag.temp > tag.temp_hi then tag.run = false end" },
   { "action": "script", "name": "reset_counters" }
@@ -673,6 +774,8 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 
 `script` は Lua スクリプトを実行します。`code` にその場で書くか、`name` で project.json の `scripts` に
 定義したスクリプトを呼びます（下記「スクリプト (Lua)」）。
+
+`login` はログイン画面を開き、`logout` はログアウトします（→「ユーザー管理」）。
 
 `system` は組み込みのシステム設定画面（下記）を開きます。`call` はランタイムに登録された名前付きアクションを呼びます。
 
@@ -843,6 +946,8 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 | `screen`                        | `goto` / `back` アクションによる画面切り替え                                                  |
 | `script` / `call` / `system`    | イベントから実行したスクリプト、`call` アクション、`reload` / `exit` / `restart`              |
 
+- ユーザー管理（`users`）を使っているときは、ログイン中のユーザー名が各行に入り、ログイン・ログアウト・
+  ログイン失敗・ロックも `kind` = `user` の行として記録されます（`user_tag` は使われません）。
 - `user_tag` に文字列タグ（ログイン中のオペレーター名など）を指定すると、その値が各行に記録されます。
   各行には、操作した画面の名前も入ります。
 - 同じタグへの書き込みが 1 秒以内に続いたとき（スライダーのドラッグ、+ ボタンの連打）は 1 行にまとめ、
@@ -914,6 +1019,8 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/ui.[ch]pp`                | `hml::Ui`: JSON → LVGL ウィジェット、バインディング、アクション、画面遷移                           |
 | `src/system_log.[ch]pp`        | `hml::SystemLog`: システムログ（SQLite への記録、検索、CSV エクスポート）                            |
 | `src/key_service.[ch]pp`       | `hml::KeyService`: SSH の鍵の管理（authorized_keys の一覧・追加・削除、鍵管理モードでの受付）        |
+| `src/users.[ch]pp`             | `hml::Users`: ユーザー管理（ユーザーとレベル、PIN ログイン、ロック、自動ログアウト）                 |
+| `src/system_users.cpp`         | ログイン画面（`__login`）と、システム設定の Users ページ                                             |
 | `src/system_keys.cpp`          | システム設定の Keys ページ（`KeyService` の画面）                                                    |
 | `src/logdb.[ch]pp`             | `hml::LogDb`: ロギング共通の SQLite 記録（バックグラウンド書き込み、保持日数・件数、CSV 出力）      |
 | `src/data_log.[ch]pp`          | `hml::DataLog`: 変数ロギング（グループ、周期 / 変化 / タグ / 手動トリガー）                         |

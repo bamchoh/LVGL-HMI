@@ -38,8 +38,16 @@ public:
     void register_action(const std::string& name, std::function<void(const std::string& arg)> fn);
     bool call_action(const std::string& name, const std::string& arg);   // false if the name is unknown
 
-    bool show_screen(const std::string& name, const std::string& anim);
+    // A screen with "level" that the current user may not see is not shown: the login screen
+    // comes up instead and continues to it after a login (false is returned).
+    // replace: the screen being left is not added to the history ("back" skips it).
+    bool show_screen(const std::string& name, const std::string& anim, bool replace = false);
     bool back();
+    void clear_history();
+    int  screen_level(const std::string& name) const;        // the screen's "level" (0 = none / unknown screen)
+    // Apply the "level" of the widgets (disable / hide) for the current user; users.cpp calls
+    // it whenever the user changes.
+    void refresh_access();
     std::optional<std::string> current_screen() const;
     // Navigation history as screen names (oldest first), e.g. to survive a rebuild of the screens.
     std::vector<std::string> history() const;

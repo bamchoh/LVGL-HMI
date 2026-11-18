@@ -34,6 +34,7 @@ add_executable(hml_tests
   test_system_log.cpp
   test_logs.cpp
   test_key_service.cpp
+  test_users.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})
