@@ -99,6 +99,12 @@ const U = {
   samePath(a, b) { return !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]); },
 
   basename(p) { return String(p).replace(/\\/g, '/').split('/').pop(); },
+  // a project saved as one file (<name>.hmlproj) rather than as a folder with project.json
+  isProjectFile(p) { return /\.hmlproj$/i.test(String(p || '')); },
+  // a file / folder name made from a title: letters, digits, . _ - only
+  safeName(text, fallback) {
+    return (String(text || '').replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '') || fallback || 'project').toLowerCase();
+  },
   dirname(p) { const s = String(p).replace(/\\/g, '/'); const i = s.lastIndexOf('/'); return i < 0 ? '.' : s.slice(0, i); },
   joinPath(a, b) { return String(a).replace(/[\\/]+$/, '') + '/' + String(b).replace(/^[\\/]+/, ''); },
   fileUrl(p) { let s = String(p).replace(/\\/g, '/'); if (!s.startsWith('/')) s = '/' + s; return 'file://' + encodeURI(s); },

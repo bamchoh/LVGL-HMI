@@ -46,6 +46,7 @@ build.cmd Debug
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
 | `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
+| `test_project_archive.cpp`                           | プロジェクトファイル（構成ファイルの一覧、作成と展開、プロジェクト外へ出るパスの拒否、PC ごとのファイルの保護）     |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
 | `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
@@ -260,6 +261,7 @@ Windows 10/11 に標準搭載）に HTML/JS の画面を表示し、C++ のホ�
 ```
 build\bin\hml_designer.exe                       # 起動（New / Open で開始）
 build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを指定して起動
+build\bin\hml_designer.exe line1.hmlproj                  # プロジェクトファイル（1 ファイルの形式）を指定して起動
 ```
 
 | 場所                                   | 内容                                                                                                                                                               |
@@ -275,6 +277,28 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | 中央: Users タブ                       | ユーザー管理: レベル名、ユーザー（名前・レベル・PIN）、自動ログアウトやロックの設定 →「ユーザー管理」   |
 | 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
 | JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
+
+### プロジェクトの保存形式
+
+プロジェクトは 2 つの形で保存できます。Save As のダイアログで選びます（既定はプロジェクトファイル）。
+
+| 形式                 | 内容                                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| プロジェクトファイル | `<名前>.hmlproj` の 1 ファイル。project.json・画面・スクリプト・画像をまとめた zip 形式        |
+| フォルダー           | `project.json` と、その隣の `screens/`、`assets/`（これまでの形）                              |
+
+- **プロジェクトファイルは 1 つで完結します。** USB メモリやメールで持ち運んだり、そのままバージョン管理に入れたりできます。
+  中身は通常の zip なので、拡張子を `.zip` にすれば一般のツールで開けます。
+- デザイナーの Open / Save / Run / Preview / Deploy は、どちらの形でも同じように使えます。
+  フォルダーのプロジェクトを開いて Save As でプロジェクトファイルにする（またはその逆）と、画像などのファイルも一緒に移ります。
+- ランタイムにも直接渡せます: `hml_runtime line1.hmlproj`
+- **入るのはプロジェクトを構成するファイルだけです**（project.json、そこや画面から名前で参照されているファイル、`assets/` の中身）。
+  記録されたログや、その PC だけの設定（`project.local.json`）は入りません。
+- プロジェクトファイルは、開くときに作業用フォルダーへ展開されます（Windows: `%LOCALAPPDATA%\hml\work\<名前>-<識別子>`、
+  Linux: `~/.cache/hml/work/...`）。Run したときのログや「device on this PC」などの PC ごとの設定はそこに置かれ、
+  プロジェクトファイルには書き戻されません。画像を追加したときも、Save するまでプロジェクトファイルには入りません。
+- デプロイしたときのターゲット上の名前は、ファイル名から拡張子を除いたものです（`Pump Station.hmlproj` → `projects/pump-station` の
+  ように、使えない文字は `-` になります）。ターゲット上は今までどおりフォルダーの形で置かれます。
 
 ### ターゲットへのデプロイ
 
@@ -1146,6 +1170,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/driver_modbus.cpp`        | Modbus TCP クライアント（std::thread で別スレッド）                                                 |
 | `src/modbus_link.[ch]pp`       | Modbus の通信路（TCP / シリアルポート）とフレーム（MBAP / RTU の CRC-16 / ASCII の LRC）          |
 | `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
+| `src/project_archive.[ch]pp`   | プロジェクトファイル（`.hmlproj`）の作成と展開、プロジェクトを構成するファイルの一覧（デザイナーと共用） |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |

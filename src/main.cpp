@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -41,6 +42,7 @@
 #include "system_settings.hpp"
 #include "tag.hpp"
 #include "active_project.hpp"
+#include "project_archive.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -169,6 +171,16 @@ int main(int argc, char** argv)
         }
     }
     if(project_path.empty()) return usage(argv[0]);
+    // A project file (<name>.hmlproj) is unpacked into its working folder and run from there
+    // (project_archive.hpp). Logs and this machine's settings live in that folder.
+    std::string archive_note;
+    if(hml::is_project_archive(project_path)) {
+        const std::filesystem::path archive = std::filesystem::u8path(project_path), work = hml::archive_work_dir(archive);
+        std::string err;
+        if(!hml::unpack_project(archive, work, &err)) { std::fprintf(stderr, "hml_runtime: %s\n", err.c_str()); return 2; }
+        archive_note = "project file '" + project_path + "' unpacked into " + work.generic_u8string();
+        project_path = (work / "project.json").generic_u8string();
+    }
     // A deployed runtime runs the project named by active_project next to it, whatever the
     // service's command line says (active_project.hpp). Not for the exports: they are asked
     // about one project by name.
@@ -179,6 +191,7 @@ int main(int argc, char** argv)
     // Capture the log from the first line on; it is written once the database is open.
     if(!splash && export_log.empty() && export_kind.empty()) hml::system_log().attach();
     hml::drivers().register_builtins();
+    if(!archive_note.empty()) HML_INFO("%s", archive_note.c_str());
     if(!active_note.empty()) HML_INFO("%s", active_note.c_str());
     if(!hml::project().load(project_path)) return 2;
     if(!splash && export_log.empty() && export_kind.empty()) hml::note_running_project(home, project_path);

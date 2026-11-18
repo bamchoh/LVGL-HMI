@@ -23,6 +23,7 @@
 
 #include <nlohmann/json.hpp>
 #include "webview/webview.h"
+#include "project_archive.hpp"     // the project file format and what a project is made of (shared with the runtime)
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -46,6 +47,7 @@ extern char** environ;
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
+using hml::project_files;
 
 namespace {
 
@@ -382,56 +384,18 @@ std::string posix_cksum(const fs::path& p, bool* ok)
     return std::to_string(~crc) + " " + std::to_string(size);
 }
 
-// The files a deploy sends: what the project is made of, not whatever else lies in its folder
-// (a project.json saved into a folder full of other things must not take them along).
-//   - project.json
-//   - every file it or one of its screens names: screen files, script files, images, the splash
-//   - everything below assets/ (images chosen at run time through a tag are named nowhere)
-// Never the recorded logs or this machine's local settings. <file, path relative to dir>
-std::vector<std::pair<fs::path, std::string>> project_files(const fs::path& dir)
+// The name a project file gets on a target (a folder there): its file name without the
+// extension, reduced to what is allowed there (letters, digits, . _ -).
+std::string target_name(const fs::path& archive)
 {
-    std::vector<std::pair<fs::path, std::string>> out;
-    std::error_code ec;
-    auto add = [&](const std::string& rel_in) {
-        fs::path relp = upath(rel_in).lexically_normal();
-        std::string rel = ustr(relp);
-        if(rel.empty() || relp.is_absolute() || rel.find(':') != std::string::npos || rel.rfind("..", 0) == 0) return false;
-        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0) return false;
-        if(!fs::is_regular_file(dir / relp, ec)) return false;
-        for(const auto& o : out) if(o.second == rel) return true;
-        out.emplace_back(dir / relp, rel);
-        return true;
-    };
-    // every string in a JSON document that is the name of a file in the project folder
-    std::function<void(const json&)> walk = [&](const json& j) {
-        if(j.is_string()) {
-            const std::string s = j.get<std::string>();
-            if(s.size() < 260 && (s.find('.') != std::string::npos || s.find('/') != std::string::npos)) add(s);
-        }
-        else if(j.is_array() || j.is_object()) for(const auto& v : j) walk(v);
-    };
-    auto parse = [&](const fs::path& file) {
-        bool ok = false;
-        std::string text = read_text(file, &ok);
-        return ok ? json::parse(text, nullptr, false, true) : json();
-    };
-    add("project.json");
-    json proj = parse(dir / "project.json");
-    if(!proj.is_discarded()) {
-        walk(proj);
-        if(proj.is_object() && proj.contains("screens") && proj["screens"].is_array()) {
-            for(const auto& s : proj["screens"]) {
-                if(!s.is_string()) continue;
-                json scr = parse(dir / upath(s.get<std::string>()));
-                if(!scr.is_discarded()) walk(scr);
-            }
-        }
+    std::string out;
+    for(unsigned char c : hml::archive_project_name(archive)) {
+        if(std::isalnum(c) || c == '_' || c == '.' || c == '-') out += static_cast<char>(c);
+        else if(!out.empty() && out.back() != '-') out += '-';
     }
-    for(auto it = fs::recursive_directory_iterator(dir / "assets", ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
-        if(it->is_regular_file(ec)) add(ustr(fs::relative(it->path(), dir, ec)));
-    }
-    std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
-    return out;
+    while(!out.empty() && (out.back() == '-' || out.back() == '.')) out.pop_back();
+    while(!out.empty() && (out.front() == '-' || out.front() == '.')) out.erase(out.begin());
+    return out.empty() ? "project" : out;
 }
 
 // What else lies in a folder besides a project's own files and folders: a project wants a
@@ -602,7 +566,12 @@ std::string open_file_dialog(void* parent, const std::string& title, const std::
                                                  "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, nullptr);
     GtkFileFilter* f = gtk_file_filter_new();
     gtk_file_filter_set_name(f, desc.c_str());
-    gtk_file_filter_add_pattern(f, pattern.c_str());
+    for(size_t a = 0; a <= pattern.size();) {                    // "*.hmlproj;*.json"
+        size_t b = pattern.find(';', a);
+        if(b == std::string::npos) b = pattern.size();
+        if(b > a) gtk_file_filter_add_pattern(f, pattern.substr(a, b - a).c_str());
+        a = b + 1;
+    }
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dlg), f);
     if(!initial_dir.empty()) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dlg), initial_dir.c_str());
     std::string out;
@@ -621,7 +590,10 @@ std::string save_file_dialog(void* parent, const std::string& title, const std::
     wchar_t buf[4096] = {};
     std::wstring wname = widen(default_name);
     wcsncpy(buf, wname.c_str(), std::size(buf) - 1);
-    std::wstring filter = std::wstring(L"JSON") + L'\0' + L"*.json" + L'\0' + L"All files" + L'\0' + L"*.*" + L'\0' + L'\0';
+    // one file (<name>.hmlproj), or the folder form (project.json with screens/ and assets/ next to it)
+    const bool folder_form = default_name.size() > 5 && default_name.compare(default_name.size() - 5, 5, ".json") == 0;
+    std::wstring filter = std::wstring(L"HML project file (*.hmlproj)") + L'\0' + L"*.hmlproj" + L'\0' +
+                          L"Project folder (project.json)" + L'\0' + L"project.json" + L'\0' + L"All files" + L'\0' + L"*.*" + L'\0' + L'\0';
     std::wstring wtitle = widen(title), wdir = widen(initial_dir);
     OPENFILENAMEW ofn{};
     ofn.lStructSize = sizeof(ofn);
@@ -630,7 +602,8 @@ std::string save_file_dialog(void* parent, const std::string& title, const std::
     ofn.nMaxFile = static_cast<DWORD>(std::size(buf));
     ofn.lpstrFilter = filter.c_str();
     ofn.lpstrTitle = wtitle.c_str();
-    ofn.lpstrDefExt = L"json";
+    ofn.lpstrDefExt = folder_form ? L"json" : L"hmlproj";
+    ofn.nFilterIndex = folder_form ? 2 : 1;
     ofn.lpstrInitialDir = wdir.empty() ? nullptr : wdir.c_str();
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_EXPLORER;
     if(!GetSaveFileNameW(&ofn)) return {};
@@ -725,6 +698,15 @@ struct Host {
     json read_project(const std::string& path)
     {
         fs::path p = upath(path);
+        // <name>.hmlproj: everything below works on the unpacked copy; "path" stays the file the user opened
+        const bool archive = hml::is_project_archive(path);
+        const fs::path opened = p;
+        if(archive) {
+            std::string e;
+            fs::path work = hml::archive_work_dir(p);
+            if(!hml::unpack_project(p, work, &e)) return err(e);
+            p = work / "project.json";
+        }
         bool ok = false;
         std::string text = read_text(p, &ok);
         if(!ok) return err("cannot read " + path);
@@ -741,11 +723,12 @@ struct Host {
             }
         }
         json recent = settings.value("recent", json::array());
-        json nr = json::array({ ustr(p) });
-        for(const auto& r : recent) if(r.is_string() && r.get<std::string>() != ustr(p) && nr.size() < 10) nr.push_back(r);
+        json nr = json::array({ ustr(opened) });
+        for(const auto& r : recent) if(r.is_string() && r.get<std::string>() != ustr(opened) && nr.size() < 10) nr.push_back(r);
         settings["recent"] = nr;
         save_settings();
-        return json{ { "ok", true }, { "path", ustr(p) }, { "dir", ustr(dir) }, { "project", text }, { "screens", screens } };
+        return json{ { "ok", true }, { "path", ustr(opened) }, { "dir", ustr(dir) }, { "project", text }, { "screens", screens }, { "archive", archive },
+                     { "name", archive ? target_name(opened) : ustr(dir.filename()) } };
     }
 
     json write_files(const std::string& dir, const json& files)
@@ -852,7 +835,8 @@ struct Host {
         std::error_code ec;
         if(!fs::is_regular_file(t.proj, ec)) { t.error = "project.json not found (save the project first)"; return t; }
         t.dir = t.proj.parent_path();
-        t.pname = ustr(t.dir.filename());
+        t.pname = opt_str(o, "name");
+        if(t.pname.empty()) t.pname = ustr(t.dir.filename());
         if(t.remote.rfind("~/", 0) == 0) t.remote = t.remote.substr(2);
         while(t.remote.size() > 1 && t.remote.back() == '/') t.remote.pop_back();
         if(t.remote.empty() || t.remote == "~") t.remote = ".";
@@ -1098,6 +1082,52 @@ struct Host {
         return json{ { "ok", true }, { "settings", j } };
     }
 
+    // The working folder of a project file (created; emptied with `clean` when a new file is
+    // about to be saved there, so nothing of an older file with the same name survives).
+    json archive_dir(const std::string& archive, bool clean)
+    {
+        fs::path work = hml::archive_work_dir(upath(archive));
+        std::error_code ec;
+        if(clean) {
+            for(const auto& e : fs::directory_iterator(work, ec)) {
+                const std::string name = ustr(e.path().filename());
+                if(name == "logs" || name == "project.local.json") continue;
+                std::error_code rec;
+                fs::remove_all(e.path(), rec);
+            }
+        }
+        fs::create_directories(work, ec);
+        if(ec) return err("cannot create " + ustr(work));
+        return json{ { "ok", true }, { "dir", ustr(work) }, { "name", target_name(upath(archive)) } };
+    }
+
+    // Write the project in `dir` as the project file `archive`.
+    json pack_project(const std::string& dir, const std::string& archive)
+    {
+        std::string e;
+        if(!hml::pack_project(upath(dir), upath(archive), &e)) return err(e);
+        std::error_code ec;
+        return json{ { "ok", true }, { "bytes", fs::file_size(upath(archive), ec) } };
+    }
+
+    // "Save As" to another place: take the project's files along (images in assets/, script
+    // files ...). project.json and the screens are written by the page afterwards.
+    json copy_project_files(const std::string& from, const std::string& to)
+    {
+        fs::path src = upath(from), dst = upath(to);
+        std::error_code ec;
+        if(from.empty() || fs::equivalent(src, dst, ec)) return json{ { "ok", true }, { "copied", 0 } };
+        int n = 0;
+        for(const auto& [file, rel] : project_files(src)) {
+            fs::path out = dst / upath(rel);
+            fs::create_directories(out.parent_path(), ec);
+            fs::copy_file(file, out, fs::copy_options::overwrite_existing, ec);
+            if(ec) return err("cannot copy " + rel + ": " + ec.message());
+            n++;
+        }
+        return json{ { "ok", true }, { "copied", n } };
+    }
+
     void check_async(const std::string& id, const json& opts)
     {
         std::thread([this, id, opts] {
@@ -1298,13 +1328,13 @@ struct Host {
                 p = open_file_dialog(window(), "Choose the SSH private key", "All files", "*", dir);
             }
             else if(kind == "targetRuntime") p = open_file_dialog(window(), "Choose the hml_runtime built for the target (Linux)", "All files", "*", dir);
-            else p = open_file_dialog(window(), "Open project.json", "HML project (project.json)", "*.json", dir);
+            else p = open_file_dialog(window(), "Open a project", "HML project (*.hmlproj, project.json)", "*.hmlproj;*.json", dir);
             if(kind == "runtime" && !p.empty()) { settings["runtime"] = p; save_settings(); find_runtime(); }
             return json(p).dump();
         });
         w->bind("hml_saveDialog", [this, args_of, str](const std::string& req) {
             json a = args_of(req);
-            return json(save_file_dialog(window(), "Save project.json", str(a, 0).empty() ? "project.json" : str(a, 0), str(a, 1))).dump();
+            return json(save_file_dialog(window(), "Save the project", str(a, 0).empty() ? "project.hmlproj" : str(a, 0), str(a, 1))).dump();
         });
         w->bind("hml_pickImage", [this, args_of, str](const std::string& req) { return pick_image(str(args_of(req), 0)).dump(); });
         w->bind("hml_launch", [this, args_of, str](const std::string& req) { return launch(str(args_of(req), 0)).dump(); });
@@ -1334,6 +1364,18 @@ struct Host {
                 w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
             }).detach();
         }, nullptr);
+        w->bind("hml_archiveDir", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return archive_dir(str(a, 0), a.size() > 1 && a[1].is_boolean() && a[1].get<bool>()).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
+        w->bind("hml_packProject", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return pack_project(str(a, 0), str(a, 1)).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
+        w->bind("hml_copyProjectFiles", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return copy_project_files(str(a, 0), str(a, 1)).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
         w->bind("hml_folderInfo", [this, args_of, str](const std::string& req) {
             // what else is in the folder a project is about to be saved into
             json a = args_of(req);
@@ -1428,6 +1470,13 @@ int app_main(const std::vector<std::string>& args)
         }
         for(auto& [k, v] : deploy_opts.items()) o[k] = v;
         o["project"] = deploy_project;
+        if(hml::is_project_archive(deploy_project)) {              // a project file: deploy its unpacked copy under the file's name
+            fs::path work = hml::archive_work_dir(upath(deploy_project));
+            std::string e;
+            if(!hml::unpack_project(upath(deploy_project), work, &e)) { std::fprintf(stdout, "error: %s\n", e.c_str()); return 1; }
+            o["project"] = ustr(work / "project.json");
+            o["name"] = target_name(upath(deploy_project));
+        }
         if(!deploy_opts.contains("clearLocal")) o.erase("clearLocal");     // never from a remembered tick
         if(deploy_check) {                                                 // --check: look only, print the result as JSON
             json c = h.check(o);

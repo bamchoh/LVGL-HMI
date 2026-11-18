@@ -588,3 +588,33 @@ test('M.driverKey names drivers like the runtime does; local driver settings are
   deq(M.withLocalDriverSetting({ drivers: { PLC: { device: 'COM4' } } }, 'PLC', 'device', ''), {});
   deq(M.withLocalDriverSetting(null, 'PLC', 'device', ''), {});
 });
+
+// ---------------------------------------------------------------- project as one file
+test('project files: name helpers and where the files live', () => {
+  const { U, M } = load();
+  assert.equal(U.isProjectFile('D:/work/line1.hmlproj'), true);
+  assert.equal(U.isProjectFile('D:\work\LINE1.HMLPROJ'), true);
+  assert.equal(U.isProjectFile('D:/work/project.json'), false);
+  assert.equal(U.isProjectFile(''), false);
+  assert.equal(U.isProjectFile(null), false);
+  assert.equal(U.safeName('My Test HMI'), 'my-test-hmi');
+  assert.equal(U.safeName('  ライン 1 / Pump #2 '), '1-pump-2');
+  assert.equal(U.safeName('日本語', 'hmi-project'), 'hmi-project');
+  assert.equal(U.safeName('..hidden..'), 'hidden');
+
+  M.newProject('t', 480, 320);
+  assert.equal(M.runPath(), null);                               // not saved yet
+  assert.equal(M.st.archive, false);
+  // a folder project: the files are where project.json is
+  M.loadFromHost({ path: 'D:/p/line1/project.json', dir: 'D:/p/line1', project: '{"screens":[]}', screens: [], archive: false, name: 'line1' });
+  assert.equal(M.runPath(), 'D:/p/line1/project.json');
+  assert.equal(M.st.name, 'line1');
+  // a project file: the user's path is the file, the files are in its working folder
+  M.loadFromHost({ path: 'D:/p/line1.hmlproj', dir: 'C:/Users/x/AppData/Local/hml/work/line1-0123456789/', project: '{"screens":[]}', screens: [], archive: true, name: 'line1' });
+  assert.equal(M.st.path, 'D:/p/line1.hmlproj');
+  assert.equal(M.st.archive, true);
+  assert.equal(M.runPath(), 'C:/Users/x/AppData/Local/hml/work/line1-0123456789/project.json');
+  M.newProject('t', 480, 320);
+  assert.equal(M.st.archive, false);
+  assert.equal(M.st.name, '');
+});
