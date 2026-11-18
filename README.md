@@ -303,7 +303,9 @@ hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
 }
 ```
 
-- `tags[].type`: `bool` / `int` / `float` / `string`。`min` / `max` を付けると書き込み時にクランプされます。
+- `tags[].type`: `bool` / `int` / `float` / `string`。`min` / `max` を付けると、HMI 側からの書き込み（ウィジェット、アクション、スクリプト、OPC UA クライアント）が
+  その範囲に丸められます。機器（Modbus）から読んだ値は丸めず、機器が持っている値をそのまま表示します。
+  範囲外の値を読んだときは、タグごとに 1 回、警告をログに出します。
 - `screens` はファイルパス（project.json からの相対）か、画面オブジェクトを直接書けます。
 
 ### ドライバ: sim（シミュレーション）

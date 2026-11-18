@@ -333,6 +333,21 @@ TEST_CASE("Tag::set clamps numeric tags to their limits")
     }
 }
 
+TEST_CASE("Tag::set_from_device keeps values outside the limits (the limits restrict HMI writes only)")
+{
+    TagStore store;
+    Tag* t = store.create("t", TagType::Int, nullptr, true, 0, 100);
+    CHECK(t->set_number_from_device(1234, nullptr));
+    CHECK(t->get_number() == doctest::Approx(1234));
+    CHECK_FALSE(t->set_number_from_device(1234.2, nullptr));   // still coerced to the tag's type
+    t->set_number_from_device(-5, nullptr);
+    CHECK(t->get_number() == doctest::Approx(-5));
+    t->set_number(1234, nullptr);                              // a write from the HMI is clamped as before
+    CHECK(t->get_number() == doctest::Approx(100));
+    t->set_number_from_device(42, nullptr);
+    CHECK(t->get_number() == doctest::Approx(42));
+}
+
 TEST_CASE("Tag::set reports whether the stored value changed")
 {
     TagStore store;
