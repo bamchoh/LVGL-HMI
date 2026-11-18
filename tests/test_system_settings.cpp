@@ -2,6 +2,7 @@
 #include <doctest.h>
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
+#include "serial_ports.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
 
@@ -346,4 +347,72 @@ TEST_CASE("run_command and local_ip_addresses")
     run_command("exit 3", &rc);
     CHECK(rc == 3);
     CHECK_FALSE(local_ip_addresses().empty());
+}
+
+TEST_CASE("serial ports: listing and names of the other operating system")
+{
+    for(const SerialPortInfo& p : list_serial_ports()) {         // whatever this machine has: well-formed entries
+        CHECK_FALSE(p.device.empty());
+        CHECK(p.device.find(' ') == std::string::npos);
+        CHECK(serial_name_problem(p.device).empty());            // its own ports are never "of the other system"
+    }
+#ifdef _WIN32
+    CHECK(serial_name_problem("COM4").empty());
+    CHECK(serial_name_problem(R"(\\.\COM12)").empty());
+    std::string msg = serial_name_problem("/dev/ttyUSB0");
+    CHECK(msg.find("is a Linux port name") != std::string::npos);
+#else
+    CHECK(serial_name_problem("/dev/ttyUSB0").empty());
+    CHECK(serial_name_problem("/dev/serial/by-id/usb-FTDI_x-if00-port0").empty());
+    std::string msg = serial_name_problem("COM4");
+    CHECK(msg.find("is a Windows port name") != std::string::npos);
+    CHECK(serial_name_problem("com12").find("Windows") != std::string::npos);
+    CHECK(serial_name_problem("COMPUTER").empty());              // not COM<number>
+#endif
+    CHECK(msg.find("local settings") != std::string::npos);      // says where to set this machine's port
+    CHECK(serial_name_problem("").empty());
+}
+
+TEST_CASE("driver page: the serial port is picked from a list, the current name stays selectable")
+{
+    Runtime rt;
+    TempProject tp;
+    Project p;
+    REQUIRE(p.load(tp.write("project.json", R"json({
+        "tags": [ { "name": "x" } ], "key_management": { "enabled": false },
+        "drivers": [ { "type": "modbus_rtu", "device": "/dev/hml-not-there", "baud": 9600, "enabled": false, "map": [] } ]
+    })json")));
+    SystemSettings& sys = system_settings();
+    REQUIRE(sys.page("driver_modbus_rtu") != nullptr);
+    Tag* dev = tags().find("sys.driver_modbus_rtu.device");
+    Tag* opts = tags().find("sys.driver_modbus_rtu.device__options");
+    REQUIRE(dev);
+    REQUIRE(opts);
+    CHECK(dev->type() == TagType::Int);                          // a dropdown: the index of the option
+    CHECK(dev->get_number() == 0);
+    const std::string options = opts->get().str;
+    CHECK(options.rfind("/dev/hml-not-there", 0) == 0);          // what is configured comes first when no such port exists
+    REQUIRE(tags().find("sys.driver_modbus_rtu.device_ports"));
+    CHECK(tags().find("sys.driver_modbus_rtu.baud")->get_number() == doctest::Approx(9600));
+
+    // applying without a change stores nothing (the name still comes from project.json)
+    CHECK(sys.apply("driver_modbus_rtu") == "");
+    CHECK_FALSE(std::filesystem::exists(tp.dir / "project.local.json"));
+
+    // picking another port (if this machine has one) stores it in the local settings only
+    size_t nl = options.find('\n');
+    if(nl != std::string::npos) {
+        std::string second = options.substr(nl + 1, options.find('\n', nl + 1) - nl - 1);
+        dev->set_number(1, nullptr);
+        CHECK(sys.apply("driver_modbus_rtu") == "");
+        std::ifstream f(tp.dir / "project.local.json");
+        json overlay = json::parse(f);
+        f.close();
+        CHECK(overlay["drivers"]["modbus_rtu"]["device"] == second);
+        CHECK(overlay["drivers"]["modbus_rtu"].size() == 1);
+        CHECK(jstr(*p.driver_config("modbus_rtu"), "device", "") == second);
+        // ... and the list now starts with the ports, the selection follows the name
+        CHECK(tags().find("sys.driver_modbus_rtu.device__options")->get().str.find("/dev/hml-not-there") == std::string::npos);
+    }
+    drivers().stop_all();
 }

@@ -134,6 +134,17 @@ const Panels = {
     const body = U.el('div', { class: 'drv-form' });
     if (sch) {
       body.append(U.el('div', { class: 'drv-fields' }, ...Props.fields(d, sch.fields, fk)));
+      if (sch.fields.some(f => f.k === 'device')) {
+        // a serial port has another name on every machine: the project holds the target's,
+        // this PC keeps its own
+        const i = this.driverSel;
+        const here = U.el('input', { type: 'text', value: App.localDriverSetting(i, 'device'), placeholder: 'e.g. COM4 (empty: the same as device)', dataset: { fk: fk + '.local_device' },
+          disabled: !M.st.path, onchange: e => App.setLocalDriverSetting(i, 'device', e.target.value.trim()) });
+        body.append(U.el('div', { class: 'drv-fields' },
+          Props.row('device on this PC', here, 'the port to use when the project runs on this PC (Run / Preview). Kept on this PC (project.local.json), not deployed'),
+          U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', onclick: () => App.serialPortDialog(i) }, 'Find serial ports …'),
+            U.el('span', { class: 'dim' }, M.st.path ? 'lists the ports of the target and of this PC' : 'save the project first'))));
+      }
       if (sch.table) body.append(this.tableEditor(d, sch.table, fk));
     } else body.append(U.el('div', { class: 'hint' }, 'Unknown driver type; edit the JSON below.'));
     const raw = U.el('textarea', { rows: 12, class: 'mono', value: JSON.stringify(d, null, 2), onchange: e => {

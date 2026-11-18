@@ -27,6 +27,7 @@ struct SettingField {
     Type        type = Type::Text;
     std::string value;               // current value as text: "1"/"0" for Bool, the option text for Select
     std::vector<std::string> options;// Select
+    bool        live_options = false;// Select: the options can change while the runtime runs (ports that get plugged in)
     bool        password = false;    // Text
     int         decimals = 0;        // Number
     std::string unit;                // Number

@@ -436,8 +436,18 @@ void Binding::on_tag_changed(const Value& v, const void* source)
             if(auto c = map_color(v)) lv_obj_set_style_text_color(obj, *c, part);
             break;
         case BindKind::Options:
-            if(wk == Widget::Dropdown) lv_dropdown_set_options(obj, v.str.c_str());
-            else if(wk == Widget::Roller) lv_roller_set_options(obj, v.str.c_str(), LV_ROLLER_MODE_NORMAL);
+            // new options reset the selection: keep the selected index (the value binding only
+            // speaks up when its own tag changes)
+            if(wk == Widget::Dropdown) {
+                uint32_t sel = lv_dropdown_get_selected(obj);
+                lv_dropdown_set_options(obj, v.str.c_str());
+                lv_dropdown_set_selected(obj, sel < lv_dropdown_get_option_count(obj) ? sel : 0);
+            }
+            else if(wk == Widget::Roller) {
+                uint32_t sel = lv_roller_get_selected(obj);
+                lv_roller_set_options(obj, v.str.c_str(), LV_ROLLER_MODE_NORMAL);
+                lv_roller_set_selected(obj, sel < lv_roller_get_option_count(obj) ? sel : 0, LV_ANIM_OFF);
+            }
             break;
     }
 }

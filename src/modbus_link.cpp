@@ -22,6 +22,7 @@ static void sock_close(sock_t s) { close(s); }
 #endif
 
 #include "modbus_link.hpp"
+#include "serial_ports.hpp"
 #include "util.hpp"
 
 #include <cstring>
@@ -237,6 +238,7 @@ public:
     bool open() override
     {
         close();
+        if(std::string problem = serial_name_problem(s_.device); !problem.empty()) { error_ = problem; return false; }
         // "\\.\COM10" is needed above COM9 and works for all of them
         std::string name = s_.device.rfind("\\\\.\\", 0) == 0 ? s_.device : "\\\\.\\" + s_.device;
         HANDLE h = CreateFileA(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -294,6 +296,7 @@ private:
     bool open() override
     {
         close();
+        if(std::string problem = serial_name_problem(s_.device); !problem.empty()) { error_ = problem; return false; }
         int fd = ::open(s_.device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
         if(fd < 0) { error_ = "cannot open " + s_.device + ": " + std::strerror(errno); return false; }
         termios t{};

@@ -208,6 +208,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `--screenshot <file.bmp>`   | 起動後にスクリーンショットを保存（`tools/bmp2png.py` で PNG 化できます）                                          |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
 | `--stats <seconds>`          | メインループの負荷を指定秒ごとにログに出す（1 秒あたりの周回数、占有率、最長の 1 周の時間）。負荷の確認用 →「負荷の確認」 |
+| `--list-serial-ports`        | その機械のシリアルポートを一覧表示して終了（project.json は不要）→「ドライバ: modbus_rtu / modbus_ascii」 |
 | `--reload-after <ms>`       | 指定時間後にホットリロードを実行（テスト用）                                                                      |
 | `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
 | `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
@@ -470,6 +471,32 @@ hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
 | `unit_id`               | `1`                                     | 相手のユニット（スレーブ）番号。`map` の行ごとに `unit_id` で上書きできる |
 | `timeout_ms`            | `500`                                   | 応答を待つ時間                                                          |
 | `host` / `port`         |                                         | `device` を書かずにこちらを書くと、同じフレームを TCP で送る（シリアル–イーサネット変換器） |
+
+**シリアルポートの名前**
+
+ポートの名前は OS によって、また機械によって違います。`device` には、**そのプロジェクトを動かす機械（ターゲット）での名前**を書きます。
+
+| OS      | 名前の例                                                             | 備考                                                                 |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Linux   | `/dev/ttyUSB0`、`/dev/ttyACM0`、`/dev/ttyAMA0`                       | USB 変換器は挿した順に番号が付くので、2 本あると入れ替わることがある |
+| Linux   | `/dev/serial/by-id/usb-FTDI_USB_HS_SERIAL_CONVERTER_XXXX-if00-port0` | USB 変換器の「変わらない名前」。挿す順番や口を変えても同じ           |
+| Windows | `COM4`                                                               | 番号は PC ごとに決まる                                               |
+
+名前を調べる方法:
+
+- **装置の画面**: システム設定の Driver ページでは、`device` をその装置で見つかったポートの一覧から選べます。
+  ページを開いたときに調べ直すので、あとから挿した変換器も出ます。「ports found」に説明つきの一覧も表示されます。
+- **デザイナー**: ドライバ設定の **Find serial ports …** で、ターゲットのポート（Deploy の接続設定を使って調べます）と
+  この PC のポートを、説明つきで一覧表示します。ターゲットのポートを選ぶと `device` に、PC のポートを選ぶと下記の
+  「device on this PC」に入ります。
+- **コマンド**: `hml_runtime --list-serial-ports` が、その機械のポートを 1 行に 1 つ表示します
+  （`デバイス名 <TAB> 変わらない名前 <TAB> 説明`）。
+
+**同じプロジェクトを PC でも動かすとき**（デザイナーの Run / Preview など）は、プロジェクトを分ける必要はありません。
+PC でのポート名は、デザイナーのドライバ設定の **device on this PC** に書きます。これは PC 側の `project.local.json` に保存され、
+その PC で動かすときだけ `device` の代わりに使われます。デプロイでは送られないので、ターゲットには影響しません。
+
+別の OS の名前のまま動かした場合（Windows で `/dev/ttyUSB0` など）は、その旨と、その機械にあるポートの一覧がログに出ます。
 
 - 通信条件（ボーレート、データ長、パリティ、ストップビット）は相手の機器に合わせてください。
 - **1 本の回線に複数のユニットをつなげます**（RS-485）。`map` の行に `unit_id` を書くと、そのユニットに問い合わせます。
@@ -1105,6 +1132,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/driver_sim.cpp`           | シミュレーションドライバ                                                                            |
 | `src/driver_modbus.cpp`        | Modbus TCP クライアント（std::thread で別スレッド）                                                 |
 | `src/modbus_link.[ch]pp`       | Modbus の通信路（TCP / シリアルポート）とフレーム（MBAP / RTU の CRC-16 / ASCII の LRC）          |
+| `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |
