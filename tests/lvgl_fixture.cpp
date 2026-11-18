@@ -1,4 +1,5 @@
 #include "lvgl_fixture.hpp"
+#include "users.hpp"
 #include "project.hpp"
 #include "script.hpp"
 #include "system_settings.hpp"
@@ -63,6 +64,9 @@ Runtime::Runtime()
                                                [this](hml::RestartTarget t) { restart_requests++; last_restart = t; } });
     hml::system_settings().clear();
     hml::system_settings().register_actions();
+    hml::users().clear();
+    hml::users().set_clock(nullptr, nullptr);
+    hml::register_user_actions();
     drivers.register_builtins();
 }
 

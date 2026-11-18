@@ -71,6 +71,7 @@ private:
     ProjectInfo info_;
     json        root_;
     json        base_drivers_;         // "drivers" of project.json before the overlay
+    json        local_users_;          // "users" of project.local.json (users edited on the device)
 };
 
 Project& project();

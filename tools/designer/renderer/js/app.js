@@ -264,6 +264,9 @@ const App = {
         info.append(...list('Changed (' + fl.changed.length + '):', fl.changed), ...list('New (' + fl.added.length + '):', fl.added),
           ...list('Only on the target, not removed by a deploy (' + fl.extra.length + '):', fl.extra));
       }
+      if (r.localUsers) info.append(U.el('div', { class: f.clearLocal.checked ? 'hint' : 'warn' }, f.clearLocal.checked
+        ? 'The ' + r.localUsers + ' user(s) edited on the target will be removed by this deploy; the project\'s users take effect.'
+        : 'Users were edited on the target (' + r.localUsers + ' user(s)): they stay in effect after a deploy, the project\'s user list is not used there.'));
       if (st.dirty) info.append(U.el('div', { class: 'hint' }, 'Unsaved changes are not part of this comparison (Deploy saves first).'));
     };
     const runCheck = async () => {
@@ -380,7 +383,7 @@ const App = {
     if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
     if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
     if (ctrl && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProjectDialog(); return; }
-    if (ctrl && /^[12345]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs'][Number(e.key) - 1]); return; }
+    if (ctrl && /^[123456]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs', 'users'][Number(e.key) - 1]); return; }
     if (ctrl && e.key.toLowerCase() === 'z' && !inInput) { e.preventDefault(); if (e.shiftKey) M.redo(); else M.undo(); return; }
     if (ctrl && e.key.toLowerCase() === 'y' && !inInput) { e.preventDefault(); M.redo(); return; }
     if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') document.getElementById('modal').hidden = true; return; }

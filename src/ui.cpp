@@ -2,6 +2,7 @@
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
+#include "users.hpp"
 #include "util.hpp"
 #include <algorithm>
 #include <cmath>
@@ -513,6 +514,16 @@ struct ActionList {
     std::vector<Action> actions;
 };
 
+// "level": N on a widget: only users of that level may operate it. What the others get:
+//   "level_deny": "disable" (default) | "hide" | "login" (looks normal, a touch opens the login screen)
+struct AccessRule {
+    enum class Deny { Disable, Hide, Login };
+    lv_obj_t* obj = nullptr;
+    int       level = 0;
+    Deny      deny = Deny::Disable;
+    bool      base_disabled = false, base_hidden = false;    // as the screen file says, without the rule
+};
+
 struct ChartCtx {
     struct Series { lv_chart_series_t* ser; Tag* tag; double scale; };
     lv_obj_t*           chart = nullptr;
@@ -529,6 +540,7 @@ struct ChartCtx {
 
 struct Screen {
     std::string name;
+    int         level = 0;            // "level": minimum user level to see the screen
     lv_obj_t*   obj = nullptr;
     lv_obj_t*   keyboard = nullptr;   // optional on-screen keyboard
     lv_obj_t*   kb_echo = nullptr;    // shows the edited text next to the keyboard when it hides the field
@@ -607,6 +619,7 @@ struct Ui::Impl {
     std::deque<int>                          history;
     std::vector<std::unique_ptr<Binding>>    bindings;
     std::vector<std::unique_ptr<ActionList>> action_lists;
+    std::vector<std::unique_ptr<AccessRule>> access_rules;
     std::vector<std::unique_ptr<ChartCtx>>   charts;
     std::vector<std::unique_ptr<std::vector<lv_point_precise_t>>> line_points;   // must outlive lv_line objects
     std::vector<std::unique_ptr<std::string>>  owned_strings;  // textarea accepted_chars: LVGL stores the pointer only
@@ -619,7 +632,7 @@ struct Ui::Impl {
     BindOpts      bind_opts;          // for the widget currently being built
     std::map<std::string, std::function<void(const std::string&)>> named_actions;
 
-    Screen* find_screen(const std::string& name)
+    Screen* find_screen(const std::string& name) const
     {
         for(auto& s : screens) if(s->name == name) return s.get();
         return nullptr;
@@ -628,8 +641,33 @@ struct Ui::Impl {
     // ---- events (LVGL -> C++) ----
     static void on_widget_value_changed(lv_event_t* e)
     {
-        static_cast<Binding*>(lv_event_get_user_data(e))->on_widget_changed(lv_event_get_target_obj(e));
+        Binding* b = static_cast<Binding*>(lv_event_get_user_data(e));
+        if(ui().impl_->denied(lv_event_get_target_obj(e))) { b->on_tag_changed(b->tag->get(), nullptr); return; }   // show the tag again
+        b->on_widget_changed(lv_event_get_target_obj(e));
     }
+    // ---- access ("level") ----
+    const AccessRule* rule_of(lv_obj_t* obj) const
+    {
+        for(const auto& r : access_rules) if(r->obj == obj) return r.get();
+        return nullptr;
+    }
+    bool denied(lv_obj_t* obj) const
+    {
+        const AccessRule* r = rule_of(obj);
+        return r && !users().allowed(r->level);
+    }
+    // Before the widget itself sees the press: a user who may not operate it gets no click, no
+    // drag, no edit; with "level_deny": "login" the login screen opens.
+    static void on_access_press(lv_event_t* e)
+    {
+        const AccessRule* r = static_cast<const AccessRule*>(lv_event_get_user_data(e));
+        if(users().allowed(r->level)) return;
+        if(lv_indev_t* indev = lv_indev_active()) lv_indev_wait_release(indev);
+        lv_event_stop_processing(e);
+        if(r->deny == AccessRule::Deny::Login) users().request_login(r->level);
+    }
+    void parse_access(lv_obj_t* obj, const json& w);
+    void apply_access(const AccessRule& r);
     static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
     {
         Binding* b = static_cast<Binding*>(lv_event_get_user_data(e));
@@ -777,7 +815,7 @@ struct Ui::Impl {
     void build_children(lv_obj_t* parent, const json& w);
     lv_obj_t* build_widget(lv_obj_t* parent, const json& w);
 
-    bool show_screen(const std::string& name, const std::string& anim);
+    bool show_screen(const std::string& name, const std::string& anim, bool replace = false);
 };
 
 // ---------------------------------------------------------------- bindings
@@ -942,7 +980,8 @@ void Ui::Impl::run_actions(const ActionList& list)
             case ActionKind::Exit:   oplog.record("system", "exit"); if(app.request_exit) app.request_exit(); break;
             case ActionKind::Restart: oplog.record("system", "restart"); if(app.request_restart) app.request_restart(a.restart); break;
             case ActionKind::Call: {
-                oplog.record("call", a.fn, "", a.arg);
+                // not the login screen's keys (they would spell the PIN); users.cpp records logins itself
+                if(a.fn.rfind("user.", 0) != 0) oplog.record("call", a.fn, "", a.arg);
                 auto it = named_actions.find(a.fn);
                 if(it == named_actions.end()) HML_WARN("call: unknown action '%s'", a.fn.c_str());
                 else it->second(a.arg);
@@ -959,7 +998,39 @@ void Ui::Impl::run_actions(const ActionList& list)
 
 void Ui::Impl::on_action_event(lv_event_t* e)
 {
+    if(ui().impl_->denied(lv_event_get_current_target_obj(e))) return;
     ui().impl_->run_actions(*static_cast<ActionList*>(lv_event_get_user_data(e)));
+}
+
+void Ui::Impl::parse_access(lv_obj_t* obj, const json& w)
+{
+    int level = static_cast<int>(jnum(w, "level", 0));
+    if(level <= 0) return;
+    auto r = std::make_unique<AccessRule>();
+    r->obj = obj;
+    r->level = level;
+    std::string deny = jstr(w, "level_deny", "disable");
+    if(iequals(deny, "hide")) r->deny = AccessRule::Deny::Hide;
+    else if(iequals(deny, "login")) r->deny = AccessRule::Deny::Login;
+    else if(!iequals(deny, "disable")) HML_WARN("level_deny: unknown value '%s' (disable | hide | login)", deny.c_str());
+    r->base_disabled = lv_obj_has_state(obj, LV_STATE_DISABLED);
+    r->base_hidden = lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(obj, &Impl::on_access_press, static_cast<lv_event_code_t>(LV_EVENT_PRESSED | LV_EVENT_PREPROCESS), r.get());
+    apply_access(*r);
+    access_rules.push_back(std::move(r));
+}
+
+void Ui::Impl::apply_access(const AccessRule& r)
+{
+    const bool ok = users().allowed(r.level);
+    if(r.deny == AccessRule::Deny::Disable) {
+        if(!ok) lv_obj_add_state(r.obj, LV_STATE_DISABLED);
+        else if(!r.base_disabled) lv_obj_remove_state(r.obj, LV_STATE_DISABLED);
+    }
+    else if(r.deny == AccessRule::Deny::Hide) {
+        if(!ok) lv_obj_add_flag(r.obj, LV_OBJ_FLAG_HIDDEN);
+        else if(!r.base_hidden) lv_obj_remove_flag(r.obj, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 std::optional<Action> Ui::Impl::parse_action(const json& j)
@@ -976,6 +1047,11 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
     if(iequals(*kind, "back")) { a.kind = ActionKind::Back; return a; }
     if(iequals(*kind, "reload")) { a.kind = ActionKind::Reload; return a; }
     if(iequals(*kind, "exit")) { a.kind = ActionKind::Exit; return a; }
+    if(iequals(*kind, "login") || iequals(*kind, "logout")) {   // user management (users.hpp)
+        a.kind = ActionKind::Call;
+        a.fn = iequals(*kind, "login") ? "user.login" : "user.logout";
+        return a;
+    }
     if(iequals(*kind, "system")) {                       // open the built-in system settings menu
         a.kind = ActionKind::Goto;
         a.screen = "__system";
@@ -1348,19 +1424,24 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     apply_common(obj, w);
     parse_bindings(obj, text_obj, wk, w);
     parse_actions(obj, w);
+    parse_access(obj, w);
     build_children(obj, w);
     return obj;
 }
 
 // ---------------------------------------------------------------- screens
 
-bool Ui::Impl::show_screen(const std::string& name, const std::string& anim)
+bool Ui::Impl::show_screen(const std::string& name, const std::string& anim, bool replace)
 {
     Screen* scr = find_screen(name);
     if(!scr) { HML_WARN("goto: unknown screen '%s'", name.c_str()); return false; }
     int idx = 0;
     while(screens[static_cast<size_t>(idx)].get() != scr) idx++;
     if(idx == current) return true;
+    if(!users().allowed(scr->level)) {                       // log in first, then continue to it
+        users().request_login(scr->level, name, anim);
+        return false;
+    }
 
     lv_obj_t* prev = lv_screen_active();
     bool prev_is_ours = false;
@@ -1368,8 +1449,10 @@ bool Ui::Impl::show_screen(const std::string& name, const std::string& anim)
 
     std::string left;
     if(current >= 0) {
-        if(history.size() == kHistoryLen) history.pop_front();
-        history.push_back(current);
+        if(!replace) {
+            if(history.size() == kHistoryLen) history.pop_front();
+            history.push_back(current);
+        }
         left = screens[static_cast<size_t>(current)]->name;
     }
     current = idx;
@@ -1426,6 +1509,7 @@ lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)
 
     auto scr = std::make_unique<Screen>();
     scr->name = *name;
+    scr->level = std::max(0, static_cast<int>(jnum(screen, "level", 0)));
     scr->obj = lv_obj_create(nullptr);
     m.building = scr.get();
 
@@ -1455,20 +1539,40 @@ void Ui::unload_all()
     m.screens.clear();
     m.bindings.clear();
     m.action_lists.clear();
+    m.access_rules.clear();
     m.line_points.clear();
     m.owned_strings.clear();
     m.current = -1;
     m.history.clear();
 }
 
-bool Ui::show_screen(const std::string& name, const std::string& anim)
+bool Ui::show_screen(const std::string& name, const std::string& anim, bool replace)
 {
-    return impl_->show_screen(name, anim);
+    return impl_->show_screen(name, anim, replace);
+}
+
+void Ui::clear_history() { impl_->history.clear(); }
+
+int Ui::screen_level(const std::string& name) const
+{
+    const Screen* s = impl_->find_screen(name);
+    return s ? s->level : 0;
+}
+
+void Ui::refresh_access()
+{
+    for(const auto& r : impl_->access_rules) impl_->apply_access(*r);
 }
 
 bool Ui::back()
 {
     Impl& m = *impl_;
+    // screens the current user may not see (any more) are skipped
+    while(!m.history.empty()) {
+        int top = m.history.back();
+        if(top >= 0 && static_cast<size_t>(top) < m.screens.size() && users().allowed(m.screens[static_cast<size_t>(top)]->level)) break;
+        m.history.pop_back();
+    }
     if(m.history.empty()) return false;
     int idx = m.history.back();
     m.history.pop_back();

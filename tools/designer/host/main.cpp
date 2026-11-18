@@ -883,6 +883,11 @@ struct Host {
             }
         }
 
+        // users edited on the target (System > Users) replace the project's list there
+        if(overlay.is_object() && overlay.contains("users") && overlay["users"].is_object() && overlay["users"].contains("list") &&
+           overlay["users"]["list"].is_array())
+            res["localUsers"] = overlay["users"]["list"].size();
+
         // ---- files
         std::vector<std::pair<std::string, std::string>> remote_sums;   // <path, "crc size">
         std::istringstream lines(section("HML_SUMS"));

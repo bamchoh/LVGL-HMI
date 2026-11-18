@@ -2,6 +2,7 @@
 #include "project.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 #include "util.hpp"
 #include "lvgl.h"
 
@@ -307,8 +308,10 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                                    { "style_label", { { "font", font + 2 } } },
                                    { "on_click", { { "action", "goto" }, { "screen", page_screen(p->id()) }, { "anim", "slide_left" } } } });
     }
+    // with user management the whole of the system settings asks for a level ("users.system_level")
+    const int level = users().system_level();
     out.push_back(json{
-        { "name", menu_screen() }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
+        { "name", menu_screen() }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
         { "children", json::array({
             header("System", json{ { "action", "back" } }),
             json{ { "type", "panel" }, { "x", 8 }, { "y", header_h + 8 }, { "w", width - 16 }, { "h", height - header_h - 16 },
@@ -365,7 +368,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                                  { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", id } } } });
         }
         out.push_back(json{
-            { "name", page_screen(id) }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
+            { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
             { "children", json::array({
                 header(p->title(), json{ { "action", "back" } }),   // pop the history: menu, then the caller
                 json{ { "type", "panel" }, { "x", 8 }, { "y", header_h + 8 }, { "w", width - 16 }, { "h", height - header_h - 16 },
@@ -675,6 +678,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     s.clear();
     s.add_page(make_about_page(proj));
     s.add_page(make_network_page());
+    if(auto up = make_users_page()) s.add_page(std::move(up));
     if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
 }

@@ -498,3 +498,73 @@ test('M logs: data log / alarms / operation log sections', () => {
   for (const t of ['interval', 'change', 'tag', 'manual']) assert.ok(SCHEMA.dataLogTriggers.includes(t));
   for (const c of ['true', 'false', 'eq', 'ne', 'gt', 'lt', 'ge', 'le']) assert.ok(SCHEMA.alarmConditions.includes(c));
 });
+
+// ---------------------------------------------------------------- users
+test('U.sha256hex matches the reference values', () => {
+  const { U } = load();
+  assert.equal(U.sha256hex(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  assert.equal(U.sha256hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  assert.equal(U.sha256hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq'), '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+  const crypto = require('node:crypto');
+  for (const t of ['s1:1234', 'x'.repeat(55), 'x'.repeat(56), 'x'.repeat(64), 'x'.repeat(1000), '日本語'])
+    assert.equal(U.sha256hex(t), crypto.createHash('sha256').update(t, 'utf8').digest('hex'), t.slice(0, 10));
+});
+
+test('M users: section, PIN hashes, warnings', () => {
+  const { M, U } = load();
+  M.newProject('t', 480, 320);
+  assert.equal(M.usersOn(), false);
+  deq(M.userProblems(), []);
+  M.setUsers(true);
+  assert.equal(M.usersOn(), true);
+  deq(M.st.project.users.levels, ['Operator', 'Maintenance', 'Admin']);
+  deq(M.userProblems(), ['no user is defined: nobody can log in']);
+
+  M.addUser(); M.addUser();
+  deq(M.st.project.users.list.map(u => u.name), ['user1', 'user2']);
+  assert.ok(M.userProblems().some(w => w.includes('"user1" has no PIN')));
+  assert.equal(M.validPin('1234'), true);
+  assert.equal(M.validPin('123'), false);
+  assert.equal(M.validPin('12a4'), false);
+  assert.equal(M.validPin('123456789'), false);
+  assert.equal(M.setUserPin(0, '12'), false);
+  assert.equal(M.setUserPin(0, '1234'), true);
+  const u0 = M.st.project.users.list[0];
+  assert.equal(u0.pin, undefined);
+  const [salt, hash] = u0.pin_hash.split('$');
+  assert.equal(salt.length, 16);
+  assert.equal(hash, U.sha256hex(salt + ':1234'));              // what the runtime checks
+  assert.equal(JSON.stringify(M.st.project).includes('1234'), false);
+  assert.equal(M.hashPin('1234', 'abcd'), 'abcd$' + U.sha256hex('abcd:1234'));
+
+  // nobody at the system level (default: the highest) yet
+  M.setUserPin(1, '5678');
+  assert.ok(M.userProblems().some(w => w.includes('no user has level 3')));
+  M.mutate(() => { M.st.project.users.list[1].level = 3; });
+  deq(M.userProblems(), []);
+  M.mutate(() => { M.st.project.users.list[1].name = 'USER1'; });
+  assert.ok(M.userProblems().some(w => w.includes('defined twice')));
+  M.mutate(() => { M.st.project.users.list[1].name = 'bad$'; });
+  assert.ok(M.userProblems().some(w => w.includes('a name is 1 to 16')));
+  M.mutate(() => { M.st.project.users.list[1].name = 'admin'; M.st.project.users.system_level = 0; M.st.project.users.list[1].level = 1; });
+  deq(M.userProblems(), []);                                     // system_level 0: no restriction, nobody needed
+
+  // switching off keeps the users; switching on again brings them back
+  M.setUsers(false);
+  assert.equal(M.st.project.users.enabled, false);
+  assert.equal(M.usersOn(), false);
+  M.setUsers(true);
+  assert.equal(M.st.project.users.enabled, undefined);
+  assert.equal(M.st.project.users.list.length, 2);
+  M.removeUser(0); M.removeUser(0);
+  M.mutate(() => { delete M.st.project.users.system_level; });
+  M.setUsers(false);
+  assert.equal(M.st.project.users, undefined);                   // nothing worth keeping
+});
+
+test('schema: login / logout actions and the access properties exist', () => {
+  const { SCHEMA } = load();
+  deq(SCHEMA.actions.login, []);
+  deq(SCHEMA.actions.logout, []);
+  deq(SCHEMA.access.map(f => f.k), ['level', 'level_deny']);
+});

@@ -10,6 +10,11 @@ const SCHEMA = {
   tagTypes: ['bool', 'int', 'float', 'string'],
   // project scripts (Lua, src/script.cpp): when a script runs. 'manual' = only from a script action / run()
   dataLogTriggers: ['interval', 'change', 'tag', 'manual'],
+  // "level": N on a widget: what users below that level get
+  levelDeny: ['', 'disable', 'hide', 'login'],
+  // access control of a widget / a screen (needs "users" in the project)
+  access: [{ k: 'level', t: 'number', hint: 'minimum user level to operate this (0 / empty = everybody). Levels are defined on the Users tab' },
+           { k: 'level_deny', t: 'select', o: ['', 'disable', 'hide', 'login'], empty: 'disable', hint: 'for users below the level: disable (greyed out), hide, or login (looks normal; a touch opens the login screen)' }],
   alarmConditions: ['true', 'false', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'],
   alarmSeverities: ['warning', 'critical', 'info'],
   scriptTriggers: ['manual', 'startup', 'interval', 'tag', 'screen_show', 'screen_hide'],
@@ -103,6 +108,7 @@ const SCHEMA = {
     back:   [], reload: [], exit: [],
     restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
     system: [{ k: 'anim', t: 'anim' }],
+    login:  [], logout: [],                        // user management: open the login screen / log out
     call:   [{ k: 'fn', t: 'text' }, { k: 'arg', t: 'text' }],
     script: [{ k: 'name', t: 'script' }, { k: 'code', t: 'code' }],   // a project script by name, or inline Lua
   },

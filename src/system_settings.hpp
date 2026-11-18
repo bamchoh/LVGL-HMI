@@ -101,6 +101,8 @@ std::unique_ptr<SettingsPage> make_network_page();
 // SSH key management (system_keys.cpp): "key_management": { "enabled", "port", "file" } in
 // project.json. Shown by default on the Linux console backends only.
 std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
+// Users of the device (system_users.cpp); only with "users" in project.json.
+std::unique_ptr<SettingsPage> make_users_page();
 void add_driver_pages(SystemSettings& s, Project& proj);
 void register_builtin_pages(SystemSettings& s, Project& proj);
 

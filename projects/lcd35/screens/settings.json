@@ -1,5 +1,6 @@
 {
   "name": "settings",
+  "level": 2,
   "scrollable": false,
   "style": { "bg_color": "#141a22", "pad": 0 },
   "children": [
@@ -11,7 +12,7 @@
           "on_click": { "action": "back" } },
         { "type": "label", "text": "Settings", "align": "center", "style": { "font": 18, "text_color": "#ffffff" } },
         { "type": "label", "align": "right_mid", "style": { "text_color": "#9fb3c8", "font": 12 },
-          "bind": { "text": { "tag": "operator", "format": "Operator: %s" } } }
+          "clickable": true, "on_click": { "action": "login" }, "bind": { "text": { "tag": "sys.user.name", "format": "User: %s" } } }
       ]
     },
 
