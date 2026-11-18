@@ -1,5 +1,6 @@
 #include <doctest.h>
 #include "lvgl_fixture.hpp"
+#include "active_project.hpp"
 #include "project.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
@@ -413,4 +414,56 @@ TEST_CASE("screens are built when first shown, the rest in the background after 
     rt.pump();
     REQUIRE(ui().show_screen("a", "none"));
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(lv_screen_active(), 0))) == "9");
+}
+
+TEST_CASE("active_project: a deployed runtime runs the project named next to it")
+{
+    TempProject tp;                                             // stands for the target's folder (~/hml)
+    const std::string dir = tp.dir.generic_string();
+    fs::create_directories(tp.dir / "projects" / "a");
+    fs::create_directories(tp.dir / "projects" / "b");
+    const std::string a = tp.write("projects/a/project.json", "{}"), b = tp.write("projects/b/project.json", "{}");
+    std::string note;
+
+    // nothing named: the command line decides
+    CHECK(resolve_active_project(dir, a, &note) == a);
+    CHECK(note.empty());
+
+    // another project is named: it wins, and the log says so
+    tp.write("active_project", "projects/b/project.json\n");
+    CHECK(fs::equivalent(resolve_active_project(dir, a, &note), b));
+    CHECK(note.find("instead of") != std::string::npos);
+    // the same one as the command line: nothing to say
+    CHECK(fs::equivalent(resolve_active_project(dir, b, &note), b));
+    CHECK(note.empty());
+    tp.write("active_project", "  projects/a/project.json  \r\n(second line ignored)\n");
+    CHECK(fs::equivalent(resolve_active_project(dir, b, &note), a));
+
+    // names that must not be followed: outside the folder, absolute, missing
+    for(const char* bad : { "../elsewhere/project.json", "projects/../../x/project.json", "/etc/passwd", "C:/Windows/win.ini", "projects/none/project.json" }) {
+        tp.write("active_project", bad);
+        CAPTURE(bad);
+        CHECK(resolve_active_project(dir, a, &note) == a);
+        CHECK(note.find("ignored") != std::string::npos);
+    }
+    tp.write("active_project", "\n");
+    CHECK(resolve_active_project(dir, a, &note) == a);
+    CHECK(note.empty());
+
+    // the runtime records what it loaded, relative to the folder
+    note_running_project(dir, b);
+    std::ifstream f(tp.dir / "running_project");
+    std::string line;
+    std::getline(f, line);
+    f.close();
+    CHECK(line == "projects/b/project.json");
+
+    // not the deployed layout (no "projects" folder next to the executable): the file is not even looked at
+    TempProject dev;
+    dev.write("active_project", "projects/b/project.json");
+    const std::string p = dev.write("project.json", "{}");
+    CHECK(resolve_active_project(dev.dir.generic_string(), p, &note) == p);
+    note_running_project(dev.dir.generic_string(), p);
+    CHECK_FALSE(fs::exists(dev.dir / "running_project"));
+    CHECK(resolve_active_project("", p, &note) == p);
 }

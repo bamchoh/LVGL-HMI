@@ -19,6 +19,7 @@ const host = {
   deploy: o => host.call('hml_deploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
   serialPorts: o => host.call('hml_serialPorts', o || {}),
+  folderInfo: dir => host.call('hml_folderInfo', dir || ''),
   localSettings: (p, o) => host.call('hml_localSettings', p || '', o || null),
   keyInfo: o => host.call('hml_keyInfo', o),
   keySend: o => host.call('hml_keySend', o),
@@ -167,7 +168,9 @@ const App = {
     const st = M.st;
     if (!st.project) return false;
     if (!st.path || as) {
-      const p = await host.saveDialog('project.json', st.dir || '');
+      let p = await host.saveDialog('project.json', st.dir || '');
+      if (!p) return false;
+      p = await this.ownFolder(p);
       if (!p) return false;
       st.path = p; st.dir = U.dirname(p);
     }
@@ -178,6 +181,33 @@ const App = {
     this.refresh();
     this.toast('saved ' + st.path, 1500);
     return true;
+  },
+  // A project is its folder (project.json, screens/, assets/), and the folder's name is the
+  // project's name on the target. Saving into a folder that already holds other things mixes
+  // the two up: offer a folder of its own. Returns the path to save to, or null (cancelled).
+  async ownFolder(path) {
+    const dir = U.dirname(path);
+    const info = await host.folderInfo(dir);
+    if (!info || !info.ok || !info.others) return path;
+    const base = (String((M.st.project && M.st.project.title) || '').replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '') || 'hmi-project').toLowerCase();
+    const name = U.el('input', { type: 'text', value: base, spellcheck: false });
+    const body = U.el('div', { class: 'deploy' },
+      U.el('div', { class: 'warn' }, 'This folder already contains ' + info.others + ' other item(s): ' + info.names.join(', ') + (info.others > info.names.length ? ', …' : '')),
+      U.el('div', { class: 'hint' }, 'A project should have a folder of its own: project.json, screens/ and assets/ are created in it, and its name is the name of the project on the target.'),
+      U.el('div', { class: 'row' }, U.el('label', null, 'new folder'), name),
+      U.el('div', { class: 'hint' }, 'Letters, digits, . _ - only (it is also used as the folder name on the target).'));
+    return new Promise(resolve => {
+      let done = false;
+      const finish = v => { if (!done) { done = true; resolve(v); } };
+      this.modal({ title: 'Save the project in its own folder?', body, buttons: [
+        { label: 'Cancel', onclick: () => finish(null) },
+        { label: 'Save here anyway', onclick: () => finish(path) },
+        { label: 'Create the folder', primary: true, onclick: () => {
+          const n = name.value.trim();
+          if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(n)) { this.toast('folder name: letters, digits, . _ - (not starting with . or -)'); return false; }
+          finish(dir.replace(/[\\/]+$/, '') + '/' + n + '/project.json');
+        } }] });
+    });
   },
   async pickImage() {
     if (!M.st.dir) { this.toast('save the project first (images are copied into its assets/ folder)'); return null; }
@@ -267,7 +297,7 @@ const App = {
     const all = (saved.deploy && typeof saved.deploy === 'object' && !Array.isArray(saved.deploy)) ? saved.deploy : {};
     const rts = this.info.targetRuntimes || [];
     const found = rts.find(p => /aarch64|arm/i.test(p)) || rts[0] || '';   // a Raspberry Pi build first
-    const d = Object.assign({ host: '', user: '', port: 22, key: '', remoteDir: 'hml', runtime: '', sendRuntime: false, restart: true },
+    const d = Object.assign({ host: '', user: '', port: 22, key: '', remoteDir: 'hml', runtime: '', sendRuntime: false, restart: true, activate: true },
       all['*'] || {}, (st.path && all[st.path]) || {});
     const text = (v, ph, cls) => U.el('input', { type: 'text', value: v || '', placeholder: ph || '', class: cls || '', spellcheck: false });
     const check = v => U.el('input', { type: 'checkbox', checked: !!v });
@@ -276,6 +306,7 @@ const App = {
       port: U.el('input', { type: 'number', value: d.port || 22, min: 1, max: 65535, class: 'short' }),
       key: text(d.key, 'default key (~/.ssh/id_*)'), remoteDir: text(d.remoteDir, 'hml'),
       sendRuntime: check(d.sendRuntime), runtime: text(d.runtime || found, 'hml_runtime built for the target (Linux)'), restart: check(d.restart !== false),
+      activate: check(d.activate !== false),
     };
     const row = (label, ...c) => U.el('div', { class: 'row' }, U.el('label', null, label), ...c);
     const browse = (kind, inp) => U.el('button', { class: 'mini', onclick: async () => { const p = await host.openDialog(kind, U.dirname(inp.value || '')); if (p) { inp.value = p; update(); } } }, '…');
@@ -295,8 +326,9 @@ const App = {
       const state = !r.exists ? 'This project has not been deployed to ' + r.target + ' yet.'
         : !r.running ? 'hml_runtime is not running on the target.'
         : r.runsThis ? 'The target is running this project.'
-        : 'The target is running another project: ' + r.running;
-      info.append(U.el('div', { class: r.exists && r.running && !r.runsThis ? 'warn' : 'hint' }, state));
+        : 'The target is running another project: ' + (r.runningProject || r.running)
+          + (f.activate.checked ? '. This deploy switches it to this project.' : '. "run on target" is not ticked: it will keep running that one.');
+      info.append(U.el('div', { class: r.exists && r.running && !r.runsThis && !f.activate.checked ? 'warn' : 'hint' }, state));
       if (!r.exists) return;
       const diff = r.local.filter(x => !x.same), same = r.local.length - diff.length;
       info.append(U.el('h4', null, 'Local settings on the target'));
@@ -349,16 +381,19 @@ const App = {
         U.el('button', { class: 'mini', title: 'Register this key on the target (the target\'s screen must be in key management mode: System > Keys)', onclick: () => registerKey() }, 'Register…')),
       row('remote folder', f.remoteDir),
       row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
+      row('run on target', f.activate, U.el('span', { class: 'dim' }, 'make this the project the target shows (it keeps doing so after a reboot)')),
       row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing')),
       row('local settings', f.clearLocal, U.el('span', { class: 'dim' }, 'remove the settings changed on the target (project.local.json)')),
       dest,
       U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.'),
       out, info);
     f.clearLocal.addEventListener('input', renderCheck);
+    f.activate.addEventListener('input', renderCheck);
     update();
     const values = () => ({
       host: f.host.value.trim(), user: f.user.value.trim(), port: Number(f.port.value) || 22, key: f.key.value.trim(),
       remoteDir: f.remoteDir.value.trim() || 'hml', runtime: f.runtime.value.trim(), sendRuntime: f.sendRuntime.checked, restart: f.restart.checked,
+      activate: f.activate.checked,
     });
     let busy = false;
     // Register the key on a target that does not know it yet (a new PC, a lost key): the target
