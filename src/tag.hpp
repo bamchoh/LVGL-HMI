@@ -10,6 +10,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace hml {
@@ -107,6 +108,7 @@ private:
     friend class Tag;
     mutable std::mutex mutex_;
     std::vector<std::unique_ptr<Tag>> tags_;
+    std::unordered_map<std::string, Tag*> index_;      // by name: find() is used for every binding and every script access
 };
 
 TagStore& tags();
