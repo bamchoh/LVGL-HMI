@@ -380,3 +380,37 @@ TEST_CASE("the global project() is a singleton and unload clears it")
     project().unload();
     CHECK(project().build_screens() == 1);   // the file is re-read, so screens still build
 }
+
+TEST_CASE("screens are built when first shown, the rest in the background after startup")
+{
+    Runtime rt;
+    TempProject tp;
+    fs::create_directories(tp.dir / "screens");
+    Project p;
+    REQUIRE(p.load(tp.project(R"json({
+        "start_screen": "b", "key_management": { "enabled": false },
+        "tags": [ { "name": "x", "type": "int", "init": 7 } ],
+        "screens": [
+            { "name": "a", "children": [ { "type": "label", "bind": { "text": { "tag": "x", "format": "%d" } } } ] },
+            { "name": "b", "children": [ { "type": "label", "text": "start" } ] },
+            { "name": "c", "children": [ { "type": "label", "bind": { "text": { "tag": "x", "format": "%d" } } } ] } ] })json")));
+    REQUIRE(p.build_screens() == 3);
+    CHECK(ui().current_screen().value_or("") == "b");
+    const size_t total = ui().screen_count();                   // a, b, c and the system screens
+    CHECK(ui().build_pending(0) == total - 1);                  // only the start screen has widgets so far
+
+    // going to a screen builds it on the spot, with the current tag values
+    tags().find("x")->set_number(8, nullptr);
+    rt.pump();
+    REQUIRE(ui().show_screen("c", "none"));
+    CHECK(ui().build_pending(0) == total - 2);
+    CHECK(std::string(lv_label_get_text(lv_obj_get_child(lv_screen_active(), 0))) == "8");
+
+    // the others follow one by one while the application runs
+    rt.advance(20 * static_cast<uint32_t>(total) + 200);
+    CHECK(ui().build_pending(0) == 0);
+    tags().find("x")->set_number(9, nullptr);
+    rt.pump();
+    REQUIRE(ui().show_screen("a", "none"));
+    CHECK(std::string(lv_label_get_text(lv_obj_get_child(lv_screen_active(), 0))) == "9");
+}

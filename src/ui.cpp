@@ -549,6 +549,8 @@ struct ChartCtx {
 struct Screen {
     std::string name;
     bool        shown = false;        // the screen on the display right now
+    json        def;                  // its description, until the widgets are built (obj == nullptr)
+    std::string base_dir;
     std::vector<Binding*> bindings;   // of the widgets on this screen
     int         level = 0;            // "level": minimum user level to see the screen
     lv_obj_t*   obj = nullptr;
@@ -687,6 +689,7 @@ struct Ui::Impl {
         if(r->deny == AccessRule::Deny::Login) users().request_login(r->level);
     }
     void parse_access(lv_obj_t* obj, const json& w);
+    void ensure_built(Screen& scr);   // build the widgets of a screen registered with add_screen()
     // The screen at `idx` becomes the one on the display: bring its widgets up to date with the
     // tags that changed while it was not shown.
     void set_shown(int idx)
@@ -1479,6 +1482,7 @@ bool Ui::Impl::show_screen(const std::string& name, const std::string& anim, boo
         users().request_login(scr->level, name, anim);
         return false;
     }
+    ensure_built(*scr);
 
     lv_obj_t* prev = lv_screen_active();
     bool prev_is_ours = false;
@@ -1536,30 +1540,59 @@ bool Ui::call_action(const std::string& name, const std::string& arg)
     return true;
 }
 
-lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)
+bool Ui::add_screen(const json& screen, const std::string& base_dir)
 {
     Impl& m = *impl_;
-    if(!screen.is_object()) return nullptr;
+    if(!screen.is_object()) return false;
     auto name = jstr_opt(screen, "name");
-    if(!name) { HML_WARN("screen without \"name\" skipped"); return nullptr; }
-    if(m.find_screen(*name)) { HML_WARN("screen '%s' defined twice", name->c_str()); return nullptr; }
-    m.base_dir = base_dir;
-
+    if(!name) { HML_WARN("screen without \"name\" skipped"); return false; }
+    if(m.find_screen(*name)) { HML_WARN("screen '%s' defined twice", name->c_str()); return false; }
     auto scr = std::make_unique<Screen>();
     scr->name = *name;
     scr->level = std::max(0, static_cast<int>(jnum(screen, "level", 0)));
-    scr->obj = lv_obj_create(nullptr);
-    m.building = scr.get();
-
-    m.apply_layout(scr->obj, screen);
-    apply_styles(scr->obj, screen);
-    if(jhas(screen, "scrollable") && !jbool(screen, "scrollable", true)) lv_obj_remove_flag(scr->obj, LV_OBJ_FLAG_SCROLLABLE);
-    m.build_children(scr->obj, screen);
-
-    m.building = nullptr;
-    lv_obj_t* obj = scr->obj;
+    scr->def = screen;
+    scr->base_dir = base_dir;
     m.screens.push_back(std::move(scr));
-    return obj;
+    return true;
+}
+
+void Ui::Impl::ensure_built(Screen& scr)
+{
+    if(scr.obj) return;
+    Screen* outer = building;                                // (a screen is not built from within another, but be safe)
+    const std::string outer_dir = base_dir;
+    const json def = std::move(scr.def);
+    scr.def = json();
+    base_dir = scr.base_dir;
+    scr.obj = lv_obj_create(nullptr);
+    building = &scr;
+
+    apply_layout(scr.obj, def);
+    apply_styles(scr.obj, def);
+    if(jhas(def, "scrollable") && !jbool(def, "scrollable", true)) lv_obj_remove_flag(scr.obj, LV_OBJ_FLAG_SCROLLABLE);
+    build_children(scr.obj, def);
+
+    building = outer;
+    base_dir = outer_dir;
+}
+
+lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)
+{
+    if(!add_screen(screen, base_dir)) return nullptr;
+    Screen& scr = *impl_->screens.back();
+    impl_->ensure_built(scr);
+    return scr.obj;
+}
+
+size_t Ui::build_pending(size_t max)
+{
+    size_t left = 0;
+    for(auto& s : impl_->screens) {
+        if(s->obj) continue;
+        if(max > 0) { impl_->ensure_built(*s); max--; }
+        else left++;
+    }
+    return left;
 }
 
 void Ui::unload_all()
@@ -1619,6 +1652,7 @@ bool Ui::back()
     std::string left = m.current >= 0 ? m.screens[static_cast<size_t>(m.current)]->name : std::string();
     std::string shown = m.screens[static_cast<size_t>(idx)]->name;
     m.current = idx;
+    m.ensure_built(*m.screens[static_cast<size_t>(idx)]);
     m.set_shown(idx);
     lv_screen_load_anim(m.screens[static_cast<size_t>(idx)]->obj, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 250, 0, false);
     if(!left.empty()) scripts().on_screen(left, false);
