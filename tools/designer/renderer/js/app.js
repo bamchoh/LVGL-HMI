@@ -20,6 +20,9 @@ const host = {
   deployCheck: o => host.call('hml_deployCheck', o),
   serialPorts: o => host.call('hml_serialPorts', o || {}),
   folderInfo: dir => host.call('hml_folderInfo', dir || ''),
+  archiveDir: (file, clean) => host.call('hml_archiveDir', file, !!clean),
+  packProject: (dir, file) => host.call('hml_packProject', dir, file),
+  copyProjectFiles: (from, to) => host.call('hml_copyProjectFiles', from || '', to),
   localSettings: (p, o) => host.call('hml_localSettings', p || '', o || null),
   keyInfo: o => host.call('hml_keyInfo', o),
   keySend: o => host.call('hml_keySend', o),
@@ -83,7 +86,7 @@ const App = {
     document.getElementById('b-undo').disabled = !st.undo.length;
     document.getElementById('b-redo').disabled = !st.redo.length;
     document.getElementById('zoom-label').textContent = Math.round(st.zoom * 100) + '%';
-    const name = st.path ? U.basename(U.dirname(st.path)) + '/project.json' : '(unsaved)';
+    const name = !st.path ? '(unsaved)' : st.archive ? U.basename(st.path) : U.basename(U.dirname(st.path)) + '/project.json';
     const title = (st.dirty ? '● ' : '') + (st.project ? st.project.title || '' : '') + '  —  ' + name;
     document.getElementById('title-label').textContent = title;
     host.setTitle('HML Designer — ' + title);
@@ -143,7 +146,7 @@ const App = {
       ...[[480, 320, '3.5" LCD'], [800, 480, '7" LCD'], [1024, 600, '10" LCD'], [1280, 720, 'HD']].map(p => U.el('button', { class: 'mini', onclick: () => { w.value = p[0]; h.value = p[1]; } }, p[0] + '×' + p[1] + ' ' + p[2])));
     const body = U.el('div', null, U.el('div', { class: 'row' }, U.el('label', null, 'title'), title),
       U.el('div', { class: 'row' }, U.el('label', null, 'width × height'), w, U.el('span', null, '×'), h), presets,
-      U.el('div', { class: 'hint' }, 'You will be asked where to save project.json (use an empty folder: screens/ and assets/ are created next to it).'));
+      U.el('div', { class: 'hint' }, 'You will be asked where to save the project: as one file (name.hmlproj, easy to carry around), or as a folder (choose "Project folder" in the dialog: project.json with screens/ and assets/ next to it).'));
     this.modal({ title: 'New project', body, buttons: [{ label: 'Cancel' }, { label: 'Create', primary: true, onclick: async () => {
       M.newProject(title.value.trim() || 'New HMI', Number(w.value) || 800, Number(h.value) || 480);
       this.refresh();
@@ -153,7 +156,7 @@ const App = {
 
   async openDialog() {
     if (!this.confirmDiscard()) return;
-    const p = await host.openDialog('project', M.st.dir || '');
+    const p = await host.openDialog('project', M.st.path ? U.dirname(M.st.path) : '');
     if (p) await this.open(p);
   },
   async open(path) {
@@ -168,14 +171,35 @@ const App = {
     const st = M.st;
     if (!st.project) return false;
     if (!st.path || as) {
-      let p = await host.saveDialog('project.json', st.dir || '');
+      // one file by default (<name>.hmlproj); a project that is a folder stays one unless the
+      // other form is picked in the dialog
+      const suggested = (st.path && !st.archive) ? 'project.json' : (st.path ? U.basename(st.path) : U.safeName(st.project.title, 'project') + '.hmlproj');
+      let p = await host.saveDialog(suggested, st.path ? U.dirname(st.path) : '');
       if (!p) return false;
-      p = await this.ownFolder(p);
-      if (!p) return false;
-      st.path = p; st.dir = U.dirname(p);
+      const from = st.dir;
+      let dir, name;
+      if (U.isProjectFile(p)) {
+        const a = await host.archiveDir(p, true);                 // its working folder on this PC
+        if (!a || !a.ok) { this.toast('save failed: ' + (a && a.error), 6000); return false; }
+        dir = a.dir; name = a.name;
+      } else {
+        p = await this.ownFolder(p);
+        if (!p) return false;
+        dir = U.dirname(p); name = U.basename(dir);
+      }
+      // the project moves: its images and other files come along
+      if (from) {
+        const c = await host.copyProjectFiles(from, dir);
+        if (!c || !c.ok) { this.toast('save failed: ' + (c && c.error), 6000); return false; }
+      }
+      st.path = p; st.dir = dir; st.archive = U.isProjectFile(p); st.name = name;
     }
     const r = await host.writeFiles(st.dir, M.filesToWrite());
     if (!r || !r.ok) { this.toast('save failed: ' + (r && r.error), 6000); return false; }
+    if (st.archive) {
+      const z = await host.packProject(st.dir, st.path);
+      if (!z || !z.ok) { this.toast('save failed: ' + (z && z.error), 6000); return false; }
+    }
     st.dirty = false;
     if (as) await this.loadLocal();
     this.refresh();
@@ -189,7 +213,7 @@ const App = {
     const dir = U.dirname(path);
     const info = await host.folderInfo(dir);
     if (!info || !info.ok || !info.others) return path;
-    const base = (String((M.st.project && M.st.project.title) || '').replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '') || 'hmi-project').toLowerCase();
+    const base = U.safeName(M.st.project && M.st.project.title, 'hmi-project');
     const name = U.el('input', { type: 'text', value: base, spellcheck: false });
     const body = U.el('div', { class: 'deploy' },
       U.el('div', { class: 'warn' }, 'This folder already contains ' + info.others + ' other item(s): ' + info.names.join(', ') + (info.others > info.names.length ? ', …' : '')),
@@ -221,7 +245,7 @@ const App = {
     const scr = M.screen(); if (!scr) return;
     const body = U.el('div', null, U.el('div', { class: 'hint' }, 'Rendering with hml_runtime…'));
     const close = this.modal({ title: 'Preview: ' + scr.name, body, buttons: [{ label: 'Close' }] });
-    const r = await host.preview(M.st.path, scr.name);
+    const r = await host.preview(M.runPath(), scr.name);
     body.innerHTML = '';
     if (r && r.ok && r.image) {
       const img = U.el('img', { class: 'preview', src: r.image });
@@ -239,7 +263,7 @@ const App = {
   async loadLocal() {
     this.local = {};
     if (!M.st.path) return;
-    const r = await host.localSettings(M.st.path);
+    const r = await host.localSettings(M.runPath());
     if (r && r.ok && r.settings) this.local = r.settings;
   },
   localDriverSetting(i, name) {
@@ -249,7 +273,7 @@ const App = {
   async setLocalDriverSetting(i, name, value) {
     if (!M.st.path) { this.toast('save the project first'); return; }
     const next = M.withLocalDriverSetting(this.local, M.driverKey(i), name, value);
-    const r = await host.localSettings(M.st.path, next);
+    const r = await host.localSettings(M.runPath(), next);
     if (!r || !r.ok) { this.toast('cannot save the local settings: ' + (r && r.error), 6000); return; }
     this.local = r.settings || {};
     this.refresh();
@@ -262,7 +286,7 @@ const App = {
     const dep = (saved.deploy && M.st.path && saved.deploy[M.st.path]) || null;
     const body = U.el('div', { class: 'deploy' }, U.el('div', { class: 'hint' }, 'Looking for serial ports …'));
     const close = this.modal({ title: 'Serial ports', body, buttons: [{ label: 'Close' }] });
-    const r = await host.serialPorts(dep ? Object.assign({}, dep, { project: M.st.path }) : {});
+    const r = await host.serialPorts(dep ? Object.assign({}, dep, { project: M.runPath(), name: M.st.name }) : {});
     body.innerHTML = '';
     const list = (ports, onPick) => {
       if (!ports.length) return U.el('div', { class: 'hint' }, 'No serial port was found.');
@@ -364,10 +388,10 @@ const App = {
       const v = values();
       if (!v.host || !v.user || !st.path) { last = null; renderCheck(); return; }
       info.innerHTML = ''; info.append(U.el('div', { class: 'hint' }, 'Checking ' + v.user + '@' + v.host + ' …'));
-      last = await host.deployCheck(Object.assign({}, v, { project: st.path }));
+      last = await host.deployCheck(Object.assign({}, v, { project: M.runPath(), name: st.name }));
       renderCheck();
     };
-    const name = () => (st.path ? U.basename(U.dirname(st.path)) : '(unsaved)');
+    const name = () => (st.path ? (st.name || U.basename(U.dirname(st.path))) : '(unsaved)');
     const update = () => {
       const dir = (f.remoteDir.value.trim() || 'hml').replace(/\/+$/, '');
       dest.textContent = 'Project → ' + (f.user.value.trim() || 'user') + '@' + (f.host.value.trim() || 'host') + ':' + dir + '/projects/' + name() + '/'
@@ -435,7 +459,7 @@ const App = {
       busy = true;
       info.innerHTML = '';
       out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.user + '@' + v.host + ' …'));
-      const r = await host.deploy(Object.assign({}, v, { project: st.path, runtime: v.sendRuntime ? v.runtime : '', clearLocal: f.clearLocal.checked }));
+      const r = await host.deploy(Object.assign({}, v, { project: M.runPath(), name: st.name, runtime: v.sendRuntime ? v.runtime : '', clearLocal: f.clearLocal.checked }));
       if (r && r.ok) { f.clearLocal.checked = false; await runCheck(); }   // what the target has now
       busy = false;
       out.innerHTML = '';
@@ -447,7 +471,7 @@ const App = {
   },
   async run() {
     if (!(await this.save(false))) return;
-    const r = await host.launch(M.st.path);
+    const r = await host.launch(M.runPath());
     if (!r || !r.ok) this.toast('run failed: ' + (r && r.error));
   },
 

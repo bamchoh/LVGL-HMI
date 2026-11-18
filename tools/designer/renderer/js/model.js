@@ -21,13 +21,17 @@ const M = {
 
   newProject(title, w, h) {
     const st = this.st;
-    st.path = null; st.dir = null;
+    st.path = null; st.dir = null; st.archive = false; st.name = '';
     st.project = this.blankProject(title, w, h);
     st.screens = [{ file: 'screens/main.json', data: this.blankScreen('main') }];
     st.cur = 0; st.sel = []; st.dirty = true; st.undo = []; st.redo = [];
   },
 
-  // r = { path, dir, project: text, screens: [{ file, text }] } from the host
+  // The project can be a folder (path = .../project.json, dir = that folder) or one file
+  // (path = .../name.hmlproj, dir = the working folder it is unpacked into). Everything that
+  // needs files on disk - Run, Preview, Deploy, images - uses dir; path is what the user sees.
+  runPath() { return this.st.dir ? this.st.dir.replace(/[\\/]+$/, '') + '/project.json' : null; },
+  // r = { path, dir, project: text, screens: [{ file, text }], archive, name } from the host
   loadFromHost(r) {
     const st = this.st;
     const project = U.parseLooseJson(r.project);
@@ -42,6 +46,7 @@ const M = {
       screens.push({ file: s.file, data });
     }
     st.path = r.path; st.dir = r.dir; st.project = project; st.screens = screens;
+    st.archive = !!r.archive; st.name = r.name || U.basename(r.dir || '');
     st.cur = 0; st.sel = []; st.dirty = false; st.undo = []; st.redo = [];
     const start = screens.findIndex(s => s.data.name === project.start_screen);
     if (start >= 0) st.cur = start;

@@ -95,6 +95,13 @@ FetchContent_Declare(sqlite
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+# ---------------------------------------------------------------- miniz (zip for project files, MIT)
+# The amalgamation (one C file) is compiled below as hml_miniz.
+FetchContent_Declare(miniz
+  URL https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
 # ---------------------------------------------------------------- open62541 (OPC UA, MPL-2.0)
 # Built from the release source tarball with the reduced namespace zero (no git submodules
 # needed). Needs Python 3 on the build host for the nodeset compiler.
@@ -137,6 +144,16 @@ if(MSVC)
   target_compile_options(hml_lua PRIVATE /W0)
 else()
   target_compile_options(hml_lua PRIVATE -w)
+endif()
+
+FetchContent_MakeAvailable(miniz)
+add_library(hml_miniz STATIC ${miniz_SOURCE_DIR}/miniz.c)
+target_include_directories(hml_miniz PUBLIC ${miniz_SOURCE_DIR})
+if(MSVC)
+  target_compile_options(hml_miniz PRIVATE /W0)
+  target_compile_definitions(hml_miniz PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+  target_compile_options(hml_miniz PRIVATE -w)
 endif()
 
 add_library(hml_sqlite STATIC ${sqlite_SOURCE_DIR}/sqlite3.c)
@@ -205,7 +222,7 @@ endif()
 file(GLOB HML_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(hml_runtime ${HML_SOURCES})
 target_include_directories(hml_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite)
+target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz)
 if(HML_OPCUA)
   target_link_libraries(hml_runtime PRIVATE open62541)
   target_compile_definitions(hml_runtime PRIVATE HML_WITH_OPCUA=1)

@@ -19,8 +19,10 @@ FetchContent_Declare(webview
 )
 FetchContent_MakeAvailable(webview)
 
-add_executable(hml_designer WIN32 host/main.cpp)
-target_link_libraries(hml_designer PRIVATE webview::core hml_json)
+# (project_archive.cpp: the project file format, shared with the runtime)
+add_executable(hml_designer WIN32 host/main.cpp ${CMAKE_SOURCE_DIR}/src/project_archive.cpp)
+target_include_directories(hml_designer PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(hml_designer PRIVATE webview::core hml_json hml_miniz)
 target_compile_definitions(hml_designer PRIVATE
   HML_DESIGNER_VERSION="0.1"
   HML_DESIGNER_RENDERER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/renderer"
