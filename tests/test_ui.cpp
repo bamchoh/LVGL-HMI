@@ -1128,3 +1128,59 @@ TEST_CASE("Ui::init may be called again to replace the app callbacks")
     CHECK(reloads == 1);
     CHECK(rt.reload_requests == 0);
 }
+
+TEST_CASE("widgets of a screen that is not shown are updated when it is shown")
+{
+    Runtime rt;
+    Tag* v = rt.tag("v", TagType::Int, 1);
+    Tag* lim = rt.tag("lim", TagType::Int, 5);
+    lv_obj_t* a = ui().build_screen(json::parse(R"json({ "name": "a", "children": [
+        { "type": "label", "bind": { "text": { "tag": "v", "format": "%d" } } } ] })json"), "");
+    lv_obj_t* b = ui().build_screen(json::parse(R"json({ "name": "b", "children": [
+        { "type": "label", "bind": { "text": { "tag": "v", "format": "%d" } } },
+        { "type": "bar", "min": 0, "max": 100, "bind": "v" },
+        { "type": "label", "text": "over", "bind": { "visible": { "tag": "v", "gt": { "tag": "lim" } } } } ] })json"), "");
+    REQUIRE(a);
+    REQUIRE(b);
+    lv_obj_t* la = lv_obj_get_child(a, 0);
+    lv_obj_t* lb = lv_obj_get_child(b, 0);
+    lv_obj_t* bar = lv_obj_get_child(b, 1);
+    lv_obj_t* over = lv_obj_get_child(b, 2);
+
+    // no screen shown yet: everything follows the tags
+    v->set_number(2, nullptr);
+    rt.pump();
+    CHECK(std::string(lv_label_get_text(la)) == "2");
+    CHECK(std::string(lv_label_get_text(lb)) == "2");
+
+    // "a" is shown: the widgets of "b" are left alone ...
+    REQUIRE(ui().show_screen("a", "none"));
+    v->set_number(42, nullptr);
+    rt.pump();
+    CHECK(std::string(lv_label_get_text(la)) == "42");
+    CHECK(std::string(lv_label_get_text(lb)) == "2");
+    CHECK(lv_bar_get_value(bar) == 2);
+    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    v->set_number(43, nullptr);
+    rt.pump();
+
+    // ... and are brought up to date the moment "b" is shown
+    REQUIRE(ui().show_screen("b", "none"));
+    CHECK(std::string(lv_label_get_text(lb)) == "43");
+    CHECK(lv_bar_get_value(bar) == 43);
+    CHECK_FALSE(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+
+    // now "a" is the one that waits; a condition on a second tag is deferred the same way
+    v->set_number(3, nullptr);
+    rt.pump();
+    CHECK(std::string(lv_label_get_text(lb)) == "3");
+    CHECK(std::string(lv_label_get_text(la)) == "43");
+    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    REQUIRE(ui().back());
+    CHECK(std::string(lv_label_get_text(la)) == "3");
+    lim->set_number(1, nullptr);                           // v (3) > lim (1) while "b" is not shown
+    rt.pump();
+    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    REQUIRE(ui().show_screen("b", "none"));
+    CHECK_FALSE(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+}
