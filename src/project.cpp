@@ -284,7 +284,8 @@ int Project::build_screens()
                 if(owned.is_null()) continue;
                 def = &owned;
             }
-            if(ui().build_screen(*def, info_.dir)) {
+            // registered now, built when first shown or shortly after startup (see below)
+            if(ui().add_screen(*def, info_.dir)) {
                 if(first.empty()) first = jstr(*def, "name", "");
                 built++;
             }
@@ -292,11 +293,11 @@ int Project::build_screens()
     }
     // system settings screens (not counted: they are not part of the project)
     for(const json& s : system_settings().screens(info_.width, info_.height)) {
-        if(!ui().build_screen(s, info_.dir)) HML_WARN("system screen '%s' could not be built", jstr(s, "name", "?").c_str());
+        if(!ui().add_screen(s, info_.dir)) HML_WARN("system screen '%s' could not be built", jstr(s, "name", "?").c_str());
     }
     // the login screen (with "users")
     for(const json& s : login_screens(info_.width, info_.height)) {
-        if(!ui().build_screen(s, info_.dir)) HML_WARN("screen '%s' could not be built", jstr(s, "name", "?").c_str());
+        if(!ui().add_screen(s, info_.dir)) HML_WARN("screen '%s' could not be built", jstr(s, "name", "?").c_str());
     }
     users().set_home(!info_.start_screen.empty() ? info_.start_screen : first);
     ui().refresh_access();
@@ -320,6 +321,14 @@ int Project::build_screens()
     ui().set_history(history);
     tags().dispatch(true);
     HML_INFO("%d screens built, showing '%s'", built, ui().current_screen().value_or("").c_str());
+    // Only the screen that is shown has its widgets so far. The others are built one at a time
+    // while the application already runs: a large project starts at once, and a mistake in any
+    // screen is still reported shortly after startup, not when somebody first opens it.
+    if(ui().build_pending(0) > 0) {
+        lv_timer_create([](lv_timer_t* t) {
+            if(ui().build_pending(1) == 0) lv_timer_delete(t);
+        }, 20, nullptr);
+    }
     return built;
 }
 

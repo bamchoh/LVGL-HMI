@@ -30,6 +30,11 @@ public:
 
     // Build a screen from its JSON description. base_dir resolves relative asset paths.
     lv_obj_t* build_screen(const json& screen, const std::string& base_dir);
+    // Register a screen without building its widgets yet: it is built when it is first shown,
+    // or by build_pending(). A project with many screens can show its first one at once.
+    bool add_screen(const json& screen, const std::string& base_dir);
+    // Build up to `max` of the screens that are still waiting; returns how many are left.
+    size_t build_pending(size_t max = 1);
 
     // Delete every screen built so far, free bindings, drop the UI tag subscriptions.
     void unload_all();
