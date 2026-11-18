@@ -534,7 +534,7 @@ test('M users: section, PIN hashes, warnings', () => {
   const [salt, hash] = u0.pin_hash.split('$');
   assert.equal(salt.length, 16);
   assert.equal(hash, U.sha256hex(salt + ':1234'));              // what the runtime checks
-  assert.equal(JSON.stringify(M.st.project).includes('1234'), false);
+  deq(Object.keys(u0).sort(), ['level', 'name', 'pin_hash']);    // nothing else is kept of the PIN (the hash is hex and may contain any digits)
   assert.equal(M.hashPin('1234', 'abcd'), 'abcd$' + U.sha256hex('abcd:1234'));
 
   // nobody at the system level (default: the highest) yet
