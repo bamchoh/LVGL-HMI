@@ -206,6 +206,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `--screen <name>`           | 起動時に表示する画面を指定                                                                                        |
 | `--screenshot <file.bmp>`   | 起動後にスクリーンショットを保存（`tools/bmp2png.py` で PNG 化できます）                                          |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
+| `--stats <seconds>`          | メインループの負荷を指定秒ごとにログに出す（1 秒あたりの周回数、占有率、最長の 1 周の時間）。負荷の確認用 →「負荷の確認」 |
 | `--reload-after <ms>`       | 指定時間後にホットリロードを実行（テスト用）                                                                      |
 | `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
 | `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
@@ -220,6 +221,27 @@ python tools\modbus_server.py --port 5020
 
 接続すると画面右上の PLC ランプが点灯し、Run スイッチ・Speed スライダー・Setpoint アークが
 サーバーのコイル / 保持レジスタと同期します。サーバーが無い場合も画面は動作します（オフライン表示）。
+
+### 負荷の確認
+
+規模の大きいプロジェクトで装置がどのくらい忙しくなるかは、`--stats` で確認できます。
+
+```
+hml_runtime project.json --stats 5
+[hml INFO ] stats: 5.0 s, 724 passes (145/s), busy 20%, longest pass 31.2 ms, 0 of 50 ms or more; tags avg 0.79 max 20.1 ms, lvgl avg 0.62 max 11.1 ms
+```
+
+- メインループの 1 周は「タグ変化の通知（`tags`）」と「LVGL の処理（`lvgl`: タイマー、入力、描画）」です。
+  1 周のあいだは他の処理が待たされるので、`longest pass` がタッチやタグ変化に対する最悪の遅れの目安になります。
+- `busy` はメインループが処理に使っている時間の割合です。100% に近づくと、周回数（`passes`）が落ちて表示の更新が遅れます。
+
+`tools/make_stress_project.py` は、タグ数・画面数・ウィジェット数・ロギング量などを指定して負荷確認用のプロジェクトを作ります
+（`--preset light | medium | heavy | extreme`、個別のオプションで上書き可）。外部とは通信しません。
+
+```
+python tools/make_stress_project.py stress --preset heavy
+hml_runtime stress/project.json --stats 5
+```
 
 ## デザイナー（GUI でプロジェクトを作る）
 
