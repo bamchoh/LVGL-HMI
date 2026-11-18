@@ -127,7 +127,40 @@ const SCHEMA = {
       table: { key: 'map', label: 'Register map', columns: [
         { k: 'tag', t: 'tag' }, { k: 'area', t: 'select', o: ['holding', 'input', 'coil', 'discrete'] }, { k: 'addr', t: 'number' },
         { k: 'dtype', t: 'select', o: ['', 'int16', 'uint16', 'int32', 'uint32', 'float', 'bool'] },
-        { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' }, { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] }] },
+        { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' }, { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] },
+        { k: 'unit_id', t: 'number', opt: true }] },
+    },
+    modbus_rtu: {
+      label: 'Modbus RTU client (serial)',
+      fields: [{ k: 'device', t: 'text', hint: 'serial port: /dev/ttyUSB0 on the device, COM4 on Windows. Leave empty and fill in host / port to go through a serial gateway (TCP)' },
+               { k: 'baud', t: 'select', o: ['', '1200', '2400', '4800', '9600', '19200', '38400', '57600', '115200'], empty: '9600' },
+               { k: 'data_bits', t: 'select', o: ['', '7', '8'], empty: '8' },
+               { k: 'parity', t: 'select', o: ['', 'none', 'even', 'odd'], empty: 'none' },
+               { k: 'stop_bits', t: 'select', o: ['', '1', '2'], empty: '1' },
+               { k: 'unit_id', t: 'number', hint: 'unit (slave) address; a row of the map may name another one' }, { k: 'poll_ms', t: 'number' },
+               { k: 'timeout_ms', t: 'number', hint: 'how long to wait for an answer (default 500)' }, { k: 'status_tag', t: 'tag' },
+               { k: 'host', t: 'text', hint: 'serial gateway: its address (only without device)' }, { k: 'port', t: 'number', hint: 'serial gateway: its TCP port' }],
+      table: { key: 'map', label: 'Register map', columns: [
+        { k: 'tag', t: 'tag' }, { k: 'area', t: 'select', o: ['holding', 'input', 'coil', 'discrete'] }, { k: 'addr', t: 'number' },
+        { k: 'dtype', t: 'select', o: ['', 'int16', 'uint16', 'int32', 'uint32', 'float', 'bool'] },
+        { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' }, { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] },
+        { k: 'unit_id', t: 'number', opt: true }] },
+    },
+    modbus_ascii: {
+      label: 'Modbus ASCII client (serial)',
+      fields: [{ k: 'device', t: 'text', hint: 'serial port: /dev/ttyUSB0 on the device, COM4 on Windows. Leave empty and fill in host / port to go through a serial gateway (TCP)' },
+               { k: 'baud', t: 'select', o: ['', '1200', '2400', '4800', '9600', '19200', '38400', '57600', '115200'], empty: '9600' },
+               { k: 'data_bits', t: 'select', o: ['', '7', '8'], empty: '7' },
+               { k: 'parity', t: 'select', o: ['', 'none', 'even', 'odd'], empty: 'even' },
+               { k: 'stop_bits', t: 'select', o: ['', '1', '2'], empty: '1' },
+               { k: 'unit_id', t: 'number', hint: 'unit (slave) address; a row of the map may name another one' }, { k: 'poll_ms', t: 'number' },
+               { k: 'timeout_ms', t: 'number', hint: 'how long to wait for an answer (default 500)' }, { k: 'status_tag', t: 'tag' },
+               { k: 'host', t: 'text', hint: 'serial gateway: its address (only without device)' }, { k: 'port', t: 'number', hint: 'serial gateway: its TCP port' }],
+      table: { key: 'map', label: 'Register map', columns: [
+        { k: 'tag', t: 'tag' }, { k: 'area', t: 'select', o: ['holding', 'input', 'coil', 'discrete'] }, { k: 'addr', t: 'number' },
+        { k: 'dtype', t: 'select', o: ['', 'int16', 'uint16', 'int32', 'uint32', 'float', 'bool'] },
+        { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' }, { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] },
+        { k: 'unit_id', t: 'number', opt: true }] },
     },
     opcua_server: {
       label: 'OPC UA server',
@@ -139,6 +172,8 @@ const SCHEMA = {
   driverDefaults: {
     sim: { type: 'sim', items: [] },
     modbus_tcp: { type: 'modbus_tcp', enabled: true, host: '127.0.0.1', port: 502, unit_id: 1, poll_ms: 200, timeout_ms: 1000, map: [] },
+    modbus_rtu: { type: 'modbus_rtu', enabled: true, device: '/dev/ttyUSB0', baud: 9600, parity: 'none', unit_id: 1, poll_ms: 200, timeout_ms: 500, map: [] },
+    modbus_ascii: { type: 'modbus_ascii', enabled: true, device: '/dev/ttyUSB0', baud: 9600, data_bits: 7, parity: 'even', unit_id: 1, poll_ms: 200, timeout_ms: 500, map: [] },
     opcua_server: { type: 'opcua_server', port: 4840, namespace: 'urn:hml:runtime', folder: 'HML' },
   },
 };
