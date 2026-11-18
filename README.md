@@ -287,6 +287,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 | private key     | SSH の秘密鍵ファイル。空なら既定の鍵（`~/.ssh/id_*`）                                                  |
 | remote folder   | ターゲット上の配置先（既定 `hml` = ホームの `hml/`）                                                   |
 | send runtime    | チェックすると、指定したターゲット用の `hml_runtime`（Linux 用のビルド）も送って入れ替える             |
+| run on target   | このプロジェクトを、ターゲットが表示するプロジェクトにする（既定でオン。再起動後もそのまま）           |
 | restart runtime | 配置後にターゲットのランタイムを再起動する（`SIGUSR2`）                                                |
 | local settings  | チェックすると、ターゲットの画面で変更された設定（`project.local.json`）を削除する。毎回オフで始まる   |
 
@@ -300,12 +301,24 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 
 デプロイが終わると、同じ内容を調べ直して表示します。
 
-ターゲット上の配置は次のとおりです。systemd のユニットなどは、この `project.json` を指すようにしておきます。
+ターゲット上の配置は次のとおりです。
 
 ```
 <remote folder>/hml_runtime
 <remote folder>/projects/<プロジェクトのフォルダ名>/project.json, screens/, assets/ ...
+<remote folder>/active_project      表示するプロジェクト（例: projects/myhmi/project.json）
 ```
+
+**送るもの**: プロジェクトを構成するファイルだけです。`project.json`、そこや画面ファイルに名前が書かれているファイル
+（画面、スクリプト、画像、スプラッシュ）、`assets/` フォルダーの中身。同じフォルダーにほかのファイルがあっても送りません。
+プロジェクトは専用のフォルダーに保存してください（フォルダー名がターゲットでのプロジェクト名になります）。
+ほかのファイルがあるフォルダーに保存しようとすると、デザイナーが新しいフォルダーを作るかどうか尋ねます。
+
+**表示するプロジェクトの切り替え**: 「run on target」がオンなら、デプロイしたプロジェクトがターゲットの表示になります。
+ターゲットの自動起動（systemd のユニットなど）はコマンドラインで 1 つのプロジェクトを指していますが、ランタイムは
+自分の隣に `active_project` があればそちらを読み込みます。ユニットを書き換える必要はありません（管理者権限も不要）。
+この動作は、実行ファイルの隣に `projects` フォルダーがある配置のときだけで、`--ignore-active` で無効にできます。
+切り替えには、この機能を持つランタイムがターゲットで動いている必要があります（古い場合は「send runtime」で入れ替えてください）。
 
 - PC 側は OS 付属の OpenSSH（`ssh` / `scp`）を使います。**鍵認証のみ**で、パスワードは聞きません。
   公開鍵は、ターゲットの画面（System > Keys）を鍵管理モードにして private key の右の **Register…** を押すと登録できます
@@ -324,7 +337,7 @@ build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを�
 
 ```
 hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
-    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart] [--clear-local]
+    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart] [--no-activate] [--clear-local]
 ```
 
 `--check` を付けると何も送らず、ターゲットの状態（上の Check と同じ内容）を JSON で表示します。

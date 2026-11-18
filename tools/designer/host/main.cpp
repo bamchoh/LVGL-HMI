@@ -14,6 +14,7 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -381,19 +382,70 @@ std::string posix_cksum(const fs::path& p, bool* ok)
     return std::to_string(~crc) + " " + std::to_string(size);
 }
 
-// The files of a project folder that a deploy sends: everything except what belongs to the
-// machine it runs on (the recorded logs, the local settings). <file, path relative to dir>
+// The files a deploy sends: what the project is made of, not whatever else lies in its folder
+// (a project.json saved into a folder full of other things must not take them along).
+//   - project.json
+//   - every file it or one of its screens names: screen files, script files, images, the splash
+//   - everything below assets/ (images chosen at run time through a tag are named nowhere)
+// Never the recorded logs or this machine's local settings. <file, path relative to dir>
 std::vector<std::pair<fs::path, std::string>> project_files(const fs::path& dir)
 {
     std::vector<std::pair<fs::path, std::string>> out;
     std::error_code ec;
-    for(auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
-        std::string rel = ustr(fs::relative(it->path(), dir, ec));
-        if(rel == "logs" || rel == ".git") { it.disable_recursion_pending(); continue; }
-        if(rel == "project.local.json" || !it->is_regular_file(ec)) continue;
-        out.emplace_back(it->path(), rel);
+    auto add = [&](const std::string& rel_in) {
+        fs::path relp = upath(rel_in).lexically_normal();
+        std::string rel = ustr(relp);
+        if(rel.empty() || relp.is_absolute() || rel.find(':') != std::string::npos || rel.rfind("..", 0) == 0) return false;
+        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0) return false;
+        if(!fs::is_regular_file(dir / relp, ec)) return false;
+        for(const auto& o : out) if(o.second == rel) return true;
+        out.emplace_back(dir / relp, rel);
+        return true;
+    };
+    // every string in a JSON document that is the name of a file in the project folder
+    std::function<void(const json&)> walk = [&](const json& j) {
+        if(j.is_string()) {
+            const std::string s = j.get<std::string>();
+            if(s.size() < 260 && (s.find('.') != std::string::npos || s.find('/') != std::string::npos)) add(s);
+        }
+        else if(j.is_array() || j.is_object()) for(const auto& v : j) walk(v);
+    };
+    auto parse = [&](const fs::path& file) {
+        bool ok = false;
+        std::string text = read_text(file, &ok);
+        return ok ? json::parse(text, nullptr, false, true) : json();
+    };
+    add("project.json");
+    json proj = parse(dir / "project.json");
+    if(!proj.is_discarded()) {
+        walk(proj);
+        if(proj.is_object() && proj.contains("screens") && proj["screens"].is_array()) {
+            for(const auto& s : proj["screens"]) {
+                if(!s.is_string()) continue;
+                json scr = parse(dir / upath(s.get<std::string>()));
+                if(!scr.is_discarded()) walk(scr);
+            }
+        }
+    }
+    for(auto it = fs::recursive_directory_iterator(dir / "assets", ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if(it->is_regular_file(ec)) add(ustr(fs::relative(it->path(), dir, ec)));
     }
     std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+    return out;
+}
+
+// What else lies in a folder besides a project's own files and folders: a project wants a
+// folder of its own.
+std::vector<std::string> foreign_entries(const fs::path& dir)
+{
+    std::vector<std::string> out;
+    std::error_code ec;
+    for(const auto& e : fs::directory_iterator(dir, ec)) {
+        std::string name = ustr(e.path().filename());
+        if(name == "project.json" || name == "project.local.json" || name == "screens" || name == "assets" || name == "logs" || name == ".git" || name == ".gitignore") continue;
+        out.push_back(name);
+    }
+    std::sort(out.begin(), out.end());
     return out;
 }
 
@@ -843,6 +895,8 @@ struct Host {
         std::string rdir = t.remote + "/" + t.pdir();
         a.insert(a.end(), { "-p", std::to_string(t.port), t.dest(),
             "echo HML_PS; ps -o args= -C hml_runtime | head -n 1; echo HML_END;"
+            " echo HML_ACTIVE; cat " + t.remote + "/active_project 2>/dev/null; echo; echo HML_END;"
+            " echo HML_RUNPROJ; cat " + t.remote + "/running_project 2>/dev/null; echo; echo HML_END;"
             " cd " + rdir + " 2>/dev/null || { echo HML_NO_PROJECT; exit 0; };"
             " echo HML_LOCAL; cat project.local.json 2>/dev/null; echo; echo HML_END;"
             " echo HML_SUMS; find . -path ./logs -prune -o -type f ! -name project.local.json -exec cksum {} +; echo HML_END" });
@@ -860,7 +914,11 @@ struct Host {
         json res{ { "ok", true }, { "target", t.dest() + ":" + rdir }, { "running", trimmed(section("HML_PS")) },
                   { "exists", pr.output.find("HML_NO_PROJECT") == std::string::npos }, { "local", json::array() },
                   { "files", { { "changed", json::array() }, { "added", json::array() }, { "extra", json::array() } } } };
-        res["runsThis"] = t.runs_here(res["running"].get<std::string>());
+        // the runtime says itself what it loaded (running_project); an older one only has its command line
+        const std::string run_proj = trimmed(section("HML_RUNPROJ")), running = res["running"].get<std::string>();
+        res["active"] = trimmed(section("HML_ACTIVE"));
+        res["runningProject"] = run_proj;
+        res["runsThis"] = !running.empty() && (run_proj.empty() ? t.runs_here(running) : run_proj == t.pdir() + "/project.json");
 
         // ---- local settings against project.json
         bool ok = false;
@@ -1064,6 +1122,8 @@ struct Host {
         std::string rt = S("runtime");
         bool restart = !(o.contains("restart") && o["restart"].is_boolean() && !o["restart"].get<bool>());
         bool clear_local = o.contains("clearLocal") && o["clearLocal"].is_boolean() && o["clearLocal"].get<bool>();
+        // make this the project the target runs (active_project next to the runtime), unless told not to
+        bool activate = !(o.contains("activate") && o["activate"].is_boolean() && !o["activate"].get<bool>());
         std::error_code ec;
         (void)pname;
         fs::path rtp;
@@ -1132,11 +1192,13 @@ struct Host {
         // the settings changed on the target's own screens: back to what the project says
         if(clear_local) { cmd += " && rm -f " + pdir + "/project.local.json"; step("removing the target's local settings (project.local.json)"); }
         if(!rtp.empty()) cmd += " && chmod +x hml_runtime.new && mv -f hml_runtime.new hml_runtime";
-        cmd += " && echo HML_INSTALLED";
+        if(activate) cmd += " && echo " + pdir + "/project.json > active_project";
+        cmd += " && rm -f running_project && echo HML_INSTALLED";
         // SIGUSR2 = restart (older runtimes are terminated by it and restarted by systemd)
         if(restart)
             cmd += " && if pgrep -x hml_runtime >/dev/null; then pkill -USR2 -x hml_runtime; sleep 5;"
                    " if pgrep -x hml_runtime >/dev/null; then echo HML_RUNNING; ps -o args= -C hml_runtime | head -n 1;"
+                   " echo HML_RUNPROJ; cat running_project 2>/dev/null; echo; echo HML_RUNPROJ_END;"
                    " else echo HML_STOPPED; fi; else echo HML_NOT_RUNNING; fi";
         step(restart ? "installing and restarting the runtime" : "installing");
         std::string out = ssh(cmd, 40000, "install");
@@ -1148,6 +1210,10 @@ struct Host {
             size_t at = log.find(mark);
             if(at != std::string::npos) log.replace(at, std::strlen(mark), text);
         }
+        if(size_t a = log.find("HML_RUNPROJ\n"), b = log.find("HML_RUNPROJ_END"); a != std::string::npos && b != std::string::npos && b > a) {
+            size_t end = log.find('\n', b);
+            log.erase(a, (end == std::string::npos ? log.size() : end + 1) - a);
+        }
 
         json res{ { "ok", true } };
         std::string note;
@@ -1156,9 +1222,30 @@ struct Host {
                 note = "hml_runtime is not running on the target: the files were installed, start the runtime there.";
             else if(out.find("HML_STOPPED") != std::string::npos)
                 note = "hml_runtime did not come back after the restart: check the log on the target.";
-            else if(!t.runs_here(out))
-                note = "The runtime on the target was restarted, but it runs a different project (see the command line above). "
-                       "Point it at " + remote + "/" + pdir + "/project.json.";
+            else {
+                // what the restarted runtime says it loaded; an older runtime says nothing
+                std::string loaded;
+                size_t a = out.find("HML_RUNPROJ\n"), b = out.find("HML_RUNPROJ_END");
+                if(a != std::string::npos && b != std::string::npos && b > a) loaded = trimmed(out.substr(a + 12, b - a - 12));
+                const std::string want = pdir + "/project.json";
+                const bool runs = loaded.empty() ? t.runs_here(out) : loaded == want;
+                // the command line of the service says nothing once the runtime chooses by itself
+                if(!loaded.empty()) {
+                    size_t r0 = log.find("running: ");
+                    if(r0 != std::string::npos) {
+                        size_t r1 = log.find('\n', r0);
+                        log.erase(r0, (r1 == std::string::npos ? log.size() : r1 + 1) - r0);
+                    }
+                }
+                if(runs) log += "the target now runs " + want + "\n";
+                else if(loaded.empty() && activate)
+                    note = "The files are installed, but the runtime on the target is too old to switch projects by itself: it still runs the project of its command line. "
+                           "Tick \"send runtime\" and deploy again (or point the service at " + remote + "/" + want + ").";
+                else if(!activate)
+                    note = "The files are installed. The target keeps running " + (loaded.empty() ? std::string("another project") : loaded) +
+                           " (\"run on target\" is not ticked).";
+                else note = "The runtime on the target was restarted, but it runs " + loaded + ", not " + want + ": check its log.";
+            }
         }
         if(!note.empty()) { res["warning"] = note; log += "! " + note + "\n"; }
         step("done");
@@ -1246,6 +1333,14 @@ struct Host {
                 w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
             }).detach();
         }, nullptr);
+        w->bind("hml_folderInfo", [this, args_of, str](const std::string& req) {
+            // what else is in the folder a project is about to be saved into
+            json a = args_of(req);
+            std::vector<std::string> other = foreign_entries(upath(str(a, 0)));
+            json names = json::array();
+            for(size_t i = 0; i < other.size() && i < 5; i++) names.push_back(other[i]);
+            return json{ { "ok", true }, { "others", other.size() }, { "names", names } }.dump(-1, ' ', false, json::error_handler_t::replace);
+        });
         w->bind("hml_serialPorts", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             json opts = a.size() > 0 && a[0].is_object() ? a[0] : json::object();
@@ -1291,6 +1386,7 @@ int app_main(const std::vector<std::string>& args)
                 opt("--remote-dir", "remoteDir") || opt("--runtime", "runtime")) {}
         else if(args[i] == "--no-restart") deploy_opts["restart"] = false;
         else if(args[i] == "--clear-local") deploy_opts["clearLocal"] = true;
+        else if(args[i] == "--no-activate") deploy_opts["activate"] = false;
         else if(args[i] == "--check") deploy_check = true;
         else if(args[i] == "--send-key" && i + 1 < args.size()) send_key_host = args[++i];
         else if(args[i] == "--key-port" && i + 1 < args.size()) send_key_port = std::atoi(args[++i].c_str());
@@ -1317,7 +1413,7 @@ int app_main(const std::vector<std::string>& args)
     }
 
     // hml_designer --deploy <project.json> [--host <h> --user <u> --port <n> --key <file>
-    //   --remote-dir <dir> --runtime <file> --no-restart --clear-local]: deploy without opening
+    //   --remote-dir <dir> --runtime <file> --no-restart --no-activate --clear-local]: deploy without opening
     //   the window. With --check nothing is sent: the state of the target is printed.
     // Options left out come from what the Deploy dialog last used for this project.
     if(!deploy_project.empty()) {

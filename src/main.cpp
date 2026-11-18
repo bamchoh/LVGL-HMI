@@ -17,6 +17,8 @@
 // --click injects a pointer click at (x,y) <ms> after start (UI test automation);
 // --shot-at saves a screenshot at the given time. Both may be repeated.
 // --stats logs every <seconds> how busy the main loop is (passes per second, longest pass).
+// --ignore-active: load the project from the command line even if an active_project file next
+// to the executable names another one (see active_project.hpp).
 //
 // SDL: F5 = reload screens, Esc = quit.  Linux fbdev/drm: SIGHUP/SIGUSR1 = reload, SIGUSR2 = restart,
 // SIGINT/SIGTERM = quit.
@@ -38,6 +40,7 @@
 #include "splash.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
+#include "active_project.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -79,7 +82,7 @@ int usage(const char* argv0)
 {
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
-                         "       [--stats <seconds>]\n"
+                         "       [--stats <seconds>] [--ignore-active]\n"
                          "       %s --list-serial-ports\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
                          "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
@@ -122,12 +125,14 @@ int main(int argc, char** argv)
     std::string project_path, screenshot, screen, export_log, export_level = "info";
     std::string export_kind, export_file, export_group;      // --export-data-log / -alarm-log / -operation-log
     uint32_t exit_after = 0, reload_after = 0, stats_s = 0;
+    bool ignore_active = false;
     bool splash = false;
 
     for(int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : nullptr; };
         if(a == "--exit-after") { const char* v = next(); if(!v) return usage(argv[0]); exit_after = static_cast<uint32_t>(std::atoi(v)); }
+        else if(a == "--ignore-active") ignore_active = true;
         else if(a == "--stats") { const char* v = next(); if(!v) return usage(argv[0]); stats_s = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--reload-after") { const char* v = next(); if(!v) return usage(argv[0]); reload_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
@@ -164,11 +169,19 @@ int main(int argc, char** argv)
         }
     }
     if(project_path.empty()) return usage(argv[0]);
+    // A deployed runtime runs the project named by active_project next to it, whatever the
+    // service's command line says (active_project.hpp). Not for the exports: they are asked
+    // about one project by name.
+    const std::string home = hml::install_dir();
+    std::string active_note;
+    if(!ignore_active && export_log.empty() && export_kind.empty()) project_path = hml::resolve_active_project(home, project_path, &active_note);
 
     // Capture the log from the first line on; it is written once the database is open.
     if(!splash && export_log.empty() && export_kind.empty()) hml::system_log().attach();
     hml::drivers().register_builtins();
+    if(!active_note.empty()) HML_INFO("%s", active_note.c_str());
     if(!hml::project().load(project_path)) return 2;
+    if(!splash && export_log.empty() && export_kind.empty()) hml::note_running_project(home, project_path);
     const hml::ProjectInfo& info = hml::project().info();
 
     if(!export_log.empty()) {
