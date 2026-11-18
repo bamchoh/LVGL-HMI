@@ -16,9 +16,11 @@
 // (tools/rpi/hml-splash.service). On the SDL backend the window stays open for --exit-after ms.
 // --click injects a pointer click at (x,y) <ms> after start (UI test automation);
 // --shot-at saves a screenshot at the given time. Both may be repeated.
+// --stats logs every <seconds> how busy the main loop is (passes per second, longest pass).
 //
 // SDL: F5 = reload screens, Esc = quit.  Linux fbdev/drm: SIGHUP/SIGUSR1 = reload, SIGUSR2 = restart,
 // SIGINT/SIGTERM = quit.
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -76,6 +78,7 @@ int usage(const char* argv0)
 {
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
+                         "       [--stats <seconds>]\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
                          "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
                          "       %s --export-data-log <file.csv> <project.json> [--group <name>]\n"
@@ -109,13 +112,14 @@ int main(int argc, char** argv)
 {
     std::string project_path, screenshot, screen, export_log, export_level = "info";
     std::string export_kind, export_file, export_group;      // --export-data-log / -alarm-log / -operation-log
-    uint32_t exit_after = 0, reload_after = 0;
+    uint32_t exit_after = 0, reload_after = 0, stats_s = 0;
     bool splash = false;
 
     for(int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : nullptr; };
         if(a == "--exit-after") { const char* v = next(); if(!v) return usage(argv[0]); exit_after = static_cast<uint32_t>(std::atoi(v)); }
+        else if(a == "--stats") { const char* v = next(); if(!v) return usage(argv[0]); stats_s = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--reload-after") { const char* v = next(); if(!v) return usage(argv[0]); reload_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
         else if(a == "--splash") splash = true;
@@ -231,11 +235,42 @@ int main(int argc, char** argv)
     const uint32_t t_start = hml::millis();
     s_t_start = t_start;
     bool shot_done = false;
+    // --stats <seconds>: how busy the main loop is, logged every <seconds>. One pass of the loop
+    // = tag notifications + LVGL (timers, input, drawing); while a pass runs nothing else is
+    // handled, so the longest pass is the worst delay a touch or a tag change can see.
+    using clock = std::chrono::steady_clock;
+    struct LoopStats {
+        uint32_t loops = 0, slow = 0;                 // slow: passes of 50 ms and more
+        double   dispatch_us = 0, lvgl_us = 0, max_dispatch_us = 0, max_lvgl_us = 0, max_pass_us = 0;
+    } stats;
+    clock::time_point stats_from = clock::now();
+    auto us_since = [](clock::time_point t) { return std::chrono::duration<double, std::micro>(clock::now() - t).count(); };
     while(!s_quit) {
+        const clock::time_point t0 = clock::now();
         hml::platform::poll();
         hml::tags().dispatch(false);
+        const clock::time_point t1 = clock::now();
         uint32_t wait = lv_timer_handler();
         uint32_t elapsed = hml::millis() - t_start;
+        if(stats_s) {
+            const double d = std::chrono::duration<double, std::micro>(t1 - t0).count(), l = us_since(t1);
+            stats.loops++;
+            stats.dispatch_us += d;
+            stats.lvgl_us += l;
+            if(d > stats.max_dispatch_us) stats.max_dispatch_us = d;
+            if(l > stats.max_lvgl_us) stats.max_lvgl_us = l;
+            if(d + l > stats.max_pass_us) stats.max_pass_us = d + l;
+            if(d + l >= 50000) stats.slow++;
+            const double span = us_since(stats_from) / 1e6;
+            if(span >= stats_s) {
+                HML_INFO("stats: %.1f s, %u passes (%.0f/s), busy %.0f%%, longest pass %.1f ms, %u of 50 ms or more; "
+                         "tags avg %.2f max %.1f ms, lvgl avg %.2f max %.1f ms",
+                         span, stats.loops, stats.loops / span, (stats.dispatch_us + stats.lvgl_us) / (span * 1e4), stats.max_pass_us / 1000, stats.slow,
+                         stats.dispatch_us / stats.loops / 1000, stats.max_dispatch_us / 1000, stats.lvgl_us / stats.loops / 1000, stats.max_lvgl_us / 1000);
+                stats = LoopStats{};
+                stats_from = clock::now();
+            }
+        }
 
         if(!screenshot.empty() && !shot_done && elapsed >= (exit_after ? exit_after / 2 : 1000)) {
             lv_refr_now(disp);
