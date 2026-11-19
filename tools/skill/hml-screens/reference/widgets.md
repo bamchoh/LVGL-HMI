@@ -26,7 +26,7 @@ How to use bindings, actions, popups and the special widgets (alarm list, trend,
 | `numeric_display` | Numeric display | `input` (true / false), `decimals` (number), `format` (text), `unit` (text), `min` (number), `max` (number), `placeholder` (text), `accepted_chars` (text) | `{"w":120,"decimals":1}` |
 | `text_display` | Text display | `input` (true / false), `text` (text), `placeholder` (text), `max_length` (number), `accepted_chars` (text), `one_line` (true / false) | `{"w":160}` |
 | `password_display` | Password input | `input` (true / false), `placeholder` (text), `max_length` (number), `accepted_chars` (text) | `{"w":160,"max_length":8}` |
-| `image` | Image | `src` (image path), `zoom` (number), `rotation` (number) | - |
+| `image` | Image | `src` (image path), `fit` (`contain` / `stretch` / `tile` / `center`), `zoom` (number), `rotation` (number) | - |
 | `chart` | Chart | `chart_type` (`line` / `bar` / `scatter`), `points` (number), `min` (number), `max` (number), `sample_ms` (number), `hdiv` (number), `vdiv` (number), `update_mode` (`shift` / `circular`), `series` (`[{ "tag", "color", "scale" }]`) | `{"w":300,"h":160,"chart_type":"line","points":100,"min":0,"max":100,"sample_ms":500,"hdiv":3,"vdiv":5,"series":[]}` |
 | `spinner` | Spinner | `time` (number), `angle` (number) | `{"w":60,"h":60}` |
 | `keyboard` | Keyboard | - | `{"align":"bottom_mid","w":"100%","h":"45%"}` |
@@ -72,6 +72,9 @@ Style objects: `style`, `style_pressed`, `style_checked`, `style_disabled`, `sty
 | `bg_opa` | number |
 | `bg_grad_color` | color (`"#rrggbb"`) |
 | `bg_grad_dir` | `hor` / `ver` |
+| `bg_image` | image file (path from project.json) |
+| `bg_image_opa` | number |
+| `bg_image_tiled` | true / false |
 | `border_color` | color (`"#rrggbb"`) |
 | `border_width` | number |
 | `border_opa` | number |
@@ -99,10 +102,10 @@ Style objects: `style`, `style_pressed`, `style_checked`, `style_disabled`, `sty
 | `opa` | number |
 | `line_color` | color (`"#rrggbb"`) |
 | `line_width` | number |
-| `line_rounded` | bool |
+| `line_rounded` | true / false |
 | `arc_color` | color (`"#rrggbb"`) |
 | `arc_width` | number |
-| `arc_rounded` | bool |
+| `arc_rounded` | true / false |
 | `image_recolor` | color (`"#rrggbb"`) |
 | `width` | number, `"50%"`, `"content"` |
 | `height` | number, `"50%"`, `"content"` |

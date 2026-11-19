@@ -63,7 +63,7 @@ function generate() {
     'Style objects: ' + S.styleSelectors.map(code).join(', ') + '.', '',
     '| key | value |', '| --- | --- |');
   for (const [k, t] of Object.entries(S.styleKeys)) {
-    const v = Array.isArray(t) ? t.map(code).join(' / ') : t === 'font' ? S.fonts.join(' / ') + ' (px)' : t === 'color' ? 'color (`"#rrggbb"`)' : t === 'size' ? 'number, `"50%"`, `"content"`' : t;
+    const v = Array.isArray(t) ? t.map(code).join(' / ') : t === 'font' ? S.fonts.join(' / ') + ' (px)' : t === 'image' ? 'image file (path from project.json)' : t === 'bool' ? 'true / false' : t === 'color' ? 'color (`"#rrggbb"`)' : t === 'size' ? 'number, `"50%"`, `"content"`' : t;
     L.push('| ' + code(k) + ' | ' + v + ' |');
   }
   L.push('');

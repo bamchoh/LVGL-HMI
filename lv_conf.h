@@ -104,6 +104,10 @@
 #define LV_FS_STDIO_LETTER 'A'
 #define LV_FS_STDIO_PATH ""
 #define LV_USE_LODEPNG 1
+/* images besides PNG: JPEG (baseline, decoded in blocks), BMP, GIF (animated: the "image" widget plays it) */
+#define LV_USE_TJPGD 1
+#define LV_USE_BMP 1
+#define LV_USE_GIF 1
 
 /* the project's font file (texts.hpp): glyphs are read from the file when first drawn */
 #define LV_USE_TINY_TTF 1

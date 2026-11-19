@@ -112,6 +112,7 @@ void check_log_sink(hml::LogLevel level, const std::string& msg)
     if(level == hml::LogLevel::Info) return;
     // (what check_project already reports, with the place)
     if(msg.rfind("bind: unknown tag", 0) == 0 || msg.rfind("unknown widget type", 0) == 0 || msg.rfind("action '", 0) == 0) return;
+    if(msg.find("are for PNG only") != std::string::npos || msg.find("only files inside the project folder") != std::string::npos) return;
     for(const std::string& m : s_check_log) if(m == msg) return;
     s_check_log.push_back(msg);
 }

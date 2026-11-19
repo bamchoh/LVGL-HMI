@@ -11,6 +11,7 @@
 #include "users.hpp"
 #include "util.hpp"
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <cstdlib>
 #include <deque>
@@ -314,6 +315,58 @@ void ta_show(lv_obj_t* ta, const std::string& text)
 
 // ================================================================ styles
 
+// ---- image files -------------------------------------------------------------------------
+// The folder the screen being built belongs to (image paths in styles are relative to it).
+std::string s_image_base_dir;
+// LVGL keeps the pointer of an image path only: the strings live here (one per file).
+const char* keep_path(const std::string& path)
+{
+    static std::set<std::string> pool;
+    return pool.insert(path).first->c_str();
+}
+// An image of the project as LVGL wants it ("A:<folder>/<file>"), or "" (and a warning): the
+// file must be inside the project folder (no "..", no absolute path), readable as an image and
+// not larger than kMaxImagePixels (a decoded image takes 4 bytes per pixel of memory).
+constexpr uint32_t kMaxImagePixels = 4u * 1024 * 1024;
+std::string image_path(const std::string& base_dir, const std::string& src)
+{
+    if(src.empty()) return "";
+    std::string norm = src;
+    for(char& c : norm) if(c == '\\') c = '/';
+    const bool outside = norm[0] == '/' || (norm.size() > 1 && norm[1] == ':') || norm == ".." || norm.rfind("../", 0) == 0
+                      || norm.find("/../") != std::string::npos || (norm.size() >= 3 && norm.compare(norm.size() - 3, 3, "/..") == 0);
+    if(outside) { HML_WARN("image '%s': only files inside the project folder can be shown", src.c_str()); return ""; }
+    const std::string path = "A:" + base_dir + "/" + norm;
+    if(norm.size() > 4 && iequals(norm.substr(norm.size() - 4), ".gif")) {
+        // (GIFs are read by the gif widget, not by an image decoder: look at the file itself)
+        std::string err;
+        auto data = read_file(base_dir + "/" + norm, 4u << 20, &err);
+        if(!data || data->size() < 10 || data->compare(0, 4, "GIF8") != 0) { HML_WARN("image '%s': no such file, not a GIF, or larger than 4 MB", src.c_str()); return ""; }
+        const uint32_t w = static_cast<uint8_t>((*data)[6]) | static_cast<uint8_t>((*data)[7]) << 8, hgt = static_cast<uint8_t>((*data)[8]) | static_cast<uint8_t>((*data)[9]) << 8;
+        if(static_cast<uint64_t>(w) * hgt > kMaxImagePixels / 4) { HML_WARN("image '%s': %ux%u is too large for an animation", src.c_str(), w, hgt); return ""; }
+        return path;
+    }
+    lv_image_header_t h;
+    if(lv_image_decoder_get_info(path.c_str(), &h) != LV_RESULT_OK) { HML_WARN("image '%s': no such file, or not a PNG / JPEG / BMP / GIF", src.c_str()); return ""; }
+    if(static_cast<uint64_t>(h.w) * h.h > kMaxImagePixels) {
+        HML_WARN("image '%s': %ux%u is too large (at most %u pixels in all)", src.c_str(), static_cast<unsigned>(h.w), static_cast<unsigned>(h.h), static_cast<unsigned>(kMaxImagePixels));
+        return "";
+    }
+    return path;
+}
+// JPEG and BMP are decoded piece by piece while they are drawn: they can only be shown in their
+// own size (no fit / zoom / rotation; stretching one draws garbage).
+bool own_size_only(const std::string& src)
+{
+    const size_t dot = src.rfind('.');
+    const std::string ext = dot == std::string::npos ? "" : src.substr(dot);
+    return iequals(ext, ".jpg") || iequals(ext, ".jpeg") || iequals(ext, ".bmp");
+}
+bool is_gif(const std::string& src)
+{
+    return src.size() > 4 && iequals(src.substr(src.size() - 4), ".gif");
+}
+
 void apply_style(lv_obj_t* obj, const json& st, lv_style_selector_t s)
 {
     if(!st.is_object()) return;
@@ -326,6 +379,12 @@ void apply_style(lv_obj_t* obj, const json& st, lv_style_selector_t s)
 
         if(iequals(k, "bg_color")) { lv_obj_set_style_bg_color(obj, color(), s); lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, s); }
         else if(iequals(k, "bg_opa")) lv_obj_set_style_bg_opa(obj, pct_to_opa(nv), s);
+        else if(iequals(k, "bg_image")) {
+            const std::string path = image_path(s_image_base_dir, sv);
+            if(!path.empty()) lv_obj_set_style_bg_image_src(obj, keep_path(path), s);
+        }
+        else if(iequals(k, "bg_image_opa")) lv_obj_set_style_bg_image_opa(obj, pct_to_opa(nv), s);
+        else if(iequals(k, "bg_image_tiled")) lv_obj_set_style_bg_image_tiled(obj, p.is_boolean() ? p.get<bool>() : nv != 0, s);
         else if(iequals(k, "bg_grad_color")) lv_obj_set_style_bg_grad_color(obj, color(), s);
         else if(iequals(k, "bg_grad_dir")) lv_obj_set_style_bg_grad_dir(obj, iequals(sv, "hor") ? LV_GRAD_DIR_HOR : iequals(sv, "ver") ? LV_GRAD_DIR_VER : LV_GRAD_DIR_NONE, s);
         else if(iequals(k, "border_color")) lv_obj_set_style_border_color(obj, color(), s);
@@ -410,6 +469,9 @@ struct Binding {
     Tag*        cmp_tag = nullptr;    // compare against another tag's live value instead of a constant
     double      scale = 1, offset = 0;    // widget = tag * scale + offset (Value)
     std::vector<std::pair<double, lv_color_t>> color_map;
+    std::vector<std::pair<double, std::string>> src_map;   // bind.src "map": value -> image file
+    std::string default_src, base_dir;
+    bool        has_src_map = false;
     std::optional<lv_color_t> default_color;
     lv_style_selector_t part = LV_PART_MAIN;
     bool        two_way = false;
@@ -495,7 +557,22 @@ void Binding::on_tag_changed(const Value& v, const void* source)
             std::string text = v.format(format);
             if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
-            else if(wk == Widget::Image) lv_image_set_src(obj, text.c_str());
+            else if(wk == Widget::Image) {
+                // the file: by the map (value -> file), else the tag's text; inside the project folder.
+                // (a text that starts with "A:" is taken as it is, as before)
+                std::string file = text;
+                if(has_src_map) {
+                    file = default_src;
+                    const double n = v.is_string() ? std::atof(v.str.c_str()) : v.num;
+                    for(const auto& [key, f] : src_map) if(key == n) { file = f; break; }
+                }
+                if(file.rfind("A:", 0) == 0) lv_image_set_src(obj, keep_path(file));
+                else {
+                    const std::string path = image_path(base_dir, file);
+                    if(path.empty()) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);          // nothing to show for this value
+                    else { lv_image_set_src(obj, keep_path(path)); lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN); }
+                }
+            }
             else lv_label_set_text(obj, text.c_str());
             break;
         }
@@ -1022,7 +1099,15 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
         if(iequals(part, "indicator")) b->part = LV_PART_INDICATOR;
         else if(iequals(part, "knob")) b->part = LV_PART_KNOB;
         parse_cmp(*b, spec);
-        if(const json* map = jget(spec, "map"); map && map->is_object()) {
+        if(const json* map = jget(spec, "map"); map && map->is_object() && wk == Widget::Image) {
+            b->has_src_map = true;
+            for(auto it = map->begin(); it != map->end(); ++it) {
+                if(!it.value().is_string()) continue;
+                if(iequals(it.key(), "default")) b->default_src = it.value().get<std::string>();
+                else b->src_map.emplace_back(iequals(it.key(), "true") ? 1 : iequals(it.key(), "false") ? 0 : std::atof(it.key().c_str()), it.value().get<std::string>());
+            }
+        }
+        else if(const json* map = jget(spec, "map"); map && map->is_object()) {
             for(auto it = map->begin(); it != map->end(); ++it) {
                 if(!it.value().is_string()) continue;
                 lv_color_t c = parse_color(it.value().get<std::string>(), lv_color_black());
@@ -1036,6 +1121,7 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
         two_way = jbool(spec, "two_way", two_way);
     }
     b->two_way = two_way;
+    b->base_dir = base_dir;
 
     Binding* raw = b.get();
     raw->screen = building;
@@ -1557,14 +1643,40 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     }
     else if(iequals(type, "image")) {
         wk = Widget::Image;
-        obj = lv_image_create(parent);
-        if(auto src = jstr_opt(w, "src")) {
-            bool absolute = (src->size() > 1 && (*src)[1] == ':') || (!src->empty() && (*src)[0] == '/');
-            std::string path = absolute ? "A:" + *src : "A:" + base_dir + "/" + *src;
-            lv_image_set_src(obj, path.c_str());
+        const std::string src = jstr(w, "src", "");
+        const std::string path = image_path(base_dir, src);
+        if(is_gif(src) && !path.empty()) {
+            // an animated GIF plays by itself (no zoom / fit / bind for it)
+            wk = Widget::Panel;
+            obj = lv_gif_create(parent);
+            lv_gif_set_src(obj, keep_path(path));
         }
-        if(jhas(w, "zoom")) lv_image_set_scale(obj, static_cast<uint32_t>(jnum(w, "zoom", 1.0) * 256));
-        if(jhas(w, "rotation")) lv_image_set_rotation(obj, static_cast<int32_t>(jnum(w, "rotation", 0) * 10));
+        else {
+            obj = lv_image_create(parent);
+            if(!path.empty()) lv_image_set_src(obj, keep_path(path));
+            // "fit": how the picture fills the widget's w / h (without it: its own size)
+            const std::string fit = jstr(w, "fit", "");
+            // (a picture that follows a tag: any of its files may be a JPEG / BMP)
+            bool plain = own_size_only(src);
+            if(const json* b = jget(w, "bind"); b && b->is_object())
+                if(const json* sb = jget(*b, "src"); sb && sb->is_object())
+                    if(const json* map = jget(*sb, "map"); map && map->is_object())
+                        for(auto it = map->begin(); it != map->end(); ++it) if(it.value().is_string() && own_size_only(it.value().get<std::string>())) plain = true;
+            if(plain) {
+                if(!fit.empty() || jhas(w, "zoom") || jhas(w, "rotation"))
+                    HML_WARN("image '%s': fit, zoom and rotation are for PNG only (a JPEG / BMP is shown in its own size)", src.empty() ? "(by tag)" : src.c_str());
+            }
+            else if(jhas(w, "zoom") || jhas(w, "rotation")) {
+                if(jhas(w, "zoom")) lv_image_set_scale(obj, static_cast<uint32_t>(jnum(w, "zoom", 1.0) * 256));
+                if(jhas(w, "rotation")) lv_image_set_rotation(obj, static_cast<int32_t>(jnum(w, "rotation", 0) * 10));
+            }
+            if(plain) {}
+            else if(iequals(fit, "contain")) lv_image_set_inner_align(obj, LV_IMAGE_ALIGN_CONTAIN);
+            else if(iequals(fit, "stretch")) lv_image_set_inner_align(obj, LV_IMAGE_ALIGN_STRETCH);
+            else if(iequals(fit, "tile")) lv_image_set_inner_align(obj, LV_IMAGE_ALIGN_TILE);
+            else if(iequals(fit, "center")) lv_image_set_inner_align(obj, LV_IMAGE_ALIGN_CENTER);
+            else if(!fit.empty()) HML_WARN("image: unknown fit '%s' (contain, stretch, tile, center)", fit.c_str());
+        }
     }
     else if(iequals(type, "chart")) {
         wk = Widget::Chart;
@@ -1765,6 +1877,7 @@ void Ui::Impl::ensure_built(Screen& scr)
     const json def = std::move(scr.def);
     scr.def = json();
     base_dir = scr.base_dir;
+    s_image_base_dir = base_dir;
     if(scr.popup) {
         // the backdrop: dims the screen (unless "dim": false) and takes every touch (modal)
         scr.backdrop = lv_obj_create(lv_layer_top());
@@ -1794,6 +1907,7 @@ void Ui::Impl::ensure_built(Screen& scr)
 
     building = outer;
     base_dir = outer_dir;
+    s_image_base_dir = base_dir;
 }
 
 lv_obj_t* Ui::build_screen(const json& screen, const std::string& base_dir)

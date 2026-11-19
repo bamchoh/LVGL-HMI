@@ -1,4 +1,5 @@
 #include "check.hpp"
+#include <cctype>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -70,12 +71,31 @@ struct Checker {
         if(!texts.count(s.substr(1))) add(where, key + ": \"" + s + "\" is not an id of \"texts\" (it is shown as it is)");
     }
 
+    // an image of the project: a file in its folder (the runtime shows nothing else)
+    void need_image(const std::string& where, const std::string& what, const std::string& src)
+    {
+        if(src.empty()) return;
+        std::string n = src;
+        for(char& ch : n) if(ch == '\\') ch = '/';
+        std::error_code ec;
+        if(n[0] == '/' || (n.size() > 1 && n[1] == ':') || n == ".." || n.rfind("../", 0) == 0 || n.find("/../") != std::string::npos)
+            add(where, what + ": \"" + src + "\" is outside the project folder (not shown)");
+        else if(!fs::is_regular_file(dir / fs::u8path(n), ec)) add(where, what + ": no file \"" + src + "\"");
+        else {
+            std::string ext = fs::u8path(n).extension().generic_u8string();
+            for(char& ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            if(ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".bmp" && ext != ".gif") add(where, what + ": \"" + src + "\" is not a PNG, JPEG, BMP or GIF");
+        }
+    }
+
     void check_style(const std::string& where, const std::string& sel, const json& st)
     {
         static const std::set<std::string> known = str_set(schema()["style"]);
         if(!st.is_object()) { add(where, sel + " is not an object"); return; }
-        for(auto it = st.begin(); it != st.end(); ++it)
+        for(auto it = st.begin(); it != st.end(); ++it) {
             if(!known.count(it.key())) add(where, sel + ": unknown style property \"" + it.key() + "\"");
+            else if(it.key() == "bg_image" && it.value().is_string()) need_image(where, sel + ".bg_image", it.value().get<std::string>());
+        }
     }
 
     void check_bind(const std::string& where, const json& b)
@@ -168,9 +188,26 @@ struct Checker {
         if(const json* o = jget(w, "options"); o && o->is_array()) for(const json& v : *o) text_id(where, "options", v);
         if(const json* l = jget(w, "labels"); l && l->is_object()) for(auto it = l->begin(); it != l->end(); ++it) text_id(where, "labels." + it.key(), it.value());
         if(type == "image") {
-            const std::string src = jstr(w, "src", "");
-            std::error_code ec;
-            if(!src.empty() && !fs::is_regular_file(dir / fs::u8path(src), ec)) add(where, "src: no file \"" + src + "\"");
+            need_image(where, "src", jstr(w, "src", ""));
+            // JPEG / BMP: their own size only
+            auto own_size = [](const std::string& f) {
+                std::string ext = fs::u8path(f).extension().generic_u8string();
+                for(char& ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+                return ext == ".jpg" || ext == ".jpeg" || ext == ".bmp";
+            };
+            std::string plain = own_size(jstr(w, "src", "")) ? jstr(w, "src", "") : "";
+            if(const json* b = jget(w, "bind"); b && b->is_object())
+                if(const json* sb = jget(*b, "src"); sb && sb->is_object())
+                    if(const json* map = jget(*sb, "map"); map && map->is_object())
+                        for(auto it = map->begin(); it != map->end(); ++it) if(it.value().is_string() && own_size(it.value().get<std::string>())) plain = it.value().get<std::string>();
+            if(!plain.empty())
+                for(const char* k : { "fit", "zoom", "rotation" })
+                    if(w.contains(k)) add(where, std::string(k) + ": only for PNG (\"" + plain + "\" is shown in its own size; make the file the size it is shown in, or use a PNG)");
+            // pictures by value: "bind": { "src": { "tag": ..., "map": { "0": "a.png", "default": "b.png" } } }
+            if(const json* b = jget(w, "bind"); b && b->is_object())
+                if(const json* sb = jget(*b, "src"); sb && sb->is_object())
+                    if(const json* map = jget(*sb, "map"); map && map->is_object())
+                        for(auto it = map->begin(); it != map->end(); ++it) if(it.value().is_string()) need_image(where, "bind.src.map." + it.key(), it.value().get<std::string>());
         }
         if(type == "chart") if(const json* ser = jget(w, "series"); ser && ser->is_array())
             for(const json& s : *ser) need_tag(where, "series", s.is_object() ? s.value("tag", json("")) : s);
