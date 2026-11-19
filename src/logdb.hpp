@@ -53,6 +53,7 @@ public:
     struct Column { std::string name, type; };     // type: "INTEGER" | "REAL" | "TEXT"
 
     // label is used in messages ("data log"); index_columns, if not empty, gets an index ("grp, ts").
+    // A column that a database written by an older version does not have yet is added on open.
     LogDb(std::string label, std::string table, std::vector<Column> columns, std::string index_columns = "");
     ~LogDb();
 
@@ -67,8 +68,10 @@ public:
     void add(int64_t ts_ms, LogRow row);
     void flush();
 
-    // Rows as [id, ts, columns...]. where is SQL after WHERE with ?1, ?2 ... placeholders ("grp = ?1").
-    std::vector<LogRow> query(const std::string& where = "", const LogRow& binds = {}, int limit = 0, bool newest_first = false);
+    // Rows as [id, ts, columns...]. where is SQL after WHERE with ?1, ?2 ... placeholders ("grp = ?1");
+    // values always go through binds, never into the SQL text. offset skips rows (paging).
+    std::vector<LogRow> query(const std::string& where = "", const LogRow& binds = {}, int limit = 0, bool newest_first = false, int offset = 0);
+    int64_t count(const std::string& where = "", const LogRow& binds = {});
 
     // "<database dir>/<stem>-YYYYMMDD-HHMMSS.csv"
     std::string export_path(const std::string& stem) const;

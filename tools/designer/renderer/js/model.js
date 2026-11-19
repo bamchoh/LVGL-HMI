@@ -80,6 +80,7 @@ const M = {
   tagChoices() {
     const out = ((this.st.project && this.st.project.tags) || []).filter(t => t && t.name).map(t => ({ name: t.name, note: t.type || '' }));
     if (this.usersOn()) for (const [n, ty] of [['sys.user.name', 'string'], ['sys.user.level', 'int'], ['sys.user.level_name', 'string'], ['sys.user.logged_in', 'bool']]) out.push({ name: n, note: ty + ' (system)' });
+    for (const [n, ty] of [['sys.alarm.active', 'int'], ['sys.alarm.unacked', 'int'], ['sys.alarm.latest', 'string'], ['sys.alarm.latest_severity', 'string']]) out.push({ name: n, note: ty + ' (system)' });
     return out;
   },
 
@@ -470,6 +471,7 @@ const M = {
     (p.scripts || []).forEach((s, i) => {
       if (/^screen_/.test(s.trigger || '') && s.screen && !screens.has(s.screen)) out.push({ text: 'script "' + (s.name || '') + '": unknown screen "' + s.screen + '"', view: 'scripts', index: i });
     });
+    if (p.alarms && U.num(p.alarms.ack_level, 0) > 0 && !usersOn) out.push({ text: 'alarms: ack_level is set, but user management is off (Users tab)', view: 'logs' });
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     return out;
   },

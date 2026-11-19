@@ -52,6 +52,25 @@
           }
         },
         {
+          "type": "button",
+          "align": "right_mid",
+          "x": -132,
+          "w": 84,
+          "h": 36,
+          "text": "Alarms",
+          "style": {
+            "bg_color": "#455a64"
+          },
+          "style_label": {
+            "font": 14
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "slide_left"
+          }
+        },
+        {
           "type": "led",
           "align": "right_mid",
           "x": -110,

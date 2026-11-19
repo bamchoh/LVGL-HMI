@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "alarm_view.hpp"
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
@@ -1449,6 +1450,12 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_READY, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_CANCEL, nullptr);
         if(building) building->keyboard = obj;
+    }
+    else if(iequals(type, "alarm_list")) {
+        obj = build_alarm_list(parent, w);
+    }
+    else if(iequals(type, "alarm_banner")) {
+        obj = build_alarm_banner(parent, w);
     }
     else if(iequals(type, "line")) {
         wk = Widget::Line;

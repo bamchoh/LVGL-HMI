@@ -35,6 +35,7 @@ add_executable(hml_tests
   test_script.cpp
   test_system_log.cpp
   test_logs.cpp
+  test_alarm_view.cpp
   test_key_service.cpp
   test_users.cpp
   test_project_archive.cpp

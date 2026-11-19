@@ -648,7 +648,7 @@ test('I18N: property names and fixed texts in Japanese, everything as it is in E
 test('every style property and widget property has a Japanese name', () => {
   const { SCHEMA } = load();
   const ctx = vm.createContext({ console });
-  vm.runInContext(fs.readFileSync(path.join(JS_DIR, 'i18n.js'), 'utf8'), ctx, { filename: 'i18n.js' });
+  for (const f of ['i18n.js', 'i18n_ja.js']) vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
   const KEYS = vm.runInContext('I18N.KEYS_JA', ctx), TEXT = vm.runInContext('I18N.TEXT_JA', ctx);
   const missing = [];
   for (const k of Object.keys(SCHEMA.styleKeys)) if (!(k in KEYS)) missing.push('style ' + k);
@@ -820,7 +820,8 @@ test('M addWidget at a position (dropped from the palette); tag choices', () => 
   M.undo();
   assert.equal((M.screen().children || []).length, 0);
   M.st.project.tags = [{ name: 'temp', type: 'float' }, { type: 'int' }];
-  deq(M.tagChoices(), [{ name: 'temp', note: 'float' }]);
+  deq(M.tagChoices().filter(t => !/^sys\./.test(t.name)), [{ name: 'temp', note: 'float' }]);
+  assert.ok(M.tagChoices().some(t => t.name === 'sys.alarm.unacked'));      // made by the runtime, always there
   M.setUsers(true);
   assert.ok(M.tagChoices().some(t => t.name === 'sys.user.name'));
 });

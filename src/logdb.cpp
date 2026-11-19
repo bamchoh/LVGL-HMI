@@ -1,4 +1,5 @@
 #include "logdb.hpp"
+#include <algorithm>
 #include "util.hpp"
 #include <atomic>
 #include <chrono>
@@ -117,6 +118,28 @@ struct LogDb::Impl {
         HML_ERROR("%s: %s (%s)", label.c_str(), err ? err : "sqlite error", sql.c_str());
         sqlite3_free(err);
         return false;
+    }
+
+    // a table made by an older version: add the columns it does not have (they read as NULL)
+    bool add_missing_columns()
+    {
+        std::vector<std::string> have;
+        sqlite3_stmt* st = nullptr;
+        if(sqlite3_prepare_v2(db, ("PRAGMA table_info(" + table + ")").c_str(), -1, &st, nullptr) != SQLITE_OK) { sqlite3_finalize(st); return false; }
+        while(sqlite3_step(st) == SQLITE_ROW) {
+            const unsigned char* n = sqlite3_column_text(st, 1);
+            have.emplace_back(n ? reinterpret_cast<const char*>(n) : "");
+        }
+        sqlite3_finalize(st);
+        for(const Column& c : columns) {
+            if(std::find(have.begin(), have.end(), c.name) != have.end()) continue;
+            // (NOT NULL needs a default for the rows that are there already)
+            std::string type = c.type;
+            if(type.find("NOT NULL") != std::string::npos) type += c.type.find("TEXT") != std::string::npos ? " DEFAULT ''" : " DEFAULT 0";
+            if(!exec("ALTER TABLE " + table + " ADD COLUMN " + c.name + " " + type)) return false;
+            HML_INFO("%s: column '%s' added to '%s'", label.c_str(), c.name.c_str(), cfg.path.c_str());
+        }
+        return true;
     }
 
     int64_t pragma(const char* name)
@@ -242,7 +265,7 @@ bool LogDb::open(const LogDbConfig& cfg, bool read_only)
             marks += ", ?" + std::to_string(i + 2);
         }
         insert += ") VALUES(" + marks + ")";
-        ok = m.exec(create + ")")
+        ok = m.exec(create + ")") && m.add_missing_columns()
           && m.exec("CREATE INDEX IF NOT EXISTS " + m.table + "_ts ON " + m.table + "(ts)")
           && (m.index_columns.empty() || m.exec("CREATE INDEX IF NOT EXISTS " + m.table + "_key ON " + m.table + "(" + m.index_columns + ")"))
           && sqlite3_prepare_v2(m.db, insert.c_str(), -1, &m.ins, nullptr) == SQLITE_OK;
@@ -315,7 +338,24 @@ void LogDb::add(int64_t ts_ms, LogRow row)
 
 void LogDb::flush() { impl_->write_pending(); }
 
-std::vector<LogRow> LogDb::query(const std::string& where, const LogRow& binds, int limit, bool newest_first)
+int64_t LogDb::count(const std::string& where, const LogRow& binds)
+{
+    Impl& m = *impl_;
+    flush();
+    std::lock_guard<std::mutex> dl(m.dbmu);
+    if(!m.db) return 0;
+    std::string sql = "SELECT COUNT(*) FROM " + m.table + (where.empty() ? "" : " WHERE " + where);
+    sqlite3_stmt* st = nullptr;
+    int64_t n = 0;
+    if(sqlite3_prepare_v2(m.db, sql.c_str(), -1, &st, nullptr) == SQLITE_OK) {
+        for(size_t i = 0; i < binds.size(); i++) bind_cell(st, static_cast<int>(i) + 1, binds[i]);
+        if(sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int64(st, 0);
+    }
+    sqlite3_finalize(st);
+    return n;
+}
+
+std::vector<LogRow> LogDb::query(const std::string& where, const LogRow& binds, int limit, bool newest_first, int offset)
 {
     Impl& m = *impl_;
     flush();
@@ -328,6 +368,7 @@ std::vector<LogRow> LogDb::query(const std::string& where, const LogRow& binds, 
     if(!where.empty()) sql += " WHERE " + where;
     sql += newest_first ? " ORDER BY id DESC" : " ORDER BY id ASC";
     if(limit > 0) sql += " LIMIT " + std::to_string(limit);
+    if(limit > 0 && offset > 0) sql += " OFFSET " + std::to_string(offset);
     sqlite3_stmt* st = nullptr;
     if(sqlite3_prepare_v2(m.db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         // (a database written by nobody yet has no table: that is an empty log, not an error)

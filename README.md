@@ -44,6 +44,7 @@ build.cmd Debug
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
+| `test_alarm_view.cpp`                                | アラームの確認（発生・復帰・確認の全順序）、再起動後の状態、履歴のページ送りと絞り込み、古い DB への列追加、確認のレベルと記録、一覧とバナー、1000 件の性能、SQL インジェクション・制御文字・不正な UTF-8 |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
 | `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
@@ -1089,11 +1090,12 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 
 ### アラーム (`alarms`)
 
-タグに対する条件を定義します。条件が成立したとき（発生 `raised`）と成立しなくなったとき（復帰 `cleared`）に
-1 行ずつ記録されます。
+タグに対する条件を定義します。条件が成立したとき（発生 `raised`）、成立しなくなったとき（復帰 `cleared`）、
+確認（アクノリッジ）されたとき（`acked`）に 1 行ずつ記録されます。
 
 ```json
 "alarms": {
+  "ack_level": 1,
   "items": [
     { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi",
       "severity": "warning", "message": "Temperature high" },
@@ -1110,10 +1112,47 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | `value` / `value_tag` | 比較する値。`value_tag` を書くと、別のタグの現在値と比較する（設定値タグをしきい値にできる）       |
 | `severity`            | `warning`（既定）/ `critical` / `info` など。記録されるだけで、動作は変わらない                    |
 | `message`             | 記録するメッセージ（省略時はアラーム名）                                                           |
+| `ack`                 | `true`（既定）: 確認されるまで「発生中のアラーム」に残る。`false`: 復帰すれば消える（確認は不要）    |
+| `ack_level`（全体）   | 確認に必要なユーザーレベル（既定 0 = 誰でも。ユーザー管理を使うとき）。足りなければログイン画面が出る |
 
-- 起動時にすでに成立しているアラームは、起動時刻で発生として記録されます。
-- 記録される列は、時刻、名前、`raised` / `cleared`、重要度、メッセージ、そのときのタグ値です。
-- 確認（アクノリッジ）と、画面上のアラーム一覧はまだありません。
+- 状態（発生中か、確認済みか）は再起動しても残ります（データベースから読み戻します）。止まっている間に
+  発生していたアラームは起動時刻で発生、止まっている間に消えたアラームは起動時刻で復帰として記録されます。
+  状態が変わっていないアラームは記録し直しません。
+- 記録される列は、時刻、名前、`raised` / `cleared` / `acked`、重要度、メッセージ、そのときのタグ値、確認した人です。
+  以前のバージョンで作ったデータベースには、開いたときに列が追加されます。
+- 確認は操作ログにも記録されます（種別 `alarm`）。
+- タグ: `sys.alarm.active`（発生中の数）、`sys.alarm.unacked`（未確認の数）、`sys.alarm.latest`（いちばん新しい未確認の
+  アラーム、なければ発生中のアラームのメッセージ）、`sys.alarm.latest_severity`。
+- 動作: `{ "action": "call", "fn": "alarm.ack", "arg": "<名前>" }`（`arg` 省略 = いちばん新しい未確認）、
+  `{ "action": "call", "fn": "alarm.ack_all" }`。
+
+#### 画面に出す: `alarm_list` と `alarm_banner`
+
+```json
+{ "type": "alarm_banner", "w": "100%", "h": 36 },
+{ "type": "alarm_list", "w": "100%", "h": 200, "columns": ["time", "severity", "message", "state"] },
+{ "type": "alarm_list", "w": "100%", "h": 200, "mode": "history", "rows": 10 }
+```
+
+| キー           | 内容                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `mode`         | `current`（既定: 発生中・未確認のアラーム、新しい順）/ `history`（記録、新しい順。ページ送りと重要度の絞り込み付き） |
+| `rows`         | `current`: 表示する最大行数（既定 50、超えた分は「+N more」）。`history`: 1 ページの行数（既定 20）     |
+| `row_height`   | 行の高さ（既定 40 px。指で押しやすい高さ）                                                             |
+| `columns`      | `time` / `severity` / `message` / `state` から選んで並べる（既定 `time, message, state`）              |
+| `ack_on_tap`   | `current`: 行をタップするとそのアラームを確認する（既定 `true`）。バナーでは既定 `false`               |
+| `severity`     | その重要度だけ表示する                                                                                 |
+| `days`         | `history`: 直近 N 日だけ（既定 0 = すべて）                                                            |
+| `blink`        | バナー: 未確認の間点滅する（既定 `true`）                                                              |
+| `labels`       | 表示文字の置き換え: `unacked` `active` `cleared` `empty` `idle` `all` `more`（`%d` が件数）`raised` `cleared_event` `acked_event` |
+
+- 色は重要度（`critical` 赤 / `warning` 琥珀 / `info` 青）、状態は塗り方（未確認 = 塗りつぶし、確認済み = 薄く、
+  復帰・未確認 = 灰色に色の帯）に加えて、文字とアイコンでも示します（色だけに頼らない）。
+- バナーは、いちばん新しい未確認のアラーム（なければ発生中のアラーム）と、ほかの件数を出します。`on_click` に
+  アラーム画面への `goto` などを書けます。
+- 一覧は表示中の画面にあるときだけ描き直します（250 ms ごとに変化を確認）。
+- 表示文字のフォントは Montserrat なので、`labels` で日本語を使う場合は日本語の字形を含むフォントが必要です
+  （多言語対応 #22 で扱います）。
 
 ```
 hml_runtime --export-alarm-log alarms.csv projects/demo/project.json

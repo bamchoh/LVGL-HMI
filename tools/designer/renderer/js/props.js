@@ -2,7 +2,7 @@
 'use strict';
 
 const Props = {
-  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled'],
+  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled', 'ack', 'blink'],
 
   init() { this.el = document.getElementById('props'); },
 

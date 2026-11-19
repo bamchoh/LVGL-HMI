@@ -108,6 +108,8 @@ const Tree = {
       case 'chart': return '↗';
       case 'keyboard': return '⌨';
       case 'line': return '╱';
+      case 'alarm_list': return '⚠';
+      case 'alarm_banner': return '⚑';
       default: return '□';
     }
   },
