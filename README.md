@@ -41,6 +41,7 @@ build.cmd Debug
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
+| `test_driver_opcua_client.cpp`                       | OPC UA クライアント（同じプロセスの open62541 サーバーを相手に: ノードの読み込みとサブスクリプション、`rw` の行だけ書き込み、**署名と暗号化**、**別の証明書のサーバーを拒否**、verify なしの警告、信頼する証明書がないと起動しない、平文で暗号化専用サーバーにつながらない、ユーザー名とパスワード（間違いの拒否、ログに出ない）、型に入らない値を書かない、サーバーの停止と復帰、停止がすぐ終わる、装置の証明書を 1 度だけ作る） |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
@@ -651,6 +652,48 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
 - ブローカーにつながらない間は、`change` のトピックごとに最新の値だけを覚えておき、つながったときに送ります。
   確認（PUBACK）が来ていない QoS 1 のメッセージは、つなぎ直したあと DUP を付けて送り直します（100 件まで）。
 - パスワードはログに出しません。`project.local.json` には平文で入るので、装置のファイルを読める人は読めます。
+
+### ドライバ: opcua_client（OPC UA クライアント）
+
+ほかの OPC UA サーバー（PLC、SCADA など）のノードをタグにします。**既定で署名と暗号化（Sign & Encrypt）を使い、
+サーバーの証明書を確認します。** 実装は open62541（MPL-2.0）で、暗号は mbedTLS です。
+
+```json
+{
+  "type": "opcua_client",
+  "endpoint": "opc.tcp://192.168.0.20:4840",
+  "server_cert": "certs/plc.der",
+  "status_tag": "plc_online", "publish_ms": 500,
+  "map": [
+    { "tag": "temp", "node": "ns=2;s=Temp" },
+    { "tag": "sp",   "node": "nsu=urn:plc:vars;s=Setpoint", "access": "rw" }
+  ]
+}
+```
+
+| キー                         | 内容                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `endpoint`                   | サーバーの `opc.tcp://ホスト:ポート`                                                            |
+| `security`                   | `sign_encrypt`（既定）/ `sign` / `none`（平文。値がネットワーク上で読めて、書き換えられる。警告付き） |
+| `policy`                     | 空欄なら両方が使える最も強いもの。`Basic256Sha256`、`Aes128_Sha256_RsaOaep`、`Aes256_Sha256_RsaPss` など |
+| `server_cert`                | 信頼するサーバーの証明書（DER / PEM、project.json からの相対パス。配列も可）。装置の `pki/trusted/` に置いたものも信頼する。**どちらもないと接続しません**（open62541 は信頼リストが空だと何でも受け入れるため） |
+| `verify`                     | 既定 `true`。`false` はサーバーの証明書を確認しない（警告付き。なりすましを防げない）              |
+| `cert_file` / `key_file`     | このクライアントの証明書と秘密鍵（DER）。空欄なら、装置が初回に `pki/own/opcua_client.der`（RSA 2048、20 年）を作り、以後それを使う。サーバー側でこの証明書を信頼させてください |
+| `application_uri`            | クライアントの URI（既定 `urn:hml:opcua_client`）。`cert_file` を使うときは証明書の URI と同じに |
+| `username` / `password`      | 装置のシステム設定（System > Driver）で入れると `project.local.json` に入り、project.json には残りません |
+| `publish_ms`                 | サーバーが変化を送る間隔（サブスクリプション。既定 500）                                         |
+| `timeout_ms` / `reconnect_ms`| 既定 5000 ms（接続）/ 1000 ms（再接続の最初の待ち。30 秒まで倍に延びる）                         |
+| `status_tag`                 | 接続中は 1                                                                                    |
+| `map[]`                      | `tag`、`node`（`ns=2;s=Temp`、`ns=3;i=1001`、名前空間 URI で書く `nsu=urn:...;s=...`）、`access`: `ro`（既定）/ `rw` |
+
+- 値はサブスクリプションで受け取ります（Boolean、整数、Float、Double、String、LocalizedText。配列は未対応）。
+- **サーバーへの書き込みは `"access": "rw"` の行だけ**です。値はノードのデータ型に変換し、入らないもの
+  （Int16 のノードに 40000、数値のノードに文字列など）は書き込まずにログに残します。接続していない間の変更は、
+  あとからまとめて送りません。
+- 接続が切れたら、セッションとサブスクリプションを作り直します。
+- `pki/` は装置の持ち物で、`logs/` や `project.local.json` と同じくデプロイで消えず、プロジェクトファイルにも入りません
+  （プロジェクトファイルから信頼する証明書を仕込むこともできません）。
+- 接続できない理由を調べるときは、環境変数 `HML_OPCUA_LOG=info`（または `debug`）で open62541 のログを増やせます。
 
 ### ドライバ: opcua_server（OPC UA サーバー）
 
@@ -1490,6 +1533,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
 | `src/project_archive.[ch]pp`   | プロジェクトファイル（`.hmlproj`）の作成と展開、プロジェクトを構成するファイルの一覧（デザイナーと共用） |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
+| `src/driver_opcua_client.cpp`  | OPC UA クライアント（open62541 + mbedTLS、サブスクリプションで読み、`rw` の行だけ書く）             |
 | `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバ |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |

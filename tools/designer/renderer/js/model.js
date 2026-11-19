@@ -747,6 +747,15 @@ const M = {
     });
     (p.drivers || []).forEach((d, i) => {
       if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
+      if (d.type === 'opcua_client') {
+        const n = d.name || d.type, at = { view: 'drivers', index: i };
+        if (!/^opc\.tcp:\/\//.test(d.endpoint || '')) out.push(Object.assign({ text: n + ': the endpoint is not opc.tcp://host:port' }, at));
+        if (d.security === 'none') out.push(Object.assign({ text: n + ': no security: values can be read and changed on the network' }, at));
+        else if (d.verify === false) out.push(Object.assign({ text: n + ': the server\'s certificate is not checked (verify off)' }, at));
+        else if (!d.server_cert) out.push(Object.assign({ text: n + ': no server certificate to trust (server_cert); put one in pki/trusted/ on the device, or it does not connect' }, at));
+        if (d.password) out.push(Object.assign({ text: n + ': the password is in project.json; better enter it on the device (System > Driver)' }, at));
+        if (!!d.cert_file !== !!d.key_file) out.push(Object.assign({ text: n + ': cert_file and key_file go together' }, at));
+      }
       if (d.type === 'mqtt') {
         const n = d.name || d.type, at = { view: 'drivers', index: i };
         if (!d.host) out.push(Object.assign({ text: n + ': no host is set' }, at));

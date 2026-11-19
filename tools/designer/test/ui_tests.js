@@ -351,6 +351,27 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('drivers: an OPC UA client is encrypted by default; switching security off is a problem', async () => {
+    Panels.showView('drivers'); App.doRefresh();
+    const sel = [...document.querySelectorAll('#view-drivers select')].find(s => [...s.options].some(o => o.value === 'opcua_client'));
+    ok(sel, 'opcua_client is offered');
+    ok([...sel.options].find(o => o.value === 'opcua_client').textContent.includes('OPC UA クライアント'), 'named in Japanese');
+    sel.value = 'opcua_client';
+    [...document.querySelectorAll('#view-drivers button')].find(b => b.textContent.includes('追加')).click();
+    App.doRefresh();
+    const i = M.st.project.drivers.length - 1, d = M.st.project.drivers[i];
+    eq(d.type, 'opcua_client');
+    const security = document.querySelector('[data-fk="drv.' + i + '.security"]');
+    ok(security, 'security field');
+    ok([...security.options].find(o => o.selected).textContent.includes('署名と暗号化'), 'Sign & Encrypt is the default');
+    ok(document.querySelector('#view-drivers').textContent.includes('ノード'), 'node table');
+    eq(App.problems.filter(p => p.index === i && p.view === 'drivers').length, 0, 'no problems by default');
+    security.value = 'none'; security.dispatchEvent(new Event('change')); App.doRefresh();
+    eq(d.security, 'none');
+    ok(App.problems.some(p => p.index === i && /no security/.test(p.text)), 'no security is a problem');
+    M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
+  });
+
   await test('alarm widgets: in the palette, drawn with the alarms of the project, settings on the Logs page', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /アラーム一覧/.test(t)) && pal.some(t => /アラームバナー/.test(t)), 'palette: ' + pal.join(','));

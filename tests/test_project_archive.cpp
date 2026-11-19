@@ -129,6 +129,7 @@ TEST_CASE("project file: pack and unpack give the same project back")
 
     // ---- unpacking again: the project is replaced, what this machine added stays
     out.write("logs/data.db", "recorded here");
+    out.write("pki/own/cert.der", "this machine's certificate");
     out.write("project.local.json", R"({ "drivers": { "plc": { "device": "COM4" } } })");
     out.write("screens/removed_meanwhile.json", "{}");
     out.write("stale.txt", "x");
@@ -137,6 +138,7 @@ TEST_CASE("project file: pack and unpack give the same project back")
     REQUIRE(unpack_project(file, out.dir, &err));
     CHECK(out.read("screens/second.json").find("new") != std::string::npos);
     CHECK(out.read("logs/data.db") == "recorded here");
+    CHECK(out.read("pki/own/cert.der") == "this machine's certificate");   // (a deploy keeps the device's certificates)
     CHECK(out.read("project.local.json").find("COM4") != std::string::npos);
     CHECK_FALSE(out.has("screens/removed_meanwhile.json"));
     CHECK_FALSE(out.has("stale.txt"));
@@ -206,11 +208,12 @@ TEST_CASE("project file: what is not a project is refused, and nothing is writte
     CHECK(out.read("project.json").find("kept") != std::string::npos);        // none of the refused files touched it
 
     // a machine's own files inside a project file (made by hand) are not taken over
-    make_zip("local.hmlproj", { { "project.json", "{ \"title\": \"new\" }" }, { "project.local.json", "{ \"x\": 1 }" }, { "logs/data.db", "x" } });
+    make_zip("local.hmlproj", { { "project.json", "{ \"title\": \"new\" }" }, { "project.local.json", "{ \"x\": 1 }" }, { "logs/data.db", "x" }, { "pki/trusted/evil.der", "x" } });
     REQUIRE(unpack_project(t.dir / "local.hmlproj", out.dir, &err));
     CHECK(out.read("project.json").find("new") != std::string::npos);
     CHECK_FALSE(out.has("project.local.json"));
     CHECK_FALSE(out.has("logs/data.db"));
+    CHECK_FALSE(out.has("pki/trusted/evil.der"));                // a project file cannot plant a trusted certificate
 }
 
 TEST_CASE("project file: one working folder per file")
