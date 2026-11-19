@@ -94,6 +94,21 @@ const SCHEMA = {
     { k: 'hidden', t: 'bool' }, { k: 'disabled', t: 'bool' }, { k: 'clickable', t: 'bool' },
     { k: 'scrollable', t: 'bool' }, { k: 'scrollbar', t: 'select', o: ['', 'off', 'on', 'auto', 'active'] },
   ],
+  // "animate" of a widget: one of these, or a list. Presets fill in the rest.
+  animate: {
+    props: ['opa', 'x', 'y', 'w', 'h', 'rotation', 'zoom', 'bg_color', 'text_color', 'frames'],
+    presets: ['blink', 'pulse', 'spin'],
+    paths: ['linear', 'ease_in', 'ease_out', 'ease_in_out', 'step'],
+    keys: ['preset', 'prop', 'from', 'to', 'time', 'delay', 'playback', 'repeat', 'path', 'when', 'files'],
+    templates: {
+      blink: { preset: 'blink', when: '' },
+      pulse: { preset: 'pulse', when: '' },
+      spin: { preset: 'spin', when: '' },
+      move: { prop: 'x', from: 0, to: 100, time: 1000, playback: true, path: 'ease_in_out' },
+      colour: { prop: 'bg_color', to: '#c62828', time: 600, playback: true },
+      frames: { prop: 'frames', files: ['assets/frame1.png', 'assets/frame2.png'], time: 600 },
+    },
+  },
   flex: [
     { k: 'flex', t: 'select', o: ['', 'row', 'column', 'row_wrap', 'column_wrap', 'row_reverse', 'column_reverse'] },
     { k: 'flex_main', t: 'select', o: ['', 'start', 'center', 'end', 'space_between', 'space_around', 'space_evenly'] },

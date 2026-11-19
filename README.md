@@ -39,6 +39,7 @@ build.cmd Debug
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_animate.cpp`                                   | アニメーション（点滅がタグで始まり止まると元に戻る、移動・回転・拡大・色、コマ送り、回数、**表示していない画面と閉じたポップアップでは動かない**、**1 秒に 3 回より速く点滅しない**、書き間違いの警告、動作中に画面を消しても安全） |
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
@@ -266,6 +267,7 @@ project.json: drivers[0] (plc): map: unknown tag "pressur"
 | 文字 | フォント（と組み込みフォント）にない文字 |
 | `runtime:` の行 | 実際に読み込んで全画面を作ったときにランタイムが出した警告とエラー |
 
+- `--at <ms>`: `--render` が、画面を表示してからおよそその時間がたった絵を描きます（アニメーションの途中。既定 200）。
 - `--render <画面>,<ファイル>`: その画面を描いて保存します（複数指定可）。`<画面>+<ポップアップ>` と書くと、その画面の上に
   ポップアップを開いた状態です（ポップアップの名前だけなら `start_screen` の上）。
   `--lang <言語>` でその言語、`--set <タグ>=<値>` でタグの値を変えた状態を描けます（この 2 つはふつうの起動でも使えます）。
@@ -1210,6 +1212,34 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `map`                                   | 値 → 色 のマップ。`default` で既定色                                                                                                        |
 | `part`                                  | `bg_color` の対象パート: `main` (既定) / `indicator` / `knob`                                                                               |
 | `two_way`                               | 双方向の明示的な ON/OFF                                                                                                                     |
+
+### アニメーション (`animate`)
+
+部品を点滅させる、回す、動かす、色を変える、絵をコマ送りする、といった動きを付けます。どの部品にも書けます（1 つ、または配列）。
+
+```json
+{ "type": "label", "text": "ALARM", "animate": { "preset": "blink", "when": "alarm_active" } },
+{ "type": "image", "src": "assets/fan.png", "animate": { "preset": "spin", "time": 1500, "when": "run" } },
+{ "type": "panel", "w": 24, "h": 24, "animate": { "prop": "x", "from": 100, "to": 400, "time": 2000, "when": { "tag": "flow", "gt": 0 } } },
+{ "type": "image", "src": "assets/c1.png", "animate": { "prop": "frames", "files": ["assets/c1.png", "assets/c2.png", "assets/c3.png"], "time": 600 } }
+```
+
+| キー | 意味 |
+| --- | --- |
+| `preset` | `blink`（1 秒周期の点滅）/ `pulse`（ゆっくりした明滅）/ `spin`（1 回転 2 秒）。ほかのキーで上書きできる |
+| `prop` | `opa`（0-100）/ `x` `y` `w` `h`（px）/ `rotation`（度）/ `zoom`（1 = 元の大きさ）/ `bg_color` `text_color` / `frames`（`image`: `files` の絵を順に表示） |
+| `from` / `to` | 両端の値（`from` を省くと今の値） |
+| `time` / `delay` | 片道の時間と、始まるまでの時間（ミリ秒。`time` の既定は 1000。`frames` では一巡の時間） |
+| `playback` / `repeat` | 往復する / 回数（省くとずっと） |
+| `path` | `linear`（既定）/ `ease_in` / `ease_out` / `ease_in_out` / `step` |
+| `when` | タグ名か条件（`bind` と同じ書き方）。**成り立つ間だけ動き、止まると部品は元に戻ります** |
+
+- 動くのは、その画面（ポップアップ）が表示されている間だけです。見えていない画面のアニメーションは止まっていて、負荷になりません。
+- **1 秒に 3 回より速い点滅はできません**（光に敏感な人への配慮。`opa` と色のアニメーションは、その速さまで遅くして警告を出します）。
+- `rotation` と `zoom` は `image`（PNG）なら軽く、ほかの部品では描画が重くなります。
+- 確認: `hml_runtime project.json --check --render main,a.png --at 600` で、表示からおよそ 600 ms 後の絵を描けます。
+- デザイナーでは、プロパティの「アニメーション」に JSON で書きます（よく使うものはボタンで追加できます）。キャンバスでは再生されないので、
+  Preview / Run で確かめます。
 
 ### アクション
 

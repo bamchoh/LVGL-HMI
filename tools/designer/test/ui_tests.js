@@ -465,6 +465,22 @@
     Panels.show('widgets');
   });
 
+  await test('animation: a ready one is added from the properties; a wrong one is a problem', async () => {
+    App.addWidget('label'); await frame();
+    const w = M.selected();
+    const btn = name => document.querySelector('[data-fk$=".animate.add.' + name + '"]');
+    ok(btn('blink') && btn('spin') && btn('move'), 'the buttons');
+    btn('blink').click(); App.doRefresh();
+    eq(M.selected().animate.preset, 'blink');
+    ok(M.selected().animate.when, 'with a tag as its condition');
+    btn('move').click(); App.doRefresh();
+    ok(Array.isArray(M.selected().animate) && M.selected().animate.length === 2, 'a second one makes a list');
+    eq(App.problems.filter(p => /^animate/.test(p.text)).length, 0, 'no problems');
+    M.mutate(() => { M.selected().animate = { prop: 'colour', to: 1 }; }); App.doRefresh();
+    ok(App.problems.some(p => /unknown prop "colour"/.test(p.text)), 'a wrong prop is a problem');
+    void w;
+  });
+
   await test('AI: the dialog gives the skill, the project folder and the runtime', async () => {
     document.getElementById('b-ai').click();
     const t = document.querySelector('[data-fk="ai.prompt"]');

@@ -741,6 +741,7 @@ const M = {
           }
         }
         if (U.num(w.level, 0) > 0 && !usersOn) out.push(Object.assign({ text: 'a level is set, but user management is off (Users tab)' }, at));
+        for (const t of this.animateProblems(w, tags)) out.push(Object.assign({ text: 'animate: ' + t }, at));
         (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
       };
       visit(s.data, []);
@@ -783,6 +784,36 @@ const M = {
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     for (const r of this.recipeProblems()) out.push(r);
     for (const t of this.textProblems()) out.push(t);
+    return out;
+  },
+
+  // What is wrong in a widget's "animate" (the same checks as the runtime's --check).
+  animateProblems(w, tags) {
+    const out = [], A = SCHEMA.animate;
+    if (w.animate === undefined) return out;
+    for (let a of Array.isArray(w.animate) ? w.animate : [w.animate]) {
+      if (typeof a === 'string') a = { preset: a };
+      if (!a || typeof a !== 'object' || Array.isArray(a)) { out.push('an animation is an object'); continue; }
+      for (const k of Object.keys(a)) if (!A.keys.includes(k)) out.push('unknown key "' + k + '"');
+      if (a.preset !== undefined && !A.presets.includes(a.preset)) { out.push('unknown preset "' + a.preset + '"'); continue; }
+      const prop = a.prop !== undefined ? a.prop : { blink: 'opa', pulse: 'opa', spin: 'rotation' }[a.preset];
+      if (prop === undefined) { out.push('no "prop" (or "preset")'); continue; }
+      if (!A.props.includes(prop)) { out.push('unknown prop "' + prop + '"'); continue; }
+      if (a.preset === undefined && prop !== 'frames' && a.to === undefined) out.push('"' + prop + '" needs "to"');
+      if (prop === 'frames') {
+        if (w.type !== 'image') out.push('"frames" is for image widgets');
+        if (!Array.isArray(a.files) || a.files.length < 2) out.push('"frames" needs "files" with two pictures or more');
+      }
+      if (a.path !== undefined && !A.paths.includes(a.path)) out.push('unknown path "' + a.path + '"');
+      const flash = ['opa', 'bg_color', 'text_color'].includes(prop), time = a.time === undefined ? (a.preset === 'blink' ? 500 : a.preset === 'pulse' ? 700 : 1000) : Number(a.time);
+      const playback = a.playback !== undefined ? !!a.playback : (a.preset === 'blink' || a.preset === 'pulse');
+      if (flash && time < (playback ? 167 : 334)) out.push(time + ' ms flashes faster than 3 times a second (the runtime slows it down)');
+      if (a.when !== undefined) {
+        const t = typeof a.when === 'string' ? a.when : (a.when && a.when.tag);
+        if (!t) out.push('"when" names no tag');
+        else if (!tags.has(t) && !/^sys\./.test(t)) out.push('unknown tag "' + t + '" (when)');
+      }
+    }
     return out;
   },
 

@@ -96,7 +96,10 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
         { "type": "trend", "group": "nogroup" },
         { "type": "recipe_table", "book": "nobook" },
         { "type": "alarm_list" },
-        { "type": "panel", "children": [ { "type": "switch", "bind": "nope6" } ] } ] })json");
+        { "type": "panel", "children": [ { "type": "switch", "bind": "nope6" } ] },
+        { "type": "label", "animate": [ { "preset": "blink", "when": "temp" }, "spin", { "prop": "x", "from": 0, "to": 9, "when": { "tag": "temp", "gt": 5 } },
+                                        { "prop": "colour", "to": 1 }, { "preset": "wobble" }, { "prop": "y" }, { "prop": "opa", "to": 0, "time": 50, "speed": 2 },
+                                        { "prop": "frames", "files": ["a.png"] }, { "preset": "pulse", "when": "nope7", "path": "bouncy" } ] } ] })json");
     const auto lines = p.check();
     auto expect = [&](const char* part) { CAPTURE(part); CHECK(has(lines, part)); };
     expect("screens/a.json: unknown key \"bind\"");
@@ -126,9 +129,18 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
     expect("children[8] (recipe_table): unknown recipe book \"nobook\"");
     expect("children[9] (alarm_list): the project has no \"alarms\"");
     expect("children[10].children[0] (switch): bind: unknown tag \"nope6\"");
+    expect("children[11] (label): animate: unknown prop \"colour\"");
+    expect("children[11] (label): animate: unknown preset \"wobble\"");
+    expect("children[11] (label): animate: \"y\" needs \"to\"");
+    expect("children[11] (label): animate: unknown key \"speed\"");
+    expect("children[11] (label): animate: 50 ms flashes faster than 3 times a second");
+    expect("children[11] (label): animate: \"frames\" is for image widgets");
+    expect("children[11] (label): animate: \"frames\" needs \"files\" with two pictures or more");
+    expect("children[11] (label): animate.when: unknown tag \"nope7\"");
+    expect("children[11] (label): animate: unknown path \"bouncy\"");
     expect("project.json: drivers[0] (sim): items: unknown tag \"ghost\"");
     expect("project.json: drivers[0] (sim): status_tag: unknown tag \"nobody\"");
-    CHECK(lines.size() == 29);                                  // and nothing else
+    CHECK(lines.size() == 38);                                  // and nothing else
 }
 
 TEST_CASE("check: broken files and a broken project")

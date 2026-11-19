@@ -104,6 +104,43 @@
 - `--check` が見るもの: ファイルがあるか、プロジェクトの中か、形式、JPEG / BMP に `fit` などを付けていないか。
   壊れたファイルや大きすぎる画像は `runtime:` の行に出る。
 
+## アニメーション
+
+どの部品にも `animate` を書ける（1 つ、または配列）。**その画面が表示されていて、`when` が成り立つ間だけ**動き、
+止まると部品は元の見た目に戻る。`when` を省くと、画面が出ている間ずっと動く。
+
+```json
+{ "type": "label", "text": "@alarm", "animate": { "preset": "blink", "when": "alarm_active" } },
+{ "type": "image", "src": "assets/fan.png", "animate": { "preset": "spin", "time": 1500, "when": "run" } },
+{ "type": "panel", "w": 24, "h": 24, "animate": { "prop": "x", "from": 100, "to": 400, "time": 2000, "path": "linear", "when": { "tag": "flow", "gt": 0 } } },
+{ "type": "panel", "style": { "bg_color": "#37474f" }, "animate": { "prop": "bg_color", "to": "#c62828", "time": 600, "playback": true, "when": { "tag": "state", "eq": 2 } } },
+{ "type": "image", "src": "assets/conv1.png", "animate": { "prop": "frames", "files": ["assets/conv1.png", "assets/conv2.png", "assets/conv3.png"], "time": 600, "when": "run" } }
+```
+
+| キー | 意味 |
+| --- | --- |
+| `preset` | `blink`（点いたり消えたり、1 秒周期）/ `pulse`（ゆっくり明滅）/ `spin`（1 回転 2 秒）。下のキーで上書きできる |
+| `prop` | 動かすもの: `opa`（不透明度 0〜100）/ `x` `y` `w` `h`（px）/ `rotation`（度）/ `zoom`（1 = 元の大きさ）/ `bg_color` `text_color` / `frames`（`image` の絵を順に替える） |
+| `from` / `to` | 両端の値。`from` を省くと今の値から |
+| `time` | 片道の時間（ミリ秒、既定 1000）。`frames` では一巡の時間 |
+| `playback` | true で往復する |
+| `repeat` | 回数（省くとずっと） |
+| `path` | 動き方: `linear`（既定）/ `ease_in` / `ease_out` / `ease_in_out` / `step`（時間の終わりで切り替わる） |
+| `delay` | 始まるまでの時間（ミリ秒） |
+| `when` | タグ名（真のとき）か条件（`{ "tag": "state", "eq": 2 }`。`bind` の条件と同じ書き方） |
+
+使いどころと決まり:
+- **動きは「いま気づいてほしいこと」だけに使う**（未確認のアラーム、運転中、流れている）。飾りに動かさない。
+  1 画面で同時に動くものは少なく（目安 3 つまで）。常に動くもの（`when` なし）は避ける。
+- 点滅（`opa` と色）は 1 秒に 3 回より速くできない（ランタイムが遅くする）。警告は `pulse` か、ゆっくりした `blink` にする。
+- 動いても読めること: 値や操作するボタンそのものは点滅させない。枠・帯・アイコンを動かす。
+- `rotation` と `zoom` は `image`（PNG）に使うのが軽い。ほかの部品に付けると描画が重くなるので、小さい部品だけにする。
+  JPEG / BMP の `image` は回転・拡大できない。
+- `x` `y` を動かす部品は `align` を付けず、`from` / `to` に座標を書く。flex で並べた中の部品は動かさない。
+- `frames` の絵は同じ大きさにする。
+- 確かめ方: `--render` に `--at <ミリ秒>` を付けると、その画面が出てからおよそその時間がたった絵になる。
+  時刻を変えて 2 枚描き、動いていること・`when` が成り立たないとき（`--set`）は止まっていることを見る。
+
 ## 動作
 
 イベント（`on_click` など）に、動作 1 つか配列（順に実行）を書く。
