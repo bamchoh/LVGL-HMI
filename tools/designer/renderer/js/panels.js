@@ -82,15 +82,16 @@ const Panels = {
       oninput: e => { this.tagFilter = e.target.value; this.renderTags(); document.querySelector('[data-fk="tagfilter"]').focus(); } });
     const add = () => { this.tagFilter = ''; M.addTag(); };
     el.append(U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, 'Tags'), U.el('span', { class: 'dim' }, tags.length + ' tags'),
-      U.el('span', { class: 'grow' }), filter, U.el('button', { class: 'primary', onclick: add }, '+ Add tag')));
+      U.el('span', { class: 'grow' }), filter, U.el('button', { onclick: () => App.tagsCsvDialog() }, 'Import / export …'), U.el('button', { class: 'primary', onclick: add }, '+ Add tag')));
     const tbl = U.el('table', { class: 'grid' });
-    tbl.append(U.el('tr', null, ...['#', 'name', 'type', 'init', 'min', 'max', ''].map(h => U.el('th', null, h))));
+    tbl.append(U.el('tr', null, ...['#', 'name', 'type', 'init', 'min', 'max', 'used', ''].map(h => U.el('th', null, I18N.label(h)))));
+    const uses = M.tagUses();
     tags.forEach((t, i) => {
       if (q && !(t.name || '').toLowerCase().includes(q)) return;
       const fk = 'tag.' + i;
       tbl.append(U.el('tr', null,
         U.el('td', { class: 'idx' }, String(i + 1)),
-        U.el('td', { style: { width: '34%' } }, U.el('input', { type: 'text', value: t.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.mutate(() => { t.name = e.target.value.trim(); }) })),
+        U.el('td', { style: { width: '34%' } }, U.el('input', { type: 'text', value: t.name || '', dataset: { fk: fk + '.name' }, onchange: e => App.renameTag(i, e.target.value) })),
         U.el('td', { style: { width: '110px' } }, Props.editor(t, 'type', { t: 'select', o: SCHEMA.tagTypes }, fk)),
         U.el('td', null, U.el('input', { type: 'text', value: t.init === undefined ? '' : String(t.init), dataset: { fk: fk + '.init' }, onchange: e => M.mutate(() => {
           const s = e.target.value.trim();
@@ -101,7 +102,13 @@ const Panels = {
         }) })),
         U.el('td', null, Props.editor(t, 'min', { t: 'number' }, fk)),
         U.el('td', null, Props.editor(t, 'max', { t: 'number' }, fk)),
-        U.el('td', { class: 'act' }, U.el('button', { class: 'mini danger', title: 'delete', onclick: () => M.removeTag(i) }, '×'))));
+        U.el('td', { class: 'uses' }, (uses.get(t.name) || []).length
+          ? U.el('button', { class: 'mini', title: 'Show where this tag is used', onclick: () => App.usesDialog(t.name) }, String(uses.get(t.name).length))
+          : U.el('span', { class: 'dim', title: 'This tag is not used anywhere' }, '0')),
+        U.el('td', { class: 'act' }, U.el('button', { class: 'mini danger', title: 'delete', onclick: () => {
+          const n = (uses.get(t.name) || []).length;
+          if (!n || App.ask(I18N.f('Tag "{0}" is used in {1} place(s). Delete it anyway?', t.name, n))) M.removeTag(i);
+        } }, '×'))));
     });
     el.append(tbl);
     if (!tags.length) el.append(U.el('div', { class: 'hint' }, 'No tags yet. Tags are the named values that widgets bind to and drivers read / write.'));

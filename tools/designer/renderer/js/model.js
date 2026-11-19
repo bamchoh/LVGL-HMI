@@ -225,6 +225,199 @@ const M = {
     });
   },
 
+  // ---- where tags are used ---------------------------------------------------
+  // Calls cb(name, set, loc, what, soft) for every place that names a tag. set(newName) changes
+  // it there; loc is { screen, path } or { view, index }; what says which property. soft: found
+  // in Lua code (tag.name) - renamed with the tag, but not reported when the tag is unknown.
+  eachTagRef(cb) {
+    const st = this.st, p = st.project;
+    if (!p) return;
+    const prop = (o, k, loc, what) => { if (o && typeof o[k] === 'string' && o[k] !== '') cb(o[k], v => { o[k] = v; }, loc, what || k, false); };
+    const list = (arr, loc, what) => { if (Array.isArray(arr)) arr.forEach((v, i) => { if (typeof v === 'string' && v) cb(v, n => { arr[i] = n; }, loc, what, false); }); };
+    const lua = (o, k, loc) => {
+      if (!o || typeof o[k] !== 'string') return;
+      for (const name of new Set([...o[k].matchAll(/\btag\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(m => m[1]))) {
+        cb(name, n => { if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)) o[k] = o[k].replace(new RegExp('\\btag\\.' + name + '\\b', 'g'), 'tag.' + n); }, loc, 'lua', true);
+      }
+    };
+    st.screens.forEach((s, si) => {
+      const visit = (w, path) => {
+        const loc = { screen: si, path };
+        if (typeof w.bind === 'string') prop(w, 'bind', loc, 'bind');
+        else if (w.bind && typeof w.bind === 'object') {
+          for (const kind of Object.keys(w.bind)) {
+            const spec = w.bind[kind];
+            if (typeof spec === 'string') prop(w.bind, kind, loc, kind);
+            else if (spec && typeof spec === 'object') {
+              prop(spec, 'tag', loc, kind);
+              for (const op of ['eq', 'ne', 'gt', 'lt', 'ge', 'le']) if (spec[op] && typeof spec[op] === 'object') prop(spec[op], 'tag', loc, kind);
+            }
+          }
+        }
+        for (const k of Object.keys(w)) {
+          if (!/^on_/.test(k) || !w[k]) continue;
+          for (const act of Array.isArray(w[k]) ? w[k] : [w[k]]) {
+            if (!act || typeof act !== 'object') continue;
+            if (['set', 'toggle', 'inc', 'dec'].includes(act.action)) prop(act, 'tag', loc, act.action);
+            if (act.action === 'script') lua(act, 'code', loc);
+          }
+        }
+        for (const s2 of Array.isArray(w.series) ? w.series : []) prop(s2, 'tag', loc, 'series');
+        (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
+      };
+      visit(s.data, []);
+    });
+    (p.drivers || []).forEach((d, i) => {
+      const loc = { view: 'drivers', index: i };
+      for (const [k, v] of Object.entries(d || {})) {
+        if (!Array.isArray(v)) continue;
+        if (k === 'tags') list(v, loc, 'tags');
+        for (const row of v) if (row && typeof row === 'object') prop(row, 'tag', loc, k);
+      }
+      prop(d, 'status_tag', loc);
+    });
+    (p.scripts || []).forEach((sc, i) => {
+      const loc = { view: 'scripts', index: i };
+      if (!sc) return;
+      list(sc.tags, loc, 'trigger'); prop(sc, 'tag', loc, 'trigger'); lua(sc, 'code', loc);
+    });
+    const logs = { view: 'logs' };
+    for (const g of (p.data_log && p.data_log.groups) || []) { if (!g) continue; list(g.tags, logs, 'data_log'); prop(g, 'trigger_tag', logs); }
+    for (const al of (p.alarms && p.alarms.items) || []) { if (!al) continue; prop(al, 'tag', logs, 'alarms'); prop(al, 'value_tag', logs); }
+    if (p.operation_log) prop(p.operation_log, 'user_tag', logs);
+  },
+  // name -> [{ loc, what }]
+  tagUses() {
+    const m = new Map();
+    this.eachTagRef((name, set, loc, what) => { if (!m.has(name)) m.set(name, []); m.get(name).push({ loc, what }); });
+    return m;
+  },
+  // Give a tag another name; everything that names it follows. Returns the number of places changed.
+  renameTag(i, name) {
+    const tags = this.st.project.tags, t = tags[i];
+    name = String(name || '').trim();
+    if (!t || t.name === name) return 0;
+    let n = 0;
+    this.mutate(() => {
+      const old = t.name;
+      t.name = name;
+      // (not when another tag has the old name too, or the new name is already taken: then the
+      // references are ambiguous and stay as they are)
+      if (!old || !name || tags.some(x => x !== t && (x.name === old || x.name === name))) return;
+      this.eachTagRef((ref, set) => { if (ref === old) { set(name); n++; } });
+    });
+    return n;
+  },
+
+  // ---- style: copy the look of one widget onto others ------------------------
+  styleOf(w) { const o = {}; for (const k of Object.keys(w || {})) if (/^style/.test(k)) o[k] = U.clone(w[k]); return o; },
+  pasteStyle(styles) {
+    const sels = this.selection();
+    if (!styles || !sels.length) return;
+    this.mutate(() => {
+      for (const p of sels) {
+        const w = this.get(p);
+        for (const k of Object.keys(w)) if (/^style/.test(k)) delete w[k];
+        Object.assign(w, U.clone(styles));
+      }
+    });
+  },
+
+  // ---- designer-only marks on a widget: "designer": { "locked": true, "hidden": true } ----
+  // locked: cannot be clicked or moved on the canvas (a background). hidden: not drawn on the
+  // canvas, to reach what is below. The runtime does not look at them.
+  flag(w, k) { return !!(w && w.designer && w.designer[k]); },
+  setFlag(k, on) {
+    const sels = this.selection();
+    if (!sels.length) return;
+    this.mutate(() => {
+      for (const p of sels) {
+        const w = this.get(p);
+        if (on) { w.designer = w.designer || {}; w.designer[k] = true; }
+        else if (w.designer) { delete w.designer[k]; if (!Object.keys(w.designer).length) delete w.designer; }
+      }
+    });
+  },
+  anyFlag(k) { let f = false; const walk = w => { if (this.flag(w, k)) f = true; (w.children || []).forEach(walk); }; if (this.screen()) walk(this.screen()); return f; },
+  clearFlag(k) {
+    this.mutate(() => {
+      const walk = w => { if (w.designer) { if (k) delete w.designer[k]; if (!k || !Object.keys(w.designer).length) delete w.designer; } (w.children || []).forEach(walk); };   // no k: all marks
+      walk(this.screen());
+    });
+  },
+
+  // ---- tags as a table of text (to and from a spreadsheet) ----------------------
+  exportTags() {
+    const cell = v => { const s = v === undefined || v === null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    return ['name,type,init,min,max'].concat(((this.st.project && this.st.project.tags) || []).map(t => [t.name, t.type, t.init, t.min, t.max].map(cell).join(','))).join('\n') + '\n';
+  },
+  // Lines of name, type, init, min, max - separated by commas or tabs (pasted from a
+  // spreadsheet); a first line "name,..." is a heading. A tag that exists is updated.
+  // Returns { added, updated, errors: ['line 3: ...'] }; nothing is changed when there are errors.
+  importTags(text) {
+    const res = { added: 0, updated: 0, errors: [] }, rows = [];
+    String(text || '').split(/\r?\n/).forEach((line, li) => {
+      if (!line.trim()) return;
+      const cells = (line.includes('\t') ? line.split('\t') : line.split(',')).map(c => c.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
+      if (!rows.length && !res.errors.length && /^name$/i.test(cells[0])) return;
+      const [name, type0, init, min, max] = cells, type = (type0 || 'int').toLowerCase();
+      if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name || '')) { res.errors.push('line ' + (li + 1) + ': "' + (name || '') + '" is not a tag name'); return; }
+      if (!SCHEMA.tagTypes.includes(type)) { res.errors.push('line ' + (li + 1) + ': unknown type "' + type0 + '" (' + SCHEMA.tagTypes.join(', ') + ')'); return; }
+      const t = { name, type };
+      if (init !== undefined && init !== '') t.init = type === 'string' ? init : type === 'bool' ? /^(true|1|on)$/i.test(init) : Number(init);
+      if (min !== undefined && min !== '') t.min = Number(min);
+      if (max !== undefined && max !== '') t.max = Number(max);
+      if ([t.min, t.max].concat(type === 'int' || type === 'float' ? [t.init] : []).some(v => v !== undefined && Number.isNaN(v))) { res.errors.push('line ' + (li + 1) + ': "' + name + '": not a number'); return; }
+      rows.push(t);
+    });
+    if (res.errors.length || !rows.length) return res;
+    this.mutate(() => {
+      const tags = this.st.project.tags = this.st.project.tags || [];
+      for (const t of rows) {
+        const old = tags.find(x => x.name === t.name);
+        if (old) { for (const k of ['type', 'init', 'min', 'max']) { if (t[k] === undefined) delete old[k]; else old[k] = t[k]; } res.updated++; }
+        else { tags.push(t); res.added++; }
+      }
+    });
+    return res;
+  },
+
+  // ---- moving widgets in the tree ----------------------------------------------
+  pathOf(obj) {
+    let found = null;
+    const walk = (w, path) => { if (found) return; if (w === obj) { found = path; return; } (w.children || []).forEach((c, i) => walk(c, path.concat(i))); };
+    if (this.screen()) walk(this.screen(), []);
+    return found;
+  },
+  // Move widgets (of one parent) so that they become children of the widget at destPath, at
+  // index (undefined = at the end). False when that is not possible (into itself, not a container).
+  moveWidgets(paths, destPath, index) {
+    if (!paths || !paths.length) return false;
+    const src = this.get(paths[0].slice(0, -1)), dest = this.get(destPath);
+    if (!src || !dest || !(this.isContainer(dest) || !destPath.length)) return false;
+    const idx = paths.map(p => p[p.length - 1]).sort((x, y) => x - y), moved = idx.map(i => src.children[i]);
+    if (moved.some(w => !w)) return false;
+    const inside = (w, target) => w === target || (w.children || []).some(c => inside(c, target));
+    if (moved.some(w => inside(w, dest))) return false;
+    this.mutate(() => {
+      dest.children = dest.children || [];
+      let at = index === undefined ? dest.children.length : Math.max(0, Math.min(index, dest.children.length));
+      if (src === dest) at -= idx.filter(i => i < at).length;
+      for (const i of idx.slice().reverse()) src.children.splice(i, 1);
+      dest.children.splice(at, 0, ...moved);
+      const dp = this.pathOf(dest);
+      this.st.sel = dp.concat(at); this.st.more = moved.slice(1).map((w, k) => dp.concat(at + 1 + k));
+    });
+    return true;
+  },
+  // 'front': drawn on top of its siblings (last), 'back': below them (first)
+  orderSelection(where) {
+    const sels = this.selection();
+    if (!sels.length) return;
+    const cp = sels[0].slice(0, -1);
+    this.moveWidgets(sels, cp, where === 'front' ? undefined : 0);
+  },
+
   // ---- problems -------------------------------------------------------------
   // Things in the project that will not work on the device: names that do not exist, and the
   // like. Each entry: { text, screen, path } for a widget or { text, view, index } for a page.
@@ -236,66 +429,41 @@ const M = {
     const okTag = n => tags.has(n) || /^sys\./.test(n);          // sys.*: made by the runtime (user, system settings)
     const usersOn = this.usersOn();
 
-    // tags
     const seenTag = new Set();
     (p.tags || []).forEach((t, i) => {
       if (!t.name) out.push({ text: 'a tag has no name', view: 'tags', index: i });
       else if (seenTag.has(t.name)) out.push({ text: 'tag "' + t.name + '" is defined twice', view: 'tags', index: i });
       seenTag.add(t.name);
     });
-    // screens
+    this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
+
     if (p.start_screen && !screens.has(p.start_screen)) out.push({ text: 'start screen "' + p.start_screen + '" does not exist', view: 'project' });
     const seenScr = new Set();
     st.screens.forEach((s, si) => {
       if (seenScr.has(s.data.name)) out.push({ text: 'screen "' + s.data.name + '" is defined twice', screen: si, path: [] });
       seenScr.add(s.data.name);
-      const tagOf = spec => (typeof spec === 'string' ? spec : spec && typeof spec === 'object' ? spec.tag : undefined);
       const visit = (w, path) => {
         const at = { screen: si, path };
-        const need = (name, what) => { if (name !== undefined && name !== '' && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '"' + (what ? ' (' + what + ')' : '') }, at)); };
-        if (typeof w.bind === 'string') need(w.bind, 'bind');
-        else if (w.bind && typeof w.bind === 'object') {
-          for (const [kind, spec] of Object.entries(w.bind)) {
-            need(tagOf(spec), kind);
-            if (spec && typeof spec === 'object') for (const op of ['eq', 'ne', 'gt', 'lt', 'ge', 'le']) if (spec[op] && typeof spec[op] === 'object') need(spec[op].tag, kind);
-          }
-        }
         for (const [k, v] of Object.entries(w)) {
           if (!/^on_/.test(k) || !v) continue;
           for (const a of Array.isArray(v) ? v : [v]) {
             if (!a || typeof a !== 'object') continue;
-            if (['set', 'toggle', 'inc', 'dec'].includes(a.action)) need(a.tag, a.action);
             if (a.action === 'goto' && a.screen && !screens.has(a.screen) && !/^__/.test(a.screen)) out.push(Object.assign({ text: 'unknown screen "' + a.screen + '" (goto)' }, at));
             if (a.action === 'script' && a.name && !scripts.has(a.name)) out.push(Object.assign({ text: 'unknown script "' + a.name + '"' }, at));
             if ((a.action === 'login' || a.action === 'logout') && !usersOn) out.push(Object.assign({ text: 'action "' + a.action + '" needs user management (Users tab)' }, at));
           }
         }
-        for (const s2 of Array.isArray(w.series) ? w.series : []) need(s2 && s2.tag, 'series');
         if (U.num(w.level, 0) > 0 && !usersOn) out.push(Object.assign({ text: 'a level is set, but user management is off (Users tab)' }, at));
         (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
       };
       visit(s.data, []);
     });
-    // drivers
     (p.drivers || []).forEach((d, i) => {
-      const at = { view: 'drivers', index: i }, name = d.name || d.type || 'driver';
-      for (const row of [].concat(Array.isArray(d.map) ? d.map : [], Array.isArray(d.items) ? d.items : [])) {
-        if (row && row.tag !== undefined && !okTag(row.tag)) out.push(Object.assign({ text: name + ': unknown tag "' + row.tag + '"' }, at));
-      }
-      if (d.status_tag && !okTag(d.status_tag)) out.push(Object.assign({ text: name + ': unknown tag "' + d.status_tag + '" (status_tag)' }, at));
-      if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push(Object.assign({ text: name + ': no serial port (device) is set' }, at));
+      if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
     });
-    // scripts
     (p.scripts || []).forEach((s, i) => {
-      if (s.trigger === 'tag' && s.tag && !okTag(s.tag)) out.push({ text: 'script "' + (s.name || '') + '": unknown tag "' + s.tag + '"', view: 'scripts', index: i });
       if (/^screen_/.test(s.trigger || '') && s.screen && !screens.has(s.screen)) out.push({ text: 'script "' + (s.name || '') + '": unknown screen "' + s.screen + '"', view: 'scripts', index: i });
     });
-    // logs
-    const logTag = (t, where) => { if (t && !okTag(t)) out.push({ text: where + ': unknown tag "' + t + '"', view: 'logs' }); };
-    if (this.logOn('data_log')) for (const g of p.data_log.groups || []) { for (const t of g.tags || []) logTag(t, 'data log "' + (g.name || '') + '"'); logTag(g.trigger_tag, 'data log "' + (g.name || '') + '"'); }
-    if (this.logOn('alarms')) for (const a of p.alarms.items || []) { logTag(a.tag, 'alarm "' + (a.name || '') + '"'); logTag(a.value_tag, 'alarm "' + (a.name || '') + '"'); }
-    if (this.logOn('operation_log') && !usersOn) logTag(p.operation_log.user_tag, 'operation log');
-    // users
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     return out;
   },

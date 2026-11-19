@@ -74,7 +74,7 @@ const App = {
     langSel.onchange = () => { I18N.set(langSel.value); host.settings({ lang: I18N.lang }); this.staticTexts(); this.doRefresh(); };
     this.staticTexts();
     if (this.info.argvProject) await this.open(this.info.argvProject);
-    else { M.newProject('New HMI', 800, 480); M.st.dirty = false; }
+    else { M.newProject('New HMI', 800, 480); M.st.dirty = false; this.offerRecovery(); }
     this.refresh();
     if (!this.info.runtime) this.toast('hml_runtime not found next to the designer: Preview / Run are unavailable');
   },
@@ -104,6 +104,8 @@ const App = {
   doRefresh() {
     const ae = document.activeElement, fk = ae && ae.dataset ? ae.dataset.fk : null;
     this.problems = M.problems();
+    this.autosave();
+    this.renderTabs();
     Canvas.render(); Tree.render(); Props.render(); Panels.render(); this.toolbar(); this.status();
     if (fk) { const e = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]'); if (e) e.focus(); }
   },
@@ -122,6 +124,163 @@ const App = {
   cut() { if (this.copy()) M.deleteSelection(); },
   paste() { if (this.clip) M.paste(this.clip); },
 
+  // ---- screen tabs: the screens being worked on, above the canvas -----------
+  tabs: [],                                         // the files of the open screens
+  renderTabs() {
+    const bar = document.getElementById('screen-tabs'), st = M.st;
+    bar.hidden = Panels.view !== 'screen' || !st.screens.length;
+    bar.innerHTML = '';
+    if (bar.hidden) return;
+    const files = st.screens.map(s => s.file), cur = st.screens[st.cur];
+    this.tabs = this.tabs.filter(f => files.includes(f));
+    if (cur && !this.tabs.includes(cur.file)) this.tabs.push(cur.file);
+    for (const f of this.tabs) {
+      const i = files.indexOf(f), s = st.screens[i];
+      bar.append(U.el('div', { class: 'stab' + (i === st.cur ? ' active' : ''), title: s.file,
+        onmousedown: e => { if (e.button === 1) { e.preventDefault(); this.closeTab(f); } },
+        onclick: () => { if (i !== M.st.cur) M.selectScreen(i); } },
+        U.el('span', null, (st.project.start_screen === s.data.name ? '● ' : '') + s.data.name),
+        this.tabs.length > 1 ? U.el('span', { class: 'x', title: 'Close the tab (the screen stays in the project)', onclick: e => { e.stopPropagation(); this.closeTab(f); } }, '×') : null));
+    }
+    const rest = st.screens.filter(s => !this.tabs.includes(s.file));
+    if (rest.length) {
+      const sel = U.el('select', { class: 'stab-more', title: 'Open another screen in a tab', onchange: e => { const i = files.indexOf(e.target.value); if (i >= 0) M.selectScreen(i); } },
+        U.el('option', { value: '' }, '+'), ...rest.map(s => U.el('option', { value: s.file }, s.data.name)));
+      bar.append(sel);
+    }
+  },
+  closeTab(file) {
+    if (this.tabs.length < 2) return;
+    const at = this.tabs.indexOf(file), cur = M.st.screens[M.st.cur];
+    this.tabs.splice(at, 1);
+    if (cur && cur.file === file) { const next = this.tabs[Math.min(at, this.tabs.length - 1)]; M.selectScreen(M.st.screens.findIndex(s => s.file === next)); }
+    else this.renderTabs();
+  },
+  nextTab(dir) {
+    const cur = M.st.screens[M.st.cur];
+    if (!cur || this.tabs.length < 2) return;
+    const next = this.tabs[(this.tabs.indexOf(cur.file) + dir + this.tabs.length) % this.tabs.length];
+    M.selectScreen(M.st.screens.findIndex(s => s.file === next));
+  },
+
+  // ---- context menu -------------------------------------------------------------
+  // items: [{ label, key, onclick, disabled }] or null for a separator
+  menu(x, y, items) {
+    this.closeMenu();
+    const m = U.el('div', { id: 'ctx-menu' });
+    for (const it of items) {
+      if (!it) { m.append(U.el('div', { class: 'sep' })); continue; }
+      m.append(U.el('div', { class: 'mi' + (it.disabled ? ' off' : ''), onclick: () => { if (it.disabled) return; this.closeMenu(); it.onclick(); } },
+        U.el('span', null, I18N.t(it.label)), U.el('span', { class: 'k' }, it.key || '')));
+    }
+    document.body.append(m);
+    m.style.left = Math.max(0, Math.min(x, window.innerWidth - m.offsetWidth - 4)) + 'px';
+    m.style.top = Math.max(0, Math.min(y, window.innerHeight - m.offsetHeight - 4)) + 'px';
+    setTimeout(() => document.addEventListener('mousedown', this._menuOff = e => { if (!m.contains(e.target)) this.closeMenu(); }), 0);
+  },
+  closeMenu() {
+    const m = document.getElementById('ctx-menu');
+    if (m) m.remove();
+    if (this._menuOff) { document.removeEventListener('mousedown', this._menuOff); this._menuOff = null; }
+  },
+  widgetMenu(e, path) {
+    // a right click on something that is not selected selects it first
+    if (!M.selection().some(p => U.samePath(p, path)) && !(path.length === 0 && U.samePath(M.st.sel, []))) this.select(path);
+    const n = M.selection().length, none = n === 0;
+    this.menu(e.clientX, e.clientY, [
+      { label: 'Cut', key: 'Ctrl+X', disabled: none, onclick: () => this.cut() },
+      { label: 'Copy', key: 'Ctrl+C', disabled: none, onclick: () => this.copy() },
+      { label: 'Paste', key: 'Ctrl+V', disabled: !this.clip, onclick: () => this.paste() },
+      { label: 'Duplicate', key: 'Ctrl+D', disabled: none, onclick: () => M.duplicateSelection() },
+      { label: 'Delete', key: 'Del', disabled: none, onclick: () => M.deleteSelection() },
+      null,
+      { label: 'Copy style', key: 'Ctrl+Alt+C', disabled: none, onclick: () => this.copyStyle() },
+      { label: 'Paste style', key: 'Ctrl+Alt+V', disabled: none || !this.styleClip, onclick: () => M.pasteStyle(this.styleClip) },
+      null,
+      M.flag(M.selected(), 'locked') ? { label: 'Unlock', disabled: none, onclick: () => M.setFlag('locked', false) } : { label: 'Lock (cannot be clicked on the canvas)', disabled: none, onclick: () => M.setFlag('locked', true) },
+      M.flag(M.selected(), 'hidden') ? { label: 'Show on the canvas', disabled: none, onclick: () => M.setFlag('hidden', false) } : { label: 'Hide on the canvas (designer only)', disabled: none, onclick: () => M.setFlag('hidden', true) },
+      { label: 'Show all / unlock all', disabled: !M.anyFlag('hidden') && !M.anyFlag('locked'), onclick: () => M.clearFlag() },
+      null,
+      { label: 'Bring to front', disabled: none, onclick: () => M.orderSelection('front') },
+      { label: 'Send to back', disabled: none, onclick: () => M.orderSelection('back') },
+      null,
+      { label: 'Select all in this panel', key: 'Ctrl+A', onclick: () => { M.selectSiblings(); this.selectionChanged(); } },
+    ]);
+  },
+
+  styleClip: null,
+  copyStyle() { const w = M.selected(); if (w && M.st.sel.length) { this.styleClip = M.styleOf(w); this.toast('Style copied', 1200); } },
+
+  // ---- tags to and from a spreadsheet -------------------------------------------
+  tagsCsvDialog() {
+    const ta = U.el('textarea', { class: 'csv', spellcheck: false, value: M.exportTags() });
+    const out = U.el('div');
+    const body = U.el('div', null,
+      U.el('div', { class: 'hint' }, 'One tag per line: name, type, init, min, max. Copy this into a spreadsheet, or paste lines from one here (commas or tabs) and press Import. A tag that already exists is updated; nothing is deleted.'),
+      ta, out);
+    this.modal({ title: 'Tags: import / export', body, buttons: [
+      { label: 'Copy', onclick: () => { ta.select(); try { document.execCommand('copy'); } catch (_) {} return false; } },
+      { label: 'Close' },
+      { label: 'Import', primary: true, onclick: () => {
+        const r = M.importTags(ta.value);
+        out.innerHTML = '';
+        if (r.errors.length) { out.append(U.el('div', { class: 'warn' }, I18N.t('Nothing was imported:')), U.el('pre', null, r.errors.join('\n'))); return false; }
+        this.toast(I18N.f('{0} tag(s) added, {1} updated', r.added, r.updated), 2500);
+      } }] });
+  },
+
+  // ---- unsaved work is kept aside, in case the designer is closed or crashes ------
+  recKey(path) { return 'hml.recover:' + String(path || '').replace(/\\/g, '/').toLowerCase(); },
+  autosave(now) {
+    clearTimeout(this._autoTimer);
+    const run = () => {
+      try {
+        const st = M.st, key = this.recKey(st.path);
+        if (this._recKey && this._recKey !== key) localStorage.removeItem(this._recKey);
+        this._recKey = key;
+        if (st.dirty && st.project) localStorage.setItem(key, JSON.stringify({ time: Date.now(), project: st.project, screens: st.screens }));
+        else localStorage.removeItem(key);
+      } catch (_) { /* no storage, or full: there is just no safety copy */ }
+    };
+    if (now) run(); else this._autoTimer = setTimeout(run, 1500);
+  },
+  // called after a project was opened (or at start, without one): offer what was not saved
+  offerRecovery() {
+    let rec = null;
+    const key = this.recKey(M.st.path);
+    try { rec = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { rec = null; }
+    if (!rec || !rec.project || !Array.isArray(rec.screens) || !rec.screens.length) return;
+    if (this.ask(I18N.f('Changes that were not saved were found ({0}). Restore them?', new Date(rec.time).toLocaleString()))) {
+      const st = M.st;
+      st.project = rec.project; st.screens = rec.screens; st.cur = 0; st.sel = []; st.more = []; st.undo = []; st.redo = []; st.dirty = true;
+    } else { try { localStorage.removeItem(key); } catch (_) {} }
+  },
+
+  // ---- tags: rename with everything that uses the tag, and where it is used ------
+  renameTag(i, name) {
+    const n = M.renameTag(i, name);
+    if (n) this.toast(I18N.f('{0} place(s) that use the tag were changed with it', n), 2500);
+  },
+  usesDialog(name) {
+    const uses = M.tagUses().get(name) || [];
+    const body = U.el('div', { class: 'prob-list' });
+    let close = null;
+    for (const u of uses) {
+      body.append(U.el('div', { class: 'item', onclick: () => { close(); this.gotoProblem(u.loc); } },
+        U.el('div', null, this.whereText(u.loc)), U.el('div', { class: 'where' }, I18N.label(u.what))));
+    }
+    close = this.modal({ title: I18N.f('Tag "{0}" is used here ({1})', name, uses.length), body, buttons: [{ label: 'Close' }] });
+  },
+  // a place in the project, in words: Screen "main" › label "x" / Drivers
+  whereText(pr) {
+    const scr = pr.screen !== undefined ? M.st.screens[pr.screen] : null;
+    if (!scr) return I18N.t({ tags: 'Tags', drivers: 'Drivers', scripts: 'Scripts', logs: 'Logs', users: 'Users', project: 'Project' }[pr.view] || '')
+      + (pr.view === 'drivers' && pr.index !== undefined ? ' › ' + ((M.st.project.drivers[pr.index] || {}).name || (M.st.project.drivers[pr.index] || {}).type || '')
+        : pr.view === 'scripts' && pr.index !== undefined ? ' › ' + ((M.st.project.scripts[pr.index] || {}).name || '') : '');
+    let w = scr.data; for (const i of pr.path) w = (w.children || [])[i];
+    return I18N.t('Screen') + ' "' + scr.data.name + '"' + (pr.path.length && w ? ' › ' + Tree.label(w, false) : '');
+  },
+
   // ---- problems: what will not work on the device --------------------------
   problems: [],
   problemsDialog() {
@@ -130,10 +289,7 @@ const App = {
     const body = U.el('div', { class: 'prob-list' });
     let close = null;
     for (const pr of list) {
-      const scr = pr.screen !== undefined ? M.st.screens[pr.screen] : null;
-      const w = scr ? (() => { let o = scr.data; for (const i of pr.path) o = (o.children || [])[i]; return o; })() : null;
-      const where = scr ? I18N.t('Screen') + ' "' + scr.data.name + '"' + (pr.path.length && w ? ' › ' + Tree.label(w, false) : '')
-        : I18N.t({ tags: 'Tags', drivers: 'Drivers', scripts: 'Scripts', logs: 'Logs', users: 'Users', project: 'Project' }[pr.view] || '');
+      const where = this.whereText(pr);
       body.append(U.el('div', { class: 'item', onclick: () => { close(); this.gotoProblem(pr); } },
         U.el('div', null, I18N.t(pr.text)), U.el('div', { class: 'where' }, where)));
     }
@@ -218,7 +374,12 @@ const App = {
   // ---- project files -----------------------------------------------------
   // a yes / no question, in the chosen language
   ask(question) { return confirm(I18N.t(question)); },
-  confirmDiscard() { return !M.st.dirty || this.ask('Discard unsaved changes?'); },
+  confirmDiscard() {
+    if (!M.st.dirty) return true;
+    if (!this.ask('Discard unsaved changes?')) return false;
+    M.st.dirty = false; this.autosave(true);                   // thrown away on purpose: no safety copy
+    return true;
+  },
 
   newProjectDialog() {
     if (!this.confirmDiscard()) return;
@@ -251,6 +412,7 @@ const App = {
     try { M.loadFromHost(r); } catch (e) { this.toast('parse error: ' + e.message, 6000); return; }
     await this.loadLocal();
     this.remember(path);
+    this.offerRecovery();
     this.refresh();
     setTimeout(() => this.zoomFit(), 50);
   },
@@ -264,9 +426,10 @@ const App = {
   },
   SHORTCUTS: [
     ['Ctrl+N / Ctrl+O / Ctrl+S', 'New / open / save (Ctrl+Shift+S: save as)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
-    ['Ctrl+1 … Ctrl+6', 'Screen editor, tags, drivers, scripts, logs, users'],
+    ['Ctrl+1 … Ctrl+6', 'Screen editor, tags, drivers, scripts, logs, users'], ['Ctrl+Tab / Ctrl+Shift+Tab', 'Next / previous screen tab'],
+    ['Drag on the background', 'Select the widgets inside the rectangle'], ['Right click', 'Menu: copy, paste, order …'],
     ['Ctrl+click, Shift+click', 'Add a widget to the selection, or take it out'], ['Ctrl+A', 'Select everything in the same panel'],
-    ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste widgets (also onto another screen)'], ['Ctrl+D', 'Duplicate'], ['Del', 'Delete'],
+    ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste widgets (also onto another screen)'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy / paste the style (look) of a widget'], ['Ctrl+D', 'Duplicate'], ['Del', 'Delete'],
     ['← ↑ → ↓', 'Move by 1 px (with Shift: 10 px)'], ['Alt + drag', 'Move without snapping to other widgets'], ['Esc', 'Clear the selection / close a dialog'],
     ['F1', 'This list'],
   ],
@@ -323,6 +486,7 @@ const App = {
     this.refresh();
     this.toast('saved ' + st.path, 1500);
     this.remember(st.path);
+    this.autosave(true);
     return true;
   },
   // A project is its folder (project.json, screens/, assets/), and the folder's name is the
@@ -619,6 +783,10 @@ const App = {
     const ctrl = e.ctrlKey || e.metaKey;
     if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
     if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
+    if (e.key === 'Escape' && document.getElementById('ctx-menu')) { this.closeMenu(); return; }
+    if (ctrl && (e.key === 'Tab' || e.key === 'PageDown' || e.key === 'PageUp') && Panels.view === 'screen') {
+      e.preventDefault(); this.nextTab(e.key === 'PageUp' || (e.key === 'Tab' && e.shiftKey) ? -1 : 1); return;
+    }
     if (e.key === 'F1') { e.preventDefault(); this.shortcutsDialog(); return; }
     if (ctrl && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProjectDialog(); return; }
     if (ctrl && /^[123456]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs', 'users'][Number(e.key) - 1]); return; }
@@ -627,6 +795,8 @@ const App = {
     if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') document.getElementById('modal').hidden = true; return; }
     if (inInput || Panels.view !== 'screen') return;   // widget shortcuts only act on the canvas
     const sel = M.st.sel, key = e.key.toLowerCase();
+    if (ctrl && e.altKey && key === 'c') { e.preventDefault(); this.copyStyle(); return; }
+    if (ctrl && e.altKey && key === 'v') { e.preventDefault(); if (this.styleClip) M.pasteStyle(this.styleClip); return; }
     if (ctrl && key === 'd') { e.preventDefault(); M.duplicateSelection(); return; }
     if (ctrl && key === 'a') { e.preventDefault(); M.selectSiblings(); this.selectionChanged(); return; }
     if (ctrl && (key === 'c' || key === 'x')) {
