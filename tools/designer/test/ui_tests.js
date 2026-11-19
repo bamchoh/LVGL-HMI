@@ -288,6 +288,33 @@
     eq(localStorage.getItem(App.recKey(M.st.path)), null, 'nothing unsaved: no safety copy');
   });
 
+  await test('recipes: the page edits books and values, the recipe table shows the book', async () => {
+    key('7', { ctrlKey: true }); App.doRefresh();
+    eq(Panels.view, 'recipes');
+    const page = document.getElementById('view-recipes');
+    ok(!page.hidden, 'page shown');
+    ok(page.textContent.includes('レシピブック'), 'in Japanese');
+    const n = M.recipeBooks().length;
+    [...page.querySelectorAll('button')].find(b => b.textContent.includes('レシピブックを追加')).click(); App.doRefresh();
+    eq(M.recipeBooks().length, n + 1);
+    const bi = n, b = M.recipeBooks()[bi];
+    [...page.querySelectorAll('button')].filter(x => x.textContent.includes('レシピを追加')).pop().click(); App.doRefresh();
+    eq(b.recipes.length, 1);
+    const cell = document.querySelector('#view-recipes input[data-fk="rec.' + bi + '.r0.' + b.items[0] + '"]');
+    ok(cell, 'value cell');
+    cell.value = '7'; cell.dispatchEvent(new Event('change')); App.doRefresh();
+    const t0 = M.st.project.tags.find(t => t.name === b.items[0]);
+    eq(b.recipes[0].values[b.items[0]], t0.type === 'string' ? '7' : t0.type === 'bool' ? false : 7);
+    Panels.showView('screen'); App.doRefresh();
+    App.addWidget('recipe_table'); await frame();
+    const sel = [...document.querySelectorAll('#props select')].find(s => [...s.options].some(o => o.value === b.name));
+    ok(sel, 'book select');
+    sel.value = b.name; sel.dispatchEvent(new Event('change')); App.doRefresh(); await frame();
+    const el2 = Canvas.root.querySelector('[data-path="' + U.pathStr(M.st.sel) + '"]');
+    ok(el2.classList.contains('lv-recipe_table') && el2.textContent.includes(b.recipes[0].name), 'preview shows the recipes');
+    eq(App.problems.filter(p => /recipe/i.test(p.text)).length, 0, 'no recipe problems');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

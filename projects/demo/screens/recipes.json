@@ -1,0 +1,19 @@
+{
+  "name": "recipes",
+  "scrollable": false,
+  "style": { "bg_color": "#141a22", "pad": 0 },
+  "children": [
+    {
+      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
+      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
+      "children": [
+        { "type": "label", "text": "Recipes", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
+        { "type": "label", "align": "center", "x": 40, "w": 420, "long_mode": "dots", "style": { "font": 14, "text_color": "#9fb3c8" },
+          "bind": { "text": "sys.recipe.status" } },
+        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "Back", "style_label": { "font": 14 },
+          "on_click": { "action": "back" } }
+      ]
+    },
+    { "type": "recipe_table", "book": "process", "x": 16, "y": 68, "w": 768, "h": 400 }
+  ]
+}

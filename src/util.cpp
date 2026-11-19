@@ -1,5 +1,7 @@
 #include "util.hpp"
 #include <atomic>
+#include <fstream>
+#include <filesystem>
 #include <cctype>
 #include <chrono>
 #include <cstdarg>
@@ -61,6 +63,39 @@ std::string vformat(const char* fmt, ...)
     }
     va_end(ap2);
     return s;
+}
+
+bool write_file_atomic(const std::string& path, const std::string& data, std::string* err)
+{
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const fs::path p = fs::u8path(path), tmp = fs::u8path(path + ".tmp");
+    if(p.has_parent_path()) fs::create_directories(p.parent_path(), ec);
+    {
+        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+        if(!f) { if(err) *err = "cannot write '" + path + ".tmp'"; return false; }
+        f.write(data.data(), static_cast<std::streamsize>(data.size()));
+        f.flush();
+        if(!f) { if(err) *err = "cannot write '" + path + ".tmp' (disk full?)"; f.close(); fs::remove(tmp, ec); return false; }
+    }
+    fs::rename(tmp, p, ec);                      // replaces the old file in one step
+    if(ec) { if(err) *err = "cannot replace '" + path + "': " + ec.message(); fs::remove(tmp, ec); return false; }
+    return true;
+}
+
+std::optional<std::string> read_file(const std::string& path, size_t max_bytes, std::string* err)
+{
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const auto size = fs::file_size(fs::u8path(path), ec);
+    if(ec) { if(err) *err = "cannot read '" + path + "'"; return std::nullopt; }
+    if(size > max_bytes) { if(err) *err = "'" + path + "' is too large (" + std::to_string(size) + " bytes, at most " + std::to_string(max_bytes) + ")"; return std::nullopt; }
+    std::ifstream f(fs::u8path(path), std::ios::binary);
+    if(!f) { if(err) *err = "cannot read '" + path + "'"; return std::nullopt; }
+    std::string data(static_cast<size_t>(size), char(0));
+    f.read(data.data(), static_cast<std::streamsize>(size));
+    data.resize(static_cast<size_t>(f.gcount()));
+    return data;
 }
 
 } // namespace hml

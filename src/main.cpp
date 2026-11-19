@@ -40,6 +40,7 @@
 #include "script.hpp"
 #include "splash.hpp"
 #include "system_settings.hpp"
+#include "recipe.hpp"
 #include "tag.hpp"
 #include "active_project.hpp"
 #include "project_archive.hpp"
@@ -253,7 +254,7 @@ int main(int argc, char** argv)
     hml::system_settings().register_actions();
     hml::register_user_actions();
     // pages that follow outside events; auto logout
-    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); }, 250, nullptr);
+    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); }, 250, nullptr);
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
     hml::ui().register_action("system_log.export", [](const std::string& arg) {
         std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;

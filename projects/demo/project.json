@@ -246,8 +246,20 @@
       "interval_ms": 500
     }
   ],
+  "recipes": {
+    "level": 2,
+    "books": [
+      { "name": "process", "items": ["speed_sp", "setpoint", "temp_lo", "temp_hi", "auto_mode"],
+        "recipes": [
+          { "name": "Standard", "values": { "speed_sp": 60, "setpoint": 50, "temp_lo": 20, "temp_hi": 30, "auto_mode": true } },
+          { "name": "Gentle",   "values": { "speed_sp": 35, "setpoint": 40, "temp_lo": 22, "temp_hi": 28, "auto_mode": true } },
+          { "name": "Cleaning", "values": { "speed_sp": 90, "setpoint": 10, "temp_lo": 10, "temp_hi": 45, "auto_mode": false } }
+        ] }
+    ]
+  },
   "screens": [
     "screens/main.json",
-    "screens/settings.json"
+    "screens/settings.json",
+    "screens/recipes.json"
   ]
 }

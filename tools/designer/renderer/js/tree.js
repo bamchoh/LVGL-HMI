@@ -108,6 +108,7 @@ const Tree = {
       case 'chart': return '↗';
       case 'keyboard': return '⌨';
       case 'line': return '╱';
+      case 'recipe_table': return '☷';
       default: return '□';
     }
   },

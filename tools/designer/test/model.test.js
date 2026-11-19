@@ -648,7 +648,7 @@ test('I18N: property names and fixed texts in Japanese, everything as it is in E
 test('every style property and widget property has a Japanese name', () => {
   const { SCHEMA } = load();
   const ctx = vm.createContext({ console });
-  vm.runInContext(fs.readFileSync(path.join(JS_DIR, 'i18n.js'), 'utf8'), ctx, { filename: 'i18n.js' });
+  for (const f of ['i18n.js', 'i18n_ja.js']) vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
   const KEYS = vm.runInContext('I18N.KEYS_JA', ctx), TEXT = vm.runInContext('I18N.TEXT_JA', ctx);
   const missing = [];
   for (const k of Object.keys(SCHEMA.styleKeys)) if (!(k in KEYS)) missing.push('style ' + k);
@@ -941,4 +941,57 @@ test('M importTags / exportTags, pasteStyle, designer marks', () => {
   deq(M.get([1]).designer, { hidden: true });
   M.clearFlag();
   deq([M.get([1]).designer, M.anyFlag('hidden')], [undefined, false]);
+});
+
+test('M recipes: books, values as the tag type, problems, renames, CSV both ways', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'sp', type: 'int', min: 0, max: 100 }, { name: 'on', type: 'bool' }, { name: 'txt', type: 'string' }];
+  const name = M.addRecipeBook();
+  assert.equal(name, 'book1');
+  const b = M.recipeBooks()[0];
+  deq(b.items, ['sp', 'on', 'txt']);
+  M.addRecipe(0); M.addRecipe(0);
+  deq(b.recipes.map(r => r.name), ['Recipe 1', 'Recipe 2']);
+  M.setRecipeValue(0, 0, 'sp', '42'); M.setRecipeValue(0, 0, 'on', 'true'); M.setRecipeValue(0, 0, 'txt', '=x');
+  deq(b.recipes[0].values, { sp: 42, on: true, txt: '=x' });
+  M.setRecipeValue(0, 0, 'txt', '');
+  deq(b.recipes[0].values, { sp: 42, on: true });
+  assert.equal(M.problems().length, 0);
+
+  M.setRecipeValue(0, 1, 'sp', '500');
+  M.setRecipeValue(0, 1, 'on', 'x');
+  M.st.project.recipes.level = 2;
+  M.screen().children = [{ type: 'recipe_table', book: 'nope' }];
+  const texts = M.problems().map(p => p.text);
+  assert.ok(texts.includes('recipe "Recipe 2": sp = 500 is outside 0..100'), texts.join(' | '));
+  assert.ok(texts.includes('recipes: a level is set, but user management is off (Users tab)'));
+  assert.ok(texts.includes('recipe table: no recipe book "nope"'));
+  M.st.project.recipes.level = 0;
+  M.setRecipeValue(0, 1, 'sp', '50');
+
+  // renaming the book: the tables follow; renaming a tag: items and values follow
+  M.screen().children = [{ type: 'recipe_table', book: 'book1' }];
+  assert.equal(M.renameRecipeBook(0, 'a/b'), false);
+  assert.equal(M.renameRecipeBook(0, 'process'), true);
+  assert.equal(M.screen().children[0].book, 'process');
+  M.renameTag(0, 'speed');
+  deq(b.items, ['speed', 'on', 'txt']);
+  deq(b.recipes[0].values, { speed: 42, on: true });
+
+  // CSV: formulas are escaped, numbers are not; the same text comes back
+  M.setRecipeValue(0, 0, 'txt', '=HYPERLINK("x")');
+  const csv = M.recipesCsv(0);
+  assert.equal(csv.split('\n')[0], 'name,speed,on,txt');
+  assert.ok(csv.includes(`Recipe 1,42,true,"'=HYPERLINK(""x"")"`), csv);
+  let r = M.importRecipesCsv(0, csv);
+  deq([r.count, r.errors], [2, []]);
+  assert.equal(b.recipes[0].values.txt, '=HYPERLINK("x")');
+  r = M.importRecipesCsv(0, 'name,secret\nA,1\n');
+  assert.ok(r.errors.length && r.count === 0);
+  r = M.importRecipesCsv(0, 'name\tspeed\nA\t1\nA\t2\n');
+  assert.ok(r.errors.some(e => /twice/.test(e)));
+  r = M.importRecipesCsv(0, 'name,speed\nA,fast\n');
+  assert.ok(r.errors.some(e => /not a number/.test(e)));
+  assert.equal(b.recipes.length, 2);                                       // nothing replaced by the bad ones
 });

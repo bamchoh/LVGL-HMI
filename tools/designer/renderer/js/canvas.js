@@ -110,6 +110,7 @@ const Canvas = {
       case 'numeric_display': return [120, null];
       case 'text_display': case 'password_display': return [160, null];
       case 'keyboard': return ['100%', '50%'];
+      case 'recipe_table': return ['100%', 300];
       default: return [null, null];
     }
   },
@@ -385,6 +386,29 @@ const Canvas = {
     }
     el.append(U.el('div', { class: 'lv-kbrow' }, U.el('div', { class: 'lv-key' }, '×'), U.el('div', { class: 'lv-key lv-key-wide' }, 'space'), U.el('div', { class: 'lv-key' }, '✓')));
   },
+  // the book's own recipes as the device will show them (current values: from the tags' init)
+  w_recipe_table(el, w) {
+    const b = M.recipeBooks().find(x => x.name === w.book);
+    const list = U.el('div', { class: 'lv-rt-list' }), right = U.el('div', { class: 'lv-rt-right' });
+    el.append(list, right);
+    if (!b) { right.append(U.el('div', { class: 'lv-al-empty' }, "no recipe book '" + (w.book || '') + "'")); return; }
+    const recs = Array.isArray(b.recipes) ? b.recipes : [], sel = recs[0];
+    recs.slice(0, 8).forEach((r, i) => list.append(U.el('div', { class: 'lv-rt-item' + (i === 0 ? ' sel' : '') }, r.name)));
+    right.append(U.el('div', null, sel ? sel.name : '-'));
+    const h = Math.max(24, U.num(w.row_height, 40));
+    const table = U.el('div', { class: 'lv-rt-rows' }, U.el('div', { class: 'lv-rt-row head' }, U.el('span', null, 'Item'), U.el('span', null, 'Recipe'), U.el('span', null, 'Current')));
+    for (const item of (b.items || []).slice(0, 10)) {
+      const t = ((M.st.project && M.st.project.tags) || []).find(x => x.name === item) || {};
+      const cur = t.init === undefined ? (t.type === 'string' ? '' : t.type === 'bool' ? 'false' : '0') : String(t.init);
+      const val = sel && sel.values && sel.values[item] !== undefined ? String(sel.values[item]) : '-';
+      const differs = val !== '-' && val !== cur;
+      table.append(U.el('div', { class: 'lv-rt-row', style: { height: h + 'px' } }, U.el('span', null, item),
+        U.el('span', { class: differs ? 'diff' : '' }, (differs ? '* ' : '') + val), U.el('span', null, cur)));
+    }
+    right.append(table, U.el('div', { class: 'lv-rt-foot' }, U.el('span', { class: 'lv-al-btn lv-rt-write' }, 'Write'), U.el('span', { class: 'lv-al-btn' }, 'Read current'),
+      U.el('span', { class: 'lv-al-btn' }, 'Save as'), U.el('span', { class: 'lv-al-btn lv-rt-del' }, 'Delete')));
+  },
+
   w_line(el, w, st, th) {
     const pts = Array.isArray(w.points) ? w.points.filter(p => Array.isArray(p) && p.length >= 2) : [];
     const maxX = Math.max(1, ...pts.map(p => +p[0])), maxY = Math.max(1, ...pts.map(p => +p[1]));

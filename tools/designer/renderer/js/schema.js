@@ -69,6 +69,7 @@ const SCHEMA = {
                         { k: 'update_mode', t: 'select', o: ['', 'shift', 'circular'] }], series: true },
     spinner:  { label: 'Spinner', def: { w: 60, h: 60 }, props: [{ k: 'time', t: 'number' }, { k: 'angle', t: 'number' }] },
     keyboard: { label: 'Keyboard', def: { align: 'bottom_mid', w: '100%', h: '45%' }, props: [] },
+    recipe_table: { label: 'Recipe table', def: { w: '100%', h: 300 }, props: [{ k: 'book', t: 'recipebook' }, { k: 'row_height', t: 'number' }] },
     line:     { label: 'Line', def: { points: [[0, 0], [120, 60]] }, props: [{ k: 'points', t: 'points' }] },
   },
 

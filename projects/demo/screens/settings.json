@@ -339,6 +339,18 @@
             },
             {
               "type": "button",
+              "text": "Recipes",
+              "style": {
+                "bg_color": "#00838f"
+              },
+              "on_click": {
+                "action": "goto",
+                "screen": "recipes",
+                "anim": "slide_left"
+              }
+            },
+            {
+              "type": "button",
               "text": "System",
               "style": {
                 "bg_color": "#455a64"
