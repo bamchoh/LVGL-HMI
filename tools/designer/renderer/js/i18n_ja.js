@@ -455,3 +455,25 @@ Object.assign(I18N.TEXT_JA, {
   'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.':
     'Raspberry Pi: 表示器が対応していればバックライトを消します（/sys/class/backlight）。対応していなければ黒い画面にするだけです。タグ sys.screen.off は消灯中 1。1 を書くとすぐに消えます。',
 });
+// ---- AI assistant, changes made from outside
+Object.assign(I18N.TEXT_JA, {
+  'Have an AI assistant make screens: what to give it': 'AI に画面を作ってもらう: AI に渡すもの',
+  'Make screens with an AI assistant': 'AI に画面を作ってもらう',
+  'An AI assistant that can read and write files on this PC (Claude Code, the Claude desktop app ...) can make screens for this project. Give it the text below: it names the guide (skill) that comes with the designer, the project folder and the runtime it checks its work with. The runtime check opens no window and contacts no device.':
+    'この PC のファイルを読み書きできる AI（Claude Code、Claude のデスクトップアプリなど）に、このプロジェクトの画面を作ってもらえます。下の文を AI に渡してください。デザイナーに付いている手引き（Skill）、プロジェクトのフォルダー、確認に使うランタイムの場所が入っています。ランタイムでの確認は、ウィンドウを出さず、機器にもつながりません。',
+  'Copy': 'コピー', 'copied': 'コピーしました',
+  'Open the skill folder': 'Skill のフォルダーを開く',
+  'Install the skill for Claude Code': 'Claude Code に Skill を入れる',
+  'installed in {0}': '{0} に入れました',
+  'Save first: the assistant reads the files, not what is open here.': '先に保存してください。AI が読むのはファイルで、ここで開いている内容ではありません。',
+  'While the assistant works, keep the designer open: when it changes the files, the designer loads them again (it asks first if there are unsaved changes here).':
+    'AI が作業している間、デザイナーは開いたままで構いません。AI がファイルを変えると、デザイナーが読み直します（ここに保存していない変更があるときは、先に聞きます）。',
+  'This project is one file (.hmlproj): the assistant works in its working folder shown above. Press Save afterwards to put its changes into the file.':
+    'このプロジェクトは 1 つのファイル（.hmlproj）です。AI は上に出ている作業用フォルダーで作業します。終わったら「保存」を押すと、AI の変更がファイルに入ります。',
+  'The project was changed outside the designer': 'プロジェクトがデザイナーの外で変更されました',
+  'Its files were changed by another program, and there are changes here that are not saved. Loading the files discards the changes made here; keeping them means the next Save overwrites the files.':
+    'ほかのプログラムがファイルを変更しましたが、ここにも保存していない変更があります。ファイルを読み込むと、ここでの変更は捨てられます。このまま続けると、次の保存でファイルが上書きされます。',
+  'Keep my changes': 'ここでの変更を残す', 'Load the files': 'ファイルを読み込む',
+  'The project was changed outside the designer: loaded again': 'プロジェクトがデザイナーの外で変更されたので、読み直しました',
+});
+I18N.PATTERNS_JA.push([/^The files were changed, but cannot be read: (.*)$/, 'ファイルが変更されましたが、読めません: $1'], [/^reload failed: (.*)$/, '読み直しに失敗しました: $1']);

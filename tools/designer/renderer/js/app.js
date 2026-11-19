@@ -9,7 +9,10 @@ const host = {
     return f(...args).catch(e => ({ ok: false, error: String(e) }));
   },
   info: () => host.call('hml_info'),
-  readProject: p => host.call('hml_readProject', p),
+  readProject: (p, workingCopy) => host.call('hml_readProject', p, !!workingCopy),
+  projectStamp: (dir, files) => host.call('hml_projectStamp', dir || '', files || []),
+  openFolder: dir => host.call('hml_openFolder', dir || ''),
+  installSkill: () => host.call('hml_installSkill'),
   writeFiles: (dir, files) => host.call('hml_writeFiles', dir, files),
   openDialog: (kind, dir) => host.call('hml_openDialog', kind, dir || ''),
   saveDialog: (name, dir) => host.call('hml_saveDialog', name, dir || ''),
@@ -53,6 +56,11 @@ const App = {
     q('b-preview').onclick = () => this.preview();
     q('b-run').onclick = () => this.run();
     q('b-deploy').onclick = () => this.deployDialog();
+    q('b-ai').onclick = () => this.aiDialog();
+    // files changed from outside (an AI assistant, a text editor): looked for when the window
+    // gets the focus back, and every few seconds while it has it
+    window.addEventListener('focus', () => this.checkOutside());
+    setInterval(() => { if (document.hasFocus()) this.checkOutside(); }, 3000);
     q('sel-screen').onchange = e => { Panels.showView('screen'); M.selectScreen(Number(e.target.value)); };
     q('t-dup').onclick = () => M.duplicateSelection();
     q('t-del').onclick = () => M.deleteSelection();
@@ -448,7 +456,88 @@ const App = {
     this.remember(path);
     this.offerRecovery();
     this.refresh();
+    await this.takeStamp();
     setTimeout(() => this.zoomFit(), 50);
+  },
+
+  // ---- changes made to the project's files from outside -------------------------------
+  stamp: null, checking: null,
+  async readStamp() {
+    const st = M.st;
+    if (!st.path || !st.dir) return null;
+    const r = await host.projectStamp(st.dir, st.screens.map(s => s.file));
+    return r && r.ok ? r.stamp : null;
+  },
+  async takeStamp() { this.stamp = await this.readStamp(); },
+  // (one check at a time: a second caller gets the one that is running)
+  checkOutside() {
+    if (!this.checking) this.checking = this.checkOutsideNow().finally(() => { this.checking = null; });
+    return this.checking;
+  },
+  async checkOutsideNow() {
+    if (this.stamp === null || !M.st.path || !document.getElementById('modal').hidden) return;
+    {
+      const now = await this.readStamp();
+      if (now === null || now === this.stamp) return;
+      this.stamp = now;                                   // asked once per change
+      if (!M.st.dirty) { await this.reloadFromDisk(); return; }
+      this.modal({ title: 'The project was changed outside the designer',
+        body: U.el('div', { class: 'hint' }, 'Its files were changed by another program, and there are changes here that are not saved. Loading the files discards the changes made here; keeping them means the next Save overwrites the files.'),
+        buttons: [{ label: 'Keep my changes' }, { label: 'Load the files', primary: true, onclick: () => { this.reloadFromDisk(); } }] });
+    }
+  },
+  // Read the files again, staying on the same screen. A project file (.hmlproj) is read from its
+  // working folder and left unsaved: Save puts the outside changes into the file.
+  async reloadFromDisk() {
+    const st = M.st, cur = st.screens[st.cur] && st.screens[st.cur].data.name, view = Panels.view, wasArchive = st.archive;
+    const r = await host.readProject(st.path, true);
+    if (!r || !r.ok) { this.toast('reload failed: ' + (r && r.error), 6000); return; }
+    try { M.loadFromHost(r); } catch (e) { this.toast('The files were changed, but cannot be read: ' + e.message, 8000); return; }
+    const i = M.st.screens.findIndex(s => s.data.name === cur);
+    if (i >= 0) M.st.cur = i;
+    if (wasArchive) M.st.dirty = true;
+    await this.loadLocal();
+    this.refresh();
+    if (view && Panels.showView) Panels.showView(view);
+    await this.takeStamp();
+    this.toast('The project was changed outside the designer: loaded again', 4000);
+  },
+
+  // ---- "AI": what an AI assistant needs to make screens for this project ---------------
+  aiPrompt() {
+    const st = M.st, i = this.info || {};
+    const ja = I18N.lang === 'ja';
+    const skill = i.skillDir ? i.skillDir.replace(/\\/g, '/') + '/SKILL.md' : '(skill folder not found)';
+    const lines = ja ? [
+      'HML（LVGL HMI）の画面を作ってください。',
+      'まず次の手引きを読み、それに従ってください: ' + skill,
+      'プロジェクトのフォルダー: ' + (st.dir || '（プロジェクトを保存してから、もう一度このダイアログを開いてください）'),
+      'ランタイム: ' + (i.runtime || '(hml_runtime が見つかりません)'),
+      '',
+      '作りたい画面: （ここに書く。例: 上に今のアラーム、下に温度のトレンド、右に今の値を大きく。メイン画面から行けるように）',
+    ] : [
+      'Please make a screen for an HML (LVGL HMI) project.',
+      'First read this guide and follow it: ' + skill,
+      'Project folder: ' + (st.dir || '(save the project first, then open this dialog again)'),
+      'Runtime: ' + (i.runtime || '(hml_runtime not found)'),
+      '',
+      'The screen I want: (write it here, e.g. current alarms on top, a temperature trend below, large values on the right; reachable from the main screen)',
+    ];
+    return lines.join('\n');
+  },
+  aiDialog() {
+    const i = this.info || {}, st = M.st;
+    const text = U.el('textarea', { rows: 8, class: 'mono', style: { width: '100%' }, spellcheck: false, value: this.aiPrompt(), dataset: { fk: 'ai.prompt' } });
+    const body = U.el('div', { class: 'deploy' },
+      U.el('div', { class: 'hint' }, 'An AI assistant that can read and write files on this PC (Claude Code, the Claude desktop app ...) can make screens for this project. Give it the text below: it names the guide (skill) that comes with the designer, the project folder and the runtime it checks its work with. The runtime check opens no window and contacts no device.'),
+      text,
+      U.el('div', { class: 'row' },
+        U.el('button', { class: 'mini', onclick: async () => { text.select(); try { await navigator.clipboard.writeText(text.value); } catch (e) { document.execCommand('copy'); } this.toast('copied', 1200); } }, 'Copy'),
+        U.el('button', { class: 'mini', disabled: !i.skillDir, onclick: () => host.openFolder(i.skillDir) }, 'Open the skill folder'),
+        U.el('button', { class: 'mini', disabled: !i.skillDir, onclick: async () => { const r = await host.installSkill(); this.toast(r && r.ok ? I18N.f('installed in {0}', r.path) : 'failed: ' + (r && r.error), 5000); } }, 'Install the skill for Claude Code')),
+      U.el('div', { class: 'hint' }, st.dirty ? 'Save first: the assistant reads the files, not what is open here.' : 'While the assistant works, keep the designer open: when it changes the files, the designer loads them again (it asks first if there are unsaved changes here).'),
+      st.archive ? U.el('div', { class: 'hint' }, 'This project is one file (.hmlproj): the assistant works in its working folder shown above. Press Save afterwards to put its changes into the file.') : null);
+    this.modal({ title: 'Make screens with an AI assistant', body, buttons: [{ label: 'Close' }] });
   },
   // ---- recently used projects (kept in the designer's settings on this PC)
   recent: [],
@@ -518,6 +607,7 @@ const App = {
     st.dirty = false;
     if (as) await this.loadLocal();
     this.refresh();
+    await this.takeStamp();
     this.toast('saved ' + st.path, 1500);
     this.remember(st.path);
     this.autosave(true);

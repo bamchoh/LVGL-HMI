@@ -628,6 +628,7 @@ std::string save_file_dialog(void* parent, const std::string& title, const std::
 struct Host {
     webview::webview* w = nullptr;
     fs::path exe, renderer, runtime, settings_path;
+    fs::path skill;                    // the AI skill shipped with the designer (<exe dir>/skills/hml-screens), or empty
     std::string argv_project;
     json settings = json::object();
     int preview_seq = 0;
@@ -671,6 +672,7 @@ struct Host {
 #endif
             },
             { "exeDir", ustr(exe) }, { "rendererDir", ustr(renderer) },
+            { "skillDir", skill.empty() ? json(nullptr) : json(ustr(skill)) },
             { "runtime", runtime.empty() ? json(nullptr) : json(ustr(runtime)) },
             { "argvProject", argv_project }, { "version", HML_DESIGNER_VERSION },
             { "targetRuntimes", target_runtimes() },
@@ -695,7 +697,9 @@ struct Host {
         return out;
     }
 
-    json read_project(const std::string& path)
+    // working_copy: a project file is not unpacked again; what is in its working folder is read
+    // (files changed there from outside, see project_stamp).
+    json read_project(const std::string& path, bool working_copy = false)
     {
         fs::path p = upath(path);
         // <name>.hmlproj: everything below works on the unpacked copy; "path" stays the file the user opened
@@ -704,7 +708,8 @@ struct Host {
         if(archive) {
             std::string e;
             fs::path work = hml::archive_work_dir(p);
-            if(!hml::unpack_project(p, work, &e)) return err(e);
+            std::error_code wec;
+            if(!(working_copy && fs::exists(work / "project.json", wec)) && !hml::unpack_project(p, work, &e)) return err(e);
             p = work / "project.json";
         }
         bool ok = false;
@@ -729,6 +734,58 @@ struct Host {
         save_settings();
         return json{ { "ok", true }, { "path", ustr(opened) }, { "dir", ustr(dir) }, { "project", text }, { "screens", screens }, { "archive", archive },
                      { "name", archive ? target_name(opened) : ustr(dir.filename()) } };
+    }
+
+    // What the project's own files look like now: "rel:size:time;" for project.json and the files
+    // named (the screens). The page compares it with what it was after its last load / save to
+    // notice changes made from outside (a text editor, an AI assistant).
+    json project_stamp(const std::string& dir, const json& files)
+    {
+        const fs::path d = upath(dir);
+        std::string out;
+        auto add = [&](const std::string& rel) {
+            std::error_code ec;
+            const fs::path f = d / upath(rel);
+            const auto size = fs::file_size(f, ec);
+            if(ec) { out += rel + ":-;"; return; }
+            const auto t = fs::last_write_time(f, ec).time_since_epoch().count();
+            out += rel + ":" + std::to_string(size) + ":" + std::to_string(static_cast<long long>(t)) + ";";
+        };
+        add("project.json");
+        if(files.is_array()) for(const auto& f : files) if(f.is_string()) add(f.get<std::string>());
+        return json{ { "ok", true }, { "stamp", out } };
+    }
+
+    json open_folder(const std::string& path)
+    {
+        const fs::path p = upath(path);
+        std::error_code ec;
+        if(!fs::is_directory(p, ec)) return err("no such folder: " + path);
+#ifdef _WIN32
+        ShellExecuteW(nullptr, L"open", p.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#else
+        std::string e;
+        if(!launch_detached("xdg-open", { ustr(p) }, p, &e)) return err(e);
+#endif
+        return json{ { "ok", true } };
+    }
+
+    // Copy the skill to where Claude Code looks for the user's skills (~/.claude/skills/hml-screens).
+    json install_skill()
+    {
+        if(skill.empty()) return err("the skill folder was not found next to the designer");
+#ifdef _WIN32
+        const char* home = std::getenv("USERPROFILE");
+#else
+        const char* home = std::getenv("HOME");
+#endif
+        if(!home || !*home) return err("no home folder");
+        const fs::path to = upath(home) / ".claude" / "skills" / "hml-screens";
+        std::error_code ec;
+        fs::create_directories(to, ec);
+        fs::copy(skill, to, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
+        if(ec) return err("cannot copy to " + ustr(to) + ": " + ec.message());
+        return json{ { "ok", true }, { "path", ustr(to) } };
     }
 
     json write_files(const std::string& dir, const json& files)
@@ -1307,7 +1364,16 @@ struct Host {
         auto str = [](const json& a, size_t i) { return (i < a.size() && a[i].is_string()) ? a[i].get<std::string>() : std::string(); };
 
         w->bind("hml_info", [this, args_of](const std::string&) { return info().dump(); });
-        w->bind("hml_readProject", [this, args_of, str](const std::string& req) { return read_project(str(args_of(req), 0)).dump(); });
+        w->bind("hml_readProject", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return read_project(str(a, 0), a.size() > 1 && a[1].is_boolean() && a[1].get<bool>()).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
+        w->bind("hml_projectStamp", [this, args_of, str](const std::string& req) {
+            json a = args_of(req);
+            return project_stamp(str(a, 0), a.size() > 1 ? a[1] : json::array()).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
+        w->bind("hml_openFolder", [this, args_of, str](const std::string& req) { return open_folder(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
+        w->bind("hml_installSkill", [this](const std::string&) { return install_skill().dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_writeFiles", [this, args_of, str](const std::string& req) {
             json a = args_of(req);
             return write_files(str(a, 0), a.size() > 1 && a[1].is_array() ? a[1] : json::array()).dump();
@@ -1500,6 +1566,13 @@ int app_main(const std::vector<std::string>& args)
     candidates.push_back(upath(HML_DESIGNER_RENDERER_DIR));
 #endif
     for(const auto& c : candidates) if(fs::exists(c / "index.html", ec)) { h.renderer = fs::absolute(c); break; }
+    {
+        std::vector<fs::path> skills{ exe_dir() / "skills" / "hml-screens" };
+#ifdef HML_DESIGNER_SKILL_DIR
+        skills.push_back(upath(HML_DESIGNER_SKILL_DIR));
+#endif
+        for(const auto& c : skills) if(fs::exists(c / "SKILL.md", ec)) { h.skill = fs::absolute(c); break; }
+    }
     if(h.renderer.empty()) {
         std::fprintf(stderr, "hml_designer: renderer/index.html not found (looked next to the executable in designer/)\n");
 #ifdef _WIN32
