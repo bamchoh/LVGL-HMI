@@ -803,7 +803,7 @@ struct Host {
 
     json pick_image(const std::string& dir)
     {
-        std::string p = open_file_dialog(window(), "Choose an image (PNG)", "PNG images", "*.png", dir);
+        std::string p = open_file_dialog(window(), "Choose an image", "Images (PNG, JPEG, BMP, GIF)", "*.png;*.jpg;*.jpeg;*.bmp;*.gif", dir);
         if(p.empty()) return json{ { "ok", false }, { "error", "cancelled" } };
         fs::path src = upath(p), d = upath(dir);
         std::error_code ec;

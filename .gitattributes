@@ -9,3 +9,6 @@
 *.ttf binary
 *.der binary
 tests/assets/opcua/*.key binary
+*.jpg binary
+*.jpeg binary
+*.gif binary

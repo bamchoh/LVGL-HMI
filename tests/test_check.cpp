@@ -81,6 +81,7 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
     Proj p;
     p.write("project.json", kProject);
     p.write("screens/p.json", R"json({ "name": "p", "popup": true, "children": [] })json");
+    p.write("notes.txt", "not a picture");
     p.write("screens/a.json", R"json({ "name": "a", "bind": "temp", "children": [
         { "type": "gauge" },
         { "type": "label", "colour": "red", "text": "@nope", "style": { "bg_colour": "#fff" } },
@@ -89,7 +90,8 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
         { "type": "button", "on_click": [ { "action": "goto", "screen": "zzz" }, { "action": "fly" }, { "action": "popup", "screen": "a" },
                                           { "action": "set", "tag": "nope4", "valeu": 1 }, { "action": "script", "name": "nope5" },
                                           { "action": "language", "lang": "fr" }, { "action": "goto", "screen": "p", "anim": "spin" } ] },
-        { "type": "image", "src": "assets/none.png" },
+        { "type": "image", "src": "assets/none.png", "style": { "bg_image": "../x.png" },
+          "bind": { "src": { "tag": "temp", "map": { "0": "assets/gone.jpg", "default": "notes.txt" } } } },
         { "type": "trend", "group": "g", "tags": ["temp", "run"] },
         { "type": "trend", "group": "nogroup" },
         { "type": "recipe_table", "book": "nobook" },
@@ -116,6 +118,9 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
     expect("on_click (language): \"fr\" is not a language");
     expect("on_click (goto): unknown anim \"spin\"");
     expect("children[5] (image): src: no file \"assets/none.png\"");
+    expect("children[5] (image): style.bg_image: \"../x.png\" is outside the project folder");
+    expect("children[5] (image): bind.src.map.0: no file \"assets/gone.jpg\"");
+    expect("children[5] (image): bind.src.map.default: \"notes.txt\" is not a PNG, JPEG, BMP or GIF");
     expect("children[6] (trend): data log group \"g\" does not record \"run\"");
     expect("children[7] (trend): unknown data log group \"nogroup\"");
     expect("children[8] (recipe_table): unknown recipe book \"nobook\"");
@@ -123,7 +128,7 @@ TEST_CASE("check: what the runtime would silently ignore is found, with the plac
     expect("children[10].children[0] (switch): bind: unknown tag \"nope6\"");
     expect("project.json: drivers[0] (sim): items: unknown tag \"ghost\"");
     expect("project.json: drivers[0] (sim): status_tag: unknown tag \"nobody\"");
-    CHECK(lines.size() == 26);                                  // and nothing else
+    CHECK(lines.size() == 29);                                  // and nothing else
 }
 
 TEST_CASE("check: broken files and a broken project")

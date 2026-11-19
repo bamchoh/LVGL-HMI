@@ -39,6 +39,7 @@ build.cmd Debug
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
@@ -1098,7 +1099,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `numeric_display`     | 数値表示器: `input`, `decimals`, `format`, `unit`, `min`, `max`, `placeholder`, `accepted_chars`（下記「データ表示器」）  |
 | `text_display`        | 文字列表示器: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                   |
 | `password_display`    | パスワード入力器（常に伏せ字）: `input` (既定 true), `placeholder`, `max_length`, `accepted_chars`                         |
-| `image`               | `src` (project.json からの相対パス, PNG 対応), `zoom`, `rotation`                                                         |
+| `image`               | 画像: `src`（project.json からの相対パス。PNG / JPEG / BMP / GIF）, `fit`, `zoom`, `rotation`（下記「画像」）            |
 | `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
 | `spinner`             | `time`, `angle`                                                                                                           |
 | `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のタップ時に表示される（`numeric_display` ではテンキー）。✓ で確定、× で閉じる（入力は破棄）。`bottom_mid` / `top_mid` 配置なら、入力欄を隠す場合は反対側の端に出る。キーの大きさは `h` と `style_items: { "font": 18 }`、`style: { "pad", "pad_gap" }` で調整 |
@@ -1126,6 +1127,29 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 
 短縮形 `"bind": "tag"` は `numeric_display` では `value`、`text_display` / `password_display` では `text` に結び付きます。
 
+#### 画像 (`image`、背景画像)
+
+```json
+{ "type": "image", "src": "assets/logo.png" },
+{ "type": "image", "w": 200, "h": 120, "src": "assets/pump.png", "fit": "contain" },
+{ "type": "image", "bind": { "src": { "tag": "state", "map": { "0": "assets/off.png", "1": "assets/on.png", "default": "assets/err.png" } } } },
+{ "type": "panel", "style": { "bg_image": "assets/plant.png", "bg_image_opa": 60 } }
+```
+
+| 形式 | できること |
+| --- | --- |
+| PNG | すべて（透過、`fit`、`zoom`、`rotation`） |
+| JPEG（ベースライン）/ BMP | 元の大きさで表示するだけ（描くときに少しずつ読むので、拡大・回転はできません。メモリは少なくて済みます） |
+| GIF | アニメーションとして再生（元の大きさ） |
+
+- `fit`（PNG）: `w` `h` の枠への合わせ方。`contain`（比率を保って全体）/ `stretch` / `tile`（敷き詰め）/ `center`。省くと元の大きさ。
+- `bind` の `src`: `map` で値ごとのファイル（bool は `"true"` / `"false"`、その他は `"default"`。当てはまらない値のときは非表示）。
+  文字列のタグにファイル名を入れても切り替えられます。
+- 背景画像: `style`（や `style_pressed` など）の `bg_image`、`bg_image_opa`（0-100）、`bg_image_tiled`。
+- **表示できるのはプロジェクトのフォルダーの中のファイルだけです**（絶対パスや `..` は表示しません。タグで指定する場合も同じ）。
+  壊れたファイル、1 枚で約 400 万ピクセルを超える画像は表示せず、警告を出します（PNG はメモリに 幅 × 高さ × 4 バイト展開されます）。
+- デザイナーでは、画像のプロパティの「…」でファイルを選ぶと `assets/` にコピーされます。
+
 ### 共通プロパティ
 
 | キー                                                                    | 説明                                                                                                                                                                                |
@@ -1145,6 +1169,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 `bg_color`, `bg_opa` (0-100), `bg_grad_color`, `bg_grad_dir` (`hor`/`ver`), `border_color`, `border_width`,
 `border_opa`, `outline_width`, `outline_color`, `radius`, `shadow_width`, `shadow_color`, `shadow_opa`,
 `text_color`, `text_opa`, `text_align` (`left`/`center`/`right`), `text_letter_space`, `text_line_space`,
+`bg_image`, `bg_image_opa`, `bg_image_tiled`,
 `font` (12/14/16/18/20/24/28/32/40/48), `pad`, `pad_left/right/top/bottom`, `pad_row`, `pad_column`, `pad_gap`,
 `margin`, `opa`, `line_color`, `line_width`, `line_rounded`, `arc_color`, `arc_width`, `arc_rounded`,
 `image_recolor`, `width`, `height`

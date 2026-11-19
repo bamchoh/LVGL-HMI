@@ -455,6 +455,14 @@ Object.assign(I18N.TEXT_JA, {
   'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.':
     'Raspberry Pi: 表示器が対応していればバックライトを消します（/sys/class/backlight）。対応していなければ黒い画面にするだけです。タグ sys.screen.off は消灯中 1。1 を書くとすぐに消えます。',
 });
+// ---- images
+Object.assign(I18N.KEYS_JA, { fit: '大きさの合わせ方', bg_image: '背景画像', bg_image_opa: '背景画像の不透明度', bg_image_tiled: '背景画像を敷き詰める' });
+Object.assign(I18N.VALUES_JA, { contain: '全体が入るように', stretch: '引き伸ばす', tile: '敷き詰める' });
+Object.assign(I18N.TEXT_JA, {
+  '(its own size)': '（元の大きさ）',
+  'how the picture fills w / h: contain (whole picture, proportions kept), stretch, tile (repeated), center. PNG only: a JPEG / BMP is shown in its own size': '画像を w / h にどう合わせるか: contain（比率を保って全体が入る）、stretch（引き伸ばす）、tile（敷き詰める）、center（中央に元の大きさで）。PNG だけ（JPEG / BMP は元の大きさで表示されます）',
+  'choose an image: PNG, JPEG, BMP or GIF (copied into the project)': '画像を選ぶ: PNG、JPEG、BMP、GIF（プロジェクトにコピーされます）',
+});
 // ---- AI assistant, changes made from outside
 Object.assign(I18N.TEXT_JA, {
   'Have an AI assistant make screens: what to give it': 'AI に画面を作ってもらう: AI に渡すもの',

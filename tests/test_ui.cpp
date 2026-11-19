@@ -375,8 +375,7 @@ TEST_CASE("widget specific properties")
         CHECK(lv_image_get_src_height(img) == 2);
         CHECK(lv_image_get_scale(img) == 128);
         CHECK(lv_image_get_rotation(img) == 900);
-        CHECK(image_src(nth(s, 1)) == "A:" + abs);
-        CHECK(lv_image_get_src_width(nth(s, 1)) == 3);
+        CHECK(image_src(nth(s, 1)) == "<null>");            // outside the project folder: not shown (test_images.cpp)
         CHECK(image_src(nth(s, 2)) == "<null>");            // unreadable file: LVGL drops the source
         CHECK(image_src(nth(s, 3)) == "<null>");
     }

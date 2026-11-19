@@ -100,7 +100,7 @@ const Props = {
         onchange: e => { const a = e.target.value.split('\n').map(l => l.split(',').map(Number)).filter(p => p.length >= 2 && !p.some(isNaN)); this.setVal(obj, k, a.length ? a : undefined); } }));
       case 'image': {
         const txt = U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: 'assets/img.png', onchange: e => this.setVal(obj, k, e.target.value.trim()) }));
-        const btn = U.el('button', { class: 'mini', title: 'choose a PNG (copied into the project)', onclick: async () => { const rel = await App.pickImage(); if (rel) this.setVal(obj, k, rel); } }, '…');
+        const btn = U.el('button', { class: 'mini', title: 'choose an image: PNG, JPEG, BMP or GIF (copied into the project)', onclick: async () => { const rel = await App.pickImage(); if (rel) this.setVal(obj, k, rel); } }, '…');
         return U.el('span', { class: 'with-btn' }, txt, btn);
       }
       case 'json': return U.el('textarea', Object.assign(attrs, { rows: 4, value: v === undefined ? '' : JSON.stringify(v),
@@ -202,7 +202,7 @@ const Props = {
     const add = U.el('select', { onchange: e => {
       const k = e.target.value; if (!k) return;
       const kind = SCHEMA.styleKeys[k];
-      const def = kind === 'color' ? '#ffffff' : kind === 'font' ? 16 : kind === 'bool' ? true : Array.isArray(kind) ? kind[0] : kind === 'size' ? 100 : 0;
+      const def = kind === 'image' ? '' : kind === 'color' ? '#ffffff' : kind === 'font' ? 16 : kind === 'bool' ? true : Array.isArray(kind) ? kind[0] : kind === 'size' ? 100 : 0;
       M.mutate(() => { w[cur] = w[cur] || {}; w[cur][k] = def; });
     } }, U.el('option', { value: '' }, I18N.t('+ add property…')));
     for (const k of Object.keys(SCHEMA.styleKeys)) if (!shown.includes(k)) add.append(U.el('option', { value: k }, I18N.named(k) ? I18N.label(k) + '  (' + k + ')' : k));

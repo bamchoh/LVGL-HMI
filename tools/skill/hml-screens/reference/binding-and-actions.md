@@ -71,6 +71,39 @@
 `w` `h` を省くと、大きさは中身とテーマで決まる。並べてそろえるもの、押すものには `w` `h` を書く。`panel` の内側の余白も
 テーマで決まるので、位置を計算で合わせたいときは `"style": { "pad": 12 }` のように自分で決める。
 
+## 画像
+
+画像はプロジェクトのフォルダーの中のファイル（ふつう `assets/`）を、`project.json` からの相対パスで書く。
+**画像は AI が作らない。** `assets/` にあるものを使い（中身と大きさは画像として開いて確かめる）、合うものがなければ、
+要る画像（何の絵か、幅 × 高さ、背景を透かすか）を伝えてユーザーに用意してもらう。それまでは `panel` と `label` で場所を取っておく。
+
+```json
+{ "type": "image", "x": 16, "y": 16, "src": "assets/logo.png" },
+{ "type": "image", "w": 200, "h": 120, "src": "assets/pump.png", "fit": "contain" },
+{ "type": "image", "src": "assets/fan.png",
+  "bind": { "src": { "tag": "state", "map": { "0": "assets/fan_off.png", "1": "assets/fan_on.png", "default": "assets/fan_err.png" } } } },
+{ "type": "image", "src": "assets/home.png", "on_click": { "action": "goto", "screen": "main" } },
+{ "type": "panel", "w": "100%", "h": "100%", "style": { "bg_image": "assets/plant.png" }, "children": [ ... ] }
+```
+
+| 形式 | できること |
+| --- | --- |
+| PNG | すべて。透過あり。`fit`・`zoom`・`rotation` が使える |
+| JPEG / BMP | **元の大きさで表示するだけ**（`fit`・`zoom`・`rotation` は効かない）。写真は、表示する大きさのファイルを用意してもらう |
+| GIF | アニメーションとして再生される（元の大きさ。`bind` で切り替えられない） |
+
+- `fit`（PNG）: `w` `h` の枠に、`contain`（比率を保って全体が入る）/ `stretch`（引き伸ばす）/ `tile`（敷き詰める）/ `center`。
+  省くと元の大きさで、`w` `h` は画像の大きさになる。
+- 値で絵を替える: `bind` の `src` に `map`（値 → ファイル。bool は `"true"` / `"false"`、その他は `"default"`）。
+  当てはまるファイルがない値のときは何も表示しない。文字列のタグにファイル名を入れて `"bind": { "src": "タグ" }` でもよい。
+- 背景に敷く: `style` の `bg_image`（画面・`panel`・`button` など。中央に元の大きさ。`"bg_image_tiled": true` で敷き詰め、
+  `bg_image_opa` で薄く）。`style_pressed` などに書けば、その状態のときだけ出る。上に載せる部品の文字が読めるか、画像で確かめる。
+- 押せる絵: `image` に `on_click`。小さい絵は、まわりに `panel` を置いて押せる範囲を 48px 以上にする。
+- 単色のアイコン（白い PNG）は `"style": { "image_recolor": "#4caf50" }` で色を付けられる（`bind` の色は `image` には使えない）。
+- 1 枚の画像は幅 × 高さが約 400 万ピクセルまで。画面より大きい画像は使わない（メモリは 幅 × 高さ × 4 バイト要る）。
+- `--check` が見るもの: ファイルがあるか、プロジェクトの中か、形式、JPEG / BMP に `fit` などを付けていないか。
+  壊れたファイルや大きすぎる画像は `runtime:` の行に出る。
+
 ## 動作
 
 イベント（`on_click` など）に、動作 1 つか配列（順に実行）を書く。

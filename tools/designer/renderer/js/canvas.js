@@ -94,6 +94,12 @@ const Canvas = {
     if (st.bg_color !== undefined) s.background = U.cssColor(st.bg_color, '');
     if (st.bg_grad_color !== undefined) s.background = 'linear-gradient(' + (st.bg_grad_dir === 'hor' ? 'to right' : 'to bottom') + ',' + U.cssColor(st.bg_color, th.card) + ',' + U.cssColor(st.bg_grad_color, th.card) + ')';
     if (st.bg_opa !== undefined && U.num(st.bg_opa, 100) === 0) s.background = 'transparent';
+    if (st.bg_image && M.st.dir) {
+      // over the background colour, centred (or repeated), as the runtime draws it
+      s.backgroundImage = 'url("' + U.fileUrl(U.joinPath(M.st.dir, st.bg_image)) + '")';
+      s.backgroundRepeat = st.bg_image_tiled ? 'repeat' : 'no-repeat';
+      s.backgroundPosition = st.bg_image_tiled ? '0 0' : 'center';
+    }
     if (st.radius !== undefined) s.borderRadius = U.num(st.radius, 0) + 'px';
     if (st.border_width !== undefined) s.borderWidth = U.num(st.border_width, 0) + 'px';
     if (st.border_color !== undefined) s.borderColor = U.cssColor(st.border_color, th.border);
@@ -369,6 +375,13 @@ const Canvas = {
   w_image(el, w) {
     if (w.src && M.st.dir) {
       const img = U.el('img', { src: U.fileUrl(U.joinPath(M.st.dir, w.src)), draggable: false });
+      // "fit": the picture fills the widget's own w / h
+      if (w.fit === 'contain' || w.fit === 'stretch' || w.fit === 'center') {
+        Object.assign(img.style, { width: '100%', height: '100%', objectFit: w.fit === 'contain' ? 'contain' : w.fit === 'stretch' ? 'fill' : 'none' });
+      } else if (w.fit === 'tile') {
+        Object.assign(el.style, { backgroundImage: 'url("' + img.src + '")', backgroundRepeat: 'repeat' });
+        return;
+      }
       if (w.zoom) img.style.transform = 'scale(' + w.zoom + ')';
       if (w.rotation) img.style.transform = (img.style.transform || '') + ' rotate(' + w.rotation + 'deg)';
       el.append(img);
