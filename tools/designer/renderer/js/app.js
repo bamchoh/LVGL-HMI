@@ -60,10 +60,25 @@ const App = {
     window.addEventListener('resize', U.debounce(() => this.status(), 200));
 
     this.info = (await host.info()) || {};
+    // the language of the designer: what was chosen before, else the system's
+    const saved = (await host.settings()) || {};
+    I18N.init(saved.lang);
+    const langSel = q('sel-lang');
+    for (const [code, name] of Object.entries(I18N.LANGS)) langSel.append(U.el('option', { value: code, selected: code === I18N.lang }, name));
+    langSel.onchange = () => { I18N.set(langSel.value); host.settings({ lang: I18N.lang }); this.staticTexts(); this.doRefresh(); };
+    this.staticTexts();
     if (this.info.argvProject) await this.open(this.info.argvProject);
     else { M.newProject('New HMI', 800, 480); M.st.dirty = false; }
     this.refresh();
     if (!this.info.runtime) this.toast('hml_runtime not found next to the designer: Preview / Run are unavailable');
+  },
+
+  // The texts that are part of the page itself (toolbar, tabs): shown in the chosen language.
+  staticTexts() {
+    for (const b of document.querySelectorAll('#toolbar button, #left-tabs button, #center-tabs button')) {
+      if (b.dataset.i18n === undefined) b.dataset.i18n = b.textContent;
+      if (/[A-Za-z]/.test(b.dataset.i18n)) b.textContent = I18N.t(b.dataset.i18n);       // (not the arrow / symbol buttons)
+    }
   },
 
   // ---- refresh -----------------------------------------------------------
@@ -114,13 +129,13 @@ const App = {
   // ---- modal -------------------------------------------------------------
   modal(opt) {
     const m = document.getElementById('modal');
-    document.getElementById('modal-title').textContent = opt.title || '';
+    document.getElementById('modal-title').textContent = I18N.t(opt.title || '');
     const body = document.getElementById('modal-body'); body.innerHTML = '';
     if (opt.body) body.append(opt.body);
     const btns = document.getElementById('modal-buttons'); btns.innerHTML = '';
     const close = () => { m.hidden = true; };
     for (const b of opt.buttons || [{ label: 'Close' }]) {
-      btns.append(U.el('button', { class: b.primary ? 'primary' : '', onclick: async () => { if (!b.onclick || (await b.onclick()) !== false) close(); } }, b.label));
+      btns.append(U.el('button', { class: b.primary ? 'primary' : '', dataset: { label: b.label }, onclick: async () => { if (!b.onclick || (await b.onclick()) !== false) close(); } }, I18N.t(b.label)));
     }
     m.hidden = false;
     const first = body.querySelector('input,textarea,select'); if (first) { first.focus(); if (first.select) first.select(); }
@@ -142,13 +157,17 @@ const App = {
     if (!this.confirmDiscard()) return;
     const title = U.el('input', { type: 'text', value: 'My HMI' });
     const w = U.el('input', { type: 'number', value: 800 }), h = U.el('input', { type: 'number', value: 480 });
-    const presets = U.el('div', { class: 'row' }, U.el('label', null, 'presets'),
-      ...[[480, 320, '3.5" LCD'], [800, 480, '7" LCD'], [1024, 600, '10" LCD'], [1280, 720, 'HD']].map(p => U.el('button', { class: 'mini', onclick: () => { w.value = p[0]; h.value = p[1]; } }, p[0] + '×' + p[1] + ' ' + p[2])));
-    const body = U.el('div', null, U.el('div', { class: 'row' }, U.el('label', null, 'title'), title),
-      U.el('div', { class: 'row' }, U.el('label', null, 'width × height'), w, U.el('span', null, '×'), h), presets,
+    // a preset also brings the touch correction of that display (kept while the size stays as it set it)
+    let chosen = null;
+    const presets = U.el('div', { class: 'row' }, U.el('label', null, I18N.t('presets')),
+      U.el('select', { onchange: e => { chosen = SCHEMA.displayPresets[Number(e.target.value)] || null; if (chosen) { w.value = chosen.width; h.value = chosen.height; } } },
+        U.el('option', { value: '' }, I18N.t('(choose to apply)')), ...SCHEMA.displayPresets.map((p, i) => U.el('option', { value: i }, p.name))));
+    const body = U.el('div', null, U.el('div', { class: 'row' }, U.el('label', null, I18N.label('title')), title),
+      U.el('div', { class: 'row' }, U.el('label', null, I18N.t('width × height')), w, U.el('span', null, '×'), h), presets,
       U.el('div', { class: 'hint' }, 'You will be asked where to save the project: as one file (name.hmlproj, easy to carry around), or as a folder (choose "Project folder" in the dialog: project.json with screens/ and assets/ next to it).'));
     this.modal({ title: 'New project', body, buttons: [{ label: 'Cancel' }, { label: 'Create', primary: true, onclick: async () => {
       M.newProject(title.value.trim() || 'New HMI', Number(w.value) || 800, Number(h.value) || 480);
+      if (chosen && chosen.touch && Number(w.value) === chosen.width && Number(h.value) === chosen.height) M.st.project.display.touch = U.clone(chosen.touch);
       this.refresh();
       await this.save(true);
     } }] });

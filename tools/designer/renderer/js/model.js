@@ -255,6 +255,28 @@ const M = {
     return out;
   },
 
+  // Apply one of SCHEMA.displayPresets: the size, and the touch correction that goes with it.
+  applyDisplayPreset(preset) {
+    this.mutate(() => {
+      const d = this.st.project.display = this.st.project.display || {};
+      d.width = preset.width; d.height = preset.height;
+      if (preset.touch) d.touch = U.clone(preset.touch); else delete d.touch;
+    });
+  },
+  // One of the four touch calibration values (min_x, min_y, max_x, max_y); the entry goes
+  // away when all four are empty.
+  setTouchCalibration(index, value) {
+    this.mutate(() => {
+      const d = this.st.project.display = this.st.project.display || {};
+      const t = d.touch = (d.touch && typeof d.touch === 'object') ? d.touch : {};
+      const c = Array.isArray(t.calibration) && t.calibration.length === 4 ? t.calibration.slice() : [0, 0, 4095, 4095];
+      c[index] = value;
+      if (c.some(v => v === undefined || v === null || v === '' || isNaN(Number(v)))) delete t.calibration;
+      else t.calibration = c.map(Number);
+      if (!Object.keys(t).length) delete d.touch;
+    });
+  },
+
   // ---- users ("users" in project.json): levels, users with a PIN, login behaviour -------
   usersOn() { return this.logOn('users'); },
   setUsers(on) {

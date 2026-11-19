@@ -618,3 +618,64 @@ test('project files: name helpers and where the files live', () => {
   assert.equal(M.st.archive, false);
   assert.equal(M.st.name, '');
 });
+
+// ---------------------------------------------------------------- language, display presets
+test('I18N: property names and fixed texts in Japanese, everything as it is in English', () => {
+  const ctx = vm.createContext({ console, navigator: { language: 'ja-JP' } });
+  vm.runInContext(fs.readFileSync(path.join(JS_DIR, 'i18n.js'), 'utf8'), ctx, { filename: 'i18n.js' });
+  const I18N = vm.runInContext('I18N', ctx);
+  I18N.init();                                                   // nothing saved: the system's language
+  assert.equal(I18N.lang, 'ja');
+  assert.equal(I18N.label('bg_color'), '背景色');
+  assert.equal(I18N.named('bg_color'), true);
+  assert.equal(I18N.label('some_new_key'), 'some_new_key');      // no entry: shown as it is
+  assert.equal(I18N.named('some_new_key'), false);
+  assert.equal(I18N.t('Save'), '保存');
+  assert.equal(I18N.t('A text nobody translated'), 'A text nobody translated');
+  assert.equal(I18N.label('Display'), '表示');                   // a fixed text used as a label
+  assert.equal(I18N.label('toString'), 'toString');              // not something inherited from Object
+  I18N.init('en');                                               // what was chosen before wins
+  assert.equal(I18N.lang, 'en');
+  assert.equal(I18N.label('bg_color'), 'bg_color');
+  assert.equal(I18N.named('bg_color'), false);
+  assert.equal(I18N.t('Save'), 'Save');
+  I18N.set('xx');
+  assert.equal(I18N.lang, 'en');
+  I18N.init('xx');                                               // an unknown saved value: back to the system's
+  assert.equal(I18N.lang, 'ja');
+});
+
+test('every style property and widget property has a Japanese name', () => {
+  const { SCHEMA } = load();
+  const ctx = vm.createContext({ console });
+  vm.runInContext(fs.readFileSync(path.join(JS_DIR, 'i18n.js'), 'utf8'), ctx, { filename: 'i18n.js' });
+  const KEYS = vm.runInContext('I18N.KEYS_JA', ctx), TEXT = vm.runInContext('I18N.TEXT_JA', ctx);
+  const missing = [];
+  for (const k of Object.keys(SCHEMA.styleKeys)) if (!(k in KEYS)) missing.push('style ' + k);
+  for (const [type, t] of Object.entries(SCHEMA.types)) {
+    for (const f of t.props || []) if (!(f.k in KEYS)) missing.push(type + '.' + f.k);
+    if (!(t.label in TEXT)) missing.push('palette ' + t.label);
+  }
+  for (const f of [].concat(SCHEMA.common, SCHEMA.flags, SCHEMA.flex, SCHEMA.access)) if (!(f.k in KEYS)) missing.push(f.k);
+  deq(missing, []);
+});
+
+test('M display presets and touch calibration', () => {
+  const { M, SCHEMA } = load();
+  M.newProject('t', 800, 480);
+  const lcd = SCHEMA.displayPresets.find(p => p.touch);
+  M.applyDisplayPreset(lcd);
+  deq(M.st.project.display, { width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220] } });
+  M.st.project.display.touch.calibration[0] = 1;                 // the preset itself is not what the project holds
+  assert.equal(lcd.touch.calibration[0], 150);
+  M.setTouchCalibration(2, 3900);
+  deq(M.st.project.display.touch.calibration, [1, 3850, 3900, 220]);
+  M.setTouchCalibration(1, '');                                  // an empty field: no calibration at all
+  assert.equal(M.st.project.display.touch.calibration, undefined);
+  assert.equal(M.st.project.display.touch.swap_axes, true);
+  M.setTouchCalibration(0, 100);                                 // starting again from the full range
+  deq(M.st.project.display.touch.calibration, [100, 0, 4095, 4095]);
+  M.applyDisplayPreset(SCHEMA.displayPresets.find(p => !p.touch));
+  assert.equal(M.st.project.display.touch, undefined);           // a display that needs no correction
+  assert.equal(M.st.project.display.width, 800);
+});
