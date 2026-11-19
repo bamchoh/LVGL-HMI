@@ -372,6 +372,21 @@
     ok(App.problems.some(p => /does not record "run"/.test(p.text)), 'a tag the group does not record');
   });
 
+  await test('popup: a screen marked as popup is drawn as a box over the dimmed screen; actions are checked', async () => {
+    const i = M.st.screens.findIndex(s => s.data.name === 'temp_detail');
+    ok(i >= 0, 'the demo has a popup');
+    M.selectScreen(i); App.doRefresh(); await frame();
+    ok(Canvas.root.classList.contains('lv-popup-back'), 'dimmed screen');
+    const box = Canvas.root.querySelector('.lv-popup-box');
+    ok(box && Math.round(box.offsetWidth) === 420, 'box of the popup size');
+    App.select([]);
+    ok([...document.querySelectorAll('#props input[type=checkbox]')].some(c => c.dataset.fk && /popup$/.test(c.dataset.fk) && c.checked), 'popup checkbox on');
+    eq(App.problems.length, 0, 'no problems in the demo');
+    M.selectScreen(0); App.doRefresh();
+    M.mutate(() => { M.screen().children[0].on_click = { action: 'popup', screen: 'main' }; }); App.doRefresh();
+    ok(App.problems.some(p => /is not a popup/.test(p.text)), 'popup to a normal screen is a problem');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

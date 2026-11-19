@@ -125,6 +125,8 @@ const SCHEMA = {
     inc:    [{ k: 'tag', t: 'tag' }, { k: 'by', t: 'number' }],
     dec:    [{ k: 'tag', t: 'tag' }, { k: 'by', t: 'number' }],
     goto:   [{ k: 'screen', t: 'screen' }, { k: 'anim', t: 'anim' }],
+    popup:  [{ k: 'screen', t: 'screen' }],          // + "set": { tag: value } in the JSON: written before it opens
+    close:  [{ k: 'screen', t: 'screen', empty: '(the top one)' }],
     back:   [], reload: [], exit: [],
     restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
     system: [{ k: 'anim', t: 'anim' }],

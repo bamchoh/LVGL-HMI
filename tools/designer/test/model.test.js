@@ -1025,3 +1025,17 @@ test('M trend widgets: group and tags are checked, tag renames follow', () => {
   assert.equal(M.screen().children[0].tags[1].tag, 'pressure');
   deq(M.st.project.data_log.groups[0].tags, ['temperature', 'pressure']);
 });
+
+test('M popups: actions must name a popup screen, the start screen must not be one', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.addScreen('detail');
+  M.st.screens[1].data.popup = true;
+  M.st.cur = 0;
+  M.screen().children = [{ type: 'button', on_click: [{ action: 'popup', screen: 'detail' }, { action: 'close' }, { action: 'popup', screen: 'main' },
+    { action: 'popup', screen: 'gone' }, { action: 'popup' }, { action: 'close', screen: 'detail' }] }];
+  const texts = M.problems().map(p => p.text).sort();
+  deq(texts, ['popup without a screen', 'screen "main" is not a popup (popup)', 'unknown screen "gone" (popup)'].sort());
+  M.st.project.start_screen = 'detail';
+  assert.ok(M.problems().some(p => p.text === 'the start screen "detail" is a popup'));
+});

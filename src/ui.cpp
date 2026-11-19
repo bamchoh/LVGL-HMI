@@ -519,7 +519,7 @@ struct BindOpts {
     std::optional<double> vmin, vmax;
 };
 
-enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call, Script };
+enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call, Script, Popup, Close };
 
 struct Action {
     ActionKind  kind = ActionKind::Back;
@@ -529,6 +529,7 @@ struct Action {
     Value       value;
     double      by = 1;
     RestartTarget restart = RestartTarget::Default;
+    std::vector<std::pair<Tag*, Value>> sets;    // Popup: tags written before it opens
 };
 
 struct ActionList {
@@ -569,6 +570,10 @@ struct Screen {
     lv_obj_t*   obj = nullptr;
     lv_obj_t*   keyboard = nullptr;   // optional on-screen keyboard
     lv_obj_t*   kb_echo = nullptr;    // shows the edited text next to the keyboard when it hides the field
+    // "popup": true - shown over the current screen (action "popup"), never as a screen itself.
+    // obj is then a box on `backdrop`, a full-size object on the top layer that takes every touch.
+    bool        popup = false;
+    lv_obj_t*   backdrop = nullptr;
 };
 
 // While no screen is shown at all (screens built for a test, or between unload and the first
@@ -652,6 +657,19 @@ struct Ui::Impl {
     std::vector<std::unique_ptr<Screen>>     screens;
     int                                      current = -1;
     std::deque<int>                          history;
+    std::vector<int>                         popups;      // open popups, the top one last
+
+    void bring_up_to_date(Screen& scr)
+    {
+        for(Binding* b : scr.bindings) {
+            if(!b->stale) continue;
+            b->stale = false;
+            b->on_tag_changed(b->tag->get(), nullptr);
+        }
+    }
+    bool open_popup(const std::string& name);
+    bool close_popup(const std::string& name);      // "" = the top one
+    void close_all_popups() { while(!popups.empty()) close_popup(""); }
     std::vector<std::unique_ptr<Binding>>    bindings;
     std::vector<std::unique_ptr<ActionList>> action_lists;
     std::vector<std::unique_ptr<AccessRule>> access_rules;
@@ -707,16 +725,12 @@ struct Ui::Impl {
     // tags that changed while it was not shown.
     void set_shown(int idx)
     {
-        for(auto& sc : screens) sc->shown = false;
+        for(auto& sc : screens) if(!sc->popup) sc->shown = false;     // (open popups stay shown)
         if(idx < 0 || static_cast<size_t>(idx) >= screens.size()) { s_some_screen_shown = false; return; }
         Screen& scr = *screens[static_cast<size_t>(idx)];
         scr.shown = true;
         s_some_screen_shown = true;
-        for(Binding* b : scr.bindings) {
-            if(!b->stale) continue;
-            b->stale = false;
-            b->on_tag_changed(b->tag->get(), nullptr);
-        }
+        bring_up_to_date(scr);
     }
     void apply_access(const AccessRule& r);
     static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
@@ -1015,6 +1029,11 @@ void Ui::Impl::run_actions(const ActionList& list)
         switch(a.kind) {
             case ActionKind::Goto:   oplog.record("screen", a.screen); show_screen(a.screen, a.anim); break;
             case ActionKind::Back:   oplog.record("screen", "(back)"); ui().back(); break;
+            case ActionKind::Popup:
+                for(const auto& [t, v] : a.sets) t->set(v, nullptr);
+                if(open_popup(a.screen)) oplog.record("screen", "popup " + a.screen);
+                break;
+            case ActionKind::Close:  close_popup(a.screen); break;
             case ActionKind::Set:
             case ActionKind::Toggle:
             case ActionKind::Inc:
@@ -1097,6 +1116,23 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
         a.anim = jstr(j, "anim", "fade");
         return a;
     }
+    if(iequals(*kind, "popup")) {
+        a.kind = ActionKind::Popup;
+        a.screen = jstr(j, "screen", "");
+        if(a.screen.empty()) { HML_WARN("popup action without \"screen\""); return std::nullopt; }
+        // "set": { "tag": value, ... } written before the popup opens (which machine it is about)
+        if(const json* s = jget(j, "set"); s && s->is_object()) {
+            for(auto it = s->begin(); it != s->end(); ++it) {
+                Tag* t = tags().find(it.key());
+                if(!t) { HML_WARN("popup '%s': unknown tag '%s' in \"set\"", a.screen.c_str(), it.key().c_str()); continue; }
+                const json& v = it.value();
+                a.sets.emplace_back(t, v.is_string() ? Value::string(v.get<std::string>()) : v.is_boolean() ? Value::number(v.get<bool>() ? 1 : 0, TagType::Bool)
+                                                                                                : Value::number(jscalar_to_number(v)));
+            }
+        }
+        return a;
+    }
+    if(iequals(*kind, "close")) { a.kind = ActionKind::Close; a.screen = jstr(j, "screen", ""); return a; }
     if(iequals(*kind, "back")) { a.kind = ActionKind::Back; return a; }
     if(iequals(*kind, "reload")) { a.kind = ActionKind::Reload; return a; }
     if(iequals(*kind, "exit")) { a.kind = ActionKind::Exit; return a; }
@@ -1496,10 +1532,49 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
 
 // ---------------------------------------------------------------- screens
 
+bool Ui::Impl::open_popup(const std::string& name)
+{
+    Screen* scr = find_screen(name);
+    if(!scr) { HML_WARN("popup: unknown screen '%s'", name.c_str()); return false; }
+    if(!scr->popup) { HML_WARN("popup: screen '%s' is not a popup (\"popup\": true)", name.c_str()); return false; }
+    if(!users().allowed(scr->level)) { users().request_login(scr->level); return false; }   // (the popup is not opened)
+    ensure_built(*scr);
+    int idx = 0;
+    while(screens[static_cast<size_t>(idx)].get() != scr) idx++;
+    popups.erase(std::remove(popups.begin(), popups.end(), idx), popups.end());     // open already: to the top
+    popups.push_back(idx);
+    lv_obj_remove_flag(scr->backdrop, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(scr->backdrop);
+    const bool was = scr->shown;
+    scr->shown = true;
+    bring_up_to_date(*scr);
+    if(!was) scripts().on_screen(name, true);
+    return true;
+}
+
+bool Ui::Impl::close_popup(const std::string& name)
+{
+    if(popups.empty()) return false;
+    int idx = popups.back();
+    if(!name.empty()) {
+        Screen* scr = find_screen(name);
+        auto it = std::find_if(popups.begin(), popups.end(), [&](int i) { return screens[static_cast<size_t>(i)].get() == scr; });
+        if(it == popups.end()) return false;
+        idx = *it;
+    }
+    popups.erase(std::remove(popups.begin(), popups.end(), idx), popups.end());
+    Screen& scr = *screens[static_cast<size_t>(idx)];
+    lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_HIDDEN);
+    scr.shown = false;
+    scripts().on_screen(scr.name, false);
+    return true;
+}
+
 bool Ui::Impl::show_screen(const std::string& name, const std::string& anim, bool replace)
 {
     Screen* scr = find_screen(name);
     if(!scr) { HML_WARN("goto: unknown screen '%s'", name.c_str()); return false; }
+    if(scr->popup) return open_popup(name);                  // (a goto to a popup opens it)
     int idx = 0;
     while(screens[static_cast<size_t>(idx)].get() != scr) idx++;
     if(idx == current) return true;
@@ -1508,6 +1583,7 @@ bool Ui::Impl::show_screen(const std::string& name, const std::string& anim, boo
         return false;
     }
     ensure_built(*scr);
+    close_all_popups();                                      // a popup belongs to the screen it was opened on
 
     lv_obj_t* prev = lv_screen_active();
     bool prev_is_ours = false;
@@ -1575,6 +1651,7 @@ bool Ui::add_screen(const json& screen, const std::string& base_dir)
     auto scr = std::make_unique<Screen>();
     scr->name = *name;
     scr->level = std::max(0, static_cast<int>(jnum(screen, "level", 0)));
+    scr->popup = jbool(screen, "popup", false);
     scr->def = screen;
     scr->base_dir = base_dir;
     m.screens.push_back(std::move(scr));
@@ -1589,11 +1666,30 @@ void Ui::Impl::ensure_built(Screen& scr)
     const json def = std::move(scr.def);
     scr.def = json();
     base_dir = scr.base_dir;
-    scr.obj = lv_obj_create(nullptr);
+    if(scr.popup) {
+        // the backdrop: dims the screen (unless "dim": false) and takes every touch (modal)
+        scr.backdrop = lv_obj_create(lv_layer_top());
+        lv_obj_remove_style_all(scr.backdrop);
+        lv_obj_set_size(scr.backdrop, lv_pct(100), lv_pct(100));
+        lv_obj_set_style_bg_color(scr.backdrop, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(scr.backdrop, jbool(def, "dim", true) ? LV_OPA_50 : LV_OPA_TRANSP, 0);
+        lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_HIDDEN);
+        scr.obj = lv_obj_create(scr.backdrop);
+        lv_obj_set_size(scr.obj, lv_pct(60), lv_pct(60));
+        lv_obj_center(scr.obj);
+        json box = def;
+        box.erase("children");
+        box.erase("hidden");
+        apply_common(scr.obj, box);                          // w / h / x / y / align / style
+    }
+    else scr.obj = lv_obj_create(nullptr);
     building = &scr;
 
-    apply_layout(scr.obj, def);
-    apply_styles(scr.obj, def);
+    if(!scr.popup) {
+        apply_layout(scr.obj, def);
+        apply_styles(scr.obj, def);
+    }
     if(jhas(def, "scrollable") && !jbool(def, "scrollable", true)) lv_obj_remove_flag(scr.obj, LV_OBJ_FLAG_SCROLLABLE);
     build_children(scr.obj, def);
 
@@ -1631,8 +1727,12 @@ void Ui::unload_all()
     // The blank screen is deleted automatically when the next screen is loaded (see show_screen).
     lv_obj_t* blank = lv_obj_create(nullptr);
     lv_screen_load(blank);
-    for(auto& s : m.screens) if(s->obj) lv_obj_delete(s->obj);
+    for(auto& s : m.screens) {
+        if(s->backdrop) lv_obj_delete(s->backdrop);          // (a popup's box goes with it)
+        else if(s->obj) lv_obj_delete(s->obj);
+    }
     m.screens.clear();
+    m.popups.clear();
     s_some_screen_shown = false;
     m.bindings.clear();
     m.action_lists.clear();
@@ -1670,6 +1770,7 @@ bool Ui::back()
         if(top >= 0 && static_cast<size_t>(top) < m.screens.size() && users().allowed(m.screens[static_cast<size_t>(top)]->level)) break;
         m.history.pop_back();
     }
+    if(!m.popups.empty()) { m.close_popup(""); return true; }   // "back" in a popup closes it
     if(m.history.empty()) return false;
     int idx = m.history.back();
     m.history.pop_back();
@@ -1683,6 +1784,15 @@ bool Ui::back()
     if(!left.empty()) scripts().on_screen(left, false);
     scripts().on_screen(shown, true);
     return true;
+}
+
+bool Ui::open_popup(const std::string& name) { return impl_->open_popup(name); }
+bool Ui::close_popup(const std::string& name) { return impl_->close_popup(name); }
+std::vector<std::string> Ui::open_popups() const
+{
+    std::vector<std::string> out;
+    for(int i : impl_->popups) out.push_back(impl_->screens[static_cast<size_t>(i)]->name);
+    return out;
 }
 
 std::optional<std::string> Ui::current_screen() const

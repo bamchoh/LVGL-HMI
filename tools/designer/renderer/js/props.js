@@ -2,7 +2,7 @@
 'use strict';
 
 const Props = {
-  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled', 'ack', 'blink'],
+  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled', 'ack', 'blink', 'dim'],
 
   init() { this.el = document.getElementById('props'); },
 
@@ -133,7 +133,10 @@ const Props = {
       const name = U.el('input', { type: 'text', value: w.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.renameScreen(M.st.cur, e.target.value) });
       el.append(U.el('div', { class: 'props-head' }, 'Screen'));
       el.append(this.section('Screen', true, this.row('name', name), ...this.fields(w, [{ k: 'scrollable', t: 'bool' },
-        { k: 'level', t: 'number', hint: 'minimum user level to open this screen (0 / empty = everybody); the login screen is shown first. Needs users (Users tab)' }], fk)));
+        { k: 'level', t: 'number', hint: 'minimum user level to open this screen (0 / empty = everybody); the login screen is shown first. Needs users (Users tab)' },
+        { k: 'popup', t: 'bool', hint: 'shown over the current screen by the action "popup" (closed by "close", "back" or a screen change), never as a screen of its own' }], fk)));
+      if (w.popup) el.append(this.section('Popup', true, ...this.fields(w, [{ k: 'w', t: 'size' }, { k: 'h', t: 'size' }, { k: 'align', t: 'select', o: SCHEMA.aligns },
+        { k: 'x', t: 'number' }, { k: 'y', t: 'number' }, { k: 'dim', t: 'bool', hint: 'darken the screen below (it cannot be touched either way)' }], fk)));
       el.append(this.section('Layout (flex)', false, ...this.fields(w, SCHEMA.flex.filter(f => f.k !== 'flex_grow'), fk)));
       el.append(this.styleSection(w, fk));
       return;

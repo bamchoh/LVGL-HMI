@@ -59,8 +59,23 @@ const Canvas = {
     // the screen's own style (background colour ...) on top of the theme; the element is
     // reused, so what a removed property had set must go first
     for (const k of ['borderWidth', 'borderColor', 'borderStyle', 'borderRadius', 'opacity', 'boxShadow', 'outline', 'textAlign', 'letterSpacing']) root.style[k] = '';
-    if (scr.style && typeof scr.style === 'object') this.applyStyle(root, scr.style, th, {});
     root.dataset.path = '';
+    if (scr.popup) {
+      // a popup: its box over the dimmed screen, where the device shows it
+      root.className = 'lv lv-screen lv-popup-back' + (scr.dim === false ? ' nodim' : '');
+      root.style.padding = '0';
+      const box = U.el('div', { class: 'lv lv-panel lv-popup-box' + (U.samePath(M.st.sel, []) ? ' hd-selected' : ''), dataset: { path: '' } });
+      const placed = Object.assign({}, scr, { type: 'panel', w: scr.w !== undefined ? scr.w : '60%', h: scr.h !== undefined ? scr.h : '60%' });
+      if (placed.align === undefined && placed.x === undefined && placed.y === undefined) placed.align = 'center';
+      this.place(box, placed, null);
+      box.style.background = th.card;
+      if (scr.style && typeof scr.style === 'object') this.applyStyle(box, scr.style, th, {});
+      root.append(box);
+      const content = this.container(box, scr, th, 12);
+      (scr.children || []).forEach((c, i) => content.append(this.build(c, [i], th, scr.flex ? scr : null)));
+      return;
+    }
+    if (scr.style && typeof scr.style === 'object') this.applyStyle(root, scr.style, th, {});
     root.className = 'lv lv-screen' + (U.samePath(M.st.sel, []) ? ' hd-selected' : '');
     const content = this.container(root, scr, th, 0);
     (scr.children || []).forEach((c, i) => content.append(this.build(c, [i], th, scr.flex ? scr : null)));

@@ -262,6 +262,7 @@
     "screens/settings.json",
     "screens/recipes.json",
     "screens/alarms.json",
-    "screens/trend.json"
+    "screens/trend.json",
+    "screens/temp_detail.json"
   ]
 }

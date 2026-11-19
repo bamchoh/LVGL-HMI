@@ -342,3 +342,18 @@ I18N.PATTERNS_JA.push(
   [/^trend: no data log group "(.*)"$/, 'トレンド: ロギンググループ「$1」がありません'],
   [/^trend: data log group "(.*)" does not record "(.*)"$/, 'トレンド: ロギンググループ「$1」は「$2」を記録していません'],
 );
+
+// ---- popups
+Object.assign(I18N.KEYS_JA, { popup: 'ポップアップとして使う', dim: '下の画面を暗くする' });
+Object.assign(I18N.ACTIONS_JA, { popup: 'ポップアップを開く', close: 'ポップアップを閉じる' });
+Object.assign(I18N.TEXT_JA, {
+  'Popup': 'ポップアップ', '(the top one)': '(いちばん上のもの)', 'popup without a screen': '開く画面が指定されていないポップアップ',
+  'shown over the current screen by the action "popup" (closed by "close", "back" or a screen change), never as a screen of its own':
+    '動作「ポップアップを開く」で今の画面の上に表示します（「閉じる」「戻る」、画面の切り替えで閉じます）。画面としては表示しません',
+  'darken the screen below (it cannot be touched either way)': '下の画面を暗くする（どちらでも下の画面には触れません）',
+});
+I18N.PATTERNS_JA.push(
+  [/^screen "(.*)" is not a popup \((.*)\)$/, '画面「$1」はポップアップではありません ($2)'],
+  [/^unknown screen "(.*)" \((popup|close)\)$/, '存在しない画面「$1」($2)'],
+  [/^the start screen "(.*)" is a popup$/, '開始画面「$1」がポップアップになっています'],
+);
