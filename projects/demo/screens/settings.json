@@ -25,7 +25,7 @@
         {
           "type": "button",
           "align": "left_mid",
-          "text": "< Back",
+          "text": "@back_arrow",
           "w": 90,
           "h": 36,
           "on_click": {
@@ -34,7 +34,7 @@
         },
         {
           "type": "label",
-          "text": "Settings",
+          "text": "@settings",
           "align": "center",
           "style": {
             "font": 24,
@@ -73,7 +73,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Operation mode",
+          "text": "@operation_mode",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -115,7 +115,7 @@
         },
         {
           "type": "label",
-          "text": "Operator name",
+          "text": "@operator_name",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -323,14 +323,14 @@
           "children": [
             {
               "type": "button",
-              "text": "Reload",
+              "text": "@reload",
               "on_click": {
                 "action": "reload"
               }
             },
             {
               "type": "button",
-              "text": "Main",
+              "text": "@main",
               "on_click": {
                 "action": "goto",
                 "screen": "main",
@@ -339,7 +339,7 @@
             },
             {
               "type": "button",
-              "text": "Trend",
+              "text": "@trend",
               "style": {
                 "bg_color": "#5e35b1"
               },
@@ -351,7 +351,7 @@
             },
             {
               "type": "button",
-              "text": "Recipes",
+              "text": "@recipes",
               "style": {
                 "bg_color": "#00838f"
               },
@@ -363,7 +363,17 @@
             },
             {
               "type": "button",
-              "text": "System",
+              "text": "@language",
+              "style": {
+                "bg_color": "#6d4c41"
+              },
+              "on_click": {
+                "action": "language"
+              }
+            },
+            {
+              "type": "button",
+              "text": "@system",
               "style": {
                 "bg_color": "#455a64"
               },
@@ -373,7 +383,7 @@
             },
             {
               "type": "button",
-              "text": "Restart",
+              "text": "@restart",
               "style": {
                 "bg_color": "#ef6c00"
               },
@@ -383,7 +393,7 @@
             },
             {
               "type": "button",
-              "text": "Exit",
+              "text": "@exit",
               "style": {
                 "bg_color": "#455a64"
               },

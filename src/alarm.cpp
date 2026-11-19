@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <tuple>
 #include "tag.hpp"
+#include "texts.hpp"
 #include "util.hpp"
 
 namespace hml {
@@ -58,7 +59,7 @@ struct Alarm {
     AlarmStatus status() const
     {
         AlarmStatus s;
-        s.name = name; s.message = message; s.severity = severity; s.value = value; s.acked_by = acked_by;
+        s.name = name; s.message = texts().resolve(message); s.severity = severity; s.value = value; s.acked_by = acked_by;
         s.active = active; s.acked = acked; s.need_ack = need_ack;
         s.raised_ms = raised_ms; s.cleared_ms = cleared_ms; s.acked_ms = acked_ms; s.seq = seq;
         return s;
@@ -100,7 +101,7 @@ struct Alarms::Impl {
 
     void record(Alarm& a, int64_t ts, const char* event, const std::string& user = "")
     {
-        db.add(ts, { a.name, event, a.severity, a.message, a.value, user });
+        db.add(ts, { a.name, event, a.severity, texts().resolve(a.message), a.value, user });
     }
 
     void changed()
@@ -117,7 +118,7 @@ struct Alarms::Impl {
         }
         set_sys_tag("sys.alarm.active", TagType::Int, Value::number(static_cast<double>(active), TagType::Int));
         set_sys_tag("sys.alarm.unacked", TagType::Int, Value::number(static_cast<double>(unacked), TagType::Int));
-        set_sys_tag("sys.alarm.latest", TagType::String, Value::string(latest ? latest->message : ""));
+        set_sys_tag("sys.alarm.latest", TagType::String, Value::string(latest ? texts().resolve(latest->message) : ""));
         set_sys_tag("sys.alarm.latest_severity", TagType::String, Value::string(latest ? latest->severity : ""));
     }
 

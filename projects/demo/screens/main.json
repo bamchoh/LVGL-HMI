@@ -29,7 +29,7 @@
         },
         {
           "type": "label",
-          "text": "Pump Station #1",
+          "text": "@title",
           "align": "left_mid",
           "x": 40,
           "style": {
@@ -57,7 +57,7 @@
           "x": -132,
           "w": 84,
           "h": 36,
-          "text": "Alarms",
+          "text": "@alarms",
           "style": {
             "bg_color": "#455a64"
           },
@@ -105,7 +105,7 @@
         {
           "type": "button",
           "align": "right_mid",
-          "text": "Setup",
+          "text": "@setup",
           "w": 48,
           "h": 36,
           "style_label": {
@@ -135,7 +135,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Temperature",
+          "text": "@temperature",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -186,7 +186,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Pressure",
+          "text": "@pressure",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -246,7 +246,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Alarm",
+          "text": "@alarm",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -417,7 +417,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Trend (temperature / level)",
+          "text": "@trend_panel",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -426,7 +426,7 @@
           "type": "chart",
           "align": "bottom_mid",
           "w": "100%",
-          "h": 170,
+          "h": 160,
           "chart_type": "line",
           "points": 120,
           "min": 0,
@@ -471,7 +471,7 @@
       "children": [
         {
           "type": "label",
-          "text": "Pump control",
+          "text": "@pump_control",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -492,7 +492,7 @@
           "children": [
             {
               "type": "label",
-              "text": "Run",
+              "text": "@run",
               "style": {
                 "font": 18,
                 "text_color": "#ffffff"
@@ -616,7 +616,7 @@
             },
             {
               "type": "button",
-              "text": "Stop",
+              "text": "@stop",
               "w": 64,
               "style": {
                 "bg_color": "#c62828"
@@ -638,7 +638,7 @@
         },
         {
           "type": "checkbox",
-          "text": "Auto mode (locks slider)",
+          "text": "@auto_mode",
           "bind": "auto_mode",
           "style": {
             "text_color": "#9fb3c8",

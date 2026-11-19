@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <functional>
 #include <map>
+#include "texts.hpp"
 #include "util.hpp"
 
 namespace hml {
@@ -304,7 +305,7 @@ lv_obj_t* build_recipe_table(lv_obj_t* parent, const json& w)
     c->book = jstr(w, "book", "");
     c->row_h = std::clamp(static_cast<int32_t>(jnum(w, "row_height", 40)), 24, 120);
     if(const json* l = jget(w, "labels"); l && l->is_object())
-        for(auto it = l->begin(); it != l->end(); ++it) if(it.value().is_string()) c->labels[it.key()] = one_line(it.value().get<std::string>(), 80);
+        for(auto it = l->begin(); it != l->end(); ++it) if(it.value().is_string()) c->labels[it.key()] = one_line(texts().resolve(it.value().get<std::string>()), 80);
 
     lv_obj_t* obj = lv_obj_create(parent);
     c->obj = obj;

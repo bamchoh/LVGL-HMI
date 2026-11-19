@@ -242,7 +242,7 @@ const Canvas = {
   w_obj(el, w, st, th, path) { this.w_panel(el, w, st, th, path); },
 
   labelText(w) {
-    if (w.text !== undefined && w.text !== null && !w.bind) return String(w.text);
+    if (w.text !== undefined && w.text !== null && !w.bind) return String(M.resolveText(w.text));
     const b = w.bind;
     if (typeof b === 'string') return '{' + b + '}';
     if (b && typeof b === 'object' && b.text !== undefined) {
@@ -252,7 +252,7 @@ const Canvas = {
         .replace(/%[-+ 0#]*\d*(?:\.\d+)?(hh|h|ll|l|L|z)?[fFeEgG]/g, '0.0').replace(/%[-+ 0#]*\d*(?:\.\d+)?s/g, '{' + (t.tag || '') + '}').replace(/\u0000/g, '%');
       if (t && t.tag) return '{' + t.tag + '}';
     }
-    return w.text !== undefined ? String(w.text) : 'Label';
+    return w.text !== undefined ? String(M.resolveText(w.text)) : 'Label';
   },
   w_label(el, w, st) {
     el.textContent = this.labelText(w);
@@ -260,14 +260,14 @@ const Canvas = {
     if (w.long_mode === 'dots' || w.long_mode === 'clip') { el.style.overflow = 'hidden'; el.style.textOverflow = w.long_mode === 'dots' ? 'ellipsis' : 'clip'; el.style.whiteSpace = 'nowrap'; }
   },
   w_button(el, w, st, th) {
-    const lbl = U.el('span', { class: 'lv-btn-label' }, w.text !== undefined ? String(w.text) : (w.bind ? this.labelText(w) : ''));
+    const lbl = U.el('span', { class: 'lv-btn-label' }, w.text !== undefined ? String(M.resolveText(w.text)) : (w.bind ? this.labelText(w) : ''));
     if (w.style_label) this.applyStyle(lbl, w.style_label, th, {});
     el.append(lbl);
     if (w.checked) el.classList.add('lv-checked');
   },
   w_switch(el, w) { el.append(U.el('div', { class: 'lv-knob' })); if (w.checked) el.classList.add('lv-checked'); },
   w_checkbox(el, w) {
-    el.append(U.el('div', { class: 'lv-box' + (w.checked ? ' lv-checked' : '') }, w.checked ? '✓' : ''), U.el('span', null, w.text !== undefined ? String(w.text) : 'Check'));
+    el.append(U.el('div', { class: 'lv-box' + (w.checked ? ' lv-checked' : '') }, w.checked ? '✓' : ''), U.el('span', null, w.text !== undefined ? String(M.resolveText(w.text)) : 'Check'));
   },
   ratio(w) { const mn = U.num(w.min, 0), mx = U.num(w.max, 100); const v = U.num(w.value, mn + (mx - mn) * 0.4); return mx === mn ? 0 : Math.max(0, Math.min(1, (v - mn) / (mx - mn))); },
   w_bar(el, w, st, th) {
@@ -316,11 +316,11 @@ const Canvas = {
     if (w.on === false || (w.on === undefined && w.bind)) { el.style.opacity = 0.35; el.style.boxShadow = 'none'; }
   },
   w_dropdown(el, w) {
-    const opts = Array.isArray(w.options) ? w.options : String(w.options || '').split('\n');
+    const opts = (Array.isArray(w.options) ? w.options : String(w.options || '').split('\n')).map(o => M.resolveText(o));
     el.append(U.el('span', { class: 'lv-grow' }, opts[U.num(w.selected, 0)] || ''), U.el('span', null, '▾'));
   },
   w_roller(el, w, st, th) {
-    const opts = Array.isArray(w.options) ? w.options : String(w.options || '').split('\n');
+    const opts = (Array.isArray(w.options) ? w.options : String(w.options || '').split('\n')).map(o => M.resolveText(o));
     const rows = Math.max(1, U.num(w.visible_rows, 3)), sel = U.num(w.selected, 0);
     for (let i = 0; i < rows; i++) {
       const idx = sel - Math.floor(rows / 2) + i;

@@ -357,3 +357,30 @@ I18N.PATTERNS_JA.push(
   [/^unknown screen "(.*)" \((popup|close)\)$/, '存在しない画面「$1」($2)'],
   [/^the start screen "(.*)" is a popup$/, '開始画面「$1」がポップアップになっています'],
 );
+
+// ---- texts / languages
+Object.assign(I18N.KEYS_JA, { languages: '言語', language: '起動時の言語', lang: '言語', file: 'ファイル' });
+Object.assign(I18N.ACTIONS_JA, { language: '表示言語を切り替える' });
+Object.assign(I18N.TEXT_JA, {
+  'Texts': '多言語テキスト', 'Font': 'フォント', 'Preview in': 'プレビューの言語', '+ Add text': '+ テキストを追加', 'No texts yet.': 'テキストはまだありません。',
+  'Texts in several languages (Ctrl+8)': '多言語テキスト (Ctrl+8)', 'Text id (letters, digits, _ . -)': 'テキストの ID（英数字と _ . -）',
+  'Write "@id" as the text of a widget (text, placeholder, options, labels) or as an alarm message: the device shows the text in its language. The language is the tag sys.lang; switch it with the action "language" (or a widget bound to sys.lang). Japanese, Chinese ... need a font that has them: Project tab > Font.':
+    '部品のテキスト（text、placeholder、options、labels）やアラームのメッセージに「@ID」と書くと、装置はその言語のテキストを表示します。言語はタグ sys.lang で、動作「表示言語を切り替える」（または sys.lang に連動した部品）で切り替えます。日本語・中国語などには、その文字があるフォントが必要です（プロジェクト タブ > フォント）。',
+  'language codes, the first is the default (and what a missing translation falls back to), e.g. ja, en': '言語コード。最初のものが既定です（訳がないときもこれを表示）。例: ja, en',
+  'the language at start': '起動時の言語',
+  'a TTF / OTF file in the project for every text (any size); empty = the built-in font (Latin letters only). tools/subset_font.py makes a small copy with the characters the project needs':
+    'すべてのテキストに使う、プロジェクト内の TTF / OTF ファイル（どの大きさでも可）。空欄 = 組み込みフォント（ラテン文字のみ）。tools/subset_font.py で、必要な文字だけの小さなファイルを作れます',
+  'Keep the license of the font next to it (Noto Sans JP: SIL Open Font License, OFL.txt).': 'フォントのライセンスはファイルの隣に置いてください（Noto Sans JP は SIL Open Font License。OFL.txt）。',
+  'Texts: import / export': '多言語テキストの取り込み / 書き出し',
+  'One text per line: id, then one column per language (the first line names them). Copy this into a spreadsheet for the translators, or paste their lines here (commas or tabs) and press Import: the texts are replaced, new languages are added.':
+    '1 行に 1 テキスト: ID、続けて言語ごとの列（1 行目に言語コード）。表計算ソフトへコピーして翻訳者に渡し、戻ってきた行をここへ貼り付けて（カンマ区切りでもタブ区切りでも可）「取り込む」を押すと、テキストが置き換わります。新しい言語は追加されます。',
+  '{0} text(s) imported': '{0} 個のテキストを取り込みました',
+  'Screen editor, tags, drivers, scripts, logs, users, recipes, texts': '画面の編集・タグ・ドライバ・スクリプト・ログ・ユーザー・レシピ・多言語テキスト',
+  'a language code of the project, or "next"': 'プロジェクトの言語コード、または "next"（次の言語）',
+});
+I18N.PATTERNS_JA.push(
+  [/^text "(.*)" has no (.*)$/, 'テキスト「$1」に $2 の訳がありません'],
+  [/^text "(.*)" in (.*) is much longer than in (.*): it may not fit$/, 'テキスト「$1」の $2 の訳は $3 よりかなり長く、収まらないかもしれません'],
+  [/^no text "(.*)" \(shown as "(.*)"\)$/, 'テキスト「$1」がありません（「$2」と表示されます）'],
+  [/^the start language "(.*)" is not one of the languages$/, '起動時の言語「$1」が言語の一覧にありません'],
+);

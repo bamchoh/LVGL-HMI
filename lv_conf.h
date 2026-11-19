@@ -105,6 +105,11 @@
 #define LV_FS_STDIO_PATH ""
 #define LV_USE_LODEPNG 1
 
+/* the project's font file (texts.hpp): glyphs are read from the file when first drawn */
+#define LV_USE_TINY_TTF 1
+#define LV_TINY_TTF_FILE_SUPPORT 1
+#define LV_TINY_TTF_CACHE_GLYPH_CNT 256
+
 #define LV_USE_DEMO_WIDGETS 0
 
 #endif /* LV_CONF_H */

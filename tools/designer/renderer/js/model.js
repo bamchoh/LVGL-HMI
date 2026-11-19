@@ -397,6 +397,116 @@ const M = {
     return res;
   },
 
+  // ---- languages and texts ("@id") ---------------------------------------------------
+  languages() {
+    const p = this.st.project || {};
+    if (Array.isArray(p.languages) && p.languages.length) return p.languages.filter(l => typeof l === 'string');
+    const out = [];
+    for (const t of Object.values(p.texts || {})) for (const l of Object.keys(t || {})) if (!out.includes(l)) out.push(l);
+    return out;
+  },
+  // the language the canvas shows (the designer's choice, else the project's start language)
+  previewLanguage() {
+    const langs = this.languages(), p = this.st.project || {};
+    if (this.st.previewLang && langs.includes(this.st.previewLang)) return this.st.previewLang;
+    return langs.includes(p.language) ? p.language : langs[0];
+  },
+  // "@id" -> the text in the preview language, as the runtime does (texts.cpp)
+  resolveText(s) {
+    if (typeof s !== 'string' || s.length < 2 || s[0] !== '@') return s;
+    if (s[1] === '@') return s.slice(1);
+    const t = ((this.st.project || {}).texts || {})[s.slice(1)];
+    if (!t || typeof t !== 'object') return s;
+    const lang = this.previewLanguage(), first = this.languages()[0];
+    return t[lang] || (first && t[first]) || Object.values(t)[0] || s;
+  },
+  textIds() { return Object.keys((this.st.project || {}).texts || {}); },
+  addText(id) {
+    id = String(id || '').trim();
+    const p = this.st.project;
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/.test(id) || (p.texts && p.texts[id])) return false;
+    this.mutate(() => { p.texts = p.texts || {}; p.texts[id] = {}; });
+    return true;
+  },
+  // rename an id: every "@old" in the screens, alarm messages and widget labels follows
+  renameText(oldId, id) {
+    id = String(id || '').trim();
+    const p = this.st.project, texts = p.texts || {};
+    if (oldId === id) return true;
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/.test(id) || texts[id] || !texts[oldId]) return false;
+    this.mutate(() => {
+      const t = {};
+      for (const [k, v] of Object.entries(texts)) t[k === oldId ? id : k] = v;      // (keeps the order)
+      p.texts = t;
+      this.eachTextRef((s, set) => { if (s === '@' + oldId) set('@' + id); });
+    });
+    return true;
+  },
+  // every place a text may be "@id": cb(text, set, loc)
+  eachTextRef(cb) {
+    const st = this.st, p = st.project || {};
+    const str = (o, k, loc) => { if (o && typeof o[k] === 'string') cb(o[k], v => { o[k] = v; }, loc); };
+    st.screens.forEach((s, si) => {
+      const visit = (w, path) => {
+        const loc = { screen: si, path };
+        str(w, 'text', loc); str(w, 'placeholder', loc);
+        if (Array.isArray(w.options)) w.options.forEach((o, i) => { if (typeof o === 'string') cb(o, v => { w.options[i] = v; }, loc); });
+        if (w.labels && typeof w.labels === 'object') for (const k of Object.keys(w.labels)) str(w.labels, k, loc);
+        (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
+      };
+      visit(s.data, []);
+    });
+    for (const a of (p.alarms && p.alarms.items) || []) str(a, 'message', { view: 'logs' });
+  },
+  textProblems() {
+    const out = [], p = this.st.project || {}, texts = p.texts || {}, langs = this.languages();
+    for (const [id, t] of Object.entries(texts)) {
+      const missing = langs.filter(l => !t || typeof t[l] !== 'string' || t[l] === '');
+      if (missing.length) out.push({ text: 'text "' + id + '" has no ' + missing.join(', '), view: 'texts' });
+      // a translation much longer than the first language may not fit where the first one does
+      const base = t && t[langs[0]];
+      if (base) for (const l of langs.slice(1)) {
+        const v = t[l];
+        if (typeof v === 'string' && U.textWidth(v) > U.textWidth(base) * 1.5 + 6 /* (room: short words differ a lot) */) out.push({ text: 'text "' + id + '" in ' + l + ' is much longer than in ' + langs[0] + ': it may not fit', view: 'texts' });
+      }
+    }
+    this.eachTextRef((s, set, loc) => {
+      if (typeof s === 'string' && /^@[A-Za-z_][A-Za-z0-9_.-]*$/.test(s) && !texts[s.slice(1)]) out.push(Object.assign({ text: 'no text "' + s.slice(1) + '" (shown as "' + s + '")' }, loc));
+    });
+    if (p.language && langs.length && !langs.includes(p.language)) out.push({ text: 'the start language "' + p.language + '" is not one of the languages', view: 'texts' });
+    return out;
+  },
+  textsCsv() {
+    const langs = this.languages(), texts = (this.st.project || {}).texts || {};
+    const cell = v => { let s = v === undefined || v === null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    return [['id'].concat(langs).map(cell).join(',')].concat(Object.entries(texts).map(([id, t]) => [id].concat(langs.map(l => (t || {})[l])).map(cell).join(','))).join('\n') + '\n';
+  },
+  // replace the texts with a table (first line: id,<language>...); new languages are added. { count, errors }
+  importTextsCsv(text) {
+    const res = { count: 0, errors: [] }, rows = U.parseTable(text);
+    if (!rows.length || rows[0][0] !== 'id') { res.errors.push('the first line must be: id,<language>,<language>...'); return res; }
+    const langs = rows[0].slice(1).map(s => s.trim());
+    for (const l of langs) if (!/^[A-Za-z0-9_-]{1,16}$/.test(l)) res.errors.push('"' + l + '" is not a language code (letters, digits, - and _)');
+    const texts = {};
+    rows.slice(1).forEach((r, i) => {
+      const id = String(r[0] || '').trim();
+      if (!/^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/.test(id)) { res.errors.push('line ' + (i + 2) + ': "' + id + '" is not an id'); return; }
+      if (texts[id]) { res.errors.push('line ' + (i + 2) + ': "' + id + '" twice'); return; }
+      const t = {};
+      langs.forEach((l, k) => { let v = r[k + 1]; if (v === undefined || v === '') return; if (v[0] === "'") v = v.slice(1); t[l] = v; });
+      texts[id] = t;
+    });
+    if (res.errors.length) return res;
+    this.mutate(() => {
+      const p = this.st.project;
+      p.texts = texts;
+      const all = this.languages().concat(langs.filter(l => !this.languages().includes(l)));
+      p.languages = Array.from(new Set((Array.isArray(p.languages) ? p.languages : []).concat(all)));
+    });
+    res.count = Object.keys(texts).length;
+    return res;
+  },
+
   // ---- recipes ---------------------------------------------------------------------
   recipeBooks() { const r = this.st.project && this.st.project.recipes; return r && Array.isArray(r.books) ? r.books : []; },
   validRecipeName(n) { return typeof n === 'string' && n.length >= 1 && n.length <= 32 && !/[\x00-\x1f\x7f]/.test(n) && n.trim() === n; },
@@ -649,6 +759,7 @@ const M = {
     if (p.alarms && U.num(p.alarms.ack_level, 0) > 0 && !usersOn) out.push({ text: 'alarms: ack_level is set, but user management is off (Users tab)', view: 'logs' });
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     for (const r of this.recipeProblems()) out.push(r);
+    for (const t of this.textProblems()) out.push(t);
     return out;
   },
 

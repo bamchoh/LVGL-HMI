@@ -309,6 +309,9 @@ TEST_CASE("the 'opcua' alias creates the same driver")
 
 #else
 
+using namespace hml;
+using hmltest::Runtime;
+
 TEST_CASE("opcua: driver is unavailable in this build")
 {
     Runtime rt;

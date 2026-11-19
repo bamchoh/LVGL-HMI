@@ -7,21 +7,21 @@
       "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
       "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
       "children": [
-        { "type": "label", "text": "Alarms", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
+        { "type": "label", "text": "@alarms", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
         { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#9fb3c8" },
           "bind": { "text": { "tag": "sys.alarm.unacked", "format": "Not acknowledged: %d" } } },
-        { "type": "button", "align": "right_mid", "x": -90, "w": 110, "h": 36, "text": "ACK all",
+        { "type": "button", "align": "right_mid", "x": -90, "w": 110, "h": 36, "text": "@ack_all",
           "style": { "bg_color": "#c62828" }, "style_label": { "font": 14 },
           "on_click": { "action": "call", "fn": "alarm.ack_all" } },
-        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "Back", "style_label": { "font": 14 },
+        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "@back", "style_label": { "font": 14 },
           "on_click": { "action": "back" } }
       ]
     },
     { "type": "alarm_banner", "x": 16, "y": 64, "w": 768, "h": 36 },
-    { "type": "label", "x": 16, "y": 108, "text": "Current (tap a row to acknowledge)", "style": { "text_color": "#9fb3c8", "font": 14 } },
+    { "type": "label", "x": 16, "y": 108, "text": "@current_alarms", "style": { "text_color": "#9fb3c8", "font": 14 } },
     { "type": "alarm_list", "x": 16, "y": 128, "w": 768, "h": 150, "rows": 20,
       "columns": ["time", "severity", "message", "state"] },
-    { "type": "label", "x": 16, "y": 286, "text": "History", "style": { "text_color": "#9fb3c8", "font": 14 } },
+    { "type": "label", "x": 16, "y": 286, "text": "@history", "style": { "text_color": "#9fb3c8", "font": 14 } },
     { "type": "alarm_list", "x": 16, "y": 306, "w": 768, "h": 166, "mode": "history", "rows": 2, "row_height": 32,
       "columns": ["time", "severity", "message", "state"] }
   ]

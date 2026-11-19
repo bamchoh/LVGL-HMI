@@ -5,6 +5,8 @@
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "system_settings.hpp"
+#include "texts.hpp"
+#include <algorithm>
 #include "recipe.hpp"
 #include "alarm_view.hpp"
 #include "tag.hpp"
@@ -200,6 +202,15 @@ bool Project::load(const std::string& path)
     // users and levels ("users"); a list edited on the device comes from project.local.json
     users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());
 
+    // languages and texts ("@id"), and the font they are drawn with
+    texts().load(root_);
+    texts().set_on_change([] { project().rebuild_screens(); });
+    {
+        std::string font = jstr(jget(root_, "font") ? *jget(root_, "font") : json::object(), "file", "");
+        set_font_file(font.empty() ? "" : resolve_path(font));
+    }
+    register_language_actions();
+
     // built-in system settings pages (About, Network, one per driver) and their "sys.*" tags
     register_builtin_pages(system_settings(), *this);
     system_settings().create_tags();
@@ -212,7 +223,9 @@ void Project::apply_theme(lv_display_t* disp)
 {
     const json* theme = jget(root_, "theme");
     const json* font = jget(theme, "font");
-    lv_theme_t* th = lv_theme_default_init(disp, info_.primary, info_.secondary, info_.dark, font ? font_from_json(font) : LV_FONT_DEFAULT);
+    // (with a font file: its size 16 unless the theme says otherwise)
+    const lv_font_t* f = font ? font_from_json(font) : has_font_file() && font_of_size(16) ? font_of_size(16) : LV_FONT_DEFAULT;
+    lv_theme_t* th = lv_theme_default_init(disp, info_.primary, info_.secondary, info_.dark, f);
     lv_display_set_theme(disp, th);
 }
 
@@ -259,6 +272,19 @@ void Project::stop_logs()
     alarms().clear();
     operation_log().clear();
     recipes().clear();
+}
+
+// The screens again, as they are in memory (no file is read, the scripts keep their state):
+// after a language switch. The screen shown and the history stay.
+void Project::rebuild_screens()
+{
+    if(lv_display_t* d = lv_display_get_default()) apply_theme(d);
+    std::string current = ui().current_screen().value_or("");
+    std::vector<std::string> history = ui().history();
+    ui().rebuild_all();
+    if(!current.empty()) ui().show_screen(current, "none", true);
+    ui().set_history(history);
+    tags().dispatch(true);
 }
 
 int Project::build_screens()

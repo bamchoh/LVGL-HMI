@@ -23,6 +23,7 @@
 #include <mutex>
 #include <thread>
 #include "data_log.hpp"
+#include "texts.hpp"
 #include "ui.hpp"
 #include "util.hpp"
 
@@ -306,7 +307,7 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     c->fixed_y = jhas(w, "min") && jhas(w, "max") && jnum(w, "max", 1) > jnum(w, "min", 0);
     c->ymin = jnum(w, "min", 0); c->ymax = jnum(w, "max", 100);
     std::string now_label = "Now";
-    if(const json* l = jget(w, "labels"); l && l->is_object()) now_label = jstr(*l, "now", now_label);
+    if(const json* l = jget(w, "labels"); l && l->is_object()) now_label = texts().resolve(jstr(*l, "now", now_label));
 
     lv_obj_t* obj = lv_obj_create(parent);
     c->obj = obj;

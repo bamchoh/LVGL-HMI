@@ -1,4 +1,7 @@
 #include "ui.hpp"
+#include "texts.hpp"
+#include "font_cmap.hpp"
+#include <map>
 #include "trend_view.hpp"
 #include "recipe.hpp"
 #include "alarm_view.hpp"
@@ -45,6 +48,90 @@ lv_color_t parse_color(const std::string& s, lv_color_t dflt)
     return dflt;
 }
 
+namespace {
+std::string s_font_file;                         // the project's font ("" = the built-in Montserrat)
+// One per size: the TinyTTF font, and a copy of it that LVGL uses. The copy asks the font only
+// for characters it has (FontCmap): see font_cmap.hpp for why.
+struct TtfFont {
+    lv_font_t* ttf = nullptr;
+    lv_font_t  use{};
+    int        size = 0;
+};
+std::map<int, std::unique_ptr<TtfFont>> s_ttf;   // by size
+FontCmap s_cmap;
+bool s_font_failed = false;
+
+bool ttf_glyph_dsc(const lv_font_t* font, lv_font_glyph_dsc_t* dsc, uint32_t letter, uint32_t next)
+{
+    if(!s_cmap.has(letter)) return false;            // -> LVGL tries the fallback (Montserrat)
+    const auto* t = static_cast<const TtfFont*>(font->user_data);
+    if(!t->ttf->get_glyph_dsc(font, dsc, letter, s_cmap.has(next) ? next : 0)) return false;
+    // the advance from the font's own metrics (TinyTTF's can be another glyph's: font_cmap.hpp)
+    const int adv = s_cmap.advance_px(letter, t->size);
+    if(adv >= 0) dsc->adv_w = static_cast<uint16_t>(adv);
+    return true;
+}
+
+const lv_font_t* montserrat(int size)
+{
+    static const struct { int size; const lv_font_t* f; } tbl[] = {
+        { 12, &lv_font_montserrat_12 }, { 14, &lv_font_montserrat_14 }, { 16, &lv_font_montserrat_16 }, { 18, &lv_font_montserrat_18 },
+        { 20, &lv_font_montserrat_20 }, { 24, &lv_font_montserrat_24 }, { 28, &lv_font_montserrat_28 }, { 32, &lv_font_montserrat_32 },
+        { 40, &lv_font_montserrat_40 }, { 48, &lv_font_montserrat_48 },
+    };
+    const lv_font_t* best = tbl[0].f;
+    int diff = 1000;
+    for(const auto& t : tbl) if(std::abs(t.size - size) < diff) { diff = std::abs(t.size - size); best = t.f; }
+    return best;
+}
+} // namespace
+
+void set_font_file(const std::string& path)
+{
+    if(path == s_font_file) return;
+    // The fonts made so far are kept, not destroyed: a theme or a style made before may still
+    // point at one (a font file changes only when a project is loaded again, so this is little).
+    static std::vector<std::unique_ptr<TtfFont>> retired;
+    for(auto& [size, f] : s_ttf) retired.push_back(std::move(f));
+    s_ttf.clear();
+    s_font_file = path;
+    s_font_failed = false;
+    if(!path.empty()) {
+        std::string err;
+        if(!s_cmap.load(path, &err)) { HML_ERROR("font '%s': %s: using the built-in font", path.c_str(), err.c_str()); s_font_failed = true; }
+    }
+}
+
+bool has_font_file() { return !s_font_file.empty(); }
+
+const lv_font_t* font_of_size(int size)
+{
+#if LV_USE_TINY_TTF
+    if(!s_font_file.empty() && !s_font_failed && size >= 6 && size <= 200) {
+        auto it = s_ttf.find(size);
+        if(it != s_ttf.end()) return &it->second->use;
+        // (no kerning: LVGL 9.4 uses a freed entry when TinyTTF's kerning cache evicts one -
+        // found with AddressSanitizer; kerning matters little at HMI sizes, not at all for Japanese)
+        lv_font_t* f = lv_tiny_ttf_create_file_ex(("A:" + s_font_file).c_str(), size, LV_FONT_KERNING_NONE, LV_TINY_TTF_CACHE_GLYPH_CNT);
+        if(f) {
+            auto t = std::make_unique<TtfFont>();
+            t->ttf = f;
+            t->size = size;
+            t->use = *f;                                 // same metrics and drawing, own glyph lookup
+            t->use.get_glyph_dsc = &ttf_glyph_dsc;
+            t->use.user_data = t.get();
+            t->use.fallback = montserrat(size);          // LV_SYMBOL_* and anything the file does not have
+            lv_font_t* use = &t->use;
+            s_ttf[size] = std::move(t);
+            return use;
+        }
+        HML_ERROR("font: cannot read '%s' (TTF / OTF): using the built-in font", s_font_file.c_str());
+        s_font_failed = true;
+    }
+#endif
+    return nullptr;
+}
+
 const lv_font_t* font_from_json(const json* v)
 {
     int size = 0;
@@ -54,6 +141,7 @@ const lv_font_t* font_from_json(const json* v)
         size_t p = s.rfind('_');
         size = std::atoi(p == std::string::npos ? s.c_str() : s.c_str() + p + 1);
     }
+    if(const lv_font_t* f = font_of_size(size)) return f;     // the project's font: any size
     switch(size) {
         case 12: return &lv_font_montserrat_12;
         case 14: return &lv_font_montserrat_14;
@@ -133,7 +221,7 @@ std::string join_options(const json* arr)
     if(!arr || !arr->is_array()) return out;
     for(const json& e : *arr) {
         if(!out.empty()) out += '\n';
-        out += jscalar_to_string(e);
+        out += texts().resolve(jscalar_to_string(e));
     }
     return out;
 }
@@ -564,6 +652,7 @@ struct Screen {
     std::string name;
     bool        shown = false;        // the screen on the display right now
     json        def;                  // its description, until the widgets are built (obj == nullptr)
+    json        source;               // its description (for rebuild_all)
     std::string base_dir;
     std::vector<Binding*> bindings;   // of the widgets on this screen
     int         level = 0;            // "level": minimum user level to see the screen
@@ -1132,6 +1221,12 @@ std::optional<Action> Ui::Impl::parse_action(const json& j)
         }
         return a;
     }
+    if(iequals(*kind, "language")) {                     // switch the language ("next": the next one of the project)
+        a.kind = ActionKind::Call;
+        a.fn = "lang.set";
+        a.arg = jstr(j, "lang", "next");
+        return a;
+    }
     if(iequals(*kind, "close")) { a.kind = ActionKind::Close; a.screen = jstr(j, "screen", ""); return a; }
     if(iequals(*kind, "back")) { a.kind = ActionKind::Back; return a; }
     if(iequals(*kind, "reload")) { a.kind = ActionKind::Reload; return a; }
@@ -1315,7 +1410,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "label")) {
         wk = Widget::Label;
         obj = lv_label_create(parent);
-        lv_label_set_text(obj, jstr(w, "text", "").c_str());
+        lv_label_set_text(obj, texts().resolve(jstr(w, "text", "")).c_str());
         if(auto lm = jstr_opt(w, "long_mode")) {
             lv_label_set_long_mode(obj, iequals(*lm, "dots") ? LV_LABEL_LONG_MODE_DOTS : iequals(*lm, "scroll") ? LV_LABEL_LONG_MODE_SCROLL_CIRCULAR : iequals(*lm, "clip") ? LV_LABEL_LONG_MODE_CLIP : LV_LABEL_LONG_MODE_WRAP);
         }
@@ -1327,7 +1422,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         auto text = jstr_opt(w, "text");
         if(text || jhas(w, "bind")) {
             text_obj = lv_label_create(obj);
-            lv_label_set_text(text_obj, text ? text->c_str() : "");
+            lv_label_set_text(text_obj, text ? texts().resolve(*text).c_str() : "");
             lv_obj_center(text_obj);
             if(const json* ls = jget(w, "style_label")) apply_style(text_obj, *ls, LV_PART_MAIN);
         }
@@ -1339,7 +1434,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "checkbox")) {
         wk = Widget::Checkbox;
         obj = lv_checkbox_create(parent);
-        lv_checkbox_set_text(obj, jstr(w, "text", "").c_str());
+        lv_checkbox_set_text(obj, texts().resolve(jstr(w, "text", "")).c_str());
     }
     else if(iequals(type, "slider")) {
         wk = Widget::Slider;
@@ -1388,7 +1483,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         wk = Widget::Textarea;
         obj = lv_textarea_create(parent);
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
-        if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, ph->c_str());
+        if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());
         lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
         lv_textarea_set_password_mode(obj, jbool(w, "password", false));
         if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
@@ -1417,7 +1512,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
         lv_textarea_set_password_mode(obj, jbool(w, "password", password));
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
-        if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, ph->c_str());
+        if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());
         if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
         std::string accepted = jstr(w, "accepted_chars", numeric ? "0123456789.-+" : "");
         if(!accepted.empty()) {
@@ -1653,6 +1748,7 @@ bool Ui::add_screen(const json& screen, const std::string& base_dir)
     scr->level = std::max(0, static_cast<int>(jnum(screen, "level", 0)));
     scr->popup = jbool(screen, "popup", false);
     scr->def = screen;
+    scr->source = screen;
     scr->base_dir = base_dir;
     m.screens.push_back(std::move(scr));
     return true;
@@ -1714,6 +1810,14 @@ size_t Ui::build_pending(size_t max)
         else left++;
     }
     return left;
+}
+
+void Ui::rebuild_all()
+{
+    std::vector<std::pair<json, std::string>> defs;
+    for(auto& s : impl_->screens) defs.emplace_back(s->source, s->base_dir);
+    unload_all();
+    for(auto& [def, dir] : defs) add_screen(def, dir);
 }
 
 void Ui::unload_all()
