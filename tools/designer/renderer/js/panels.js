@@ -332,9 +332,12 @@ const Panels = {
         this.tableEditor(o, { key: 'groups', label: 'Groups', columns: [{ k: 'name', t: 'text' }, { k: 'trigger', t: 'select', o: SCHEMA.dataLogTriggers },
           { k: 'interval_ms', t: 'number', opt: true }, { k: 'tags', t: 'csv', opt: true }, { k: 'trigger_tag', t: 'tag', opt: true }] }, fk)]);
     section('alarms', 'Alarms', 'A condition on a tag; every raise and clear is recorded. condition "true" = the tag is on / non-zero; the others compare the tag with value, or with value_tag if given. Export: hml_runtime --export-alarm-log out.csv project.json, or call "alarm_log.export".',
-      (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, this.LOG_DB_FIELDS('logs/alarm.db', 100000), fk)),
+      (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, [{ k: 'ack_level', t: 'number', hint: 'user level needed to acknowledge an alarm on the device (0 / empty = everybody; needs user management)' }]
+          .concat(this.LOG_DB_FIELDS('logs/alarm.db', 100000)), fk)),
         this.tableEditor(o, { key: 'items', label: 'Alarms', columns: [{ k: 'name', t: 'text' }, { k: 'tag', t: 'tag' }, { k: 'condition', t: 'select', o: SCHEMA.alarmConditions },
-          { k: 'value', t: 'text', opt: true }, { k: 'value_tag', t: 'tag', opt: true }, { k: 'severity', t: 'select', o: SCHEMA.alarmSeverities }, { k: 'message', t: 'text', opt: true }] }, fk)]);
+          { k: 'value', t: 'text', opt: true }, { k: 'value_tag', t: 'tag', opt: true }, { k: 'severity', t: 'select', o: SCHEMA.alarmSeverities }, { k: 'message', t: 'text', opt: true },
+          { k: 'ack', t: 'bool', opt: true }] }, fk),
+        U.el('div', { class: 'hint' }, 'ack: the alarm stays in the alarm list until it is acknowledged (default). Show alarms on the screens with the "Alarm list" and "Alarm banner" widgets; tags sys.alarm.active, sys.alarm.unacked, sys.alarm.latest; actions call "alarm.ack" / "alarm.ack_all".')]);
     section('operation_log', 'Operation log', 'What the operator did on the screens: values written from widgets and by set / toggle / inc / dec actions (old and new value), screen changes, scripts and calls started from widget events. Text typed into a password field is never stored. Export: hml_runtime --export-operation-log out.csv project.json, or call "operation_log.export".',
       (o, fk) => [U.el('div', { class: 'drv-fields' }, Props.row('user_tag', Props.editor(o, 'user_tag', { t: 'tag' }, fk), 'string tag holding the current operator; its value is stored with every row'),
         ...Props.fields(o, this.LOG_DB_FIELDS('logs/operation.db', 100000), fk))]);

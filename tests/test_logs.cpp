@@ -364,8 +364,8 @@ TEST_CASE("alarms: raise and clear are recorded")
     std::string csv = t.file("alarms.csv");
     CHECK(alarms().export_csv(csv) == 6);
     std::string text = read_all(csv);
-    CHECK(text.find("time,name,event,severity,message,value\r\n") == 3);
-    CHECK(text.find(",temp_high,raised,warning,Temperature high,31\r\n") != std::string::npos);
+    CHECK(text.find("time,name,event,severity,message,value,user\r\n") == 3);
+    CHECK(text.find(",temp_high,raised,warning,Temperature high,31,\r\n") != std::string::npos);
 
     alarms().clear();
     CHECK(alarms().count() == 0);
@@ -510,7 +510,7 @@ TEST_CASE("logs: started from project.json, exported through call actions")
     CHECK(ui().call_action("operation_log.export", t.file("o.csv")));
     CHECK(read_all(t.file("d.csv")).find("time,temp,run\r\n") == 3);
     CHECK(read_all(t.file("d.csv")).find(",26,0\r\n") != std::string::npos);
-    CHECK(read_all(t.file("a.csv")).find(",hot,raised,warning,hot,26\r\n") != std::string::npos);
+    CHECK(read_all(t.file("a.csv")).find(",hot,raised,warning,hot,26,\r\n") != std::string::npos);
     CHECK(read_all(t.file("o.csv")).find(",screen,x,,\r\n") != std::string::npos);
 
     project().stop_logs();
