@@ -41,15 +41,17 @@ const Panels = {
     this.renderUsers();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
-    for (const t of M.tagNames()) dl.append(U.el('option', { value: t }));
+    for (const t of M.tagChoices()) dl.append(U.el('option', { value: t.name, label: t.note }));
   },
 
   renderWidgets() {
     const el = document.getElementById('tab-widgets'); el.innerHTML = '';
-    el.append(U.el('div', { class: 'hint' }, I18N.t('Click to add to the selected panel (or the screen).')));
+    el.append(U.el('div', { class: 'hint' }, I18N.t('Click to add to the selected panel (or the screen), or drag onto the canvas.')));
     const grid = U.el('div', { class: 'palette' });
     for (const [type, t] of Object.entries(SCHEMA.types)) {
-      grid.append(U.el('button', { class: 'pal', onclick: () => App.addWidget(type), disabled: !M.screen() }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
+      grid.append(U.el('button', { class: 'pal', draggable: true, onclick: () => App.addWidget(type), disabled: !M.screen(),
+        ondragstart: e => { Canvas.dragType = type; e.dataTransfer.setData('text/plain', type); e.dataTransfer.effectAllowed = 'copy'; },
+        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
     }
     el.append(grid);
   },
@@ -64,7 +66,7 @@ const Panels = {
         U.el('input', { type: 'radio', name: 'start', checked: isStart, title: 'start screen', onclick: e => { e.stopPropagation(); M.mutate(() => { M.st.project.start_screen = s.data.name; }); } }),
         U.el('span', { class: 'grow' }, s.data.name, U.el('span', { class: 'dim' }, '  ' + s.file)),
         U.el('button', { class: 'mini', title: 'rename', onclick: async e => { e.stopPropagation(); const n = await App.prompt('Screen name', s.data.name); if (n) M.renameScreen(i, n); } }, '✎'),
-        U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (confirm('Delete screen "' + s.data.name + '"?')) M.removeScreen(i); } }, '×')));
+        U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (App.ask('Delete screen "' + s.data.name + '"?')) M.removeScreen(i); } }, '×')));
     });
     el.append(list);
     el.append(U.el('div', { class: 'row' }, U.el('button', { onclick: async () => { const n = await App.prompt('New screen name', 'screen' + (M.st.screens.length + 1)); if (n && !M.addScreen(n)) App.toast('name already used or invalid'); } }, '+ Add screen')));
@@ -125,7 +127,7 @@ const Panels = {
     });
     side.append(list);
     const addSel = U.el('select', { style: { flex: '1' } });
-    for (const [k, v] of Object.entries(SCHEMA.drivers)) addSel.append(U.el('option', { value: k }, v.label + ' (' + k + ')'));
+    for (const [k, v] of Object.entries(SCHEMA.drivers)) addSel.append(U.el('option', { value: k }, I18N.t(v.label) + ' (' + k + ')'));
     side.append(U.el('div', { class: 'row' }, addSel, U.el('button', { onclick: () => { M.addDriver(addSel.value); this.driverSel = drivers.length - 1; } }, '+ Add')));
 
     const d = drivers[this.driverSel];
@@ -180,7 +182,7 @@ const Panels = {
       list.append(U.el('div', { class: 'item' + (i === this.scriptSel ? ' sel' : ''), onclick: () => { this.scriptSel = i; this.renderScripts(); } },
         U.el('input', { type: 'checkbox', checked: s.enabled !== false, title: 'enabled', onclick: e => e.stopPropagation(), onchange: e => M.mutate(() => { if (e.target.checked) delete s.enabled; else s.enabled = false; }) }),
         U.el('span', { class: 'grow' }, s.name || '?', U.el('span', { class: 'dim' }, '  ' + this.scriptSummary(s))),
-        U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (confirm('Delete script "' + (s.name || '') + '"?')) M.removeScript(i); } }, '×')));
+        U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (App.ask('Delete script "' + (s.name || '') + '"?')) M.removeScript(i); } }, '×')));
     });
     side.append(list, U.el('div', { class: 'row' }, U.el('button', { class: 'primary', onclick: () => { this.scriptSel = M.addScript(); } }, '+ Add script')));
     side.append(U.el('div', { class: 'hint' }, 'Lua 5.4. All scripts share one Lua state: a function or variable defined by a startup script can be used by the others.'));
@@ -190,7 +192,7 @@ const Panels = {
     const i = this.scriptSel, fk = 'scr.' + i, trig = s.trigger || 'manual';
     const name = U.el('input', { type: 'text', value: s.name || '', dataset: { fk: fk + '.name' }, onchange: e => { if (!M.renameScript(i, e.target.value)) { App.toast('name is empty or already used'); e.target.value = s.name || ''; } } });
     const trigSel = U.el('select', { dataset: { fk: fk + '.trigger' }, onchange: e => M.setScriptTrigger(i, e.target.value) });
-    for (const t of SCHEMA.scriptTriggers) trigSel.append(U.el('option', { value: t, selected: t === trig }, t));
+    for (const t of SCHEMA.scriptTriggers) trigSel.append(U.el('option', { value: t, selected: t === trig }, I18N.value(t)));
     if (!SCHEMA.scriptTriggers.includes(trig)) trigSel.append(U.el('option', { value: trig, selected: true }, trig));
     const rows = [Props.row('name', name), Props.row('trigger', trigSel, 'when the script runs')];
     if (trig === 'interval') rows.push(Props.row('interval_ms', Props.editor(s, 'interval_ms', { t: 'number' }, fk), 'period in milliseconds (minimum 10)'));

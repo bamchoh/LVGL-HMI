@@ -33,11 +33,15 @@ const Tree = {
 
   node(w, path, isRoot) {
     const li = U.el('li');
-    const selected = U.samePath(M.st.sel, path);
+    const selected = U.samePath(M.st.sel, path) || (!isRoot && M.selection().some(p => U.samePath(p, path)));
     const row = U.el('div', {
       class: 'tr-row' + (selected ? ' sel' : '') + (w.hidden ? ' hidden-w' : ''),
       dataset: { path: U.pathStr(path) },
-      onclick: e => { e.stopPropagation(); App.select(path); },
+      onclick: e => {
+        e.stopPropagation();
+        if ((e.ctrlKey || e.shiftKey || e.metaKey) && !isRoot) { M.toggleSelect(path); App.selectionChanged(); }
+        else App.select(path);
+      },
       ondblclick: e => { e.stopPropagation(); if (!isRoot) Props.focusFirst(); },
     }, U.el('span', { class: 'tr-icon' }, this.icon(w, isRoot)), U.el('span', { class: 'tr-label' }, this.label(w, isRoot)));
     li.append(row);

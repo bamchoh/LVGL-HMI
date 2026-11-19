@@ -5,9 +5,15 @@ const U = {
   // el('div', {class:'x', onclick: fn, title:'..'}, child, 'text', ...)
   el(tag, attrs, ...children) {
     const e = document.createElement(tag);
+    // Texts of the user interface are shown in the chosen language (I18N). Only elements that
+    // are "chrome" by their nature are looked at - buttons, headings, labels, hints - so that
+    // what the user wrote (widget texts on the canvas, names in the tree) is never translated.
+    const tr = (typeof I18N !== 'undefined') ? I18N : null;
+    const chrome = tr && (U.CHROME_TAGS.includes(tag) || (attrs && typeof attrs.class === 'string' && /(^| )(hint|warn|ok|dim)( |$)/.test(attrs.class)));
     if (attrs) {
-      for (const [k, v] of Object.entries(attrs)) {
+      for (let [k, v] of Object.entries(attrs)) {
         if (v === undefined || v === null || v === false) continue;
+        if (tr && (k === 'title' || k === 'placeholder') && typeof v === 'string') v = tr.t(v);
         if (k === 'class') e.className = v;
         else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
         else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
@@ -18,10 +24,11 @@ const U = {
     }
     for (const c of children.flat()) {
       if (c === undefined || c === null || c === false) continue;
-      e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+      e.append(c instanceof Node ? c : document.createTextNode(chrome && typeof c === 'string' ? tr.t(c) : String(c)));
     }
     return e;
   },
+  CHROME_TAGS: ['button', 'summary', 'h3', 'h4', 'th', 'label'],
 
   svg(tag, attrs, ...children) {
     const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
