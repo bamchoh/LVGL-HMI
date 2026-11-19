@@ -33,6 +33,8 @@ std::vector<fs::path> shipped_projects()
     for(const auto& e : fs::directory_iterator(root)) {
         if(e.is_directory() && fs::exists(e.path() / "project.json")) out.push_back(e.path() / "project.json");
     }
+    // the example of the AI skill (tools/skill/hml-screens): what it shows as correct must be correct
+    out.push_back(fs::path(HML_TEST_SOURCE_DIR) / "tools" / "skill" / "hml-screens" / "examples" / "project.json");
     std::sort(out.begin(), out.end());
     return out;
 }

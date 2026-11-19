@@ -1,0 +1,15 @@
+{
+  "title": "Skill example",
+  "display": { "width": 800, "height": 480 },
+  "theme": { "dark": true, "primary": "#2196f3", "secondary": "#ff9800", "font": 16 },
+  "start_screen": "overview",
+  "tags": [
+    { "name": "temp", "type": "float", "init": 24.5 },
+    { "name": "pressure", "type": "float", "init": 3.2 },
+    { "name": "level", "type": "float", "init": 62, "min": 0, "max": 100 },
+    { "name": "speed_sp", "type": "int", "init": 40, "min": 0, "max": 100 },
+    { "name": "run", "type": "bool", "init": true },
+    { "name": "plc_online", "type": "bool", "init": true }
+  ],
+  "screens": [ "screens/overview.json", "screens/confirm_stop.json" ]
+}

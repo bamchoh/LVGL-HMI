@@ -1113,3 +1113,37 @@ test('M opcua_client driver: endpoint, no security, verify off, nothing to trust
   M.renameTag(0, 'temperature');
   assert.equal(M.st.project.drivers[0].map[0].tag, 'temperature');
 });
+
+// ---------------------------------------------------------------- the AI skill (tools/skill)
+
+test('skill: the widget reference is what schema.js says, and the example uses only known keys', () => {
+  const { execFileSync } = require('node:child_process');
+  const skill = path.join(__dirname, '..', '..', 'skill');
+  execFileSync(process.execPath, [path.join(skill, 'gen_reference.js'), '--check']);       // throws when out of date
+  const { SCHEMA } = load();
+  const known = new Set(['type', 'name', 'children', 'bind', 'text', 'series', 'popup', 'dim']
+    .concat(SCHEMA.common.map(f => f.k), SCHEMA.flags.map(f => f.k), SCHEMA.flex.map(f => f.k), SCHEMA.access.map(f => f.k), SCHEMA.styleSelectors, SCHEMA.events));
+  const dir = path.join(skill, 'hml-screens', 'examples');
+  const project = JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8'));
+  const tags = new Set(project.tags.map(t => t.name));
+  const screens = project.screens.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
+  const names = new Set(screens.map(s => s.name));
+  const visit = (w, top) => {
+    if (!top) assert.ok(SCHEMA.types[w.type], 'widget type ' + w.type);
+    const own = top ? [] : SCHEMA.types[w.type].props.map(p => p.k);
+    for (const k of Object.keys(w)) assert.ok(known.has(k) || own.includes(k), (w.type || 'screen') + ': key "' + k + '"');
+    for (const sel of SCHEMA.styleSelectors) for (const k of Object.keys(w[sel] || {})) assert.ok(k in SCHEMA.styleKeys, 'style key "' + k + '"');
+    const binds = typeof w.bind === 'string' ? { _: w.bind } : (w.bind || {});
+    for (const [kind, b] of Object.entries(binds)) {
+      if (kind !== '_') assert.ok(SCHEMA.bindKinds.includes(kind), 'bind kind "' + kind + '"');
+      assert.ok(tags.has(typeof b === 'string' ? b : b.tag), 'tag of bind ' + JSON.stringify(b));
+    }
+    for (const ev of SCHEMA.events) for (const a of [].concat(w[ev] || [])) {
+      assert.ok(SCHEMA.actions[a.action], 'action ' + a.action);
+      if (a.tag) assert.ok(tags.has(a.tag), 'tag ' + a.tag);
+      if (a.screen) assert.ok(names.has(a.screen), 'screen ' + a.screen);
+    }
+    (w.children || []).forEach(c => visit(c, false));
+  };
+  screens.forEach(s => visit(s, true));
+});
