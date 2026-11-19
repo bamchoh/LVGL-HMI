@@ -820,7 +820,8 @@ test('M addWidget at a position (dropped from the palette); tag choices', () => 
   M.undo();
   assert.equal((M.screen().children || []).length, 0);
   M.st.project.tags = [{ name: 'temp', type: 'float' }, { type: 'int' }];
-  deq(M.tagChoices(), [{ name: 'temp', note: 'float' }]);
+  deq(M.tagChoices().filter(t => !/^sys\./.test(t.name)), [{ name: 'temp', note: 'float' }]);
+  assert.ok(M.tagChoices().some(t => t.name === 'sys.alarm.unacked'));      // made by the runtime, always there
   M.setUsers(true);
   assert.ok(M.tagChoices().some(t => t.name === 'sys.user.name'));
 });
@@ -994,4 +995,18 @@ test('M recipes: books, values as the tag type, problems, renames, CSV both ways
   r = M.importRecipesCsv(0, 'name,speed\nA,fast\n');
   assert.ok(r.errors.some(e => /not a number/.test(e)));
   assert.equal(b.recipes.length, 2);                                       // nothing replaced by the bad ones
+});
+
+test('U.slmpAddress agrees with the runtime parser; M.problems names wrong SLMP addresses', () => {
+  const { U, M } = load();
+  const ok = s => !!U.slmpAddress(s);
+  for (const s of ['D100', 'x1f', 'W 1A', 'SM400', 'SD0', 'SB0', 'DX10', 'ZR0FFFF', 'S5', 'TN3', 'D10.F', 'M0010', 'D16777215']) assert.ok(ok(s), s);
+  for (const s of ['', 'Q10', 'D1A', 'D16777216', 'M10.1', 'D10.G', 'D10.10', 'D', 'D-1', 'D'.repeat(100), null, undefined]) assert.ok(!ok(s), String(s));
+  deq(U.slmpAddress('d10.3'), { dev: 'D', number: 10, bit: 3 });
+  deq(U.slmpAddress('X1F'), { dev: 'X', number: 31, bit: -1 });
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'a', type: 'int' }];
+  M.st.project.drivers = [{ type: 'slmp', name: 'plc', map: [{ tag: 'a', addr: 'D100' }, { tag: 'a', addr: 'D1A' }, { tag: 'b', addr: 'M0' }] }];
+  const texts = M.problems().map(p => p.text);
+  deq(texts.sort(), ['plc: "D1A" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
 });

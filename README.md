@@ -39,11 +39,13 @@ build.cmd Debug
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
 | `test_recipe.cpp`                                    | レシピ（読み込み・選択・書き込み・保存・値の変更・削除、範囲外なら何も書かない、書き込み後の確認、装置での保存と再起動後の読み戻し、壊れたファイル・書けないとき、CSV の数式エスケープと取り込みの検証・大きさの上限、名前とブック名（パスにならない）、ランダムなバイト列、レベル、レシピ表の部品と確認ダイアログ）、`write_file_atomic` |
+| `test_alarm_view.cpp`                                | アラームの確認（発生・復帰・確認の全順序）、再起動後の状態、履歴のページ送りと絞り込み、古い DB への列追加、確認のレベルと記録、一覧とバナー、1000 件の性能、SQL インジェクション・制御文字・不正な UTF-8 |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
 | `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
@@ -550,6 +552,51 @@ PC でのポート名は、デザイナーのドライバ設定の **device on t
 - Linux では、ランタイムを動かすユーザーがシリアルポートに読み書きできる必要があります（通常は `dialout` グループ）。
 - 応答のチェックサム（RTU は CRC-16、ASCII は LRC）が合わないフレームは捨てます。
 
+### ドライバ: slmp（三菱電機 MELSEC: SLMP / MC プロトコル）
+
+SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP）で MELSEC の CPU または Ethernet ユニットと読み書きします。
+
+```json
+{
+  "type": "slmp",
+  "host": "192.168.3.39", "port": 5007, "frame": "3e",
+  "poll_ms": 200, "timeout_ms": 1000, "status_tag": "plc_online",
+  "write_ranges": ["D0-D999", "M0-M99"],
+  "map": [
+    { "tag": "speed", "addr": "D100" },
+    { "tag": "total", "addr": "D102", "dtype": "int32" },
+    { "tag": "temp",  "addr": "D110", "dtype": "float" },
+    { "tag": "run",   "addr": "M0" },
+    { "tag": "in3",   "addr": "X1F", "access": "ro" },
+    { "tag": "ready", "addr": "D120.3" },
+    { "tag": "name",  "addr": "D200", "dtype": "string", "length": 16 }
+  ]
+}
+```
+
+| キー                 | 内容                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `host` / `port`      | CPU（または Ethernet ユニット）のアドレスと SLMP のポート。GX Works の「外部機器接続設定」で開けたポート |
+| `frame`              | `3e`（既定）/ `4e`（要求ごとにシリアル番号が付き、応答の取り違えを防げる）                              |
+| `network` `pc` `io` `station` | 経路（既定 0 / 255 / 0x3FF / 0 = 接続した局の CPU）                                          |
+| `write_ranges`       | 書き込みを許す範囲（`"D0-D999"` のように）。省略時は SM / SD 以外すべて書き込める                      |
+| `allow_system_write` | `true` のときだけ SM / SD に書き込む（既定 `false`）                                                    |
+| `addr`               | GX Works の書き方: `D100` `W1A` `R0` `ZR100` `M0` `X1F` `Y20` `B0` `L0` `F0` `V0` `S0` `TS0` `TC0` `TN0` `SS0` `SC0` `SN0` `CS0` `CC0` `CN0` `SM400` `SD0` `SB0` `SW0` `DX0` `DY0` `Z0`。X Y B W SB SW DX DY ZR は 16 進。`D10.3` はワードのビット（読み取りのみ） |
+| `dtype`              | ワードデバイス: `int16`（既定）`uint16` `int32` `uint32` `float` `string`（`length` 文字、下位バイトが先）。ビットデバイスは bool |
+| `scale` / `offset`   | 値 = 生の値 × scale + offset（書き込みは逆算）                                                          |
+| `access`             | `rw`（既定）/ `ro` / `wo`                                                                               |
+| `swap_words`         | 32 ビットの値の上位ワードが先（既定は MELSEC と同じく下位ワードが先）                                   |
+
+- 読み出しは、同じデバイスでまとめて一括読み出し（ワード単位、1 回 960 ワードまで、32 ワードまでの隙間は続けて読む）
+  にするので、1000 点でも数回の要求で済みます。ビットデバイスは 16 点ずつワード単位で読みます。
+- 書き込みは、ワードデバイスはワード単位、ビットデバイスはビット単位の一括書き込みです。ワードのビット（`D10.3`）は
+  書き込みません（PLC が同時に同じワードを書くと消えてしまう読み書きになるため）。
+- 応答はヘッダー・長さ（最大 960 ワード分）・4E のシリアル番号を確かめ、合わないもの・途中で切れたもの・時間内に
+  来ないものは捨てて接続し直します。終了コード（`C056` など）が返ったときは、接続を保ったまま値を変えずに警告を
+  1 度出します。
+- SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
+  範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
+
 ### ドライバ: opcua_server（OPC UA サーバー）
 
 タグを OPC UA の変数ノードとして公開します。SCADA や他の HMI、Python (asyncua) などの
@@ -1044,11 +1091,12 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 
 ### アラーム (`alarms`)
 
-タグに対する条件を定義します。条件が成立したとき（発生 `raised`）と成立しなくなったとき（復帰 `cleared`）に
-1 行ずつ記録されます。
+タグに対する条件を定義します。条件が成立したとき（発生 `raised`）、成立しなくなったとき（復帰 `cleared`）、
+確認（アクノリッジ）されたとき（`acked`）に 1 行ずつ記録されます。
 
 ```json
 "alarms": {
+  "ack_level": 1,
   "items": [
     { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi",
       "severity": "warning", "message": "Temperature high" },
@@ -1065,10 +1113,47 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | `value` / `value_tag` | 比較する値。`value_tag` を書くと、別のタグの現在値と比較する（設定値タグをしきい値にできる）       |
 | `severity`            | `warning`（既定）/ `critical` / `info` など。記録されるだけで、動作は変わらない                    |
 | `message`             | 記録するメッセージ（省略時はアラーム名）                                                           |
+| `ack`                 | `true`（既定）: 確認されるまで「発生中のアラーム」に残る。`false`: 復帰すれば消える（確認は不要）    |
+| `ack_level`（全体）   | 確認に必要なユーザーレベル（既定 0 = 誰でも。ユーザー管理を使うとき）。足りなければログイン画面が出る |
 
-- 起動時にすでに成立しているアラームは、起動時刻で発生として記録されます。
-- 記録される列は、時刻、名前、`raised` / `cleared`、重要度、メッセージ、そのときのタグ値です。
-- 確認（アクノリッジ）と、画面上のアラーム一覧はまだありません。
+- 状態（発生中か、確認済みか）は再起動しても残ります（データベースから読み戻します）。止まっている間に
+  発生していたアラームは起動時刻で発生、止まっている間に消えたアラームは起動時刻で復帰として記録されます。
+  状態が変わっていないアラームは記録し直しません。
+- 記録される列は、時刻、名前、`raised` / `cleared` / `acked`、重要度、メッセージ、そのときのタグ値、確認した人です。
+  以前のバージョンで作ったデータベースには、開いたときに列が追加されます。
+- 確認は操作ログにも記録されます（種別 `alarm`）。
+- タグ: `sys.alarm.active`（発生中の数）、`sys.alarm.unacked`（未確認の数）、`sys.alarm.latest`（いちばん新しい未確認の
+  アラーム、なければ発生中のアラームのメッセージ）、`sys.alarm.latest_severity`。
+- 動作: `{ "action": "call", "fn": "alarm.ack", "arg": "<名前>" }`（`arg` 省略 = いちばん新しい未確認）、
+  `{ "action": "call", "fn": "alarm.ack_all" }`。
+
+#### 画面に出す: `alarm_list` と `alarm_banner`
+
+```json
+{ "type": "alarm_banner", "w": "100%", "h": 36 },
+{ "type": "alarm_list", "w": "100%", "h": 200, "columns": ["time", "severity", "message", "state"] },
+{ "type": "alarm_list", "w": "100%", "h": 200, "mode": "history", "rows": 10 }
+```
+
+| キー           | 内容                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `mode`         | `current`（既定: 発生中・未確認のアラーム、新しい順）/ `history`（記録、新しい順。ページ送りと重要度の絞り込み付き） |
+| `rows`         | `current`: 表示する最大行数（既定 50、超えた分は「+N more」）。`history`: 1 ページの行数（既定 20）     |
+| `row_height`   | 行の高さ（既定 40 px。指で押しやすい高さ）                                                             |
+| `columns`      | `time` / `severity` / `message` / `state` から選んで並べる（既定 `time, message, state`）              |
+| `ack_on_tap`   | `current`: 行をタップするとそのアラームを確認する（既定 `true`）。バナーでは既定 `false`               |
+| `severity`     | その重要度だけ表示する                                                                                 |
+| `days`         | `history`: 直近 N 日だけ（既定 0 = すべて）                                                            |
+| `blink`        | バナー: 未確認の間点滅する（既定 `true`）                                                              |
+| `labels`       | 表示文字の置き換え: `unacked` `active` `cleared` `empty` `idle` `all` `more`（`%d` が件数）`raised` `cleared_event` `acked_event` |
+
+- 色は重要度（`critical` 赤 / `warning` 琥珀 / `info` 青）、状態は塗り方（未確認 = 塗りつぶし、確認済み = 薄く、
+  復帰・未確認 = 灰色に色の帯）に加えて、文字とアイコンでも示します（色だけに頼らない）。
+- バナーは、いちばん新しい未確認のアラーム（なければ発生中のアラーム）と、ほかの件数を出します。`on_click` に
+  アラーム画面への `goto` などを書けます。
+- 一覧は表示中の画面にあるときだけ描き直します（250 ms ごとに変化を確認）。
+- 表示文字のフォントは Montserrat なので、`labels` で日本語を使う場合は日本語の字形を含むフォントが必要です
+  （多言語対応 #22 で扱います）。
 
 ```
 hml_runtime --export-alarm-log alarms.csv projects/demo/project.json

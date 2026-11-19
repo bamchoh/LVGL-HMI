@@ -2,7 +2,7 @@
 'use strict';
 
 const Props = {
-  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled'],
+  el: null, styleSel: 'style', TRUE_DEFAULT: ['adjustable', 'clickable', 'scrollable', 'enabled', 'ack', 'blink'],
 
   init() { this.el = document.getElementById('props'); },
 
@@ -97,7 +97,7 @@ const Props = {
       }
       case 'json': return U.el('textarea', Object.assign(attrs, { rows: 4, value: v === undefined ? '' : JSON.stringify(v),
         onchange: e => { try { this.setVal(obj, k, e.target.value.trim() === '' ? undefined : JSON.parse(e.target.value)); } catch (err) { App.toast('JSON: ' + err.message); } } }));
-      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v,
+      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: f.placeholder ? I18N.t(f.placeholder) : undefined,
         oninput: e => this.live(st, obj, k, e.target.value), onchange: e => this.commit(st, obj, k, e.target.value) }));
     }
   },

@@ -28,6 +28,24 @@ const U = {
     }
     return e;
   },
+  // An SLMP (MELSEC) device address as the runtime reads it (src/slmp.cpp): { dev, number, bit } or null.
+  SLMP_DEVICES: [['STS', 0, 1], ['STC', 0, 1], ['STN', 0, 0], ['SM', 0, 1], ['SD', 0, 0], ['SB', 1, 1], ['SW', 1, 0], ['SS', 0, 1], ['SC', 0, 1],
+    ['SN', 0, 0], ['DX', 1, 1], ['DY', 1, 1], ['TS', 0, 1], ['TC', 0, 1], ['TN', 0, 0], ['CS', 0, 1], ['CC', 0, 1], ['CN', 0, 0], ['ZR', 1, 0],
+    ['D', 0, 0], ['W', 1, 0], ['R', 0, 0], ['Z', 0, 0], ['M', 0, 1], ['X', 1, 1], ['Y', 1, 1], ['B', 1, 1], ['L', 0, 1], ['F', 0, 1], ['V', 0, 1], ['S', 0, 1]],
+  slmpAddress(text) {
+    const s = String(text === undefined || text === null ? '' : text).replace(/\s+/g, '').toUpperCase();
+    if (!s || s.length > 16) return null;
+    for (const [name, hex, bit] of U.SLMP_DEVICES) {
+      if (!s.startsWith(name) || !/^[0-9A-F]/.test(s.slice(name.length))) continue;
+      const m = /^([0-9A-F]+)(?:\.([0-9A-F]+))?$/.exec(s.slice(name.length));
+      if (!m || m[1].length > 8 || (!hex && /[A-F]/.test(m[1]))) return null;
+      const number = parseInt(m[1], hex ? 16 : 10);
+      if (number > 0xFFFFFF) return null;
+      if (m[2] !== undefined && (bit || m[2].length > 1)) return null;
+      return { dev: name, number, bit: m[2] === undefined ? -1 : parseInt(m[2], 16) };
+    }
+    return null;
+  },
   CHROME_TAGS: ['button', 'summary', 'h3', 'h4', 'th', 'label'],
 
   svg(tag, attrs, ...children) {

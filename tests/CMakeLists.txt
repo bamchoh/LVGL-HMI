@@ -21,6 +21,7 @@ add_executable(hml_tests
   test_driver_registry.cpp
   test_driver_sim.cpp
   test_driver_modbus.cpp
+  test_driver_slmp.cpp
   test_driver_modbus_serial.cpp
   test_driver_opcua.cpp
   test_screenshot.cpp
@@ -35,6 +36,7 @@ add_executable(hml_tests
   test_system_log.cpp
   test_logs.cpp
   test_recipe.cpp
+  test_alarm_view.cpp
   test_key_service.cpp
   test_users.cpp
   test_project_archive.cpp

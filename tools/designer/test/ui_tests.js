@@ -315,6 +315,49 @@
     eq(App.problems.filter(p => /recipe/i.test(p.text)).length, 0, 'no recipe problems');
   });
 
+  await test('drivers: an SLMP driver can be added and its map shows address problems', async () => {
+    Panels.showView('drivers'); App.doRefresh();
+    const sel = [...document.querySelectorAll('#view-drivers select')].find(s => [...s.options].some(o => o.value === 'slmp'));
+    ok(sel, 'slmp is offered');
+    ok([...sel.options].find(o => o.value === 'slmp').textContent.includes('三菱電機'), 'named in Japanese');
+    sel.value = 'slmp';
+    [...document.querySelectorAll('#view-drivers button')].find(b => b.textContent.includes('追加')).click();
+    App.doRefresh();
+    const d = M.st.project.drivers[M.st.project.drivers.length - 1];
+    eq([d.type, d.port, d.frame], ['slmp', 5007, '3e']);
+    ok(document.querySelector('#view-drivers').textContent.includes('デバイスの割り付け'), 'map table');
+    M.mutate(() => { d.map.push({ tag: M.st.project.tags[0].name, addr: 'D1A' }); }); App.doRefresh();
+    ok(App.problems.some(p => /D1A/.test(p.text)), 'a wrong address is a problem');
+    ok(document.querySelector('#view-drivers input[placeholder="D100 / M0 / X1F / D10.3"]'), 'the address field shows examples');
+  });
+
+  await test('alarm widgets: in the palette, drawn with the alarms of the project, settings on the Logs page', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /アラーム一覧/.test(t)) && pal.some(t => /アラームバナー/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('alarm_list'); await frame();
+    const p = M.st.sel, el2 = Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    ok(el2 && el2.classList.contains('lv-alarm_list'), 'drawn');
+    const first = M.st.project.alarms.items[0].message;
+    ok(el2.textContent.includes(first), 'the alarm "' + first + '" of the project is shown as a sample');
+    ok(el2.querySelector('.lv-al-unacked') && el2.querySelector('.lv-al-cleared'), 'states are shown');
+    const mode = [...document.querySelectorAll('#props select')].find(s => [...s.options].some(o => o.value === 'history'));
+    ok(mode, 'mode select');
+    mode.value = 'history'; mode.dispatchEvent(new Event('change')); App.doRefresh(); await frame();
+    ok(Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"] .lv-al-foot'), 'history has page buttons');
+    eq(M.get(p).mode, 'history');
+    App.addWidget('alarm_banner'); await frame();
+    ok(Canvas.root.querySelector('.lv-alarm_banner').textContent.includes(first), 'banner');
+    eq(App.problems.length, 0, 'no problems');
+    Panels.showView('logs'); App.doRefresh();
+    ok(document.querySelector('[data-fk="log.alarms.ack_level"]'), 'ack_level field');
+    ok([...document.querySelectorAll('#view-logs th')].some(t => /確認が必要/.test(t.textContent)), 'ack column');
+    M.st.project.alarms.ack_level = 2; App.doRefresh();
+    ok(!App.problems.some(x => /ack_level/.test(x.text)), 'the demo has user management: fine');
+    const users = M.st.project.users; delete M.st.project.users; App.doRefresh();
+    ok(App.problems.some(x => /ack_level/.test(x.text)), 'a level without user management is a problem');
+    M.st.project.users = users; delete M.st.project.alarms.ack_level;
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

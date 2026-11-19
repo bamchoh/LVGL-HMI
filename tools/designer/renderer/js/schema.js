@@ -71,6 +71,12 @@ const SCHEMA = {
     keyboard: { label: 'Keyboard', def: { align: 'bottom_mid', w: '100%', h: '45%' }, props: [] },
     recipe_table: { label: 'Recipe table', def: { w: '100%', h: 300 }, props: [{ k: 'book', t: 'recipebook' }, { k: 'row_height', t: 'number' }] },
     line:     { label: 'Line', def: { points: [[0, 0], [120, 60]] }, props: [{ k: 'points', t: 'points' }] },
+    alarm_list: { label: 'Alarm list', def: { w: '100%', h: 240, ack_on_tap: true },
+                props: [{ k: 'mode', t: 'select', o: ['', 'current', 'history'], empty: 'current' }, { k: 'rows', t: 'number' },
+                        { k: 'row_height', t: 'number' }, { k: 'columns', t: 'csv' }, { k: 'ack_on_tap', t: 'bool' },
+                        { k: 'severity', t: 'text' }, { k: 'days', t: 'number' }] },
+    alarm_banner: { label: 'Alarm banner', def: { w: '100%', h: 36 },
+                props: [{ k: 'blink', t: 'bool' }, { k: 'ack_on_tap', t: 'bool' }] },
   },
 
   // keys of the widget object that are not "props" (handled by dedicated editors)
@@ -173,6 +179,23 @@ const SCHEMA = {
         { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' }, { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] },
         { k: 'unit_id', t: 'number', opt: true }] },
     },
+    slmp: {
+      label: 'Mitsubishi SLMP / MC protocol (MELSEC)',
+      fields: [{ k: 'host', t: 'text' }, { k: 'port', t: 'number', hint: 'the SLMP port of the CPU or of the Ethernet unit (Karakuri: 5007)' },
+               { k: 'frame', t: 'select', o: ['', '3e', '4e'], empty: '3e' }, { k: 'poll_ms', t: 'number' },
+               { k: 'timeout_ms', t: 'number', hint: 'how long to wait for an answer (default 1000)' }, { k: 'status_tag', t: 'tag' },
+               { k: 'network', t: 'number', hint: 'route: network number (default 0 = the station itself)' },
+               { k: 'pc', t: 'number', hint: 'route: PC number (default 255)' },
+               { k: 'io', t: 'number', hint: 'route: request destination module I/O number (default 1023 = 0x3FF, the CPU)' },
+               { k: 'station', t: 'number', hint: 'route: request destination station number (default 0)' },
+               { k: 'write_ranges', t: 'csv', hint: 'only these may be written, e.g. D0-D999, M0-M99 (empty = everything except SM / SD)' },
+               { k: 'allow_system_write', t: 'bool', hint: 'also write SM / SD (the CPU\'s own relays and registers)' }],
+      table: { key: 'map', label: 'Device map', columns: [
+        { k: 'tag', t: 'tag' }, { k: 'addr', t: 'text', placeholder: 'D100 / M0 / X1F / D10.3' },
+        { k: 'dtype', t: 'select', o: ['', 'int16', 'uint16', 'int32', 'uint32', 'float', 'string'] },
+        { k: 'length', t: 'number', opt: true }, { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' },
+        { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] }, { k: 'swap_words', t: 'bool', opt: true }] },
+    },
     opcua_server: {
       label: 'OPC UA server',
       fields: [{ k: 'port', t: 'number' }, { k: 'namespace', t: 'text' }, { k: 'folder', t: 'text' }],
@@ -186,5 +209,6 @@ const SCHEMA = {
     modbus_rtu: { type: 'modbus_rtu', enabled: true, device: '/dev/ttyUSB0', baud: 9600, parity: 'none', unit_id: 1, poll_ms: 200, timeout_ms: 500, map: [] },
     modbus_ascii: { type: 'modbus_ascii', enabled: true, device: '/dev/ttyUSB0', baud: 9600, data_bits: 7, parity: 'even', unit_id: 1, poll_ms: 200, timeout_ms: 500, map: [] },
     opcua_server: { type: 'opcua_server', port: 4840, namespace: 'urn:hml:runtime', folder: 'HML' },
+    slmp: { type: 'slmp', enabled: true, host: '192.168.3.39', port: 5007, frame: '3e', poll_ms: 200, timeout_ms: 1000, map: [] },
   },
 };

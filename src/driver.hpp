@@ -48,6 +48,7 @@ std::unique_ptr<Driver> make_sim_driver(const json& cfg);
 std::unique_ptr<Driver> make_modbus_tcp_driver(const json& cfg);
 std::unique_ptr<Driver> make_modbus_rtu_driver(const json& cfg);     // serial line (or through a TCP gateway)
 std::unique_ptr<Driver> make_modbus_ascii_driver(const json& cfg);
+std::unique_ptr<Driver> make_slmp_driver(const json& cfg);          // Mitsubishi MELSEC, SLMP / MC protocol 3E / 4E over TCP
 std::unique_ptr<Driver> make_opcua_server_driver(const json& cfg);   // returns nullptr when built without HML_OPCUA
 
 } // namespace hml

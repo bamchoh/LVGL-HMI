@@ -6,6 +6,7 @@
 #include "script.hpp"
 #include "system_settings.hpp"
 #include "recipe.hpp"
+#include "alarm_view.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -241,6 +242,7 @@ void Project::start_logs(bool read_only)
         }
     });
     ui().register_action("data_log.sample", [](const std::string& arg) { data_log().sample(arg); });
+    register_alarm_actions();
     ui().register_action("alarm_log.export", [](const std::string& arg) {
         int64_t n = alarms().export_csv(arg);
         if(n >= 0) HML_INFO("alarm log: %lld rows exported", static_cast<long long>(n));

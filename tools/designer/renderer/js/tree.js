@@ -109,6 +109,8 @@ const Tree = {
       case 'keyboard': return '⌨';
       case 'line': return '╱';
       case 'recipe_table': return '☷';
+      case 'alarm_list': return '⚠';
+      case 'alarm_banner': return '⚑';
       default: return '□';
     }
   },

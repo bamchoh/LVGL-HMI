@@ -80,6 +80,7 @@ const M = {
   tagChoices() {
     const out = ((this.st.project && this.st.project.tags) || []).filter(t => t && t.name).map(t => ({ name: t.name, note: t.type || '' }));
     if (this.usersOn()) for (const [n, ty] of [['sys.user.name', 'string'], ['sys.user.level', 'int'], ['sys.user.level_name', 'string'], ['sys.user.logged_in', 'bool']]) out.push({ name: n, note: ty + ' (system)' });
+    for (const [n, ty] of [['sys.alarm.active', 'int'], ['sys.alarm.unacked', 'int'], ['sys.alarm.latest', 'string'], ['sys.alarm.latest_severity', 'string']]) out.push({ name: n, note: ty + ' (system)' });
     return out;
   },
 
@@ -607,10 +608,17 @@ const M = {
     });
     (p.drivers || []).forEach((d, i) => {
       if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
+      if (d.type === 'slmp') {
+        if (!d.host) out.push({ text: (d.name || d.type) + ': no host is set', view: 'drivers', index: i });
+        for (const row of Array.isArray(d.map) ? d.map : []) {
+          if (row && row.addr !== undefined && !U.slmpAddress(row.addr)) out.push({ text: (d.name || d.type) + ': "' + row.addr + '" is not a device address', view: 'drivers', index: i });
+        }
+      }
     });
     (p.scripts || []).forEach((s, i) => {
       if (/^screen_/.test(s.trigger || '') && s.screen && !screens.has(s.screen)) out.push({ text: 'script "' + (s.name || '') + '": unknown screen "' + s.screen + '"', view: 'scripts', index: i });
     });
+    if (p.alarms && U.num(p.alarms.ack_level, 0) > 0 && !usersOn) out.push({ text: 'alarms: ack_level is set, but user management is off (Users tab)', view: 'logs' });
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     for (const r of this.recipeProblems()) out.push(r);
     return out;

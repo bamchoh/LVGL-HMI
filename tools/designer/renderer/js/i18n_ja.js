@@ -305,3 +305,32 @@ I18N.PATTERNS_JA.push(
   [/^recipe book "(.*)": a recipe name is 1 to 32 characters$/, 'レシピブック「$1」: レシピ名は 1〜32 文字です'],
   [/^recipe book "(.*)" is defined twice$/, 'レシピブック「$1」が 2 回定義されています'],
 );
+// ---- SLMP driver
+Object.assign(I18N.KEYS_JA, { frame: 'フレーム', network: 'ネットワーク番号', pc: 'PC 番号', io: '要求先ユニット I/O 番号', station: '要求先局番',
+  write_ranges: '書き込みを許す範囲', allow_system_write: 'SM / SD にも書き込む', length: '文字数' });
+Object.assign(I18N.TEXT_JA, {
+  'Mitsubishi SLMP / MC protocol (MELSEC)': '三菱電機 SLMP / MC プロトコル (MELSEC)',
+  'Mitsubishi SLMP / MC protocol (MELSEC) (slmp)': '三菱電機 SLMP / MC プロトコル (MELSEC) (slmp)',
+  'Device map': 'デバイスの割り付け',
+  'the SLMP port of the CPU or of the Ethernet unit (Karakuri: 5007)': 'CPU または Ethernet ユニットの SLMP のポート番号（Karakuri は 5007）',
+  'how long to wait for an answer (default 1000)': '応答を待つ時間（既定 1000）',
+  'route: network number (default 0 = the station itself)': '経路: ネットワーク番号（既定 0 = 接続した局そのもの）',
+  'route: PC number (default 255)': '経路: PC 番号（既定 255）',
+  'route: request destination module I/O number (default 1023 = 0x3FF, the CPU)': '経路: 要求先ユニット I/O 番号（既定 1023 = 0x3FF、CPU）',
+  'route: request destination station number (default 0)': '経路: 要求先局番（既定 0）',
+  'only these may be written, e.g. D0-D999, M0-M99 (empty = everything except SM / SD)': 'ここに書いた範囲だけ書き込める。例: D0-D999, M0-M99（空欄 = SM / SD 以外すべて）',
+  "also write SM / SD (the CPU's own relays and registers)": 'SM / SD（CPU 自身の特殊リレー・特殊レジスタ）にも書き込む',
+  'D100 / M0 / X1F / D10.3': 'D100 / M0 / X1F / D10.3',
+});
+I18N.PATTERNS_JA.push([/^(.*): "(.*)" is not a device address$/, '$1: 「$2」はデバイスの書き方ではありません'], [/^(.*): no host is set$/, '$1: ホストが設定されていません']);
+// ---- alarm widgets
+Object.assign(I18N.KEYS_JA, { rows: '行数', row_height: '行の高さ', columns: '表示する列', ack_on_tap: 'タップで確認', severity: '重要度', days: '期間 (日)',
+  blink: '点滅', ack: '確認が必要', ack_level: '確認に必要なレベル', labels: '表示文字' });
+Object.assign(I18N.VALUES_JA, { current: '発生中のアラーム', history: '履歴' });
+Object.assign(I18N.TEXT_JA, {
+  'Alarm list': 'アラーム一覧', 'Alarm banner': 'アラームバナー',
+  'user level needed to acknowledge an alarm on the device (0 / empty = everybody; needs user management)': '装置でアラームを確認 (ACK) するのに必要なユーザーレベル（0 / 空欄 = 誰でも。ユーザー管理が必要）',
+  'ack: the alarm stays in the alarm list until it is acknowledged (default). Show alarms on the screens with the "Alarm list" and "Alarm banner" widgets; tags sys.alarm.active, sys.alarm.unacked, sys.alarm.latest; actions call "alarm.ack" / "alarm.ack_all".':
+    '確認が必要（既定）: 確認 (ACK) されるまでアラーム一覧に残ります。画面には部品「アラーム一覧」「アラームバナー」で表示します。タグ sys.alarm.active（発生中の数）・sys.alarm.unacked（未確認の数）・sys.alarm.latest（最新のメッセージ）、動作 call "alarm.ack" / "alarm.ack_all" も使えます。',
+  'alarms: ack_level is set, but user management is off (Users tab)': 'アラーム: 確認に必要なレベルが設定されていますが、ユーザー管理がオフです（ユーザー タブ）',
+});

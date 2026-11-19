@@ -260,6 +260,7 @@
   "screens": [
     "screens/main.json",
     "screens/settings.json",
-    "screens/recipes.json"
+    "screens/recipes.json",
+    "screens/alarms.json"
   ]
 }
