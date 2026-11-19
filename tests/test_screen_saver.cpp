@@ -163,10 +163,10 @@ TEST_CASE("screen saver: it covers popups and dialogs too")
     lv_obj_t* black = lv_obj_get_child(sys_layer, -1);
     lv_obj_update_layout(black);
     CHECK(lv_obj_get_width(black) == lv_display_get_horizontal_resolution(lv_display_get_default()));
-    CHECK(lv_obj_has_flag(black, LV_OBJ_FLAG_CLICKABLE));
+    CHECK(lv_obj_is_clickable(black));
     CHECK(lv_obj_get_style_bg_opa(black, LV_PART_MAIN) == LV_OPA_COVER);
     screen_saver().wake();
-    CHECK(lv_obj_has_flag(black, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(black));
 }
 
 // ================================================================ the device setting

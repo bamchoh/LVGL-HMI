@@ -30,7 +30,7 @@ lv_obj_t* box_of(const char* name)
     }
     return nullptr;
 }
-bool visible(lv_obj_t* box) { return box && !lv_obj_has_flag(lv_obj_get_parent(box), LV_OBJ_FLAG_HIDDEN); }
+bool visible(lv_obj_t* box) { return box && !lv_obj_is_hidden(lv_obj_get_parent(box)); }
 
 struct Fixture {
     Runtime rt;
@@ -76,7 +76,7 @@ TEST_CASE("popup: opens over the screen, is modal, nests, closes")
     REQUIRE(box);
     CHECK(visible(box));
     lv_obj_t* back = lv_obj_get_parent(box);
-    CHECK(lv_obj_has_flag(back, LV_OBJ_FLAG_CLICKABLE));       // takes every touch: the screen below cannot be used
+    CHECK(lv_obj_is_clickable(back));       // takes every touch: the screen below cannot be used
     CHECK(lv_obj_get_style_bg_opa(back, LV_PART_MAIN) == LV_OPA_50);
     lv_obj_update_layout(back);
     CHECK(lv_obj_get_width(box) == 300);

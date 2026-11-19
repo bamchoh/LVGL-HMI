@@ -22,7 +22,7 @@ lv_obj_t* build_widgets(const json& widgets)
 }
 
 lv_obj_t* nth(lv_obj_t* parent, int32_t idx) { return lv_obj_get_child(parent, idx); }
-bool hidden(lv_obj_t* o) { return lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN); }
+bool hidden(lv_obj_t* o) { return lv_obj_is_hidden(o); }
 bool checked(lv_obj_t* o) { return lv_obj_has_state(o, LV_STATE_CHECKED); }
 
 } // namespace

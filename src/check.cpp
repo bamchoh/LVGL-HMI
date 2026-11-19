@@ -409,7 +409,7 @@ std::vector<std::string> missing_glyphs_on(lv_obj_t* root)
     while(!todo.empty()) {
         lv_obj_t* o = todo.back();
         todo.pop_back();
-        if(!o || lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) continue;          // (what is hidden now is not drawn)
+        if(!o || lv_obj_is_hidden(o)) continue;          // (what is hidden now is not drawn)
         if(lv_obj_check_type(o, &lv_label_class)) look(o, lv_label_get_text(o), LV_PART_MAIN);
         else if(lv_obj_check_type(o, &lv_checkbox_class)) look(o, lv_checkbox_get_text(o), LV_PART_MAIN);
         else if(lv_obj_check_type(o, &lv_dropdown_class)) look(o, lv_dropdown_get_options(o), LV_PART_MAIN);

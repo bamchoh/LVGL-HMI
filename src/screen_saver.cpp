@@ -113,7 +113,7 @@ void ScreenSaver::blank()
         lv_obj_set_size(layer_, lv_pct(100), lv_pct(100));
         lv_obj_set_style_bg_color(layer_, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(layer_, LV_OPA_COVER, 0);
-        lv_obj_add_flag(layer_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_clickable(layer_, true);
         // The waking touch is the layer's: LVGL is told to ignore the rest of that press, so
         // nothing under the finger gets the release / click.
         lv_obj_add_event_cb(layer_, [](lv_event_t*) {
@@ -121,7 +121,7 @@ void ScreenSaver::blank()
             screen_saver().wake();
         }, LV_EVENT_PRESSED, nullptr);
     }
-    lv_obj_remove_flag(layer_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(layer_, false);
     lv_obj_move_foreground(layer_);
     lv_obj_update_layout(layer_);                  // full size now: a touch right after must hit it
     dark_ = true;
@@ -135,7 +135,7 @@ void ScreenSaver::wake()
 {
     if(!dark_) return;
     dark_ = false;
-    if(layer_) lv_obj_add_flag(layer_, LV_OBJ_FLAG_HIDDEN);
+    if(layer_) lv_obj_set_hidden(layer_, true);
     backlight(true);
     if(lv_display_t* d = lv_display_get_default()) lv_display_trigger_activity(d);
     update_tag();

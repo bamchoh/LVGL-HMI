@@ -11,7 +11,7 @@ lv_obj_t* build_splash(lv_display_t* disp, const ProjectInfo& info)
     lv_obj_remove_style_all(scr);
     lv_obj_set_style_bg_color(scr, info.splash_bg, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(scr, false);
     const int32_t w = lv_display_get_horizontal_resolution(disp), h = lv_display_get_vertical_resolution(disp);
 
     bool shown = false;

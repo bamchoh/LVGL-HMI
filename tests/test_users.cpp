@@ -256,7 +256,7 @@ TEST_CASE("users: the level of widgets (disable / hide / login) and of screens")
 
     // ---- nobody logged in
     CHECK(lv_obj_has_state(inc, LV_STATE_DISABLED));
-    CHECK(lv_obj_has_flag(hidden, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(hidden));
     CHECK_FALSE(lv_obj_has_state(ask, LV_STATE_DISABLED));       // "login": looks normal
     CHECK(lv_obj_has_state(sw, LV_STATE_DISABLED));
     lv_obj_send_event(inc, LV_EVENT_CLICKED, nullptr);           // even if an event gets through: no action
@@ -300,7 +300,7 @@ TEST_CASE("users: the level of widgets (disable / hide / login) and of screens")
 
     // ---- level 2: everything on this screen works
     CHECK_FALSE(lv_obj_has_state(inc, LV_STATE_DISABLED));
-    CHECK_FALSE(lv_obj_has_flag(hidden, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(hidden));
     CHECK(lv_obj_has_state(off, LV_STATE_DISABLED));             // "disabled": true in the file stays
     lv_obj_send_event(inc, LV_EVENT_CLICKED, nullptr);
     lv_obj_send_event(hidden, LV_EVENT_CLICKED, nullptr);

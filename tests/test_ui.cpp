@@ -149,7 +149,7 @@ TEST_CASE("screen level style, scrollable and layout")
     REQUIRE(scr);
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(scr, LV_PART_MAIN), lv_color_hex(0x102030)));
     CHECK(lv_obj_get_style_pad_left(scr, LV_PART_MAIN) == 7);
-    CHECK_FALSE(lv_obj_has_flag(scr, LV_OBJ_FLAG_SCROLLABLE));
+    CHECK_FALSE(lv_obj_is_scrollable(scr));
     CHECK(lv_obj_get_style_flex_flow(scr, LV_PART_MAIN) == LV_FLEX_FLOW_COLUMN);
     CHECK(widget_count(scr) == 2);
     CHECK(lv_screen_active() == scr);
@@ -269,7 +269,7 @@ TEST_CASE("every widget type is created with the matching LVGL class")
         CAPTURE(i);
         CHECK(lv_obj_check_type(nth(scr, static_cast<int32_t>(i)), expected[i]));
     }
-    CHECK(lv_obj_has_flag(nth(scr, 17), LV_OBJ_FLAG_HIDDEN));   // keyboard starts hidden
+    CHECK(lv_obj_is_hidden(nth(scr, 17)));   // keyboard starts hidden
 }
 
 TEST_CASE("widget specific properties")
@@ -318,8 +318,8 @@ TEST_CASE("widget specific properties")
         CHECK(lv_arc_get_max_value(arc) == 40);
         CHECK(lv_arc_get_value(arc) == 12);
         CHECK(lv_arc_get_rotation(arc) == 90);
-        CHECK_FALSE(lv_obj_has_flag(arc, LV_OBJ_FLAG_CLICKABLE));
-        CHECK(lv_obj_has_flag(nth(parent, 3), LV_OBJ_FLAG_CLICKABLE));
+        CHECK_FALSE(lv_obj_is_clickable(arc));
+        CHECK(lv_obj_is_clickable(nth(parent, 3)));
     }
     SUBCASE("led") {
         lv_obj_t* on = build_widgets(J(R"([ { "type": "led", "on": true, "color": "red" }, { "type": "led" } ])"));
@@ -427,19 +427,19 @@ TEST_CASE("keyboard shows for a focused textarea and hides when done")
     REQUIRE(ta);
     lv_obj_t* kb = nth(lv_obj_get_parent(ta), 1);
     REQUIRE(lv_obj_check_type(kb, &lv_keyboard_class));
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
 
     click(ta);
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     CHECK(lv_keyboard_get_textarea(kb) == ta);
 
     lv_obj_send_event(ta, LV_EVENT_READY, nullptr);
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
 
     lv_obj_send_event(ta, LV_EVENT_FOCUSED, nullptr);
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     lv_obj_send_event(kb, LV_EVENT_CANCEL, nullptr);          // the keyboard's own ok/close buttons
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
 }
 
 // ================================================================ common properties and styles
@@ -458,21 +458,21 @@ TEST_CASE("common properties: size, position, flags and states")
     CHECK(lv_obj_get_style_x(p, LV_PART_MAIN) == 10);
     CHECK(lv_obj_get_style_y(p, LV_PART_MAIN) == 20);
     CHECK(lv_obj_get_style_align(p, LV_PART_MAIN) == LV_ALIGN_BOTTOM_RIGHT);
-    CHECK(lv_obj_has_flag(p, LV_OBJ_FLAG_HIDDEN));
-    CHECK_FALSE(lv_obj_has_flag(p, LV_OBJ_FLAG_SCROLLABLE));
+    CHECK(lv_obj_is_hidden(p));
+    CHECK_FALSE(lv_obj_is_scrollable(p));
     CHECK(lv_obj_get_scrollbar_mode(p) == LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_t* l = nth(lv_obj_get_parent(p), 1);
     CHECK(lv_obj_get_style_width(l, LV_PART_MAIN) == LV_SIZE_CONTENT);
     CHECK(lv_obj_get_style_height(l, LV_PART_MAIN) == lv_pct(100));
-    CHECK(lv_obj_has_flag(l, LV_OBJ_FLAG_CLICKABLE));
-    CHECK(lv_obj_has_flag(l, LV_OBJ_FLAG_CHECKABLE));
+    CHECK(lv_obj_is_clickable(l));
+    CHECK(lv_obj_is_checkable(l));
     CHECK(lv_obj_has_state(l, LV_STATE_CHECKED));
     CHECK(lv_obj_has_state(l, LV_STATE_DISABLED));
 
     lv_obj_t* b = nth(lv_obj_get_parent(p), 2);
-    CHECK_FALSE(lv_obj_has_flag(b, LV_OBJ_FLAG_CLICKABLE));
-    CHECK(lv_obj_has_flag(b, LV_OBJ_FLAG_SCROLLABLE) == lv_obj_has_flag(lv_button_create(lv_screen_active()), LV_OBJ_FLAG_SCROLLABLE));
+    CHECK_FALSE(lv_obj_is_clickable(b));
+    CHECK(lv_obj_is_scrollable(b) == lv_obj_is_scrollable(lv_button_create(lv_screen_active())));
 }
 
 TEST_CASE("align names")
@@ -795,7 +795,7 @@ TEST_CASE("visible / hidden / enabled / disabled bindings")
     ])json"));
     REQUIRE(first);
     lv_obj_t* scr = lv_obj_get_parent(first);
-    auto hidden = [&](int32_t i) { return lv_obj_has_flag(nth(scr, i), LV_OBJ_FLAG_HIDDEN); };
+    auto hidden = [&](int32_t i) { return lv_obj_is_hidden(nth(scr, i)); };
     auto disabled = [&](int32_t i) { return lv_obj_has_state(nth(scr, i), LV_STATE_DISABLED); };
 
     CHECK(hidden(0));
@@ -1022,7 +1022,7 @@ TEST_CASE("actions on click")
     click(child(7));
     CHECK(rt.exit_requests == 1);
 
-    CHECK(lv_obj_has_flag(child(8), LV_OBJ_FLAG_CLICKABLE));  // labels with actions become clickable
+    CHECK(lv_obj_is_clickable(child(8)));  // labels with actions become clickable
     click(child(8));
     CHECK(cnt->get_number() == doctest::Approx(1));
 
@@ -1159,7 +1159,7 @@ TEST_CASE("widgets of a screen that is not shown are updated when it is shown")
     CHECK(std::string(lv_label_get_text(la)) == "42");
     CHECK(std::string(lv_label_get_text(lb)) == "2");
     CHECK(lv_bar_get_value(bar) == 2);
-    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(over));
     v->set_number(43, nullptr);
     rt.pump();
 
@@ -1167,19 +1167,19 @@ TEST_CASE("widgets of a screen that is not shown are updated when it is shown")
     REQUIRE(ui().show_screen("b", "none"));
     CHECK(std::string(lv_label_get_text(lb)) == "43");
     CHECK(lv_bar_get_value(bar) == 43);
-    CHECK_FALSE(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(over));
 
     // now "a" is the one that waits; a condition on a second tag is deferred the same way
     v->set_number(3, nullptr);
     rt.pump();
     CHECK(std::string(lv_label_get_text(lb)) == "3");
     CHECK(std::string(lv_label_get_text(la)) == "43");
-    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(over));
     REQUIRE(ui().back());
     CHECK(std::string(lv_label_get_text(la)) == "3");
     lim->set_number(1, nullptr);                           // v (3) > lim (1) while "b" is not shown
     rt.pump();
-    CHECK(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(over));
     REQUIRE(ui().show_screen("b", "none"));
-    CHECK_FALSE(lv_obj_has_flag(over, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(over));
 }

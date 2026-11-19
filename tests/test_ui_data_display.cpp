@@ -84,8 +84,8 @@ TEST_CASE("numeric_display: display only by default")
 
     SUBCASE("not interactive") {
         lv_obj_t* d = nth(s, 1);
-        CHECK_FALSE(lv_obj_has_flag(d, LV_OBJ_FLAG_CLICKABLE));
-        CHECK_FALSE(lv_obj_has_flag(d, LV_OBJ_FLAG_CLICK_FOCUSABLE));
+        CHECK_FALSE(lv_obj_is_clickable(d));
+        CHECK_FALSE(lv_obj_is_click_focusable(d));
         CHECK(lv_obj_get_style_opa(d, LV_PART_CURSOR) == LV_OPA_TRANSP);
         CHECK(lv_obj_get_style_text_align(d, LV_PART_MAIN) == LV_TEXT_ALIGN_RIGHT);
         CHECK(lv_textarea_get_one_line(d));
@@ -117,8 +117,8 @@ TEST_CASE("numeric_display with input: writes on confirmation, clamps, reverts o
         { "type": "numeric_display", "bind": { "value": { "tag": "sp", "two_way": false } }, "input": true }
     ])json"));
     lv_obj_t* in = nth(s, 0);
-    CHECK(lv_obj_has_flag(in, LV_OBJ_FLAG_CLICKABLE));
-    CHECK(lv_obj_has_flag(in, LV_OBJ_FLAG_USER_1));
+    CHECK(lv_obj_is_clickable(in));
+    CHECK(hml::ui_number_pad(in));
     CHECK(ta_text(in) == "10.0 rpm");
 
     SUBCASE("typing alone does not write, READY does, and the text is normalised") {
@@ -231,19 +231,19 @@ TEST_CASE("text_display and password_display")
     lv_obj_t* pw = nth(s, 2);
 
     CHECK(ta_text(ro) == "Alice");
-    CHECK_FALSE(lv_obj_has_flag(ro, LV_OBJ_FLAG_CLICKABLE));
+    CHECK_FALSE(lv_obj_is_clickable(ro));
     CHECK_FALSE(lv_textarea_get_password_mode(ro));
     CHECK(ta_text(nth(s, 4)) == "Op: Alice");
 
-    CHECK(lv_obj_has_flag(in, LV_OBJ_FLAG_CLICKABLE));
-    CHECK_FALSE(lv_obj_has_flag(in, LV_OBJ_FLAG_USER_1));  // text keyboard
+    CHECK(lv_obj_is_clickable(in));
+    CHECK_FALSE(hml::ui_number_pad(in));  // text keyboard
     CHECK(std::string(lv_textarea_get_placeholder_text(in)) == "name");
     CHECK(lv_textarea_get_max_length(in) == 6);
 
     CHECK(lv_textarea_get_password_mode(pw));
-    CHECK(lv_obj_has_flag(pw, LV_OBJ_FLAG_CLICKABLE));      // password fields are inputs by default
+    CHECK(lv_obj_is_clickable(pw));      // password fields are inputs by default
     CHECK(lv_textarea_get_max_length(pw) == 4);
-    CHECK_FALSE(lv_obj_has_flag(nth(s, 3), LV_OBJ_FLAG_CLICKABLE));
+    CHECK_FALSE(lv_obj_is_clickable(nth(s, 3)));
 
     SUBCASE("text input commits on READY only") {
         lv_textarea_set_text(in, "");
@@ -291,7 +291,7 @@ TEST_CASE("the on-screen keyboard switches to the number pad for numeric inputs"
 
     send(num, LV_EVENT_FOCUSED);                             // a tap focuses, then clicks
     send(num, LV_EVENT_CLICKED);
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
     CHECK(ta_text(num) == "1");                              // kept and selected for replacement
     CHECK(selected(num));
@@ -299,19 +299,19 @@ TEST_CASE("the on-screen keyboard switches to the number pad for numeric inputs"
 
     lv_textarea_add_text(num, "5");
     send(num, LV_EVENT_READY);
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
     CHECK(tags().find("n")->get_number() == doctest::Approx(5));
     CHECK(ta_text(num) == "5");
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN) == false);   // (no re-open for the next field)
+    CHECK_FALSE(lv_obj_is_hidden(kb) == false);   // (no re-open for the next field)
 
     send(txt, LV_EVENT_FOCUSED);
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_TEXT_LOWER);
     send(txt, LV_EVENT_CANCEL);
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
 
     send(ro, LV_EVENT_CLICKED);                              // display-only: no keyboard
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
 }
 
 namespace {
@@ -357,7 +357,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         lv_textarea_add_text(num, "99");
         lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
         send(kb, LV_EVENT_VALUE_CHANGED);                    // what a tap on that key produces
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK(n->get_number() == doctest::Approx(7));
         CHECK(ta_text(num) == "7");
     }
@@ -367,7 +367,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         lv_textarea_add_text(num, "42");
         lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_OK)));
         send(kb, LV_EVENT_VALUE_CHANGED);
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK(n->get_number() == doctest::Approx(42));
     }
     SUBCASE("text keyboard: x restores the text") {
@@ -377,7 +377,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         lv_textarea_add_text(txt, "zzz");
         lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
         send(kb, LV_EVENT_VALUE_CHANGED);
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK(ta_text(txt) == "abc");
     }
 }
@@ -431,7 +431,7 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
     lv_obj_t* kb = nth(s, 1);
     rt.advance(50);
     lv_obj_update_layout(s);
-    REQUIRE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    REQUIRE(lv_obj_is_hidden(kb));
     REQUIRE(ta_text(num) == "42");
 
     ScriptedPointer ptr;
@@ -446,7 +446,7 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         ptr.move(cx, cy - 60, rt);
         ptr.release(rt);
         CHECK(lv_obj_get_scroll_y(list) > before);               // the list scrolled
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));          // no keyboard
+        CHECK(lv_obj_is_hidden(kb));          // no keyboard
         CHECK(ta_text(num) == "42");                             // text untouched
         // the field kept the focus; once it is back in view a tap starts editing as usual
         rt.advance(800);                                         // let the scroll momentum settle
@@ -455,7 +455,7 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         lv_obj_get_coords(num, &a);
         ptr.press((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2, rt);
         ptr.release(rt);
-        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(lv_obj_is_hidden(kb));
         CHECK(ta_text(num) == "42");
         CHECK(selected(num));
     }
@@ -464,12 +464,12 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         ptr.move(cx + 60, cy, rt);                               // the list does not scroll horizontally
         ptr.move(a.x2 + 60, cy, rt);                             // now outside the field
         ptr.release(rt);
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK(ta_text(num) == "42");
         // the next real tap works
         ptr.press(cx, cy, rt);
         ptr.release(rt);
-        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(lv_obj_is_hidden(kb));
         CHECK(ta_text(num) == "42");
         CHECK(selected(num));
     }
@@ -477,26 +477,26 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
         ptr.press(a.x1 + 10, cy, rt);
         ptr.move(a.x2 - 10, cy, rt);                             // horizontal: the list does not scroll
         ptr.release(rt);
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK_FALSE(selected(num));
         ptr.press(cx, cy, rt);                                   // slide off and back onto the press point
         ptr.move(a.x2 + 40, cy, rt);
         ptr.move(cx, cy, rt);
         ptr.release(rt);
-        CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_is_hidden(kb));
         CHECK_FALSE(selected(num));
     }
     SUBCASE("a few pixels of jitter while pressed is still a tap") {
         ptr.press(cx, cy, rt);
         ptr.move(cx + 4, cy - 3, rt);
         ptr.release(rt);
-        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(lv_obj_is_hidden(kb));
         CHECK(selected(num));
     }
     SUBCASE("a plain tap opens the keyboard and clears the field") {
         ptr.press(cx, cy, rt);
         ptr.release(rt);
-        CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+        CHECK_FALSE(lv_obj_is_hidden(kb));
         CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
         CHECK(ta_text(num) == "42");
         CHECK(selected(num));
@@ -569,7 +569,7 @@ TEST_CASE("the keyboard moves to the top edge when it would cover the field")
     lv_obj_update_layout(s);
 
     send(bottom_field, LV_EVENT_CLICKED);                      // display is 240 high: y 200..230 is under a 120 px keyboard
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     CHECK(lv_obj_get_style_align(kb, LV_PART_MAIN) == LV_ALIGN_TOP_MID);
     send(bottom_field, LV_EVENT_CANCEL);
 
@@ -594,11 +594,11 @@ TEST_CASE("a field hidden by the keyboard either way gets an echo of the typed t
 
     send(field, LV_EVENT_FOCUSED);                             // a tap: focus, then click
     send(field, LV_EVENT_CLICKED);                             // y 100..140 is covered by a 160 px keyboard at either edge
-    CHECK_FALSE(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(kb));
     REQUIRE(lv_obj_get_child_count(s) == children_before + 1); // the echo label was created
     lv_obj_t* echo = lv_obj_get_child(s, static_cast<int32_t>(children_before));
     REQUIRE(lv_obj_check_type(echo, &lv_label_class));
-    CHECK_FALSE(lv_obj_has_flag(echo, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(echo));
     CHECK(std::string(lv_label_get_text(echo)) == "abc|");    // the (selected) current value
 
     lv_textarea_add_text(field, "xy");
@@ -610,13 +610,13 @@ TEST_CASE("a field hidden by the keyboard either way gets an echo of the typed t
     CHECK(ke.y2 <= ka.y1);                                     // sits right above the bottom keyboard
 
     send(field, LV_EVENT_READY);
-    CHECK(lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN));
-    CHECK(lv_obj_has_flag(echo, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(kb));
+    CHECK(lv_obj_is_hidden(echo));
     CHECK(lv_obj_get_child_count(s) == children_before + 1);  // reused, not recreated
 
     // password fields echo bullets only
     lv_obj_t* pw = nth(s, 1);
-    lv_obj_remove_flag(pw, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(pw, false);
     send(pw, LV_EVENT_FOCUSED);
     send(pw, LV_EVENT_CLICKED);
     lv_textarea_add_text(pw, "1234");

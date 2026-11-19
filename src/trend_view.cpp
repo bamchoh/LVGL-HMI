@@ -315,7 +315,7 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(obj, 6, 0);
     lv_obj_set_style_pad_row(obj, 4, 0);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(obj, false);
 
     c->range_label = lv_label_create(obj);
     lv_label_set_text(c->range_label, "");
