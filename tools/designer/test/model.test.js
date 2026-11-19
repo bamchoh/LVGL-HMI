@@ -1077,3 +1077,21 @@ test('M texts: @id in the preview language, checks, renames, CSV both ways', () 
   assert.ok(r.errors.some(e => /twice/.test(e)));
   assert.equal(Object.keys(p.texts).length, 5);                        // nothing replaced by the bad ones
 });
+
+test('M mqtt driver: missing host, no TLS, password in the project, wildcards; tag renames follow', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'temp', type: 'float' }, { name: 'sp', type: 'int' }];
+  M.st.project.drivers = [{ type: 'mqtt', name: 'mq', tls: false, password: 'x',
+    publish: ['temp', { tag: 'sp', topic: 'a/#' }], subscribe: [{ tag: 'sp', topic: 'cmd/sp' }, 'ghost'] }];
+  deq(M.problems().map(p => p.text).sort(), [
+    'mq: "a/#": wildcards (+ #) are not allowed', 'mq: no TLS: user name, password and values can be read on the network',
+    'mq: no host is set', 'mq: the password is in project.json; better enter it on the device (System > Driver)',
+    'unknown tag "ghost" (subscribe)'].sort());
+  M.st.project.drivers = [{ type: 'mqtt', host: 'b', verify: false, publish: ['temp'], subscribe: [{ tag: 'sp' }] }];
+  deq(M.problems().map(p => p.text), ["mqtt: the broker's certificate is not checked (verify off)"]);
+  M.renameTag(0, 'temperature');
+  M.renameTag(1, 'speed');
+  deq(M.st.project.drivers[0].publish, ['temperature']);
+  deq(M.st.project.drivers[0].subscribe, [{ tag: 'speed' }]);
+});

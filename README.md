@@ -40,6 +40,7 @@ build.cmd Debug
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
+| `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
@@ -600,6 +601,56 @@ SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP�
   1 度出します。
 - SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
   範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
+
+### ドライバ: mqtt（MQTT クライアント）
+
+MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）、指令を受け取って（subscribe）タグに書き込みます。
+**既定で TLS（1.2 / 1.3）を使い、ブローカーの証明書とホスト名を確認します。** 実装は mbedTLS（Apache-2.0）です。
+
+```json
+{
+  "type": "mqtt",
+  "host": "broker.example.com", "port": 8883,
+  "ca_file": "certs/ca.pem",
+  "client_id": "hml-pump1", "topic_prefix": "plant/line1/pump1/",
+  "status_topic": "status", "status_tag": "mqtt_online",
+  "publish": [
+    "temp",
+    { "tag": "state", "qos": 1, "retain": true },
+    { "tag": "flow", "topic": "flow_lpm", "mode": "interval", "interval_ms": 10000 }
+  ],
+  "subscribe": [
+    { "tag": "speed_sp", "topic": "cmd/speed_sp" }
+  ]
+}
+```
+
+| キー                         | 内容                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `host` / `port`              | ブローカー。ポートの既定は 8883（TLS）、`"tls": false` なら 1883                                |
+| `tls`                        | 既定 `true`。`false` は平文（ユーザー名・パスワード・値がネットワーク上で読める）。閉じたネットワークだけで |
+| `verify`                     | 既定 `true`: 証明書を `ca_file` の CA で確かめ、ホスト名も確認する。`false` は警告付き（なりすましを防げない） |
+| `ca_file`                    | ブローカーの CA 証明書（PEM、project.json からの相対パス）。Linux では空欄ならシステムの CA（`/etc/ssl/certs/ca-certificates.crt`） |
+| `cert_file` / `key_file`     | クライアント証明書と秘密鍵（PEM）。ブローカーが求める場合                                       |
+| `username` / `password`      | 装置のシステム設定（System > Driver）で入れると `project.local.json` に入り、project.json には残りません |
+| `client_id`                  | 装置ごとに別の値にする                                                                         |
+| `topic_prefix`               | すべてのトピックの前に付く                                                                     |
+| `status_topic`               | 接続すると `online`（retain）、切れるとブローカーが遺言（last will）で `offline` を出す          |
+| `status_tag`                 | 接続中は 1                                                                                    |
+| `payload`                    | `value`（既定。`21.5`、bool は `true` / `false`）/ `json`（`{"v": 21.5, "ts": ミリ秒}`）         |
+| `qos` / `retain`             | publish の既定（QoS は 0 か 1）                                                                |
+| `publish[]`                  | `tag`、`topic`（既定はタグ名）、`mode`: `change`（既定、変化したとき）/ `interval`（`interval_ms` ごと）、`qos`、`retain` |
+| `subscribe[]`                | `tag`、`topic`（既定はタグ名）。**ここに書いたタグだけが外から書き込まれます**。ワイルドカード（`+` `#`）は使えません |
+| `keepalive_s` / `timeout_ms` / `reconnect_ms` | 既定 30 秒 / 5000 ms（接続とハンドシェイク）/ 1000 ms（再接続の最初の待ち。30 秒まで倍に延びる） |
+
+- 受け取った値は、数値のタグなら数値か、bool なら `true` / `false` / `1` / `0` / `on` / `off` か、文字列なら UTF-8 で
+  256 バイト以下かを確かめ、タグの `min` / `max` の外なら書き込みません（ログに警告）。`{"v": ...}` の形も受け付けます。
+  受け取って書いた値は、同じタグを publish していても送り返しません。
+- ブローカーからのパケットは、長さ（64 KiB まで）・種類・フラグ・トピック（UTF-8、ワイルドカードなし）を確かめ、
+  壊れていれば接続を切ってつなぎ直します（QoS 2 には対応していません）。
+- ブローカーにつながらない間は、`change` のトピックごとに最新の値だけを覚えておき、つながったときに送ります。
+  確認（PUBACK）が来ていない QoS 1 のメッセージは、つなぎ直したあと DUP を付けて送り直します（100 件まで）。
+- パスワードはログに出しません。`project.local.json` には平文で入るので、装置のファイルを読める人は読めます。
 
 ### ドライバ: opcua_server（OPC UA サーバー）
 
@@ -1439,6 +1490,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
 | `src/project_archive.[ch]pp`   | プロジェクトファイル（`.hmlproj`）の作成と展開、プロジェクトを構成するファイルの一覧（デザイナーと共用） |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
+| `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバ |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |
 | `legacy_c/`                    | 書き直し前の C 版（参照用、ビルド対象外。不要なら削除可）                                           |

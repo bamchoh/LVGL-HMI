@@ -561,6 +561,14 @@ private:
 
 // ---------------------------------------------------------------- drivers
 
+// Settings a driver type takes that are better entered on the device than kept in project.json
+// (credentials): shown even when the project does not have them.
+std::vector<const char*> device_only_keys(const json& cfg)
+{
+    if(iequals(jstr(cfg, "type", ""), "mqtt")) return { "username", "password" };
+    return {};
+}
+
 class DriverPage final : public SettingsPage {
 public:
     DriverPage(Project& proj, std::string key, std::string title)
@@ -618,8 +626,15 @@ public:
                 f.decimals = (d == static_cast<double>(static_cast<long long>(d))) ? 0 : 3;
                 f.value = vformat("%g", d);
             }
-            else if(v.is_string()) { f.type = SettingField::Type::Text; f.value = v.get<std::string>(); }
+            else if(v.is_string()) { f.type = SettingField::Type::Text; f.value = v.get<std::string>(); f.password = k == "password"; }
             else continue;                                     // arrays / objects (map, items) are not editable here
+            out.push_back(f);
+        }
+        for(const char* k : device_only_keys(*cfg)) {
+            if(cfg->contains(k)) continue;
+            SettingField f;
+            f.key = f.label = k;
+            f.password = std::string(k) == "password";
             out.push_back(f);
         }
         return out;
@@ -655,7 +670,12 @@ public:
             }
             else {
                 const json* orig = jget(*cfg, k.c_str());
-                if(!orig) continue;
+                const json empty_text = "";
+                if(!orig) {
+                    const auto extra = device_only_keys(*cfg);
+                    if(std::find_if(extra.begin(), extra.end(), [&](const char* e) { return k == e; }) == extra.end()) continue;
+                    orig = &empty_text;
+                }
                 const json* b = base ? jget(*base, k.c_str()) : nullptr;
                 if(orig->is_boolean()) { v = (text == "1"); same = b && b->is_boolean() && *b == v; }
                 else if(orig->is_number()) {
@@ -663,7 +683,7 @@ public:
                     // the field shows the number with %g: the same text means "not changed"
                     same = b && b->is_number() && (*b == v || vformat("%g", b->get<double>()) == text);
                 }
-                else { v = text; same = b && b->is_string() && *b == v; }
+                else { v = text; same = (b && b->is_string() && *b == v) || (!b && text.empty()); }
             }
             if(same) d.erase(k);
             else d[k] = v;

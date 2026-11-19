@@ -331,6 +331,26 @@
     ok(document.querySelector('#view-drivers input[placeholder="D100 / M0 / X1F / D10.3"]'), 'the address field shows examples');
   });
 
+  await test('drivers: an MQTT driver with TLS on, a publish and a subscribe table; no TLS is a problem', async () => {
+    Panels.showView('drivers'); App.doRefresh();
+    const sel = [...document.querySelectorAll('#view-drivers select')].find(s => [...s.options].some(o => o.value === 'mqtt'));
+    ok(sel, 'mqtt is offered');
+    sel.value = 'mqtt';
+    [...document.querySelectorAll('#view-drivers button')].find(b => b.textContent.includes('追加')).click();
+    App.doRefresh();
+    const i = M.st.project.drivers.length - 1, d = M.st.project.drivers[i];
+    eq([d.type, d.port, d.tls], ['mqtt', 8883, true]);
+    const view = document.querySelector('#view-drivers').textContent;
+    ok(view.includes('送信（タグの値をブローカーへ）') && view.includes('受信（指令: ここにあるタグだけ書き込まれる）'), 'both tables');
+    const tls = document.querySelector('[data-fk="drv.' + i + '.tls"]');
+    ok(tls && tls.checked, 'TLS is on');
+    eq(App.problems.filter(p => p.index === i && p.view === 'drivers').length, 0, 'no problems with TLS on');
+    tls.checked = false; tls.dispatchEvent(new Event('change')); App.doRefresh();
+    eq(d.tls, false);
+    ok(App.problems.some(p => /TLS/.test(p.text) && p.index === i), 'no TLS is a problem');
+    M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
+  });
+
   await test('alarm widgets: in the palette, drawn with the alarms of the project, settings on the Logs page', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /アラーム一覧/.test(t)) && pal.some(t => /アラームバナー/.test(t)), 'palette: ' + pal.join(','));

@@ -323,6 +323,38 @@ Object.assign(I18N.TEXT_JA, {
   'D100 / M0 / X1F / D10.3': 'D100 / M0 / X1F / D10.3',
 });
 I18N.PATTERNS_JA.push([/^(.*): "(.*)" is not a device address$/, '$1: 「$2」はデバイスの書き方ではありません'], [/^(.*): no host is set$/, '$1: ホストが設定されていません']);
+// ---- MQTT driver
+Object.assign(I18N.KEYS_JA, { tls: 'TLS（暗号化）', verify: '証明書を確認', ca_file: 'CA 証明書', cert_file: 'クライアント証明書', key_file: '秘密鍵',
+  client_id: 'クライアント ID', topic_prefix: 'トピックの前置き', status_topic: '状態トピック', payload: '送る形式', qos: 'QoS', retain: '保持 (retain)',
+  keepalive_s: 'キープアライブ (秒)', reconnect_ms: '再接続の待ち (ms)', topic: 'トピック', publish: '送信', subscribe: '受信' });
+Object.assign(I18N.VALUES_JA, { change: '変化したとき' });
+Object.assign(I18N.TEXT_JA, {
+  'MQTT client': 'MQTT クライアント',
+  'MQTT client (mqtt)': 'MQTT クライアント (mqtt)',
+  'Publish (tag values to the broker)': '送信（タグの値をブローカーへ）',
+  'Subscribe (commands: only these tags can be written)': '受信（指令: ここにあるタグだけ書き込まれる）',
+  'the broker': 'ブローカー',
+  'default 8883 (TLS), 1883 without TLS': '既定 8883（TLS）、TLS なしは 1883',
+  'encrypted (TLS 1.2 / 1.3). Without it user name, password and values can be read on the network': '暗号化する（TLS 1.2 / 1.3）。切るとユーザー名・パスワード・値がネットワーク上で読めます',
+  "check the broker's certificate and host name. Without it anybody on the way can pretend to be the broker": 'ブローカーの証明書とホスト名を確認する。切ると途中の誰でもブローカーになりすませます',
+  "the CA certificate of the broker (PEM), relative to project.json. On Linux the system's CAs when empty": 'ブローカーの CA 証明書（PEM、project.json からの相対パス）。Linux では空欄ならシステムの CA',
+  'client certificate (PEM), if the broker wants one': 'クライアント証明書（PEM）。ブローカーが求める場合',
+  'its private key (PEM)': 'その秘密鍵（PEM）',
+  'unique per device': '装置ごとに別の値',
+  'put before every topic, e.g. plant/line1/pump1/': 'すべてのトピックの前に付く。例: plant/line1/pump1/',
+  '"online" (retained) while connected, "offline" as the last will': '接続中は "online"（保持）、切れたら遺言 (last will) で "offline"',
+  'value: 21.5 / json: {"v": 21.5, "ts": ms}': 'value: 21.5 / json: {"v": 21.5, "ts": ミリ秒}',
+  'default of the published tags': '送信するタグの既定',
+  'connect / handshake (default 5000)': '接続とハンドシェイクの時間制限（既定 5000）',
+  'first wait before connecting again; doubles up to 30 s (default 1000)': '再接続までの最初の待ち。30 秒まで倍に延びる（既定 1000）',
+  '(the tag name)': '（タグ名）',
+});
+I18N.PATTERNS_JA.push(
+  [/^(.*): no TLS: user name, password and values can be read on the network$/, '$1: TLS なし: ユーザー名・パスワード・値がネットワーク上で読めます'],
+  [/^(.*): the broker's certificate is not checked \(verify off\)$/, '$1: ブローカーの証明書を確認していません（verify がオフ）'],
+  [/^(.*): the password is in project.json; better enter it on the device \(System > Driver\)$/, '$1: パスワードが project.json にあります。装置で入力してください（システム > ドライバ）'],
+  [/^(.*): "(.*)": wildcards \(\+ #\) are not allowed$/, '$1: 「$2」: ワイルドカード（+ #）は使えません'],
+);
 // ---- alarm widgets
 Object.assign(I18N.KEYS_JA, { rows: '行数', row_height: '行の高さ', columns: '表示する列', ack_on_tap: 'タップで確認', severity: '重要度', days: '期間 (日)',
   blink: '点滅', ack: '確認が必要', ack_level: '確認に必要なレベル', labels: '表示文字' });

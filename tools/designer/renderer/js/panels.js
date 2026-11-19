@@ -158,7 +158,7 @@ const Panels = {
           U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', onclick: () => App.serialPortDialog(i) }, 'Find serial ports …'),
             U.el('span', { class: 'dim' }, M.st.path ? 'lists the ports of the target and of this PC' : 'save the project first'))));
       }
-      if (sch.table) body.append(this.tableEditor(d, sch.table, fk));
+      (sch.tables || (sch.table ? [sch.table] : [])).forEach((t, ti) => body.append(this.tableEditor(d, t, ti ? fk + '.' + t.key : fk)));
     } else body.append(U.el('div', { class: 'hint' }, 'Unknown driver type; edit the JSON below.'));
     const raw = U.el('textarea', { rows: 12, class: 'mono', value: JSON.stringify(d, null, 2), onchange: e => {
       try { const o = JSON.parse(e.target.value); M.mutate(() => { drivers[this.driverSel] = o; }); } catch (err) { App.toast('JSON: ' + err.message); }
@@ -169,6 +169,7 @@ const Panels = {
     if (d.type === 'sim') return (d.items || []).length + ' items';
     if (d.type === 'modbus_tcp') return (d.host || '') + ':' + (d.port || 502) + ', ' + (d.map || []).length + ' regs';
     if (d.type === 'opcua_server') return 'port ' + (d.port || 4840);
+    if (d.type === 'mqtt') return (d.host || '') + (d.tls === false ? ' (no TLS)' : '') + ', ' + (d.publish || []).length + ' out / ' + (d.subscribe || []).length + ' in';
     return '';
   },
 
