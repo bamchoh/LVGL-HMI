@@ -44,6 +44,9 @@
 #include "screen_saver.hpp"
 #include "tag.hpp"
 #include "active_project.hpp"
+#include "check.hpp"
+#include "screenshot.hpp"
+#include "texts.hpp"
 #include "project_archive.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
@@ -84,15 +87,112 @@ bool file_exists(const std::string& p)
 
 int usage(const char* argv0)
 {
-    std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]\n"
-                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...\n"
-                         "       [--stats <seconds>] [--ignore-active]\n"
+    std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.png|bmp>]\n"
+                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.png|bmp>]...\n"
+                         "       [--stats <seconds>] [--ignore-active] [--lang <code>] [--set <tag>=<value>]...\n"
+                         "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--lang <code>] [--set <tag>=<value>]...\n"
+                         "           (no window, no drivers, nothing recorded: lists what is wrong; exit code 1 if anything is)\n"
                          "       %s --list-serial-ports\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
                          "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
                          "       %s --export-data-log <file.csv> <project.json> [--group <name>]\n"
-                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0, argv0);
+                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0, argv0, argv0);
     return 1;
+}
+
+// ---- --check / --render: look at a project without running it ----
+// The files are checked (check.hpp), then the project is loaded and every screen is built on a
+// display that exists in memory only, so that what the runtime itself complains about is seen
+// too. No window, no drivers (no device is contacted), no logs, nothing written but the pictures.
+struct Render { std::string screen, popup, path; };     // popup: opened over the screen ("screen+popup")
+std::vector<std::string> s_check_log;
+void check_log_sink(hml::LogLevel level, const std::string& msg)
+{
+    if(level == hml::LogLevel::Info) return;
+    // (what check_project already reports, with the place)
+    if(msg.rfind("bind: unknown tag", 0) == 0 || msg.rfind("unknown widget type", 0) == 0 || msg.rfind("action '", 0) == 0) return;
+    for(const std::string& m : s_check_log) if(m == msg) return;
+    s_check_log.push_back(msg);
+}
+
+int run_check(const std::string& project_path, const std::vector<Render>& renders, const std::string& lang,
+              const std::vector<std::pair<std::string, std::string>>& sets)
+{
+    std::vector<std::string> screen_names;
+    std::vector<hml::CheckProblem> problems = hml::check_project(project_path, &screen_names);
+    hml::set_log_quiet(true);
+    hml::set_log_sink(check_log_sink);
+    bool loaded = hml::project().load(project_path);
+    int rendered = 0;
+    std::vector<std::string> notes;
+    if(loaded) {
+        const hml::ProjectInfo& info = hml::project().info();
+        lv_init();
+        lv_tick_set_cb([]() -> uint32_t { return hml::millis(); });
+        static std::vector<uint32_t> buf;
+        buf.resize(static_cast<size_t>(info.width) * 40);
+        lv_display_t* disp = lv_display_create(info.width, info.height);
+        lv_display_set_buffers(disp, buf.data(), nullptr, static_cast<uint32_t>(buf.size() * 4), LV_DISPLAY_RENDER_MODE_PARTIAL);
+        lv_display_set_flush_cb(disp, [](lv_display_t* d, const lv_area_t*, uint8_t*) { lv_display_flush_ready(d); });
+        hml::project().apply_theme(disp);
+        hml::ui().init(nullptr, hml::AppCallbacks{ [] {}, [] {}, [](hml::RestartTarget) {} });
+        hml::system_settings().register_actions();
+        hml::register_user_actions();
+        for(const auto& [name, value] : sets) {
+            hml::Tag* t = hml::tags().find(name);
+            auto v = t ? hml::Value::parse(t->type(), value) : std::nullopt;
+            if(!t) notes.push_back("--set: unknown tag \"" + name + "\"");
+            else if(!v) notes.push_back("--set: \"" + value + "\" is not a value for " + name);
+            else t->set(*v, nullptr);
+        }
+        if(!lang.empty() && !hml::texts().set_language(lang)) notes.push_back("--lang: \"" + lang + "\" is not a language of the project");
+        // alarms, trends and recipes as on the device, recorded into a folder that is thrown away
+        std::error_code ec;
+        const std::filesystem::path scratch = std::filesystem::temp_directory_path(ec) / ("hml-check-" + std::to_string(hml::LogDb::now_ms()));
+        std::filesystem::create_directories(scratch, ec);
+        hml::project().start_logs(false, scratch.generic_u8string());
+        hml::project().build_screens();
+        hml::users().preview_as_highest();
+        auto settle = [&](int passes) {
+            for(int i = 0; i < passes; i++) { hml::tags().dispatch(false); lv_timer_handler(); hml::sleep_ms(5); }
+        };
+        // every screen once: screens are built when they are first shown
+        for(const std::string& name : screen_names) {
+            if(!hml::ui().show_screen(name, "none")) s_check_log.push_back("screen '" + name + "' cannot be shown");
+            settle(3);
+        }
+        for(const Render& r : renders) {
+            while(hml::ui().close_popup()) {}
+            hml::ui().show_screen(hml::project().info().start_screen, "none");
+            if(!hml::ui().show_screen(r.screen, "none")) { notes.push_back("--render: unknown screen \"" + r.screen + "\""); continue; }
+            if(!r.popup.empty() && !hml::ui().open_popup(r.popup)) { notes.push_back("--render: \"" + r.popup + "\" is not a popup"); continue; }
+            settle(40);
+            lv_refr_now(disp);
+            if(hml::save_screenshot(disp, r.path)) rendered++;
+            else notes.push_back("--render: cannot write " + r.path);
+        }
+    }
+    hml::set_log_sink(nullptr);
+    if(loaded) {
+        hml::project().stop_logs();
+        std::error_code ec;
+        const std::filesystem::path tmp = std::filesystem::temp_directory_path(ec);
+        for(auto it = std::filesystem::directory_iterator(tmp, ec); !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
+            const std::string n = it->path().filename().generic_u8string();
+            if(n.rfind("hml-check-", 0) == 0) { std::error_code rec; std::filesystem::remove_all(it->path(), rec); }
+        }
+    }
+    for(const hml::CheckProblem& p : problems) std::printf("%s\n", p.line().c_str());
+    if(!loaded && problems.empty()) std::printf("project.json: cannot be loaded\n");
+    for(const std::string& m : s_check_log) std::printf("runtime: %s\n", m.c_str());
+    for(const std::string& m : notes) std::printf("%s\n", m.c_str());
+    for(const Render& r : renders) std::printf("rendered: %s%s%s -> %s\n", r.screen.c_str(), r.popup.empty() ? "" : "+", r.popup.c_str(), r.path.c_str());
+    const size_t n = problems.size() + s_check_log.size() + notes.size() + ((!loaded && problems.empty()) ? 1 : 0);
+    if(n) std::printf("%d problem(s)\n", static_cast<int>(n));
+    else std::printf("no problems\n");
+    (void)rendered;
+    std::fflush(nullptr);
+    std::_Exit(n ? 1 : 0);      // (nothing to save; LVGL and the stores are not torn down)
 }
 
 // --splash: draw one frame, then exit
@@ -121,6 +221,7 @@ int main(int argc, char** argv)
 {
     // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
     //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
+    if(argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) { usage(argv[0]); return 0; }
     if(argc >= 2 && std::string(argv[1]) == "--list-serial-ports") {
         for(const hml::SerialPortInfo& p : hml::list_serial_ports())
             std::printf("%s\t%s\t%s\n", p.device.c_str(), p.stable.c_str(), p.description.c_str());
@@ -131,6 +232,10 @@ int main(int argc, char** argv)
     uint32_t exit_after = 0, reload_after = 0, stats_s = 0;
     bool ignore_active = false;
     bool splash = false;
+    bool check = false;
+    std::vector<Render> renders;
+    std::string check_lang;
+    std::vector<std::pair<std::string, std::string>> check_sets;
 
     for(int i = 1; i < argc; i++) {
         std::string a = argv[i];
@@ -141,6 +246,25 @@ int main(int argc, char** argv)
         else if(a == "--reload-after") { const char* v = next(); if(!v) return usage(argv[0]); reload_after = static_cast<uint32_t>(std::atoi(v)); }
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
         else if(a == "--splash") splash = true;
+        else if(a == "--check") check = true;
+        else if(a == "--render") {
+            const char* v = next();
+            const std::string s = v ? v : "";
+            const size_t comma = s.find(',');
+            if(comma == std::string::npos || comma == 0 || comma + 1 >= s.size()) return usage(argv[0]);
+            const std::string what = s.substr(0, comma);
+            const size_t plus = what.find('+');
+            renders.push_back({ what.substr(0, plus), plus == std::string::npos ? "" : what.substr(plus + 1), s.substr(comma + 1) });
+            check = true;
+        }
+        else if(a == "--lang") { const char* v = next(); if(!v) return usage(argv[0]); check_lang = v; }
+        else if(a == "--set") {
+            const char* v = next();
+            const std::string s = v ? v : "";
+            const size_t eq = s.find('=');
+            if(eq == std::string::npos || eq == 0) return usage(argv[0]);
+            check_sets.emplace_back(s.substr(0, eq), s.substr(eq + 1));
+        }
         else if(a == "--export-system-log") { const char* v = next(); if(!v) return usage(argv[0]); export_log = v; }
         else if(a == "--export-data-log" || a == "--export-alarm-log" || a == "--export-operation-log") {
             const char* v = next();
@@ -182,6 +306,12 @@ int main(int argc, char** argv)
         if(!hml::unpack_project(archive, work, &err)) { std::fprintf(stderr, "hml_runtime: %s\n", err.c_str()); return 2; }
         archive_note = "project file '" + project_path + "' unpacked into " + work.generic_u8string();
         project_path = (work / "project.json").generic_u8string();
+    }
+    if(check) {
+        if(!screen.empty() || !screenshot.empty() || !s_clicks.empty() || !s_shots.empty())
+            std::fprintf(stderr, "hml_runtime: --screen, --screenshot, --click and --shot-at do nothing with --check (use --render <screen>,<file>)\n");
+        hml::drivers().register_builtins();
+        return run_check(project_path, renders, check_lang, check_sets);
     }
     // A deployed runtime runs the project named by active_project next to it, whatever the
     // service's command line says (active_project.hpp). Not for the exports: they are asked
@@ -265,6 +395,13 @@ int main(int argc, char** argv)
 
     hml::project().start_drivers();
     hml::project().start_logs();
+    for(const auto& [name, value] : check_sets) {              // --set tag=value
+        hml::Tag* t = hml::tags().find(name);
+        auto v = t ? hml::Value::parse(t->type(), value) : std::nullopt;
+        if(t && v) t->set(*v, nullptr);
+        else HML_WARN("--set %s=%s: %s", name.c_str(), value.c_str(), t ? "not a value for this tag" : "unknown tag");
+    }
+    if(!check_lang.empty()) hml::texts().set_language(check_lang);
     hml::project().build_screens();
     if(!screen.empty()) hml::ui().show_screen(screen, "none");
     HML_INFO("running (%s backend). %s", hml::platform::name(), hml::platform::hint());

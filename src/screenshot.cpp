@@ -2,11 +2,12 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include "miniz.h"
 #include "util.hpp"
 
 namespace hml {
 
-bool save_screenshot_bmp(lv_display_t* disp, const std::string& path)
+bool save_screenshot(lv_display_t* disp, const std::string& path)
 {
     lv_draw_buf_t* buf = lv_snapshot_take(lv_display_get_screen_active(disp), LV_COLOR_FORMAT_XRGB8888);
     if(!buf) { HML_WARN("screenshot: snapshot failed"); return false; }
@@ -32,6 +33,24 @@ bool save_screenshot_bmp(lv_display_t* disp, const std::string& path)
     const uint32_t row = (w * 3 + 3) & ~3u;
     FILE* f = std::fopen(path.c_str(), "wb");
     if(!f) { HML_WARN("screenshot: cannot write %s", path.c_str()); lv_draw_buf_destroy(buf); return false; }
+
+    if(path.size() >= 4 && iequals(path.substr(path.size() - 4), ".png")) {
+        std::vector<uint8_t> rgb(static_cast<size_t>(w) * h * 3);
+        for(uint32_t y = 0; y < h; y++) {
+            const uint8_t* src = static_cast<const uint8_t*>(buf->data) + y * buf->header.stride;
+            uint8_t* d = rgb.data() + static_cast<size_t>(y) * w * 3;
+            for(uint32_t x = 0; x < w; x++) { d[x * 3] = src[x * 4 + 2]; d[x * 3 + 1] = src[x * 4 + 1]; d[x * 3 + 2] = src[x * 4]; }
+        }
+        lv_draw_buf_destroy(buf);
+        size_t len = 0;
+        void* png = tdefl_write_image_to_png_file_in_memory(rgb.data(), static_cast<int>(w), static_cast<int>(h), 3, &len);
+        const bool ok = png && std::fwrite(png, 1, len, f) == len;
+        if(png) mz_free(png);
+        std::fclose(f);
+        if(!ok) { HML_WARN("screenshot: cannot write %s", path.c_str()); return false; }
+        HML_INFO("screenshot saved to %s", path.c_str());
+        return true;
+    }
 
     uint8_t hdr[54] = { 'B', 'M' };
     auto put32 = [&](size_t off, uint32_t v) { std::memcpy(hdr + off, &v, 4); };

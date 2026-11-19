@@ -21,6 +21,7 @@ add_executable(hml_tests
   test_driver_registry.cpp
   test_driver_sim.cpp
   test_driver_modbus.cpp
+  test_check.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp
@@ -81,6 +82,11 @@ if(HML_BACKEND STREQUAL "sdl")
       -P ${CMAKE_CURRENT_SOURCE_DIR}/smoke_runtime.cmake)
   set_tests_properties(hml_runtime_smoke PROPERTIES TIMEOUT 120)
 endif()
+
+# hml_runtime --check on the demo project: no window and no device on any backend; exit code 0 = no problems.
+add_test(NAME hml_runtime_check COMMAND hml_runtime ${CMAKE_SOURCE_DIR}/projects/demo/project.json --check
+  --render main,${CMAKE_BINARY_DIR}/check_main.png)
+set_tests_properties(hml_runtime_check PROPERTIES TIMEOUT 120 PASS_REGULAR_EXPRESSION "no problems")
 
 # Designer renderer (HTML/JS) unit tests: plain Node, no packages (node --test, Node 18+).
 find_program(HML_NODE node)

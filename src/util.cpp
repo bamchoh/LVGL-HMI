@@ -33,7 +33,10 @@ void sleep_ms(uint32_t ms)
 
 namespace {
 std::atomic<LogSink> s_log_sink{ nullptr };
+std::atomic<bool> s_log_quiet{ false };
 }
+
+void set_log_quiet(bool quiet) { s_log_quiet = quiet; }
 
 void set_log_sink(LogSink sink)
 {
@@ -43,8 +46,10 @@ void set_log_sink(LogSink sink)
 void log(LogLevel level, const std::string& msg)
 {
     const char* name = level == LogLevel::Info ? "INFO" : level == LogLevel::Warn ? "WARN" : "ERROR";
-    std::printf("[hml %-5s] %s\n", name, msg.c_str());
-    std::fflush(stdout);
+    if(!s_log_quiet) {
+        std::printf("[hml %-5s] %s\n", name, msg.c_str());
+        std::fflush(stdout);
+    }
     if(LogSink sink = s_log_sink.load()) sink(level, msg);
 }
 

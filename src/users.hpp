@@ -78,6 +78,9 @@ public:
     static bool valid_pin(const std::string& pin);            // 4..8 digits
     static bool valid_name(const std::string& name);          // 1..16 of letters, digits, _ - . space
 
+    // hml_runtime --check / --render: every screen can be shown (the highest level, no PIN asked).
+    // Nothing is operated in that mode.
+    void preview_as_highest() { if(enabled()) set_current("preview", max_level()); }
     // Tests: replace the clocks (milliseconds; inactive = since the last input).
     void set_clock(std::function<uint32_t()> now_ms, std::function<uint32_t()> inactive_ms);
 

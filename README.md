@@ -39,6 +39,7 @@ build.cmd Debug
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
 | `test_driver_opcua_client.cpp`                       | OPC UA クライアント（同じプロセスの open62541 サーバーを相手に: ノードの読み込みとサブスクリプション、`rw` の行だけ書き込み、**署名と暗号化**、**別の証明書のサーバーを拒否**、verify なしの警告、信頼する証明書がないと起動しない、平文で暗号化専用サーバーにつながらない、ユーザー名とパスワード（間違いの拒否、ログに出ない）、型に入らない値を書かない、サーバーの停止と復帰、停止がすぐ終わる、装置の証明書を 1 度だけ作る） |
@@ -215,7 +216,8 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `Esc`                       | 終了。Linux fbdev/drm では `Ctrl-C` (`SIGINT` / `SIGTERM`)                                                        |
 | `SIGUSR2`（Linux fbdev/drm）| ランタイムを再起動（終了処理をしてから同じコマンドラインで起動し直す）。デザイナーの Deploy が使う                |
 | `--screen <name>`           | 起動時に表示する画面を指定                                                                                        |
-| `--screenshot <file.bmp>`   | 起動後にスクリーンショットを保存（`tools/bmp2png.py` で PNG 化できます）                                          |
+| `--screenshot <file>`       | 起動後にスクリーンショットを保存。名前が `.png` で終われば PNG、それ以外は BMP                                    |
+| `--check`                   | プロジェクトの間違いを一覧にして終了（下記「プロジェクトの検査」）。`--render` `--lang` `--set` と組み合わせられる |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
 | `--stats <seconds>`          | メインループの負荷を指定秒ごとにログに出す（1 秒あたりの周回数、占有率、最長の 1 周の時間）。負荷の確認用 →「負荷の確認」 |
 | `--list-serial-ports`        | その機械のシリアルポートを一覧表示して終了（project.json は不要）→「ドライバ: modbus_rtu / modbus_ascii」 |
@@ -223,7 +225,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
 | `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
 | `--click <x>,<y>,<ms>`      | 起動から `ms` 後に座標 (x,y) をクリック（複数指定可、UI 自動テスト用）                                            |
-| `--shot-at <ms>,<file.bmp>` | 指定時刻にスクリーンショットを保存（複数指定可）                                                                  |
+| `--shot-at <ms>,<file>`     | 指定時刻にスクリーンショットを保存（複数指定可。`.png` なら PNG）                                                 |
 
 デモの Modbus 接続を試すには、同梱のテストサーバーを別ターミナルで起動してください。
 
@@ -233,6 +235,44 @@ python tools\modbus_server.py --port 5020
 
 接続すると画面右上の PLC ランプが点灯し、Run スイッチ・Speed スライダー・Setpoint アークが
 サーバーのコイル / 保持レジスタと同期します。サーバーが無い場合も画面は動作します（オフライン表示）。
+
+### プロジェクトの検査（`--check`）
+
+```
+hml_runtime project.json --check
+hml_runtime project.json --check --render main,main.png --render main+temp_detail,popup.png --lang en --set temp=34.5
+```
+
+プロジェクトを動かさずに、間違いを 1 行ずつ（`ファイル: 場所: 内容`）出します。**ウィンドウを出さず、ドライバを起動せず
+（機器につながない）、プロジェクトのフォルダーに何も書きません。** 間違いがなければ `no problems` で終了コード 0、
+あれば件数を出して 1 です。デザイナーなしで（スクリプトや AI から）プロジェクトを確かめるためのものです。
+
+```
+screens/main.json: children[3] (button): on_click (goto): unknown screen "setting"
+screens/main.json: children[5] (label): unknown key "colour" (ignored by the runtime)
+project.json: drivers[0] (plc): map: unknown tag "pressur"
+3 problem(s)
+```
+
+| 見つけるもの | 例 |
+| --- | --- |
+| ファイル | 読めない、JSON の文法エラー、画面がない、画面名の重複、`start_screen` がない |
+| 部品 | 知らない `type`、知らないキー（つづりの間違い。ランタイムは黙って無視する）、知らないスタイルのキー |
+| `bind` | 知らない種類、ないタグ、知らないキー |
+| 動作 | 知らない動作・キー、ないタグ・画面・スクリプト・言語・アニメーション、ポップアップでない画面への `popup` |
+| 参照 | `texts` にない `"@ID"`、ない画像・フォントのファイル、トレンドのグループとタグ、レシピのブック、アラームの設定がない |
+| ドライバ | 表（`map`、`items`、`publish` …）と `status_tag` のないタグ |
+| `runtime:` の行 | 実際に読み込んで全画面を作ったときにランタイムが出した警告とエラー |
+
+- `--render <画面>,<ファイル>`: その画面を描いて保存します（複数指定可）。`<画面>+<ポップアップ>` と書くと、その画面の上に
+  ポップアップを開いた状態です（ポップアップの名前だけなら `start_screen` の上）。
+  `--lang <言語>` でその言語、`--set <タグ>=<値>` でタグの値を変えた状態を描けます（この 2 つはふつうの起動でも使えます）。
+- スクリプトは動きます（周期のスクリプトがタグを書き換えるプロジェクトでは、`--set` した値と違う値が出ることがあります）。
+  文字が □ になる（フォントにない字）ことは検出しません。
+- 描くときは、いちばん高いユーザーレベルでログインした状態です。アラーム・トレンド・レシピは装置と同じように動きますが、
+  記録は一時フォルダーに置いて終了時に消します。機器につながないので、値は `init` と `--set` のままです。
+- 部品やキーの一覧は、デザイナーの `schema.js` から生成した `src/check_schema.inc` です（`node tools/skill/gen_reference.js`。
+  ずれるとテストが落ちます）。訳の抜けや、収まらないかもしれない長い訳は、デザイナーの問題一覧で見ます。
 
 ### 負荷の確認
 
@@ -410,11 +450,11 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 3. AI にプロジェクトのフォルダーとデザイナーのフォルダーを教えて、作りたい画面を頼む。
 4. できたらデザイナーでプロジェクトを開き直し、問題一覧と見た目を確かめる。
 
-- AI は、プロジェクトの**コピー**（`drivers` を空にしたもの）をランタイムで描いて画像で確かめます。実物のプロジェクトで
-  ランタイムを動かして機器につながることはありません。
+- AI は `hml_runtime --check --render ...`（上記「プロジェクトの検査」）で、間違いの一覧と画面の画像を得て確かめます。
+  ウィンドウは出ず、機器にもつながらず、プロジェクトには何も書かれません。
 - AI が変えるのは画面と、必要なら `tags` と `texts` です。`drivers`、`users`、装置の設定には触れません。
-- ランタイムが警告するのは、知らない部品・知らないタグ・文法エラーまでです。つづりを間違えたプロパティや、行き先のない
-  画面遷移は、デザイナーの問題一覧で見つけます。
+- 見た目（重なり、はみ出し）と意味（出すタグ、単位）は機械では確かめられません。AI は画像を見て直し、最後に人が
+  デザイナーで確かめます。
 - 見本と一覧が実装とずれないよう、テストが確かめています（見本のプロジェクトは `hml_tests` が読み込んで全画面を描き、
   一覧は `node --test` が `schema.js` と突き合わせます）。
 
@@ -1564,6 +1604,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
 | `src/driver_opcua_client.cpp`  | OPC UA クライアント（open62541 + mbedTLS、サブスクリプションで読み、`rw` の行だけ書く）             |
 | `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバ |
+| `src/check.[ch]pp` / `src/check_schema.inc` | プロジェクトの検査（`hml_runtime --check`）。知っている部品・キーの一覧は `schema.js` から生成 |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |
 | `legacy_c/`                    | 書き直し前の C 版（参照用、ビルド対象外。不要なら削除可）                                           |

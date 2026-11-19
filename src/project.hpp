@@ -47,7 +47,9 @@ public:
     // databases and start recording; also registers their call actions (data_log.export ...).
     // With read_only nothing is recorded (export from a second process). Needs the tags, and
     // LVGL unless read_only. stop_logs() must run before the tags are cleared.
-    void start_logs(bool read_only = false);
+    // log_dir: where the databases go instead of the project folder (hml_runtime --check: a
+    // temporary folder, so that alarms and trends work and the project is not written to).
+    void start_logs(bool read_only = false, const std::string& log_dir = "");
     void stop_logs();
 
     // Driver configuration (overlay applied) by its overlay key, see driver_keys(). nullptr if unknown.
