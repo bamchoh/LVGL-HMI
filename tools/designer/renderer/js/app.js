@@ -13,6 +13,7 @@ const host = {
   projectStamp: (dir, files) => host.call('hml_projectStamp', dir || '', files || []),
   openFolder: dir => host.call('hml_openFolder', dir || ''),
   installSkill: () => host.call('hml_installSkill'),
+  addFont: dir => host.call('hml_addFont', dir || ''),
   writeFiles: (dir, files) => host.call('hml_writeFiles', dir, files),
   openDialog: (kind, dir) => host.call('hml_openDialog', kind, dir || ''),
   saveDialog: (name, dir) => host.call('hml_saveDialog', name, dir || ''),
@@ -435,11 +436,16 @@ const App = {
     const body = U.el('div', null, U.el('div', { class: 'row' }, U.el('label', null, I18N.label('title')), title),
       U.el('div', { class: 'row' }, U.el('label', null, I18N.t('width × height')), w, U.el('span', null, '×'), h), presets,
       U.el('div', { class: 'hint' }, 'You will be asked where to save the project: as one file (name.hmlproj, easy to carry around), or as a folder (choose "Project folder" in the dialog: project.json with screens/ and assets/ next to it).'));
+    // Japanese (and other non-Latin) text needs a font in the project: offered here, on by default
+    // when the designer itself is shown in Japanese
+    const jp = U.el('input', { type: 'checkbox', checked: I18N.lang === 'ja' && !!(this.info && this.info.fontsDir), disabled: !(this.info && this.info.fontsDir), dataset: { fk: 'new.font' } });
+    body.append(U.el('div', { class: 'row' }, U.el('label', null, 'Japanese font'), jp,
+      U.el('span', { class: 'dim' }, 'put Noto Sans JP into the project (about 1.2 MB). Without a font Japanese text is shown as empty boxes')));
     this.modal({ title: 'New project', body, buttons: [{ label: 'Cancel' }, { label: 'Create', primary: true, onclick: async () => {
       M.newProject(title.value.trim() || 'New HMI', Number(w.value) || 800, Number(h.value) || 480);
       if (chosen && chosen.touch && Number(w.value) === chosen.width && Number(h.value) === chosen.height) M.st.project.display.touch = U.clone(chosen.touch);
       this.refresh();
-      await this.save(true);
+      if ((await this.save(true)) && jp.checked && (await this.addBundledFont())) await this.save(false);
     } }] });
   },
 
@@ -503,6 +509,19 @@ const App = {
     this.toast('The project was changed outside the designer: loaded again', 4000);
   },
 
+  // Put the Japanese font that comes with the designer into the project (assets/fonts/) and
+  // make it the project's font. The project must have a folder: it is saved first.
+  async addBundledFont() {
+    const st = M.st;
+    if (!st.project) return false;
+    if (!st.path && !(await this.save(false))) return false;
+    const r = await host.addFont(st.dir);
+    if (!r || !r.ok) { this.toast('failed: ' + (r && r.error), 6000); return false; }
+    M.mutate(() => { st.project.font = Object.assign({}, st.project.font, { file: r.rel }); });
+    this.toast(I18N.f('font added: {0}', r.rel), 4000);
+    return true;
+  },
+
   // ---- "AI": what an AI assistant needs to make screens for this project ---------------
   aiPrompt() {
     const st = M.st, i = this.info || {};
@@ -513,6 +532,7 @@ const App = {
       'まず次の手引きを読み、それに従ってください: ' + skill,
       'プロジェクトのフォルダー: ' + (st.dir || '（プロジェクトを保存してから、もう一度このダイアログを開いてください）'),
       'ランタイム: ' + (i.runtime || '(hml_runtime が見つかりません)'),
+      '日本語フォント（プロジェクトにないときに入れるもの）: ' + (i.fontsDir || '(見つかりません)'),
       '',
       '作りたい画面: （ここに書く。例: 上に今のアラーム、下に温度のトレンド、右に今の値を大きく。メイン画面から行けるように）',
     ] : [
@@ -520,6 +540,7 @@ const App = {
       'First read this guide and follow it: ' + skill,
       'Project folder: ' + (st.dir || '(save the project first, then open this dialog again)'),
       'Runtime: ' + (i.runtime || '(hml_runtime not found)'),
+      'Japanese font (to put into the project when it has none): ' + (i.fontsDir || '(not found)'),
       '',
       'The screen I want: (write it here, e.g. current alarms on top, a temperature trend below, large values on the right; reachable from the main screen)',
     ];

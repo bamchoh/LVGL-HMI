@@ -781,6 +781,13 @@ const M = {
       if (/^screen_/.test(s.trigger || '') && s.screen && !screens.has(s.screen)) out.push({ text: 'script "' + (s.name || '') + '": unknown screen "' + s.screen + '"', view: 'scripts', index: i });
     });
     if (p.alarms && U.num(p.alarms.ack_level, 0) > 0 && !usersOn) out.push({ text: 'alarms: ack_level is set, but user management is off (Users tab)', view: 'logs' });
+    // Japanese, Chinese, Korean text and no font for it: the built-in font has Latin letters only
+    if (!(p.font && p.font.file)) {
+      const cjk = /[\u3000-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]/;
+      const where = cjk.test(JSON.stringify(p.texts || {})) ? 'the texts' : st.screens.some(s => cjk.test(JSON.stringify(s.data))) ? 'a screen'
+                  : cjk.test(JSON.stringify(p.alarms || {})) ? 'the alarms' : '';
+      if (where) out.push({ text: 'Japanese text is used (' + where + '), but the project has no font for it: it is shown as empty boxes. Project tab > Font', view: 'screen' });
+    }
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     for (const r of this.recipeProblems()) out.push(r);
     for (const t of this.textProblems()) out.push(t);

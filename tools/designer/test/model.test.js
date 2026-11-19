@@ -1046,6 +1046,7 @@ test('M texts: @id in the preview language, checks, renames, CSV both ways', () 
   const p = M.st.project;
   p.languages = ['ja', 'en'];
   p.texts = { title: { ja: 'ポンプ場', en: 'Pump station' }, only_ja: { ja: '日本語' }, long: { ja: '停止', en: 'Emergency stop pressed' } };
+  p.font = { file: 'assets/fonts/NotoSansJP-subset.otf' };
   assert.equal(M.resolveText('@title'), 'ポンプ場');
   M.st.previewLang = 'en';
   assert.equal(M.resolveText('@title'), 'Pump station');
@@ -1163,4 +1164,19 @@ test('M animate: what is wrong in an animation is a problem', () => {
     'animate: 50 ms flashes faster than 3 times a second (the runtime slows it down)', 'animate: "frames" is for image widgets',
     'animate: "frames" needs "files" with two pictures or more', 'animate: unknown tag "ghost" (when)', 'animate: unknown path "bouncy"',
     'animate: an animation is an object'].sort());
+});
+
+test('M font: Japanese text without a font in the project is a problem', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.screen().children = [{ type: 'label', text: 'Temperature' }];
+  deq(M.problems(), []);
+  M.screen().children = [{ type: 'label', text: '温度' }];
+  deq(M.problems().map(p => p.text), ['Japanese text is used (a screen), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
+  M.screen().children = [{ type: 'label', text: '@temp' }];
+  M.st.project.languages = ['ja'];
+  M.st.project.texts = { temp: { ja: '温度' } };
+  deq(M.problems().map(p => p.text), ['Japanese text is used (the texts), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
+  M.st.project.font = { file: 'assets/fonts/NotoSansJP-subset.otf' };
+  deq(M.problems(), []);
 });
