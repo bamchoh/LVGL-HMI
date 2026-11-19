@@ -40,6 +40,7 @@ add_executable(hml_tests
   test_alarm_view.cpp
   test_key_service.cpp
   test_users.cpp
+  test_popup.cpp
   test_project_archive.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )

@@ -606,6 +606,8 @@ const M = {
     this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
 
     if (p.start_screen && !screens.has(p.start_screen)) out.push({ text: 'start screen "' + p.start_screen + '" does not exist', view: 'project' });
+    const startPopup = st.screens.find(x => x.data.name === p.start_screen && x.data.popup);
+    if (startPopup) out.push({ text: 'the start screen "' + p.start_screen + '" is a popup', view: 'project' });
     const seenScr = new Set();
     st.screens.forEach((s, si) => {
       if (seenScr.has(s.data.name)) out.push({ text: 'screen "' + s.data.name + '" is defined twice', screen: si, path: [] });
@@ -617,6 +619,12 @@ const M = {
           for (const a of Array.isArray(v) ? v : [v]) {
             if (!a || typeof a !== 'object') continue;
             if (a.action === 'goto' && a.screen && !screens.has(a.screen) && !/^__/.test(a.screen)) out.push(Object.assign({ text: 'unknown screen "' + a.screen + '" (goto)' }, at));
+            if ((a.action === 'popup' || a.action === 'close') && a.screen) {
+              const target = st.screens.find(x => x.data.name === a.screen);
+              if (!target) out.push(Object.assign({ text: 'unknown screen "' + a.screen + '" (' + a.action + ')' }, at));
+              else if (!target.data.popup) out.push(Object.assign({ text: 'screen "' + a.screen + '" is not a popup (' + a.action + ')' }, at));
+            }
+            if (a.action === 'popup' && !a.screen) out.push(Object.assign({ text: 'popup without a screen' }, at));
             if (a.action === 'script' && a.name && !scripts.has(a.name)) out.push(Object.assign({ text: 'unknown script "' + a.name + '"' }, at));
             if ((a.action === 'login' || a.action === 'logout') && !usersOn) out.push(Object.assign({ text: 'action "' + a.action + '" needs user management (Users tab)' }, at));
           }

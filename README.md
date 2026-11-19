@@ -49,6 +49,7 @@ build.cmd Debug
 | `test_trend.cpp`                                     | トレンド（区間ごとの最小・最大・最後、短いピークが消えない、bool・文字列・点を含むタグ名、1 分ごとの要約の書き込み、要約と記録の組み合わせが記録だけの結果と一致、名前の SQL インジェクション、100 万件の速さ、部品の移動・拡大縮小・凡例・存在しないグループ） |
 | `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
 | `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
+| `test_popup.cpp`                                     | ポップアップ（開く・モーダル・重ねる・名前を指定して閉じる・戻るで閉じる、画面の切り替えで閉じる、goto でも開く、ポップアップでない画面は開かない、閉じている間は更新しない、レベル、1000 回の開閉で部品が増えない） |
 | `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
 | `test_project_archive.cpp`                           | プロジェクトファイル（構成ファイルの一覧、作成と展開、プロジェクト外へ出るパスの拒否、PC ごとのファイルの保護）     |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
@@ -951,6 +952,8 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
   { "action": "dec",    "tag": "speed", "by": 10 },
   { "action": "goto",   "screen": "settings", "anim": "slide_left" },
   { "action": "back" },
+  { "action": "popup",  "screen": "temp_detail", "set": { "detail_unit": 2 } },
+  { "action": "close" },
   { "action": "reload" },
   { "action": "exit" },
   { "action": "restart" },
@@ -980,6 +983,27 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 ```
 
 `anim`: `none` / `fade` / `slide_left` / `slide_right` / `slide_top` / `slide_bottom` / `over_left` / `over_right`
+
+#### ポップアップ（`popup` / `close`）
+
+画面ファイルに `"popup": true` を書くと、その画面は今の画面の上に重ねて開く**ポップアップ**になります
+（画面として切り替わることはありません。`goto` で指定しても開くだけです）。
+
+```json
+{ "name": "temp_detail", "popup": true, "w": 420, "h": 260, "dim": true, "level": 0,
+  "style": { "bg_color": "#1f2a38", "radius": 10 },
+  "children": [ ...,  { "type": "button", "text": "Close", "on_click": { "action": "close" } } ] }
+```
+
+- 大きさと位置は部品と同じ `w` `h` `x` `y` `align`（既定: 60 % × 60 %、中央）。`dim: false` で下の画面を暗くしない。
+- 開いている間、下の画面には触れません（モーダル）。ポップアップからさらにポップアップを開けます（上に重なる）。
+- 閉じるのは `close`（いちばん上のもの。`"screen"` で名前を指定もできる）、`back`（ポップアップの中ではそれを閉じる）、
+  画面の切り替え（`goto` / `back` / ログイン画面）です。
+- `popup` の `"set": { "タグ": 値 }` は、開く前にタグへ書き込みます。どの装置の詳細かを渡すのに使います
+  （ポップアップの中の部品はそのタグや、それをもとにスクリプトで用意したタグを表示する）。
+- `level` は画面と同じで、足りなければログイン画面が出て、ポップアップは開きません。
+- 一度作ったポップアップは閉じても残して使い回すので、何度開閉してもメモリは増えません。閉じている間は部品を更新せず、
+  開いたときに最新の値にします。
 
 ## スクリプト (Lua)
 

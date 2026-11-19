@@ -125,6 +125,7 @@
       "y": 72,
       "w": 240,
       "h": 150,
+      "on_click": { "action": "popup", "screen": "temp_detail" },
       "scrollable": false,
       "style": {
         "bg_color": "#1b2430",

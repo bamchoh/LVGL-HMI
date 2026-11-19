@@ -47,8 +47,13 @@ public:
     // comes up instead and continues to it after a login (false is returned).
     // replace: the screen being left is not added to the history ("back" skips it).
     bool show_screen(const std::string& name, const std::string& anim, bool replace = false);
-    bool back();
+    bool back();                                              // in a popup: closes it
     void clear_history();
+    // Popups: screens with "popup": true, shown over the current screen until closed (or until
+    // the screen changes). close_popup("") closes the top one. False if nothing happened.
+    bool open_popup(const std::string& name);
+    bool close_popup(const std::string& name = "");
+    std::vector<std::string> open_popups() const;             // bottom first
     int  screen_level(const std::string& name) const;        // the screen's "level" (0 = none / unknown screen)
     // Apply the "level" of the widgets (disable / hide) for the current user; users.cpp calls
     // it whenever the user changes.
