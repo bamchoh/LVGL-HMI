@@ -448,10 +448,93 @@ void apply_styles(lv_obj_t* obj, const json& w)
 // ================================================================ model
 
 enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line };
-enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options };
+enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options, Anim };
 enum class Cmp { None, Eq, Ne, Gt, Lt, Ge, Le };
 
 struct Screen;
+
+// ---- "animate": a property of a widget that moves by itself -------------------------------
+// { "prop": "opa", "from": 100, "to": 30, "time": 600, "playback": true, "when": { "tag": "alarm", "eq": 1 } }
+// It runs while its screen is shown and its "when" holds (always, without one); when it stops
+// the property goes back to what it was (rest).
+struct AnimSpec {
+    enum class Prop { Opa, X, Y, W, H, Rotation, Zoom, BgColor, TextColor, Frames };
+    lv_obj_t*   obj = nullptr;
+    Screen*     screen = nullptr;
+    bool        image = false;            // an image widget: rotation / zoom are its own (cheaper than a transform)
+    Prop        prop = Prop::Opa;
+    int32_t     from = 0, to = 0, rest = 0;
+    lv_color_t  c_from{}, c_to{}, c_rest{};
+    std::vector<std::string> files;       // Frames: the pictures in order ("A:..." paths)
+    std::string rest_file;
+    uint32_t    time = 1000, delay = 0;
+    uint32_t    repeat = 0;               // 0 = for ever
+    bool        playback = false;
+    lv_anim_path_cb_t path = lv_anim_path_linear;
+    bool        cond = true;              // what "when" says now
+    bool        running = false;
+
+    void apply(int32_t v) const
+    {
+        switch(prop) {
+            case Prop::Opa: lv_obj_set_style_opa(obj, static_cast<lv_opa_t>(v), LV_PART_MAIN); break;
+            case Prop::X: lv_obj_set_x(obj, v); break;
+            case Prop::Y: lv_obj_set_y(obj, v); break;
+            case Prop::W: lv_obj_set_width(obj, v); break;
+            case Prop::H: lv_obj_set_height(obj, v); break;
+            case Prop::Rotation:
+                if(image) lv_image_set_rotation(obj, v);
+                else lv_obj_set_style_transform_rotation(obj, v, LV_PART_MAIN);
+                break;
+            case Prop::Zoom:
+                if(image) lv_image_set_scale(obj, static_cast<uint32_t>(v));
+                else { lv_obj_set_style_transform_scale_x(obj, v, LV_PART_MAIN); lv_obj_set_style_transform_scale_y(obj, v, LV_PART_MAIN); }
+                break;
+            case Prop::BgColor: lv_obj_set_style_bg_color(obj, lv_color_mix(c_to, c_from, static_cast<uint8_t>(v)), LV_PART_MAIN); break;
+            case Prop::TextColor: lv_obj_set_style_text_color(obj, lv_color_mix(c_to, c_from, static_cast<uint8_t>(v)), LV_PART_MAIN); break;
+            case Prop::Frames: {
+                if(files.empty()) break;
+                const size_t i = std::min<size_t>(static_cast<size_t>(v < 0 ? 0 : v), files.size() - 1);
+                if(lv_image_get_src(obj) != files[i].c_str()) lv_image_set_src(obj, files[i].c_str());
+                break;
+            }
+        }
+    }
+    void to_rest() const
+    {
+        switch(prop) {
+            case Prop::BgColor: lv_obj_set_style_bg_color(obj, c_rest, LV_PART_MAIN); break;
+            case Prop::TextColor: lv_obj_set_style_text_color(obj, c_rest, LV_PART_MAIN); break;
+            case Prop::Frames: if(!rest_file.empty()) lv_image_set_src(obj, rest_file.c_str()); break;
+            default: apply(rest);
+        }
+    }
+    static void exec(void* var, int32_t v) { static_cast<AnimSpec*>(var)->apply(v); }
+    void stop()
+    {
+        if(!running) return;
+        running = false;
+        lv_anim_delete(this, &AnimSpec::exec);
+        to_rest();
+    }
+    void start()
+    {
+        if(running) return;
+        running = true;
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, this);
+        lv_anim_set_exec_cb(&a, &AnimSpec::exec);
+        lv_anim_set_values(&a, from, to);
+        lv_anim_set_duration(&a, time);
+        lv_anim_set_delay(&a, delay);
+        if(playback) lv_anim_set_reverse_duration(&a, time);
+        lv_anim_set_repeat_count(&a, repeat ? repeat : LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_path_cb(&a, path);
+        lv_anim_start(&a);
+    }
+    void update();   // start or stop, by "when" and by whether the screen is shown (defined after Screen)
+};
 
 struct Binding {
     lv_obj_t*   obj = nullptr;        // the widget (for buttons with text: the inner label for Text)
@@ -473,6 +556,7 @@ struct Binding {
     std::string default_src, base_dir;
     bool        has_src_map = false;
     std::optional<lv_color_t> default_color;
+    AnimSpec*   anim = nullptr;       // BindKind::Anim: the animation whose "when" this is
     lv_style_selector_t part = LV_PART_MAIN;
     bool        two_way = false;
     std::optional<double> vmin, vmax;     // numeric_display "min"/"max": clamp what the operator typed
@@ -603,6 +687,9 @@ void Binding::on_tag_changed(const Value& v, const void* source)
         case BindKind::TextColor:
             if(auto c = map_color(v)) lv_obj_set_style_text_color(obj, *c, part);
             break;
+        case BindKind::Anim:
+            if(anim) { anim->cond = condition(v); anim->update(); }
+            break;
         case BindKind::Options:
             // new options reset the selection: keep the selected index (the value binding only
             // speaks up when its own tag changes)
@@ -682,6 +769,7 @@ struct BindOpts {
     bool        commit_on_ready = false;
     std::string format;                   // default "format" when the bind spec has none
     std::optional<double> vmin, vmax;
+    AnimSpec*   anim = nullptr;           // add_binding(BindKind::Anim): whose "when" it is
 };
 
 enum class ActionKind { Goto, Back, Set, Toggle, Inc, Dec, Reload, Exit, Restart, Call, Script, Popup, Close };
@@ -741,6 +829,13 @@ struct Screen {
     bool        popup = false;
     lv_obj_t*   backdrop = nullptr;
 };
+
+void AnimSpec::update()
+{
+    const bool want = cond && (!screen || screen->shown);
+    if(want) start();
+    else stop();
+}
 
 // While no screen is shown at all (screens built for a test, or between unload and the first
 // show) every widget is kept up to date.
@@ -840,6 +935,9 @@ struct Ui::Impl {
     std::vector<std::unique_ptr<ActionList>> action_lists;
     std::vector<std::unique_ptr<AccessRule>> access_rules;
     std::vector<std::unique_ptr<ChartCtx>>   charts;
+    std::vector<std::unique_ptr<AnimSpec>>   anims;       // "animate" of the widgets
+    void update_anims() { for(auto& a : anims) a->update(); }
+    void parse_animate(lv_obj_t* obj, Widget wk, const json& w);
     std::vector<std::unique_ptr<std::vector<lv_point_precise_t>>> line_points;   // must outlive lv_line objects
     std::vector<std::unique_ptr<std::string>>  owned_strings;  // textarea accepted_chars: LVGL stores the pointer only
     lv_group_t*   group = nullptr;
@@ -897,6 +995,7 @@ struct Ui::Impl {
         scr.shown = true;
         s_some_screen_shown = true;
         bring_up_to_date(scr);
+        update_anims();                                               // (those of the screen that was left stop)
     }
     void apply_access(const AccessRule& r);
     static void on_widget_cancel(lv_event_t* e)   // data display: discard the edit, show the tag again
@@ -1078,6 +1177,116 @@ void Ui::Impl::parse_cmp(Binding& b, const json& spec)
     }
 }
 
+// "animate": one object or a list of them.
+//   prop      opa (0-100) | x | y | w | h (px) | rotation (degrees) | zoom (1 = as it is) | bg_color | text_color
+//             | frames ("files": pictures shown one after the other; image widgets)
+//   from, to  the two ends ("from" default: what the widget has now)
+//   time      ms for one way (default 1000);  delay ms;  playback: true = there and back
+//   repeat    how many times (default: for ever)
+//   path      linear (default) | ease_in | ease_out | ease_in_out | step (jumps at the end of "time")
+//   when      a tag ("alarm") or a condition ({ "tag": "state", "eq": 2 }): it runs only while that holds
+//   preset    "blink" | "pulse" | "spin": the keys above filled in (they can still be given)
+// Something that flashes faster than 3 times a second can trigger seizures: opa and colour
+// animations are slowed down to that.
+void Ui::Impl::parse_animate(lv_obj_t* obj, Widget wk, const json& w)
+{
+    const json* list = jget(w, "animate");
+    if(!list) return;
+    for(json j : list->is_array() ? *list : json::array({ *list })) {
+        if(j.is_string()) j = json{ { "preset", j } };
+        if(!j.is_object()) { HML_WARN("animate: an animation is an object { \"prop\": ... }"); continue; }
+        const std::string preset = jstr(j, "preset", "");
+        auto dflt = [&](const char* k, const json& v) { if(!j.contains(k)) j[k] = v; };
+        if(iequals(preset, "blink")) { dflt("prop", "opa"); dflt("to", 0); dflt("time", 500); dflt("playback", true); dflt("path", "step"); }
+        else if(iequals(preset, "pulse")) { dflt("prop", "opa"); dflt("to", 35); dflt("time", 700); dflt("playback", true); dflt("path", "ease_in_out"); }
+        else if(iequals(preset, "spin")) { dflt("prop", "rotation"); dflt("from", 0); dflt("to", 360); dflt("time", 2000); }
+        else if(!preset.empty()) { HML_WARN("animate: unknown preset '%s' (blink, pulse, spin)", preset.c_str()); continue; }
+
+        auto a = std::make_unique<AnimSpec>();
+        a->obj = obj;
+        a->screen = building;
+        a->image = wk == Widget::Image;
+        const std::string prop = jstr(j, "prop", "");
+        using P = AnimSpec::Prop;
+        static const std::pair<const char*, P> props[] = { { "opa", P::Opa }, { "x", P::X }, { "y", P::Y }, { "w", P::W }, { "h", P::H }, { "rotation", P::Rotation },
+            { "zoom", P::Zoom }, { "bg_color", P::BgColor }, { "text_color", P::TextColor }, { "frames", P::Frames } };
+        bool known = false;
+        for(const auto& [n, p] : props) if(iequals(prop, n)) { a->prop = p; known = true; }
+        if(!known) { HML_WARN("animate: unknown prop '%s' (opa, x, y, w, h, rotation, zoom, bg_color, text_color, frames)", prop.c_str()); continue; }
+
+        a->time = static_cast<uint32_t>(std::clamp(jnum(j, "time", 1000), 20.0, 3600000.0));
+        a->delay = static_cast<uint32_t>(std::clamp(jnum(j, "delay", 0), 0.0, 3600000.0));
+        a->playback = jbool(j, "playback", false);
+        a->repeat = static_cast<uint32_t>(std::clamp(jnum(j, "repeat", 0), 0.0, 65000.0));
+        const std::string path = jstr(j, "path", "linear");
+        a->path = iequals(path, "ease_in") ? lv_anim_path_ease_in : iequals(path, "ease_out") ? lv_anim_path_ease_out
+                : iequals(path, "ease_in_out") ? lv_anim_path_ease_in_out : iequals(path, "step") ? lv_anim_path_step : lv_anim_path_linear;
+        if(!iequals(path, "linear") && a->path == lv_anim_path_linear) HML_WARN("animate: unknown path '%s' (linear, ease_in, ease_out, ease_in_out, step)", path.c_str());
+
+        const bool has_from = j.contains("from");
+        if(!j.contains("to") && a->prop != P::Frames) { HML_WARN("animate: '%s' needs \"to\"", prop.c_str()); continue; }
+        switch(a->prop) {
+            case P::Opa:
+                a->rest = lv_obj_get_style_opa(obj, LV_PART_MAIN);
+                a->from = has_from ? pct_to_opa(static_cast<int32_t>(jnum(j, "from", 100))) : a->rest;
+                a->to = pct_to_opa(static_cast<int32_t>(jnum(j, "to", 0)));
+                break;
+            case P::X: case P::Y: case P::W: case P::H:
+                a->rest = a->prop == P::X ? lv_obj_get_style_x(obj, LV_PART_MAIN) : a->prop == P::Y ? lv_obj_get_style_y(obj, LV_PART_MAIN)
+                        : a->prop == P::W ? lv_obj_get_style_width(obj, LV_PART_MAIN) : lv_obj_get_style_height(obj, LV_PART_MAIN);
+                a->from = has_from ? static_cast<int32_t>(jnum(j, "from", 0)) : a->rest;
+                a->to = static_cast<int32_t>(jnum(j, "to", 0));
+                break;
+            case P::Rotation:
+                a->rest = a->image ? lv_image_get_rotation(obj) : 0;
+                a->from = has_from ? static_cast<int32_t>(jnum(j, "from", 0) * 10) : a->rest;
+                a->to = static_cast<int32_t>(jnum(j, "to", 0) * 10);
+                if(!a->image) { lv_obj_set_style_transform_pivot_x(obj, lv_pct(50), LV_PART_MAIN); lv_obj_set_style_transform_pivot_y(obj, lv_pct(50), LV_PART_MAIN); }
+                break;
+            case P::Zoom:
+                a->rest = a->image ? static_cast<int32_t>(lv_image_get_scale(obj)) : 256;
+                a->from = has_from ? static_cast<int32_t>(jnum(j, "from", 1) * 256) : a->rest;
+                a->to = static_cast<int32_t>(jnum(j, "to", 1) * 256);
+                if(!a->image) { lv_obj_set_style_transform_pivot_x(obj, lv_pct(50), LV_PART_MAIN); lv_obj_set_style_transform_pivot_y(obj, lv_pct(50), LV_PART_MAIN); }
+                break;
+            case P::BgColor: case P::TextColor:
+                a->c_rest = a->prop == P::BgColor ? lv_obj_get_style_bg_color(obj, LV_PART_MAIN) : lv_obj_get_style_text_color(obj, LV_PART_MAIN);
+                a->c_from = has_from ? parse_color(jstr(j, "from", ""), a->c_rest) : a->c_rest;
+                a->c_to = parse_color(jstr(j, "to", ""), a->c_rest);
+                a->from = 0; a->to = 255;
+                break;
+            case P::Frames: {
+                if(!a->image) { HML_WARN("animate: \"frames\" is for image widgets"); break; }
+                if(const json* fl = jget(j, "files"); fl && fl->is_array())
+                    for(const json& f : *fl) if(f.is_string()) { const std::string p = image_path(base_dir, f.get<std::string>()); if(!p.empty()) a->files.push_back(keep_path(p)); }
+                if(const void* src = lv_image_get_src(obj)) a->rest_file = static_cast<const char*>(src);
+                a->from = 0; a->to = static_cast<int32_t>(a->files.size());
+                a->playback = false;
+                a->path = lv_anim_path_linear;
+                break;
+            }
+        }
+        if(a->prop == P::Frames && a->files.size() < 2) { HML_WARN("animate: \"frames\" needs \"files\" with two pictures or more"); continue; }
+        // at most three flashes a second
+        if(a->prop == P::Opa || a->prop == P::BgColor || a->prop == P::TextColor) {
+            const uint32_t min_time = a->playback ? 167 : 334;
+            if(a->time < min_time) { HML_WARN("animate: %u ms flashes faster than 3 times a second; %u ms is used", static_cast<unsigned>(a->time), static_cast<unsigned>(min_time)); a->time = min_time; }
+        }
+
+        AnimSpec* raw = a.get();
+        anims.push_back(std::move(a));
+        if(const json* when = jget(j, "when")) {
+            raw->cond = false;
+            BindOpts saved = bind_opts;
+            bind_opts = BindOpts{};
+            bind_opts.anim = raw;
+            if(!add_binding(obj, wk, BindKind::Anim, *when, false)) HML_WARN("animate: it never runs (its \"when\" names no tag)");
+            bind_opts = saved;
+        }
+        raw->update();
+    }
+}
+
 Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const json& spec, bool two_way)
 {
     std::string tagname = spec.is_string() ? spec.get<std::string>() : jstr(spec, "tag", "");
@@ -1090,6 +1299,7 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     b->vmin = bind_opts.vmin;
     b->vmax = bind_opts.vmax;
     b->commit_on_ready = bind_opts.commit_on_ready;
+    b->anim = bind_opts.anim;
     if(spec.is_object()) {
         b->format = jstr(spec, "format", bind_opts.format);
         b->invert = jbool(spec, "invert", false);
@@ -1734,6 +1944,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     lv_obj_add_style(obj, &style_disabled, LV_STATE_DISABLED);
     apply_common(obj, w);
     parse_bindings(obj, text_obj, wk, w);
+    parse_animate(obj, wk, w);
     parse_actions(obj, w);
     parse_access(obj, w);
     build_children(obj, w);
@@ -1758,6 +1969,7 @@ bool Ui::Impl::open_popup(const std::string& name)
     const bool was = scr->shown;
     scr->shown = true;
     bring_up_to_date(*scr);
+    update_anims();
     if(!was) scripts().on_screen(name, true);
     return true;
 }
@@ -1776,6 +1988,7 @@ bool Ui::Impl::close_popup(const std::string& name)
     Screen& scr = *screens[static_cast<size_t>(idx)];
     lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_HIDDEN);
     scr.shown = false;
+    update_anims();
     scripts().on_screen(scr.name, false);
     return true;
 }
@@ -1943,6 +2156,8 @@ void Ui::unload_all()
     tags().unsubscribe_group(SubGroup::UI);
     for(auto& c : m.charts) if(c->timer) lv_timer_delete(c->timer);
     m.charts.clear();
+    for(auto& a : m.anims) lv_anim_delete(a.get(), nullptr);   // before their widgets go
+    m.anims.clear();
 
     // LVGL needs an active screen at all times: load a blank one, then delete ours.
     // The blank screen is deleted automatically when the next screen is loaded (see show_screen).

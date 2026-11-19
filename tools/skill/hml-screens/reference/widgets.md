@@ -144,6 +144,18 @@ An event can be put on any widget. A screen file itself takes `name`, `children`
 
 Screen change animations (`"anim"`): `none`, `fade`, `slide_left`, `slide_right`, `slide_top`, `slide_bottom`, `over_left`, `over_right`, `move_left`, `move_right`, `move_top`, `move_bottom`.
 
+## Animation (`"animate"` of any widget)
+
+One object or a list. Keys: `preset`, `prop`, `from`, `to`, `time`, `delay`, `playback`, `repeat`, `path`, `when`, `files`.
+
+| key | value |
+| --- | --- |
+| `prop` | `opa` / `x` / `y` / `w` / `h` / `rotation` / `zoom` / `bg_color` / `text_color` / `frames` |
+| `preset` | `blink` / `pulse` / `spin` (fills in `prop`, `to`, `time` ...) |
+| `path` | `linear` / `ease_in` / `ease_out` / `ease_in_out` / `step` |
+
+How to use it: binding-and-actions.md.
+
 ## Displays
 
 | display | width | height |

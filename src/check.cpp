@@ -156,11 +156,53 @@ struct Checker {
         }
     }
 
+    void check_animate(const std::string& where, const std::string& type, const json& list)
+    {
+        const json& A = schema()["animate"];
+        static const std::set<std::string> keys = str_set(A["keys"]), props = str_set(A["props"]), presets = str_set(A["presets"]), paths = str_set(A["paths"]);
+        for(json a : list.is_array() ? list : json::array({ list })) {
+            if(a.is_string()) a = json{ { "preset", a } };
+            if(!a.is_object()) { add(where, "animate: an animation is an object { \"prop\": ... }"); continue; }
+            for(auto k = a.begin(); k != a.end(); ++k) if(!keys.count(k.key())) add(where, "animate: unknown key \"" + k.key() + "\"");
+            const std::string preset = jstr(a, "preset", "");
+            if(a.contains("preset") && !presets.count(preset)) { add(where, "animate: unknown preset \"" + preset + "\""); continue; }
+            const std::string prop = jstr(a, "prop", preset == "spin" ? "rotation" : preset.empty() ? "" : "opa");
+            if(prop.empty()) { add(where, "animate: no \"prop\" (or \"preset\")"); continue; }
+            if(!props.count(prop)) { add(where, "animate: unknown prop \"" + prop + "\""); continue; }
+            if(preset.empty() && prop != "frames" && !a.contains("to")) add(where, "animate: \"" + prop + "\" needs \"to\"");
+            if(prop == "frames") {
+                if(type != "image") add(where, "animate: \"frames\" is for image widgets");
+                const json* fl = jget(a, "files");
+                if(!fl || !fl->is_array() || fl->size() < 2) add(where, "animate: \"frames\" needs \"files\" with two pictures or more");
+                else for(const json& f : *fl) if(f.is_string()) need_image(where, "animate.files", f.get<std::string>());
+            }
+            if(const json* p = jget(a, "path"); p && p->is_string() && !paths.count(p->get<std::string>())) add(where, "animate: unknown path \"" + p->get<std::string>() + "\"");
+            const bool flash = prop == "opa" || prop == "bg_color" || prop == "text_color";
+            const double time = jnum(a, "time", preset == "blink" ? 500 : preset == "pulse" ? 700 : 1000);
+            const bool playback = jbool(a, "playback", preset == "blink" || preset == "pulse");
+            if(flash && time < (playback ? 167 : 334))
+                add(where, "animate: " + std::to_string(static_cast<int>(time)) + " ms flashes faster than 3 times a second (the runtime slows it down)");
+            if(const json* wh = jget(a, "when")) {
+                if(wh->is_string()) need_tag(where, "animate.when", *wh);
+                else if(wh->is_object()) {
+                    need_tag(where, "animate.when", wh->value("tag", json("")));
+                    static const std::set<std::string> conds = str_set(schema()["conditions"]);
+                    for(auto k = wh->begin(); k != wh->end(); ++k) {
+                        if(k.key() == "tag" || k.key() == "invert") continue;
+                        if(!conds.count(k.key())) add(where, "animate.when: unknown key \"" + k.key() + "\"");
+                        else if(k.value().is_object()) need_tag(where, "animate.when." + k.key(), k.value().value("tag", json("")));
+                    }
+                }
+                else add(where, "animate.when is neither a tag name nor a condition");
+            }
+        }
+    }
+
     void check_widget(const json& w, const std::string& path, bool screen)
     {
         const json& S = schema();
         static const std::set<std::string> common = str_set(S["common"]), selectors = str_set(S["selectors"]), events = str_set(S["events"]);
-        static const std::set<std::string> any{ "type", "name", "children", "bind", "labels", "checked", "checkable" };
+        static const std::set<std::string> any{ "type", "name", "children", "bind", "labels", "checked", "checkable", "animate" };
         static const std::set<std::string> screen_keys{ "name", "children", "popup", "dim" };
         if(!w.is_object()) { add(path, "a widget is an object { \"type\": ... }"); return; }
         std::string type = screen ? "" : jstr(w, "type", "");
@@ -184,6 +226,7 @@ struct Checker {
         }
         if(screen) return;
 
+        if(const json* an = jget(w, "animate")) check_animate(where, type, *an);
         for(const char* k : { "text", "placeholder" }) if(const json* v = jget(w, k)) text_id(where, k, *v);
         if(const json* o = jget(w, "options"); o && o->is_array()) for(const json& v : *o) text_id(where, "options", v);
         if(const json* l = jget(w, "labels"); l && l->is_object()) for(auto it = l->begin(); it != l->end(); ++it) text_id(where, "labels." + it.key(), it.value());

@@ -455,6 +455,14 @@ Object.assign(I18N.TEXT_JA, {
   'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.':
     'Raspberry Pi: 表示器が対応していればバックライトを消します（/sys/class/backlight）。対応していなければ黒い画面にするだけです。タグ sys.screen.off は消灯中 1。1 を書くとすぐに消えます。',
 });
+// ---- animation
+Object.assign(I18N.KEYS_JA, { animate: 'アニメーション' });
+Object.assign(I18N.TEXT_JA, {
+  'Animation': 'アニメーション', 'add': '追加',
+  'what moves by itself: { "prop": "opa" | "x" | "y" | "w" | "h" | "rotation" | "zoom" | "bg_color" | "text_color" | "frames", "from", "to", "time" (ms), "playback", "repeat", "path", "when": tag or condition }, or { "preset": "blink" | "pulse" | "spin" }. It runs while its screen is shown and "when" holds. Not played on the canvas: use Preview / Run':
+    '自動で動かすもの: { "prop": "opa" | "x" | "y" | "w" | "h" | "rotation" | "zoom" | "bg_color" | "text_color" | "frames", "from", "to", "time"（ミリ秒）, "playback"（往復）, "repeat"（回数）, "path"（動き方）, "when": タグか条件 }、または { "preset": "blink"（点滅）| "pulse"（ゆっくり明滅）| "spin"（回転）}。その画面が表示されていて "when" が成り立つ間だけ動きます。キャンバスでは再生されません（Preview / Run で確かめます）',
+});
+I18N.PATTERNS_JA.push([/^animate: (.*)$/, 'アニメーション: $1']);
 // ---- images
 Object.assign(I18N.KEYS_JA, { fit: '大きさの合わせ方', bg_image: '背景画像', bg_image_opa: '背景画像の不透明度', bg_image_tiled: '背景画像を敷き詰める' });
 Object.assign(I18N.VALUES_JA, { contain: '全体が入るように', stretch: '引き伸ばす', tile: '敷き詰める' });

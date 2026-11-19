@@ -98,11 +98,64 @@
   当てはまるファイルがない値のときは何も表示しない。文字列のタグにファイル名を入れて `"bind": { "src": "タグ" }` でもよい。
 - 背景に敷く: `style` の `bg_image`（画面・`panel`・`button` など。中央に元の大きさ。`"bg_image_tiled": true` で敷き詰め、
   `bg_image_opa` で薄く）。`style_pressed` などに書けば、その状態のときだけ出る。上に載せる部品の文字が読めるか、画像で確かめる。
+- 絵を重ねる: 同じ親の中で、あとに書いた部品が上に描かれる。2 つの `image` に同じ `align`（`center` など）と同じずれを付けると
+  中心が重なる（ポンプの絵の上に羽根、など）。`rotation` と `zoom` は絵の中心を軸にする。`zoom` と `animate` の回転は一緒に使える。
+- 拡大すると縁がぎざぎざになる（`fit` も `zoom` も補間しない）。大きく見せたい絵は、表示する大きさのファイルを用意してもらう。
+  縮小はきれいに出る。
+- 大きさの調べ方（PowerShell）: `Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile("<ファイル>"); "$($i.Width)x$($i.Height)"; $i.Dispose()`。
+  白い絵に透明の背景のアイコンは、画像として開くと真っ白に見える。暗い `panel` の上に置いて `--render` で確かめる。
 - 押せる絵: `image` に `on_click`。小さい絵は、まわりに `panel` を置いて押せる範囲を 48px 以上にする。
 - 単色のアイコン（白い PNG）は `"style": { "image_recolor": "#4caf50" }` で色を付けられる（`bind` の色は `image` には使えない）。
 - 1 枚の画像は幅 × 高さが約 400 万ピクセルまで。画面より大きい画像は使わない（メモリは 幅 × 高さ × 4 バイト要る）。
 - `--check` が見るもの: ファイルがあるか、プロジェクトの中か、形式、JPEG / BMP に `fit` などを付けていないか。
   壊れたファイルや大きすぎる画像は `runtime:` の行に出る。
+
+## アニメーション
+
+どの部品にも `animate` を書ける（1 つ、または配列）。**その画面が表示されていて、`when` が成り立つ間だけ**動き、
+止まると部品は元の見た目に戻る。`when` を省くと、画面が出ている間ずっと動く。
+
+```json
+{ "type": "label", "text": "@alarm", "animate": { "preset": "blink", "when": "alarm_active" } },
+{ "type": "image", "src": "assets/fan.png", "animate": { "preset": "spin", "time": 1500, "when": "run" } },
+{ "type": "panel", "w": 24, "h": 24, "animate": { "prop": "x", "from": 100, "to": 400, "time": 2000, "path": "linear", "when": { "tag": "flow", "gt": 0 } } },
+{ "type": "panel", "style": { "bg_color": "#37474f" }, "animate": { "prop": "bg_color", "to": "#c62828", "time": 600, "playback": true, "when": { "tag": "state", "eq": 2 } } },
+{ "type": "image", "src": "assets/conv1.png", "animate": { "prop": "frames", "files": ["assets/conv1.png", "assets/conv2.png", "assets/conv3.png"], "time": 600, "when": "run" } }
+```
+
+| キー | 意味 |
+| --- | --- |
+| `preset` | `blink`（点いたり消えたり、1 秒周期）/ `pulse`（ゆっくり明滅）/ `spin`（1 回転 2 秒）。下のキーで上書きできる |
+| `prop` | 動かすもの: `opa`（不透明度 0〜100）/ `x` `y` `w` `h`（px）/ `rotation`（度）/ `zoom`（1 = 元の大きさ）/ `bg_color` `text_color` / `frames`（`image` の絵を順に替える） |
+| `from` / `to` | 両端の値。`from` を省くと今の値から |
+| `time` | 片道の時間（ミリ秒、既定 1000）。`frames` では一巡の時間 |
+| `playback` | true で往復する |
+| `repeat` | 回数（省くとずっと） |
+| `path` | 動き方: `linear`（既定）/ `ease_in` / `ease_out` / `ease_in_out` / `step`（時間の終わりで切り替わる） |
+| `delay` | 始まるまでの時間（ミリ秒） |
+| `when` | タグ名（真のとき）か条件（`{ "tag": "state", "eq": 2 }`。`bind` の条件と同じ書き方） |
+
+- `preset` の `time`: `blink` は既定 500（点いている 500 + 消えている 500 = 1 秒周期）、`pulse` は 700、`spin` は 2000（1 回転）。
+  遅くしたいときは `time` を大きくする。既定の `blink` は十分ゆっくりで、そのまま使ってよい。
+- `when` の条件は `bind` と同じで、別のタグとも比べられる: `"when": { "tag": "temp", "gt": { "tag": "temp_hi" } }`。
+- 止まると元の見た目に戻る（回転の途中でも元の角度に、点滅の途中でも見える状態に）。**「条件のときだけ出て、その間点滅する」**
+  ものは、`visible` と `animate` の両方に同じ条件を書く:
+  `{ "type": "image", "src": "assets/warning.png", "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } }, "animate": { "preset": "blink", "when": { "tag": "temp", "gt": { "tag": "temp_hi" } } } }`
+
+使いどころと決まり:
+- **動きは「いま気づいてほしいこと」だけに使う**（未確認のアラーム、運転中、流れている）。飾りに動かさない。
+  1 画面で同時に動くものは少なく（目安 3 つまで）。常に動くもの（`when` なし）は避ける。
+- 点滅（`opa` と色）は 1 秒に 3 回より速くできない（ランタイムが遅くする）。警告は `pulse` か、ゆっくりした `blink` にする。
+- 動いても読めること: 値や操作するボタンそのものは点滅させない。枠・帯・アイコンを動かす。
+- `rotation` と `zoom` は `image`（PNG）に使うのが軽い。ほかの部品に付けると描画が重くなるので、小さい部品だけにする。
+  JPEG / BMP の `image` は回転・拡大できない。
+- `x` `y` を動かす部品は `align` を付けず、`from` / `to` に座標を書く。flex で並べた中の部品は動かさない。
+- `frames` の絵は同じ大きさにする。
+- 確かめ方: `--render` に `--at <ミリ秒>` を付けると、その画面が出てからおよそその時間がたった絵になる。
+  時刻を変えて 2 枚描き、動いていること・`when` が成り立たないとき（`--set`）は止まっていることを見る。
+  `--at` は 1 回の実行で 1 つ（全部の `--render` に効く）なので、時刻ごとに実行する。
+  **点滅は「消えている」瞬間に当たると部品がないように見える**。1 秒周期の `blink` なら `--at 450` と `--at 950` のように
+  半周期ずらした 2 枚を描き、片方に出ていればよい。回転は `--at 200` と `--at 700` で角度が違えばよい。
 
 ## 動作
 
@@ -167,6 +220,7 @@
 - `"@ID"` が使えるのは、部品の `text` / `placeholder` / `options` の各項目、アラームの `message`、部品の `labels`。
 - `bind` の `format` の中では使えない。単位や記号だけにして、説明の文字は別の `label` に分ける。
 - 足す ID は既存のものと重ならない、意味のわかる英小文字と `_`。すべての言語の訳を入れる。
+- 操作の言葉（「運転」「停止」: ボタン）と状態の言葉（「運転中」「停止中」: 表示）は別の意味なので、別の ID にする。
 - 同じ意味の ID がもうあれば、それを使う。言い回しが少し違うだけなら既存の言葉に合わせる（既存の訳は変えない）。
 - `languages` がないプロジェクトでは、文字をそのまま書く。
 

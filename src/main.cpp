@@ -91,7 +91,7 @@ int usage(const char* argv0)
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.png|bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.png|bmp>]...\n"
                          "       [--stats <seconds>] [--ignore-active] [--lang <code>] [--set <tag>=<value>]...\n"
-                         "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--lang <code>] [--set <tag>=<value>]...\n"
+                         "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--at <ms>] [--lang <code>] [--set <tag>=<value>]...\n"
                          "           (no window, no drivers, nothing recorded: lists what is wrong; exit code 1 if anything is)\n"
                          "       %s --list-serial-ports\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
@@ -118,7 +118,7 @@ void check_log_sink(hml::LogLevel level, const std::string& msg)
 }
 
 int run_check(const std::string& project_path, const std::vector<Render>& renders, const std::string& lang,
-              const std::vector<std::pair<std::string, std::string>>& sets)
+              const std::vector<std::pair<std::string, std::string>>& sets, uint32_t render_at_ms)
 {
     std::vector<std::string> screen_names;
     std::vector<hml::CheckProblem> problems = hml::check_project(project_path, &screen_names);
@@ -193,7 +193,7 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
             hml::ui().show_screen(hml::project().info().start_screen, "none");
             if(!hml::ui().show_screen(r.screen, "none")) { notes.push_back("--render: unknown screen \"" + r.screen + "\""); continue; }
             if(!r.popup.empty() && !hml::ui().open_popup(r.popup)) { notes.push_back("--render: \"" + r.popup + "\" is not a popup"); continue; }
-            settle(40);
+            settle(std::max(1, static_cast<int>(render_at_ms / 5)));     // (animations: the picture after that time)
             lv_refr_now(disp);
             if(hml::save_screenshot(disp, r.path)) rendered++;
             else notes.push_back("--render: cannot write " + r.path);
@@ -263,6 +263,7 @@ int main(int argc, char** argv)
     bool check = false;
     std::vector<Render> renders;
     std::string check_lang;
+    uint32_t render_at_ms = 200;      // --at: how long a screen has been shown when --render takes its picture
     std::vector<std::pair<std::string, std::string>> check_sets;
 
     for(int i = 1; i < argc; i++) {
@@ -285,6 +286,7 @@ int main(int argc, char** argv)
             renders.push_back({ what.substr(0, plus), plus == std::string::npos ? "" : what.substr(plus + 1), s.substr(comma + 1) });
             check = true;
         }
+        else if(a == "--at") { const char* v = next(); if(!v) return usage(argv[0]); render_at_ms = static_cast<uint32_t>(std::clamp(std::atoi(v), 5, 60000)); }
         else if(a == "--lang") { const char* v = next(); if(!v) return usage(argv[0]); check_lang = v; }
         else if(a == "--set") {
             const char* v = next();
@@ -339,7 +341,7 @@ int main(int argc, char** argv)
         if(!screen.empty() || !screenshot.empty() || !s_clicks.empty() || !s_shots.empty())
             std::fprintf(stderr, "hml_runtime: --screen, --screenshot, --click and --shot-at do nothing with --check (use --render <screen>,<file>)\n");
         hml::drivers().register_builtins();
-        return run_check(project_path, renders, check_lang, check_sets);
+        return run_check(project_path, renders, check_lang, check_sets, render_at_ms);
     }
     // A deployed runtime runs the project named by active_project next to it, whatever the
     // service's command line says (active_project.hpp). Not for the exports: they are asked

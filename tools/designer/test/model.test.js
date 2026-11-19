@@ -1121,7 +1121,7 @@ test('skill: the widget reference is what schema.js says, and the example uses o
   const skill = path.join(__dirname, '..', '..', 'skill');
   execFileSync(process.execPath, [path.join(skill, 'gen_reference.js'), '--check']);       // throws when out of date
   const { SCHEMA } = load();
-  const known = new Set(['type', 'name', 'children', 'bind', 'text', 'series', 'popup', 'dim']
+  const known = new Set(['type', 'name', 'children', 'bind', 'text', 'series', 'popup', 'dim', 'animate']
     .concat(SCHEMA.common.map(f => f.k), SCHEMA.flags.map(f => f.k), SCHEMA.flex.map(f => f.k), SCHEMA.access.map(f => f.k), SCHEMA.styleSelectors, SCHEMA.events));
   const dir = path.join(skill, 'hml-screens', 'examples');
   const project = JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8'));
@@ -1146,4 +1146,21 @@ test('skill: the widget reference is what schema.js says, and the example uses o
     (w.children || []).forEach(c => visit(c, false));
   };
   screens.forEach(s => visit(s, true));
+});
+
+test('M animate: what is wrong in an animation is a problem', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'alarm', type: 'bool' }];
+  M.screen().children = [
+    { type: 'label', text: 'ok', animate: [{ preset: 'blink', when: 'alarm' }, 'spin', { prop: 'x', from: 0, to: 9, when: { tag: 'alarm', eq: 1 } }] },
+    { type: 'label', text: 'bad', animate: [{ prop: 'colour', to: 1 }, { preset: 'wobble' }, { prop: 'y' }, { prop: 'opa', to: 0, time: 50, speed: 2 },
+                                           { prop: 'frames', files: ['a.png'] }, { preset: 'pulse', when: 'ghost', path: 'bouncy' }, 5] },
+    { type: 'image', animate: { prop: 'frames', files: ['a.png', 'b.png'], time: 400 } },
+  ];
+  deq(M.problems().map(p => p.text).sort(), [
+    'animate: unknown prop "colour"', 'animate: unknown preset "wobble"', 'animate: "y" needs "to"', 'animate: unknown key "speed"',
+    'animate: 50 ms flashes faster than 3 times a second (the runtime slows it down)', 'animate: "frames" is for image widgets',
+    'animate: "frames" needs "files" with two pictures or more', 'animate: unknown tag "ghost" (when)', 'animate: unknown path "bouncy"',
+    'animate: an animation is an object'].sort());
 });

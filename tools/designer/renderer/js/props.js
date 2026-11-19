@@ -152,6 +152,7 @@ const Props = {
     el.append(this.section('Layout', !!w.flex, ...layout));
     el.append(this.section('Flags', false, ...this.fields(w, SCHEMA.flags, fk)));
     el.append(this.section('Access (users)', w.level !== undefined, ...this.fields(w, SCHEMA.access, fk)));
+    el.append(this.section('Animation', w.animate !== undefined, ...this.animateRows(w, fk)));
     el.append(this.styleSection(w, fk));
     el.append(this.bindSection(w, fk));
     el.append(this.eventSection(w, fk));
@@ -175,6 +176,19 @@ const Props = {
   },
 
   // ---- style -------------------------------------------------------------
+  // "animate": edited as JSON (one animation or a list); the buttons add a ready one
+  animateRows(w, fk) {
+    const add = tpl => M.mutate(() => {
+      const one = U.clone(SCHEMA.animate.templates[tpl]);
+      if ('when' in one) { const t = M.tagNames()[0]; if (t) one.when = t; else delete one.when; }
+      w.animate = w.animate === undefined ? one : (Array.isArray(w.animate) ? w.animate : [w.animate]).concat([one]);
+    });
+    const buttons = U.el('div', { class: 'row' }, U.el('label', null, 'add'),
+      ...Object.keys(SCHEMA.animate.templates).map(t => U.el('button', { class: 'mini', dataset: { fk: fk + '.animate.add.' + t }, onclick: () => add(t) }, t)));
+    return [this.row('animate', this.editor(w, 'animate', { t: 'json' }, fk),
+        'what moves by itself: { "prop": "opa" | "x" | "y" | "w" | "h" | "rotation" | "zoom" | "bg_color" | "text_color" | "frames", "from", "to", "time" (ms), "playback", "repeat", "path", "when": tag or condition }, or { "preset": "blink" | "pulse" | "spin" }. It runs while its screen is shown and "when" holds. Not played on the canvas: use Preview / Run'),
+      buttons];
+  },
   styleSection(w, fk) {
     const sel = U.el('select', { onchange: e => { this.styleSel = e.target.value; this.render(); } });
     for (const s of SCHEMA.styleSelectors) {
