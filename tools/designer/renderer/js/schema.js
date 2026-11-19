@@ -202,6 +202,29 @@ const SCHEMA = {
         { k: 'length', t: 'number', opt: true }, { k: 'scale', t: 'number' }, { k: 'offset', t: 'number' },
         { k: 'access', t: 'select', o: ['', 'rw', 'ro', 'wo'] }, { k: 'swap_words', t: 'bool', opt: true }] },
     },
+    mqtt: {
+      label: 'MQTT client',
+      fields: [{ k: 'host', t: 'text', hint: 'the broker' }, { k: 'port', t: 'number', hint: 'default 8883 (TLS), 1883 without TLS' },
+               { k: 'tls', t: 'bool', hint: 'encrypted (TLS 1.2 / 1.3). Without it user name, password and values can be read on the network' },
+               { k: 'verify', t: 'bool', hint: 'check the broker\'s certificate and host name. Without it anybody on the way can pretend to be the broker' },
+               { k: 'ca_file', t: 'text', hint: 'the CA certificate of the broker (PEM), relative to project.json. On Linux the system\'s CAs when empty' },
+               { k: 'cert_file', t: 'text', hint: 'client certificate (PEM), if the broker wants one' }, { k: 'key_file', t: 'text', hint: 'its private key (PEM)' },
+               { k: 'client_id', t: 'text', hint: 'unique per device' }, { k: 'topic_prefix', t: 'text', hint: 'put before every topic, e.g. plant/line1/pump1/' },
+               { k: 'status_topic', t: 'text', hint: '"online" (retained) while connected, "offline" as the last will' },
+               { k: 'status_tag', t: 'tag' },
+               { k: 'payload', t: 'select', o: ['', 'value', 'json'], empty: 'value', hint: 'value: 21.5 / json: {"v": 21.5, "ts": ms}' },
+               { k: 'qos', t: 'select', o: ['', '0', '1'], empty: '0', hint: 'default of the published tags' },
+               { k: 'retain', t: 'bool', hint: 'default of the published tags' },
+               { k: 'keepalive_s', t: 'number' }, { k: 'timeout_ms', t: 'number', hint: 'connect / handshake (default 5000)' },
+               { k: 'reconnect_ms', t: 'number', hint: 'first wait before connecting again; doubles up to 30 s (default 1000)' }],
+      tables: [
+        { key: 'publish', label: 'Publish (tag values to the broker)', columns: [
+          { k: 'tag', t: 'tag' }, { k: 'topic', t: 'text', placeholder: '(the tag name)' }, { k: 'mode', t: 'select', o: ['', 'change', 'interval'] },
+          { k: 'interval_ms', t: 'number' }, { k: 'qos', t: 'select', o: ['', '0', '1'] }, { k: 'retain', t: 'bool', opt: true }], stringItems: true },
+        { key: 'subscribe', label: 'Subscribe (commands: only these tags can be written)', columns: [
+          { k: 'tag', t: 'tag' }, { k: 'topic', t: 'text', placeholder: '(the tag name)' }], stringItems: true },
+      ],
+    },
     opcua_server: {
       label: 'OPC UA server',
       fields: [{ k: 'port', t: 'number' }, { k: 'namespace', t: 'text' }, { k: 'folder', t: 'text' }],
@@ -216,5 +239,7 @@ const SCHEMA = {
     modbus_ascii: { type: 'modbus_ascii', enabled: true, device: '/dev/ttyUSB0', baud: 9600, data_bits: 7, parity: 'even', unit_id: 1, poll_ms: 200, timeout_ms: 500, map: [] },
     opcua_server: { type: 'opcua_server', port: 4840, namespace: 'urn:hml:runtime', folder: 'HML' },
     slmp: { type: 'slmp', enabled: true, host: '192.168.3.39', port: 5007, frame: '3e', poll_ms: 200, timeout_ms: 1000, map: [] },
+    mqtt: { type: 'mqtt', enabled: true, host: 'broker.example.com', port: 8883, tls: true, ca_file: 'certs/ca.pem', client_id: 'hml-1', topic_prefix: 'hml/',
+            status_topic: 'status', publish: [], subscribe: [] },
   },
 };

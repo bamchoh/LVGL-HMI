@@ -22,6 +22,7 @@ add_executable(hml_tests
   test_driver_sim.cpp
   test_driver_modbus.cpp
   test_driver_slmp.cpp
+  test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp
   test_driver_opcua.cpp
   test_screenshot.cpp
@@ -48,7 +49,7 @@ add_executable(hml_tests
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})
 target_compile_definitions(hml_tests PRIVATE HML_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(hml_tests PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz)
+target_link_libraries(hml_tests PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz hml_mbedtls)
 if(HML_OPCUA)
   target_link_libraries(hml_tests PRIVATE open62541)
   target_compile_definitions(hml_tests PRIVATE HML_WITH_OPCUA=1)

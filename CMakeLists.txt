@@ -102,6 +102,15 @@ FetchContent_Declare(miniz
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+# ---------------------------------------------------------------- mbedTLS (TLS for MQTT, Apache-2.0 / GPL-2.0+)
+# The 3.6 LTS release archive has its generated sources: the library is compiled directly
+# (SOURCE_SUBDIR points nowhere so that its own CMake project is not added).
+FetchContent_Declare(mbedtls
+  URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.4/mbedtls-3.6.4.tar.bz2
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  SOURCE_SUBDIR hml-no-cmake
+)
+
 # ---------------------------------------------------------------- open62541 (OPC UA, MPL-2.0)
 # Built from the release source tarball with the reduced namespace zero (no git submodules
 # needed). Needs Python 3 on the build host for the nodeset compiler.
@@ -144,6 +153,20 @@ if(MSVC)
   target_compile_options(hml_lua PRIVATE /W0)
 else()
   target_compile_options(hml_lua PRIVATE -w)
+endif()
+
+FetchContent_MakeAvailable(mbedtls)
+file(GLOB _hml_mbedtls_sources ${mbedtls_SOURCE_DIR}/library/*.c)
+add_library(hml_mbedtls STATIC ${_hml_mbedtls_sources})
+target_include_directories(hml_mbedtls PUBLIC ${mbedtls_SOURCE_DIR}/include PRIVATE ${mbedtls_SOURCE_DIR}/library)
+if(MSVC)
+  target_compile_options(hml_mbedtls PRIVATE /W0)
+  target_compile_definitions(hml_mbedtls PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+  target_compile_options(hml_mbedtls PRIVATE -w)
+endif()
+if(WIN32)
+  target_link_libraries(hml_mbedtls PUBLIC bcrypt ws2_32)     # entropy (BCryptGenRandom), sockets
 endif()
 
 FetchContent_MakeAvailable(miniz)
@@ -222,7 +245,7 @@ endif()
 file(GLOB HML_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(hml_runtime ${HML_SOURCES})
 target_include_directories(hml_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz)
+target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz hml_mbedtls)
 if(HML_OPCUA)
   target_link_libraries(hml_runtime PRIVATE open62541)
   target_compile_definitions(hml_runtime PRIVATE HML_WITH_OPCUA=1)

@@ -277,7 +277,7 @@ const M = {
       const loc = { view: 'drivers', index: i };
       for (const [k, v] of Object.entries(d || {})) {
         if (!Array.isArray(v)) continue;
-        if (k === 'tags') list(v, loc, 'tags');
+        if (k === 'tags' || k === 'publish' || k === 'subscribe') list(v, loc, k);
         for (const row of v) if (row && typeof row === 'object') prop(row, 'tag', loc, k);
       }
       prop(d, 'status_tag', loc);
@@ -747,6 +747,19 @@ const M = {
     });
     (p.drivers || []).forEach((d, i) => {
       if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
+      if (d.type === 'mqtt') {
+        const n = d.name || d.type, at = { view: 'drivers', index: i };
+        if (!d.host) out.push(Object.assign({ text: n + ': no host is set' }, at));
+        if (d.tls === false) out.push(Object.assign({ text: n + ': no TLS: user name, password and values can be read on the network' }, at));
+        else if (d.verify === false) out.push(Object.assign({ text: n + ': the broker\'s certificate is not checked (verify off)' }, at));
+        if (d.password) out.push(Object.assign({ text: n + ': the password is in project.json; better enter it on the device (System > Driver)' }, at));
+        for (const key of ['publish', 'subscribe']) {
+          for (const row of Array.isArray(d[key]) ? d[key] : []) {
+            const t = (typeof row === 'string' ? '' : (row && row.topic) || '');
+            if (/[+#]/.test(t)) out.push(Object.assign({ text: n + ': "' + t + '": wildcards (+ #) are not allowed' }, at));
+          }
+        }
+      }
       if (d.type === 'slmp') {
         if (!d.host) out.push({ text: (d.name || d.type) + ': no host is set', view: 'drivers', index: i });
         for (const row of Array.isArray(d.map) ? d.map : []) {

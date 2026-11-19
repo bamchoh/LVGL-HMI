@@ -416,3 +416,37 @@ TEST_CASE("driver page: the serial port is picked from a list, the current name 
     }
     drivers().stop_all();
 }
+
+TEST_CASE("driver page: the MQTT user name and password are entered on the device, the password hidden")
+{
+    Runtime rt;
+    TempProject tp;
+    Project p;
+    REQUIRE(p.load(tp.write("project.json", R"json({
+        "tags": [ { "name": "x" } ], "key_management": { "enabled": false },
+        "drivers": [ { "type": "mqtt", "host": "127.0.0.1", "port": 1, "tls": false, "enabled": false } ]
+    })json")));
+    SystemSettings& sys = system_settings();
+    SettingsPage* page = sys.page("driver_mqtt");
+    REQUIRE(page);
+    bool user = false, pass_hidden = false;
+    for(const SettingField& f : page->fields()) {
+        if(f.key == "username") user = !f.password;
+        if(f.key == "password") pass_hidden = f.password;
+    }
+    CHECK(user);
+    CHECK(pass_hidden);                                          // not in project.json, still offered
+    // nothing entered: nothing stored
+    CHECK(sys.apply("driver_mqtt") == "");
+    CHECK_FALSE(std::filesystem::exists(tp.dir / "project.local.json"));
+    tags().find("sys.driver_mqtt.username")->set_string("op", nullptr);
+    tags().find("sys.driver_mqtt.password")->set_string("pw-123", nullptr);
+    CHECK(sys.apply("driver_mqtt") == "");
+    std::ifstream f(tp.dir / "project.local.json");
+    json overlay = json::parse(f);
+    f.close();
+    CHECK(overlay["drivers"]["mqtt"]["username"] == "op");
+    CHECK(overlay["drivers"]["mqtt"]["password"] == "pw-123");
+    CHECK(jstr(*p.driver_config("mqtt"), "password", "") == "pw-123");
+    drivers().stop_all();
+}
