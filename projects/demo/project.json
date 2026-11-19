@@ -248,6 +248,7 @@
   ],
   "screens": [
     "screens/main.json",
-    "screens/settings.json"
+    "screens/settings.json",
+    "screens/alarms.json"
   ]
 }

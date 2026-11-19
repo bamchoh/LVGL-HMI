@@ -110,6 +110,8 @@ const Canvas = {
       case 'numeric_display': return [120, null];
       case 'text_display': case 'password_display': return [160, null];
       case 'keyboard': return ['100%', '50%'];
+      case 'alarm_list': return ['100%', 240];
+      case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
   },
@@ -385,6 +387,50 @@ const Canvas = {
     }
     el.append(U.el('div', { class: 'lv-kbrow' }, U.el('div', { class: 'lv-key' }, '×'), U.el('div', { class: 'lv-key lv-key-wide' }, 'space'), U.el('div', { class: 'lv-key' }, '✓')));
   },
+  // ---- alarms: drawn with the project's own alarm definitions as samples
+  ALARM_COLORS: { critical: '#f44336', error: '#f44336', alarm: '#f44336', warning: '#ffa000', info: '#2196f3' },
+  alarmColor(sev) { return this.ALARM_COLORS[String(sev || '').toLowerCase()] || '#9e9e9e'; },
+  alarmSamples() {
+    const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
+    return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  w_alarm_list(el, w) {
+    const history = w.mode === 'history', lab = w.labels || {};
+    const cols = Array.isArray(w.columns) && w.columns.length ? w.columns : ['time', 'message', 'state'];
+    const h = Math.max(16, U.num(w.row_height, 40));
+    const body = U.el('div', { class: 'lv-al-body' });
+    const items = this.alarmSamples().filter(a => !w.severity || String(a.severity || 'warning').toLowerCase() === String(w.severity).toLowerCase());
+    // (at least three rows, so that the three states - not acknowledged, acknowledged, cleared - are all shown)
+    const rows = items.length ? Math.min(Math.max(items.length * (history ? 2 : 1), 3), Math.max(1, U.num(w.rows, history ? 20 : 50)), 6) : 0;
+    if (!items.length) body.append(U.el('div', { class: 'lv-al-empty' }, lab.empty || 'No alarms'));
+    for (let i = 0; i < rows; i++) {
+      const a = items[i % items.length], sev = a.severity || 'warning', c = this.alarmColor(sev);
+      // current: the first is not acknowledged, the second acknowledged, the third cleared
+      const kind = history ? 'hist' : ['unacked', 'active', 'cleared'][i % 3];
+      const row = U.el('div', { class: 'lv-al-row lv-al-' + kind, style: { height: h + 'px', borderLeftColor: c } });
+      if (kind === 'unacked') row.style.background = c;
+      else if (kind === 'active') row.style.background = c + '66';
+      const hh = String(10 + (i % 10)).padStart(2, '0');
+      const time = history ? '11-19 ' + hh + ':0' + (i % 6) + ':12' : hh + ':0' + (i % 6) + ':12';
+      for (const col of cols) {
+        if (col === 'time') row.append(U.el('span', null, time));
+        else if (col === 'severity') row.append(U.el('span', null, '⚠ ' + sev));
+        else if (col === 'message') row.append(U.el('span', { class: 'lv-grow' }, a.message || a.name));
+        else if (col === 'state') row.append(U.el('span', null, history ? (i % 2 ? (lab.cleared_event || 'cleared') : (lab.raised || 'raised'))
+          : kind === 'unacked' ? '🔔 ' + (lab.unacked || 'UNACK') : kind === 'cleared' ? '🔔 ' + (lab.cleared || 'CLEARED') : '✓ ' + (lab.active || 'ACTIVE')));
+      }
+      body.append(row);
+    }
+    el.append(body);
+    if (history) el.append(U.el('div', { class: 'lv-al-foot' }, U.el('span', { class: 'lv-al-btn' }, '◀'), U.el('span', null, '1 / 3'),
+      U.el('span', { class: 'lv-al-btn' }, '▶'), w.severity ? null : U.el('span', { class: 'lv-al-dd' }, (lab.all || 'All') + ' ▾')));
+  },
+  w_alarm_banner(el, w) {
+    const a = this.alarmSamples()[0], c = this.alarmColor(a.severity || 'warning');
+    el.style.background = c;
+    el.append(U.el('span', { class: 'lv-grow' }, '⚠ 10:00:12  ' + (a.message || a.name) + (this.alarmSamples().length > 1 ? '  (+' + (this.alarmSamples().length - 1) + ')' : '')));
+  },
+
   w_line(el, w, st, th) {
     const pts = Array.isArray(w.points) ? w.points.filter(p => Array.isArray(p) && p.length >= 2) : [];
     const maxX = Math.max(1, ...pts.map(p => +p[0])), maxY = Math.max(1, ...pts.map(p => +p[1]));

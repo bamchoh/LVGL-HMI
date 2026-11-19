@@ -70,6 +70,12 @@ const SCHEMA = {
     spinner:  { label: 'Spinner', def: { w: 60, h: 60 }, props: [{ k: 'time', t: 'number' }, { k: 'angle', t: 'number' }] },
     keyboard: { label: 'Keyboard', def: { align: 'bottom_mid', w: '100%', h: '45%' }, props: [] },
     line:     { label: 'Line', def: { points: [[0, 0], [120, 60]] }, props: [{ k: 'points', t: 'points' }] },
+    alarm_list: { label: 'Alarm list', def: { w: '100%', h: 240, ack_on_tap: true },
+                props: [{ k: 'mode', t: 'select', o: ['', 'current', 'history'], empty: 'current' }, { k: 'rows', t: 'number' },
+                        { k: 'row_height', t: 'number' }, { k: 'columns', t: 'csv' }, { k: 'ack_on_tap', t: 'bool' },
+                        { k: 'severity', t: 'text' }, { k: 'days', t: 'number' }] },
+    alarm_banner: { label: 'Alarm banner', def: { w: '100%', h: 36 },
+                props: [{ k: 'blink', t: 'bool' }, { k: 'ack_on_tap', t: 'bool' }] },
   },
 
   // keys of the widget object that are not "props" (handled by dedicated editors)

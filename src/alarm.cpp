@@ -1,5 +1,7 @@
 #include "alarm.hpp"
+#include <algorithm>
 #include <cstdlib>
+#include <tuple>
 #include "tag.hpp"
 #include "util.hpp"
 
@@ -16,7 +18,16 @@ struct Alarm {
     double      value_num = 0;
     std::string value_str;
     Tag*        value_tag = nullptr;
+    bool        need_ack = true;
+
+    // state
     bool        active = false;
+    bool        acked = true;
+    int64_t     raised_ms = 0, cleared_ms = 0, acked_ms = 0;
+    uint64_t    seq = 0;                    // order of the raises (several can share a millisecond)
+    std::string acked_by, value;
+
+    bool current() const { return active || !acked; }
 
     bool evaluate() const
     {
@@ -43,6 +54,15 @@ struct Alarm {
             default: return false;
         }
     }
+
+    AlarmStatus status() const
+    {
+        AlarmStatus s;
+        s.name = name; s.message = message; s.severity = severity; s.value = value; s.acked_by = acked_by;
+        s.active = active; s.acked = acked; s.need_ack = need_ack;
+        s.raised_ms = raised_ms; s.cleared_ms = cleared_ms; s.acked_ms = acked_ms; s.seq = seq;
+        return s;
+    }
 };
 
 bool parse_cond(const std::string& s, Cond& out)
@@ -55,19 +75,99 @@ bool parse_cond(const std::string& s, Cond& out)
     return false;
 }
 
+void set_sys_tag(const std::string& name, TagType type, const Value& v)
+{
+    Tag* t = tags().find(name);
+    if(!t) tags().create(name, type, &v, false, 0, 0);
+    else t->set(v, nullptr);
+}
+
+AlarmEvent to_event(const LogRow& r)
+{
+    // [id, ts, name, event, severity, message, value, user]
+    return { r[1].i, r[2].s, r[3].s, r[4].s, r[5].s, r.size() > 6 ? r[6].str() : "", r.size() > 7 ? r[7].str() : "" };
+}
+
 } // namespace
 
 struct Alarms::Impl {
     LogDb db{ "alarm log", "alarm", { { "name", "TEXT NOT NULL" }, { "event", "TEXT NOT NULL" }, { "severity", "TEXT NOT NULL" },
-                                      { "message", "TEXT NOT NULL" }, { "value", "TEXT" } }, "name, ts" };
+                                      { "message", "TEXT NOT NULL" }, { "value", "TEXT" }, { "user", "TEXT" } }, "name, ts" };
     std::vector<std::unique_ptr<Alarm>> items;
+    uint64_t gen = 1;
+    uint64_t seq = 0;
+    int      ack_level = 0;
+
+    void record(Alarm& a, int64_t ts, const char* event, const std::string& user = "")
+    {
+        db.add(ts, { a.name, event, a.severity, a.message, a.value, user });
+    }
+
+    void changed()
+    {
+        gen++;
+        size_t active = 0, unacked = 0;
+        const Alarm* latest = nullptr;           // newest unacknowledged, else newest active
+        for(const auto& a : items) {
+            if(a->active) active++;
+            if(!a->acked) unacked++;
+            if(!a->current()) continue;
+            auto rank = [](const Alarm* x) { return std::make_tuple(!x->acked ? 1 : 0, x->raised_ms, x->seq); };
+            if(!latest || rank(a.get()) > rank(latest)) latest = a.get();
+        }
+        set_sys_tag("sys.alarm.active", TagType::Int, Value::number(static_cast<double>(active), TagType::Int));
+        set_sys_tag("sys.alarm.unacked", TagType::Int, Value::number(static_cast<double>(unacked), TagType::Int));
+        set_sys_tag("sys.alarm.latest", TagType::String, Value::string(latest ? latest->message : ""));
+        set_sys_tag("sys.alarm.latest_severity", TagType::String, Value::string(latest ? latest->severity : ""));
+    }
 
     void update(Alarm& a)
     {
         bool now = a.evaluate();
         if(now == a.active) return;
+        const int64_t ts = LogDb::now_ms();
         a.active = now;
-        db.add({ a.name, now ? "raised" : "cleared", a.severity, a.message, a.tag->get().format() });
+        a.value = a.tag->get().format();
+        if(now) {
+            a.raised_ms = ts;
+            a.seq = ++seq;
+            a.acked = !a.need_ack;              // a new occurrence has to be acknowledged again
+            a.acked_ms = 0;
+            a.acked_by.clear();
+        }
+        else a.cleared_ms = ts;
+        record(a, ts, now ? "raised" : "cleared");
+        changed();
+    }
+
+    // The state at the end of the last run, from its newest events. After the newest "raised"
+    // there can only be one "cleared" and one "acked", so a few rows are enough.
+    void restore(Alarm& a)
+    {
+        a.active = false; a.acked = true;
+        std::vector<LogRow> rows = db.query("name = ?1", { a.name }, 4, true);
+        bool cleared = false, acked = false;
+        for(const LogRow& r : rows) {
+            AlarmEvent e = to_event(r);
+            if(e.event == "cleared") { if(!cleared) { cleared = true; a.cleared_ms = e.ts_ms; } }
+            else if(e.event == "acked") { if(!acked) { acked = true; a.acked_ms = e.ts_ms; a.acked_by = e.user; } }
+            else if(e.event == "raised") {
+                a.active = !cleared;
+                a.acked = acked || !a.need_ack;
+                a.raised_ms = e.ts_ms;
+                a.value = e.value;
+                return;
+            }
+        }
+        a.cleared_ms = a.acked_ms = 0; a.acked_by.clear();      // no raise found: nothing pending
+    }
+
+    // load(): bring the restored state up to date with the tags without recording what is unchanged
+    void start(Alarm& a)
+    {
+        const bool now = a.evaluate();
+        if(now == a.active) return;
+        update(a);
     }
 };
 
@@ -80,6 +180,8 @@ void Alarms::clear()
     if(!m.items.empty()) tags().unsubscribe_group(SubGroup::Alarm);
     m.items.clear();
     m.db.close();
+    m.ack_level = 0;
+    m.gen++;
 }
 
 int Alarms::load(const json* section, const std::string& base_dir, bool read_only)
@@ -87,10 +189,12 @@ int Alarms::load(const json* section, const std::string& base_dir, bool read_onl
     Impl& m = *impl_;
     clear();
     LogDbConfig cfg = parse_log_config(section, base_dir, "logs/alarm.db", 100000);
+    if(read_only) return section && section->is_object() && m.db.open(cfg, true) ? 1 : 0;
+    m.changed();                                // the sys.alarm.* tags exist even without alarms
     if(!section || !section->is_object()) return 0;
-    if(read_only) return m.db.open(cfg, true) ? 1 : 0;
     if(!cfg.enabled) return 0;
     if(!m.db.open(cfg)) return 0;
+    m.ack_level = std::max(0, static_cast<int>(jnum(*section, "ack_level", 0)));
 
     const json* list = jget(*section, "items");
     if(list && list->is_array()) {
@@ -117,6 +221,7 @@ int Alarms::load(const json* section, const std::string& base_dir, bool read_onl
             }
             a->message = jstr(aj, "message", a->name);
             a->severity = jstr(aj, "severity", "warning");
+            a->need_ack = jbool(aj, "ack", true);
 
             Alarm* raw = a.get();
             Impl* mp = &m;
@@ -125,7 +230,9 @@ int Alarms::load(const json* section, const std::string& base_dir, bool read_onl
             m.items.push_back(std::move(a));
         }
     }
-    for(auto& a : m.items) m.update(*a);        // alarms that are active from the start
+    for(auto& a : m.items) m.restore(*a);
+    for(auto& a : m.items) m.start(*a);
+    m.changed();
     HML_INFO("alarms: %d defined, recording to '%s'", static_cast<int>(m.items.size()), cfg.path.c_str());
     return static_cast<int>(m.items.size());
 }
@@ -133,6 +240,8 @@ int Alarms::load(const json* section, const std::string& base_dir, bool read_onl
 bool Alarms::enabled() const { return impl_->db.is_open(); }
 size_t Alarms::count() const { return impl_->items.size(); }
 LogDb& Alarms::db() { return impl_->db; }
+uint64_t Alarms::generation() const { return impl_->gen; }
+int Alarms::ack_level() const { return impl_->ack_level; }
 
 bool Alarms::active(const std::string& name) const
 {
@@ -147,28 +256,116 @@ std::vector<std::string> Alarms::active_names() const
     return out;
 }
 
+std::vector<AlarmStatus> Alarms::current() const
+{
+    std::vector<AlarmStatus> out;
+    for(const auto& a : impl_->items) if(a->current()) out.push_back(a->status());
+    std::stable_sort(out.begin(), out.end(), [](const AlarmStatus& x, const AlarmStatus& y) {
+        return x.raised_ms != y.raised_ms ? x.raised_ms > y.raised_ms : x.seq > y.seq;
+    });
+    return out;
+}
+
+std::optional<AlarmStatus> Alarms::status(const std::string& name) const
+{
+    for(const auto& a : impl_->items) if(a->name == name) return a->status();
+    return std::nullopt;
+}
+
+size_t Alarms::active_count() const { size_t n = 0; for(const auto& a : impl_->items) n += a->active ? 1 : 0; return n; }
+size_t Alarms::unacked_count() const { size_t n = 0; for(const auto& a : impl_->items) n += a->acked ? 0 : 1; return n; }
+
+std::vector<std::string> Alarms::severities() const
+{
+    std::vector<std::string> out;
+    for(const auto& a : impl_->items) if(std::find(out.begin(), out.end(), a->severity) == out.end()) out.push_back(a->severity);
+    return out;
+}
+
+bool Alarms::ack(const std::string& name, const std::string& user)
+{
+    Impl& m = *impl_;
+    for(auto& a : m.items) {
+        if(a->name != name) continue;
+        if(a->acked) return false;
+        a->acked = true;
+        a->acked_ms = LogDb::now_ms();
+        a->acked_by = user;
+        m.record(*a, a->acked_ms, "acked", user);
+        m.changed();
+        return true;
+    }
+    return false;
+}
+
+int Alarms::ack_all(const std::string& user)
+{
+    std::vector<std::string> names;
+    for(const auto& a : impl_->items) if(!a->acked) names.push_back(a->name);
+    int n = 0;
+    for(const std::string& name : names) n += ack(name, user) ? 1 : 0;
+    return n;
+}
+
 std::vector<AlarmEvent> Alarms::query(int limit, bool newest_first)
 {
     std::vector<AlarmEvent> out;
-    for(const LogRow& r : impl_->db.query("", {}, limit, newest_first)) {
-        out.push_back({ r[1].i, r[2].s, r[3].s, r[4].s, r[5].s, r[6].str() });
-    }
+    for(const LogRow& r : impl_->db.query("", {}, limit, newest_first)) out.push_back(to_event(r));
     return out;
+}
+
+namespace {
+// the WHERE of a history query; values go in as parameters
+std::string history_where(const std::string& severity, int64_t since_ms, LogRow& binds)
+{
+    std::string where;
+    if(!severity.empty()) { binds.emplace_back(severity); where = "severity = ?" + std::to_string(binds.size()); }
+    if(since_ms > 0) { binds.emplace_back(since_ms); where += (where.empty() ? "" : " AND ") + std::string("ts >= ?") + std::to_string(binds.size()); }
+    return where;
+}
+} // namespace
+
+std::vector<AlarmEvent> Alarms::history(int limit, int offset, const std::string& severity, int64_t since_ms)
+{
+    std::vector<AlarmEvent> out;
+    if(limit <= 0) return out;
+    LogRow binds;
+    std::string where = history_where(severity, since_ms, binds);
+    for(const LogRow& r : impl_->db.query(where, binds, limit, true, std::max(0, offset))) out.push_back(to_event(r));
+    return out;
+}
+
+int64_t Alarms::history_count(const std::string& severity, int64_t since_ms)
+{
+    LogRow binds;
+    std::string where = history_where(severity, since_ms, binds);
+    return impl_->db.count(where, binds);
 }
 
 int64_t Alarms::export_csv(std::string path)
 {
     if(!impl_->db.is_open()) { HML_ERROR("alarm log: export failed: no alarms are defined"); return -1; }
     std::vector<std::vector<std::string>> rows;
-    for(const AlarmEvent& e : query()) rows.push_back({ LogDb::format_time(e.ts_ms), e.name, e.event, e.severity, e.message, e.value });
+    for(const AlarmEvent& e : query()) rows.push_back({ LogDb::format_time(e.ts_ms), e.name, e.event, e.severity, e.message, e.value, e.user });
     if(path.empty()) path = impl_->db.export_path("alarm-log");
-    return LogDb::write_csv(path, { "time", "name", "event", "severity", "message", "value" }, rows);
+    return LogDb::write_csv(path, { "time", "name", "event", "severity", "message", "value", "user" }, rows);
 }
 
 Alarms& alarms()
 {
     static Alarms instance;
     return instance;
+}
+
+std::string alarm_text_line(const std::string& s, size_t max_bytes)
+{
+    std::string out;
+    out.reserve(std::min(s.size(), max_bytes));
+    for(unsigned char c : s) out.push_back(c < 0x20 || c == 0x7f ? ' ' : static_cast<char>(c));
+    if(out.size() <= max_bytes) return out;
+    size_t cut = max_bytes;
+    while(cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) cut--;     // not inside a UTF-8 character
+    return out.substr(0, cut) + "\xE2\x80\xA6";
 }
 
 } // namespace hml

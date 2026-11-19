@@ -278,3 +278,15 @@ Object.assign(I18N.TEXT_JA, {
   '{0} tag(s) added, {1} updated': 'タグを {0} 個追加、{1} 個更新しました',
   'Changes that were not saved were found ({0}). Restore them?': '保存されていない変更が見つかりました（{0}）。復元しますか？',
 });
+
+// ---- alarm widgets
+Object.assign(I18N.KEYS_JA, { rows: '行数', row_height: '行の高さ', columns: '表示する列', ack_on_tap: 'タップで確認', severity: '重要度', days: '期間 (日)',
+  blink: '点滅', ack: '確認が必要', ack_level: '確認に必要なレベル', labels: '表示文字' });
+Object.assign(I18N.VALUES_JA, { current: '発生中のアラーム', history: '履歴' });
+Object.assign(I18N.TEXT_JA, {
+  'Alarm list': 'アラーム一覧', 'Alarm banner': 'アラームバナー',
+  'user level needed to acknowledge an alarm on the device (0 / empty = everybody; needs user management)': '装置でアラームを確認 (ACK) するのに必要なユーザーレベル（0 / 空欄 = 誰でも。ユーザー管理が必要）',
+  'ack: the alarm stays in the alarm list until it is acknowledged (default). Show alarms on the screens with the "Alarm list" and "Alarm banner" widgets; tags sys.alarm.active, sys.alarm.unacked, sys.alarm.latest; actions call "alarm.ack" / "alarm.ack_all".':
+    '確認が必要（既定）: 確認 (ACK) されるまでアラーム一覧に残ります。画面には部品「アラーム一覧」「アラームバナー」で表示します。タグ sys.alarm.active（発生中の数）・sys.alarm.unacked（未確認の数）・sys.alarm.latest（最新のメッセージ）、動作 call "alarm.ack" / "alarm.ack_all" も使えます。',
+  'alarms: ack_level is set, but user management is off (Users tab)': 'アラーム: 確認に必要なレベルが設定されていますが、ユーザー管理がオフです（ユーザー タブ）',
+});
