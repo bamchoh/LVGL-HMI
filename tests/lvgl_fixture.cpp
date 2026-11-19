@@ -56,7 +56,12 @@ void Lvgl::render()
 
 Runtime::Runtime()
 {
-    Lvgl::get();
+    lv_display_t* disp = Lvgl::get().disp;
+    // A test that applied a project's theme (its colours, its font file) must not hand it to the
+    // tests after it: every test starts from LVGL's default theme and the built-in font.
+    lv_display_set_theme(disp, lv_theme_default_init(disp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), false, LV_FONT_DEFAULT));
+    for(lv_obj_t* layer : { lv_display_get_layer_top(disp), lv_display_get_layer_sys(disp) })
+        if(layer) lv_obj_remove_local_style_prop(layer, LV_STYLE_TEXT_FONT, LV_PART_MAIN);
     hml::scripts().clear();
     hml::project().stop_logs();
     hml::tags().clear();

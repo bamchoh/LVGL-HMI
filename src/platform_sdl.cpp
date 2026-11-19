@@ -35,6 +35,10 @@ int SDLCALL event_filter(void*, SDL_Event* ev)
 lv_display_t* init(const ProjectInfo& info, Callbacks cb, lv_indev_t** kb_out)
 {
     s_cb = std::move(cb);
+    // Without a window (SDL_VIDEODRIVER=dummy: the designer's preview, the smoke test) there is no
+    // accelerated renderer, and LVGL 9.6 refuses to start without one: ask for SDL's software renderer.
+    const char* video = SDL_getenv("SDL_VIDEODRIVER");
+    if(video && SDL_strcasecmp(video, "dummy") == 0) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     lv_display_t* disp = lv_sdl_window_create(info.width, info.height);
     if(!disp) { HML_ERROR("cannot create SDL window"); return nullptr; }
     lv_sdl_window_set_title(disp, info.title.c_str());

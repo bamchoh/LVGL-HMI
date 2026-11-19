@@ -5,6 +5,8 @@
 // deterministically: advance(ms) moves the clock and pumps lv_timer_handler + tags().dispatch().
 #pragma once
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <string>
 #include "lvgl.h"
 #include "driver.hpp"
@@ -12,6 +14,15 @@
 #include "ui.hpp"
 
 namespace hmltest {
+
+// The repository root, for the tests that read its files (projects, test assets). It is the
+// directory the tests were built from; HML_TEST_SOURCE_DIR in the environment says where the
+// files are when the binary runs somewhere else (cross-built and copied to a Raspberry Pi).
+inline std::filesystem::path source_dir()
+{
+    const char* e = std::getenv("HML_TEST_SOURCE_DIR");
+    return e && *e ? std::filesystem::path(e) : std::filesystem::path(HML_TEST_SOURCE_DIR);
+}
 
 struct Lvgl {
     static Lvgl& get();                 // lv_init + display on first use

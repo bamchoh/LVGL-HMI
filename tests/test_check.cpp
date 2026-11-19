@@ -174,7 +174,7 @@ TEST_CASE("check: broken files and a broken project")
 
 TEST_CASE("check: the shipped projects and the skill's example have no problems")
 {
-    const fs::path root = fs::path(HML_TEST_SOURCE_DIR);
+    const fs::path root = hmltest::source_dir();
     for(const char* rel : { "projects/demo", "projects/lcd35", "tools/skill/hml-screens/examples" }) {
         CAPTURE(rel);
         const auto problems = check_project((root / rel / "project.json").generic_string());

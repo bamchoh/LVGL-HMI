@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml)
 
-JSON で書いた画面定義を LVGL (v9.4) で描画し、タグ（プロセス変数）とウィジェットを
+JSON で書いた画面定義を LVGL (v9.6) で描画し、タグ（プロセス変数）とウィジェットを
 双方向にバインドする HMI ランタイムです。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
 Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作します。
 データソースはドライバ方式で、シミュレーション、Modbus TCP クライアント、OPC UA サーバー
@@ -893,7 +893,8 @@ python -I tools/subset_font.py NotoSansJP-Regular.otf projects/myhmi/assets/font
 LVGL 9.4 の TinyTTF には不具合が 2 つあり、ランタイムは回避しています: フォントにない文字を求めるとキャッシュの要素が
 二重に解放される（フォントの文字表 `cmap` を自分で読み、ある文字だけを TinyTTF に求める）、カーニングのキャッシュが
 解放済みの要素を使い、一部の文字の送り幅が別の字形のものになる（カーニングを使わず、送り幅は `hmtx` から求める）。
-どちらも AddressSanitizer と表示の確認で見つけたものです（`src/font_cmap.hpp`）。
+どちらも AddressSanitizer と表示の確認で見つけたものです（`src/font_cmap.hpp`）。LVGL 9.6 ではどれも起きなくなりましたが、
+回避は残しています（負担が小さく、カーニングはこのフォントでは文字の配置がかなり遅くなるため）。
 
 ## ユーザー管理
 
