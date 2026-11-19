@@ -10,12 +10,36 @@ const Props = {
   // fk = focus key, used by App.refresh() to restore the focus after a rebuild
   setVal(obj, k, v) { M.mutate(() => { if (v === undefined || v === '' || v === null) delete obj[k]; else obj[k] = v; }); },
 
+  // Editing shows on the canvas while typing or dragging in a colour picker, not only when
+  // the field is left. The property panel itself is not rebuilt meanwhile (the field would
+  // lose the cursor); one undo step covers the whole edit.
+  //   live(...)    while the value changes (v undefined = not a usable value yet: ignored)
+  //   commit(...)  when the edit is finished
+  live(state, obj, k, v) {
+    if (v === undefined) return;
+    if (!state.on) { M.pushUndo(); state.on = true; M.st.dirty = true; App.toolbar(); }
+    if (v === '' || v === null) delete obj[k]; else obj[k] = v;
+    Canvas.render();
+  },
+  commit(state, obj, k, v) {
+    if (!state.on) { this.setVal(obj, k, v); return; }
+    state.on = false;
+    if (v === undefined || v === '' || v === null) delete obj[k]; else obj[k] = v;
+    M.st.dirty = true;
+    App.refresh();
+  },
+
   editor(obj, k, f, fk) {
     const t = f.t || 'text', v = obj[k];
     const attrs = { dataset: { fk: fk + '.' + k } };
+    const st = { on: false };                       // the state of a live edit of this field
     switch (t) {
-      case 'number': return U.el('input', Object.assign(attrs, { type: 'number', step: 'any', value: v === undefined ? '' : v,
-        onchange: e => this.setVal(obj, k, e.target.value === '' ? undefined : Number(e.target.value)) }));
+      case 'number': {
+        const num = s => (s === '' ? '' : isNaN(Number(s)) ? undefined : Number(s));
+        return U.el('input', Object.assign(attrs, { type: 'number', step: 'any', value: v === undefined ? '' : v,
+          oninput: e => this.live(st, obj, k, num(e.target.value)),
+          onchange: e => this.commit(st, obj, k, e.target.value === '' ? undefined : Number(e.target.value)) }));
+      }
       case 'bool': {
         const dflt = this.TRUE_DEFAULT.includes(k);   // undefined means true for these keys
         return U.el('input', Object.assign(attrs, { type: 'checkbox', checked: v === undefined ? dflt : !!v,
@@ -24,7 +48,7 @@ const Props = {
       case 'select': {
         const o = f.o || [];
         const s = U.el('select', Object.assign(attrs, { onchange: e => this.setVal(obj, k, e.target.value) }));
-        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? (f.empty || '(default)') : opt));
+        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? I18N.t(f.empty || '(default)') : opt));
         if (v !== undefined && !o.map(String).includes(String(v))) s.append(U.el('option', { value: v, selected: true }, v));
         return s;
       }
@@ -36,12 +60,20 @@ const Props = {
         value: Array.isArray(v) ? v.join('\n') : (v || ''), onkeydown: U.tabKey, onchange: e => this.setVal(obj, k, e.target.value) }));
       case 'tag': return U.el('input', Object.assign(attrs, { type: 'text', list: 'dl-tags', value: v === undefined ? '' : v, placeholder: 'tag',
         onchange: e => this.setVal(obj, k, e.target.value.trim()) }));
-      case 'size': return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: 'px / 50% / content',
-        onchange: e => { const s = e.target.value.trim(); this.setVal(obj, k, s === '' ? undefined : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s); } }));
+      case 'size': {
+        const size = s => (s === '' ? '' : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : /^(\d+(\.\d+)?%|content|full)$/.test(s) ? s : undefined);
+        return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: 'px / 50% / content',
+          oninput: e => this.live(st, obj, k, size(e.target.value.trim())),
+          onchange: e => { const s = e.target.value.trim(); this.commit(st, obj, k, s === '' ? undefined : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s); } }));
+      }
       case 'color': {
+        const usable = s => (s === '' ? '' : /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s) ? s : undefined);   // names are applied when the field is left
         const txt = U.el('input', Object.assign(attrs, { type: 'text', class: 'color-text', value: v === undefined ? '' : v, placeholder: '#rrggbb / red',
-          onchange: e => this.setVal(obj, k, e.target.value.trim()) }));
-        const sw = U.el('input', { type: 'color', value: U.hex6(v, '#808080'), oninput: e => { txt.value = e.target.value; }, onchange: e => this.setVal(obj, k, e.target.value) });
+          oninput: e => { const c = usable(e.target.value.trim()); this.live(st, obj, k, c); if (c) sw.value = U.hex6(c, '#808080'); },
+          onchange: e => this.commit(st, obj, k, e.target.value.trim()) }));
+        const sw = U.el('input', { type: 'color', value: U.hex6(v, '#808080'),
+          oninput: e => { txt.value = e.target.value; this.live(st, obj, k, e.target.value); },
+          onchange: e => this.commit(st, obj, k, e.target.value) });
         return U.el('span', { class: 'color-ed' }, sw, txt);
       }
       case 'lines': return U.el('textarea', Object.assign(attrs, { rows: 3, value: Array.isArray(v) ? v.join('\n') : (v || ''),
@@ -57,19 +89,25 @@ const Props = {
       }
       case 'json': return U.el('textarea', Object.assign(attrs, { rows: 4, value: v === undefined ? '' : JSON.stringify(v),
         onchange: e => { try { this.setVal(obj, k, e.target.value.trim() === '' ? undefined : JSON.parse(e.target.value)); } catch (err) { App.toast('JSON: ' + err.message); } } }));
-      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, onchange: e => this.setVal(obj, k, e.target.value) }));
+      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v,
+        oninput: e => this.live(st, obj, k, e.target.value), onchange: e => this.commit(st, obj, k, e.target.value) }));
     }
   },
 
-  row(label, input, hint) { return U.el('div', { class: 'row', title: hint || '' }, U.el('label', null, label), input); },
+  // label: a property key or a fixed text. It is shown by its display name in the chosen
+  // language; the tooltip then names the key (what is written in the project files).
+  row(label, input, hint) {
+    const tip = I18N.named(label) ? label + (hint ? '\n' + hint : '') : (hint || '');
+    return U.el('div', { class: 'row', title: tip }, U.el('label', null, I18N.label(label)), input);
+  },
   fields(obj, defs, fk) { return defs.map(f => this.row(f.label || f.k, this.editor(obj, f.k, f, fk), f.hint)); },
-  section(title, open, ...body) { return U.el('details', { open: open !== false, class: 'sec' }, U.el('summary', null, title), U.el('div', { class: 'sec-body' }, ...body)); },
+  section(title, open, ...body) { return U.el('details', { open: open !== false, class: 'sec' }, U.el('summary', null, I18N.t(title)), U.el('div', { class: 'sec-body' }, ...body)); },
 
   // ---- panel -------------------------------------------------------------
   render() {
     const el = this.el; el.innerHTML = '';
     const path = M.st.sel, w = path ? M.get(path) : null;
-    if (!w) { el.append(U.el('div', { class: 'hint' }, 'Select a widget on the canvas or in the tree.')); return; }
+    if (!w) { el.append(U.el('div', { class: 'hint' }, I18N.t('Select a widget on the canvas or in the tree.'))); return; }
     const isRoot = path.length === 0, fk = 'w:' + U.pathStr(path);
     const common = SCHEMA.common.map(f => f.k === 'align' ? Object.assign({}, f, { o: SCHEMA.aligns }) : f);
 
@@ -107,22 +145,32 @@ const Props = {
       const has = w[s] && Object.keys(w[s]).length;
       sel.append(U.el('option', { value: s, selected: s === this.styleSel }, s + (has ? ' ●' : '')));
     }
-    const cur = this.styleSel, st = (w[cur] && typeof w[cur] === 'object') ? w[cur] : {};
+    const cur = this.styleSel, has = !!(w[cur] && typeof w[cur] === 'object');
+    // The usual properties are always offered (empty = the theme's value); a value typed into
+    // one of them creates the style object, emptying the last one removes it again.
+    const st = has ? w[cur] : {};
     const rows = [];
-    for (const k of Object.keys(st)) {
+    const shown = SCHEMA.commonStyle.concat(Object.keys(st).filter(k => !SCHEMA.commonStyle.includes(k)));
+    for (const k of shown) {
       const kind = SCHEMA.styleKeys[k];
       const f = Array.isArray(kind) ? { t: 'select', o: [''].concat(kind) } : { t: kind || 'text' };
-      const del = U.el('button', { class: 'mini danger', title: 'remove', onclick: () => M.mutate(() => { delete w[cur][k]; if (!Object.keys(w[cur]).length) delete w[cur]; }) }, '×');
-      rows.push(U.el('div', { class: 'row' }, U.el('label', null, k), this.editor(st, k, f, fk + '.' + cur), del));
+      const set = k in st;
+      // edits go through a holder so that the style object only exists while it has something in it
+      const holder = new Proxy(st, {
+        set: (o, p, val) => { if (!w[cur] || typeof w[cur] !== 'object') w[cur] = o; o[p] = val; return true; },
+        deleteProperty: (o, p) => { delete o[p]; if (w[cur] === o && !Object.keys(o).length) delete w[cur]; return true; },
+      });
+      const del = set ? U.el('button', { class: 'mini danger', title: 'remove', onclick: () => M.mutate(() => { delete holder[k]; }) }, '×') : null;
+      rows.push(U.el('div', { class: 'row' + (set ? '' : ' unset'), title: I18N.named(k) ? k : '' }, U.el('label', null, I18N.label(k)), this.editor(holder, k, f, fk + '.' + cur), del));
     }
     const add = U.el('select', { onchange: e => {
       const k = e.target.value; if (!k) return;
       const kind = SCHEMA.styleKeys[k];
       const def = kind === 'color' ? '#ffffff' : kind === 'font' ? 16 : kind === 'bool' ? true : Array.isArray(kind) ? kind[0] : kind === 'size' ? 100 : 0;
       M.mutate(() => { w[cur] = w[cur] || {}; w[cur][k] = def; });
-    } }, U.el('option', { value: '' }, '+ add property…'));
-    for (const k of Object.keys(SCHEMA.styleKeys)) if (!(k in st)) add.append(U.el('option', { value: k }, k));
-    return this.section('Style', Object.keys(st).length > 0, this.row('selector', sel), ...rows, this.row('', add));
+    } }, U.el('option', { value: '' }, I18N.t('+ add property…')));
+    for (const k of Object.keys(SCHEMA.styleKeys)) if (!shown.includes(k)) add.append(U.el('option', { value: k }, I18N.named(k) ? I18N.label(k) + '  (' + k + ')' : k));
+    return this.section('Style', true, this.row('selector', sel), ...rows, this.row('', add));
   },
 
   // ---- bind --------------------------------------------------------------

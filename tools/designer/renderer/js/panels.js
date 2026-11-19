@@ -46,10 +46,10 @@ const Panels = {
 
   renderWidgets() {
     const el = document.getElementById('tab-widgets'); el.innerHTML = '';
-    el.append(U.el('div', { class: 'hint' }, 'Click to add to the selected panel (or the screen).'));
+    el.append(U.el('div', { class: 'hint' }, I18N.t('Click to add to the selected panel (or the screen).')));
     const grid = U.el('div', { class: 'palette' });
     for (const [type, t] of Object.entries(SCHEMA.types)) {
-      grid.append(U.el('button', { class: 'pal', onclick: () => App.addWidget(type), disabled: !M.screen() }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), t.label));
+      grid.append(U.el('button', { class: 'pal', onclick: () => App.addWidget(type), disabled: !M.screen() }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
     }
     el.append(grid);
   },
@@ -68,7 +68,7 @@ const Panels = {
     });
     el.append(list);
     el.append(U.el('div', { class: 'row' }, U.el('button', { onclick: async () => { const n = await App.prompt('New screen name', 'screen' + (M.st.screens.length + 1)); if (n && !M.addScreen(n)) App.toast('name already used or invalid'); } }, '+ Add screen')));
-    el.append(U.el('div', { class: 'hint' }, 'The radio button marks the start screen. Files are screens/<name>.json; renaming keeps the file name.'));
+    el.append(U.el('div', { class: 'hint' }, I18N.t('The radio button marks the start screen. Files are screens/<name>.json; renaming keeps the file name.')));
   },
 
   renderTags() {
@@ -243,7 +243,7 @@ const Panels = {
     // "tags": ["temp", {"tag": "x", "access": "ro"}] - edit everything in object form (the runtime accepts both)
     items.forEach((it, i) => { if (typeof it === 'string') items[i] = { tag: it }; });
     const tbl = U.el('table', { class: 'grid' });
-    tbl.append(U.el('tr', null, ...tdef.columns.map(c => U.el('th', null, c.k)), U.el('th')));
+    tbl.append(U.el('tr', null, ...tdef.columns.map(c => U.el('th', { title: I18N.named(c.k) ? c.k : '' }, I18N.label(c.k))), U.el('th')));
     items.forEach((it, i) => {
       const cells = tdef.columns.map(c => U.el('td', null, Props.editor(it, c.k, c, fk + '.' + tdef.key + '.' + i)));
       tbl.append(U.el('tr', null, ...cells, U.el('td', null, U.el('button', { class: 'mini danger', onclick: () => M.mutate(() => items.splice(i, 1)) }, '×'))));
@@ -347,14 +347,23 @@ const Panels = {
     el.append(Props.section('Project', true,
       Props.row('title', Props.editor(p, 'title', { t: 'text' }, fk)),
       Props.row('start_screen', Props.editor(p, 'start_screen', { t: 'select', o: M.screenNames() }, fk))));
+    // a known display: its size and touch correction in one step
+    const preset = U.el('select', { dataset: { fk: fk + '.preset' }, onchange: e => { const p0 = SCHEMA.displayPresets[Number(e.target.value)]; if (p0) M.applyDisplayPreset(p0); } },
+      U.el('option', { value: '' }, I18N.t('(choose to apply)')), ...SCHEMA.displayPresets.map((p0, i) => U.el('option', { value: i }, p0.name)));
     el.append(Props.section('Display', true,
+      Props.row('display preset', preset, I18N.t('Sets the size and the touch correction for a known display.')),
       ...Props.fields(d, [{ k: 'width', t: 'number' }, { k: 'height', t: 'number' }, { k: 'zoom', t: 'number', hint: 'SDL window zoom (PC only)' },
         { k: 'rotation', t: 'select', o: ['', '0', '90', '180', '270'] }, { k: 'dpi', t: 'number', hint: 'theme scale, default 130' }], fk + '.display')));
+    // touch correction: resistive panels report raw values that have to be mapped to the screen
+    const cal = Array.isArray(touch.calibration) && touch.calibration.length === 4 ? touch.calibration : ['', '', '', ''];
+    const calib = U.el('div', { class: 'calib' }, ...['left edge', 'top edge', 'right edge', 'bottom edge'].map((name, i) =>
+      U.el('label', null, I18N.t(name), U.el('input', { type: 'number', value: cal[i], dataset: { fk: fk + '.calib' + i },
+        onchange: e => M.setTouchCalibration(i, e.target.value === '' ? '' : Number(e.target.value)) }))));
+    el.append(Props.section('Touch panel', !!(d.touch && Object.keys(d.touch).length),
+      Props.row('swap_axes', Props.editor(touch, 'swap_axes', { t: 'bool' }, fk + '.touch'), 'the panel reports X where the screen has Y'),
+      Props.row('touch calibration', calib, I18N.t('Raw values the touch panel reports at the edges of the screen (after the axis swap). Take them from a preset, or measure with tools/rpi/touch_raw.py.'))));
     el.append(Props.section('Raspberry Pi (fbdev / drm / evdev)', false,
-      ...Props.fields(d, [{ k: 'fbdev', t: 'text', hint: '/dev/fb0' }, { k: 'drm', t: 'text', hint: '/dev/dri/card0' }, { k: 'input', t: 'text', hint: 'empty = auto detect' }], fk + '.display'),
-      Props.row('touch swap_axes', Props.editor(touch, 'swap_axes', { t: 'bool' }, fk + '.touch')),
-      Props.row('touch calibration', U.el('input', { type: 'text', value: Array.isArray(touch.calibration) ? touch.calibration.join(', ') : '', placeholder: 'min_x, min_y, max_x, max_y', dataset: { fk: fk + '.calib' },
-        onchange: e => M.mutate(() => { const a = e.target.value.split(',').map(s => Number(s.trim())); if (a.length === 4 && !a.some(isNaN)) touch.calibration = a; else delete touch.calibration; if (!Object.keys(touch).length) delete d.touch; }) }))));
+      ...Props.fields(d, [{ k: 'fbdev', t: 'text', hint: '/dev/fb0' }, { k: 'drm', t: 'text', hint: '/dev/dri/card0' }, { k: 'input', t: 'text', hint: 'empty = auto detect' }], fk + '.display')));
     el.append(Props.section('Boot splash (Raspberry Pi)', false,
       ...Props.fields(d, [{ k: 'splash', t: 'image' }, { k: 'splash_bg', t: 'color' }], fk + '.display'),
       U.el('div', { class: 'hint' }, 'Shown during boot by hml-splash.service (hml_runtime --splash) until the HMI starts. PNG, centred and shrunk to fit; empty = the project title. Background default: black.')));

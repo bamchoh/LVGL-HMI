@@ -51,6 +51,10 @@ const Canvas = {
     root.style.fontSize = th.font + 'px';
     root.style.color = th.text;
     root.style.background = th.scr;
+    // the screen's own style (background colour ...) on top of the theme; the element is
+    // reused, so what a removed property had set must go first
+    for (const k of ['borderWidth', 'borderColor', 'borderStyle', 'borderRadius', 'opacity', 'boxShadow', 'outline', 'textAlign', 'letterSpacing']) root.style[k] = '';
+    if (scr.style && typeof scr.style === 'object') this.applyStyle(root, scr.style, th, {});
     root.dataset.path = '';
     root.className = 'lv lv-screen' + (U.samePath(M.st.sel, []) ? ' hd-selected' : '');
     const content = this.container(root, scr, th, 0);

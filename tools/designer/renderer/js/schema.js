@@ -10,6 +10,16 @@ const SCHEMA = {
   tagTypes: ['bool', 'int', 'float', 'string'],
   // project scripts (Lua, src/script.cpp): when a script runs. 'manual' = only from a script action / run()
   dataLogTriggers: ['interval', 'change', 'tag', 'manual'],
+  // Displays whose size and touch correction are known. "touch" is what goes into
+  // display.touch (null: the panel needs no correction).
+  displayPresets: [
+    { name: '3.5" LCD 480x320 (ADS7846 touch)', width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220] } },
+    { name: '7" touch display 800x480', width: 800, height: 480, touch: null },
+    { name: '10.1" touch display 1024x600', width: 1024, height: 600, touch: null },
+    { name: 'HD 1280x720', width: 1280, height: 720, touch: null },
+  ],
+  // style properties that are offered right away (the others through "add property")
+  commonStyle: ['bg_color', 'text_color', 'font', 'radius', 'border_width', 'border_color', 'pad'],
   // "level": N on a widget: what users below that level get
   levelDeny: ['', 'disable', 'hide', 'login'],
   // access control of a widget / a screen (needs "users" in the project)
