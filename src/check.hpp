@@ -4,6 +4,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "lvgl.h"
 
 namespace hml {
 
@@ -16,5 +17,12 @@ struct CheckProblem {
 
 // path: project.json (a folder project). screens: the names of its screens, in order.
 std::vector<CheckProblem> check_project(const std::string& path, std::vector<std::string>* screens = nullptr);
+
+// The characters of text the font (with its fallbacks) has no glyph for, each once, separated by
+// spaces ("" = none). They would be drawn as an empty box.
+std::string missing_glyphs(const lv_font_t* font, const std::string& text);
+// The same for what a built screen shows now: labels, checkboxes, dropdowns, text boxes below
+// root, each in its own font. One line per text: <text>: no glyph for: <characters>.
+std::vector<std::string> missing_glyphs_on(lv_obj_t* root);
 
 } // namespace hml

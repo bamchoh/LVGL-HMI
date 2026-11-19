@@ -200,3 +200,30 @@ TEST_CASE("data displays: one line of a value has no scrollbar, unless asked for
     CHECK(lv_obj_get_scrollbar_mode(lv_obj_get_child(lv_screen_active(), 0)) == LV_SCROLLBAR_MODE_OFF);
     CHECK(lv_obj_get_scrollbar_mode(lv_obj_get_child(lv_screen_active(), 1)) == LV_SCROLLBAR_MODE_AUTO);
 }
+
+TEST_CASE("check: characters the font has no glyph for are named")
+{
+    hmltest::Runtime rt;
+    const lv_font_t* f = LV_FONT_DEFAULT;                       // the built-in font: Latin letters and symbols
+    CHECK(missing_glyphs(f, "Temperature 21.5 C") == "");
+    CHECK(missing_glyphs(f, LV_SYMBOL_OK " ok") == "");
+    CHECK(missing_glyphs(f, "温度 temp 温") == "温 度");        // each character once
+    CHECK(missing_glyphs(f, "line 1\nline 2") == "");          // control characters are not glyphs
+
+    json scr = json::parse(R"~({ "name": "s", "children": [
+        { "type": "label", "text": "ok" },
+        { "type": "label", "text": "圧力" },
+        { "type": "label", "text": "隠", "hidden": true },
+        { "type": "checkbox", "text": "自動" },
+        { "type": "panel", "children": [ { "type": "button", "text": "停止" } ] } ] })~");
+    REQUIRE(ui().build_screen(scr, ""));
+    REQUIRE(ui().show_screen("s", "none"));
+    rt.advance(50);
+    const auto lines = missing_glyphs_on(lv_screen_active());
+    auto has_line = [&](const char* part) { return std::any_of(lines.begin(), lines.end(), [&](const std::string& l) { return l.find(part) != std::string::npos; }); };
+    CHECK(lines.size() == 3);
+    CHECK(has_line("\"圧力\": no glyph for: 圧 力"));
+    CHECK(has_line("\"自動\": no glyph for: 自 動"));
+    CHECK(has_line("\"停止\": no glyph for: 停 止"));
+    CHECK_FALSE(has_line("隠"));                                // what is hidden is not drawn
+}
