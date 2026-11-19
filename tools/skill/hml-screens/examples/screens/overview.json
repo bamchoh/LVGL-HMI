@@ -1,0 +1,50 @@
+{
+  "name": "overview",
+  "style": { "bg_color": "#141a22" },
+  "children": [
+    { "type": "label", "x": 16, "y": 14, "text": "Pump overview", "style": { "font": 24 } },
+    { "type": "led", "align": "top_right", "x": -56, "y": 16, "w": 20, "h": 20, "color": "#4caf50", "bind": "plc_online" },
+    { "type": "label", "align": "top_right", "x": -16, "y": 16, "text": "PLC",
+      "bind": { "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } } } },
+
+    { "type": "panel", "x": 16, "y": 56, "w": 768, "h": 128, "flex": "row", "flex_main": "space_between",
+      "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+      "children": [
+        { "type": "panel", "w": 248, "h": 128, "style": { "radius": 8, "pad": 12 },
+          "children": [
+            { "type": "label", "text": "Temperature", "style": { "text_color": "#90a4ae" } },
+            { "type": "label", "y": 36, "bind": { "text": { "tag": "temp", "format": "%.1f °C" } }, "style": { "font": 40 } }
+          ] },
+        { "type": "panel", "w": 248, "h": 128, "style": { "radius": 8, "pad": 12 },
+          "children": [
+            { "type": "label", "text": "Pressure", "style": { "text_color": "#90a4ae" } },
+            { "type": "label", "y": 36, "bind": { "text": { "tag": "pressure", "format": "%.2f bar" } }, "style": { "font": 40 } }
+          ] },
+        { "type": "panel", "w": 248, "h": 128, "style": { "radius": 8, "pad": 12 },
+          "children": [
+            { "type": "label", "text": "Level", "style": { "text_color": "#90a4ae" } },
+            { "type": "label", "y": 36, "bind": { "text": { "tag": "level", "format": "%.0f %%" } }, "style": { "font": 40 } },
+            { "type": "bar", "align": "bottom_left", "w": "100%", "h": 8, "min": 0, "max": 100, "bind": "level" }
+          ] }
+      ] },
+
+    { "type": "panel", "x": 16, "y": 200, "w": 768, "h": 184, "style": { "radius": 8, "pad": 16 },
+      "children": [
+        { "type": "label", "text": "Pump", "style": { "text_color": "#90a4ae" } },
+        { "type": "label", "y": 44, "text": "Run" },
+        { "type": "switch", "x": 96, "y": 36, "w": 72, "h": 40, "bind": "run" },
+        { "type": "label", "x": 200, "y": 44, "text": "RUNNING", "style": { "text_color": "#4caf50" }, "bind": { "visible": "run" } },
+        { "type": "label", "x": 200, "y": 44, "text": "STOPPED", "style": { "text_color": "#78909c" }, "bind": { "hidden": "run" } },
+        { "type": "label", "y": 108, "text": "Speed" },
+        { "type": "slider", "x": 96, "y": 112, "w": 456, "min": 0, "max": 100, "bind": "speed_sp" },
+        { "type": "numeric_display", "align": "bottom_right", "w": 136, "h": 48, "bind": "speed_sp", "decimals": 0, "unit": " %",
+          "input": true, "min": 0, "max": 100 }
+      ] },
+
+    { "type": "button", "align": "bottom_left", "x": 16, "y": -16, "w": 160, "h": 56, "text": "STOP",
+      "style": { "bg_color": "#c62828" }, "bind": { "enabled": "run" },
+      "on_click": { "action": "popup", "screen": "confirm_stop" } },
+
+    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "45%" }
+  ]
+}

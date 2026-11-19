@@ -1,0 +1,12 @@
+{
+  "name": "confirm_stop", "popup": true, "w": 420, "h": 220, "dim": true,
+  "style": { "bg_color": "#1f2a38", "radius": 10, "pad": 16 },
+  "children": [
+    { "type": "label", "text": "Stop the pump?", "style": { "font": 24 } },
+    { "type": "label", "y": 44, "w": "100%", "long_mode": "wrap", "text": "The pump stops at once.", "style": { "text_color": "#90a4ae" } },
+    { "type": "button", "align": "bottom_left", "w": 168, "h": 56, "text": "Cancel", "on_click": { "action": "close" } },
+    { "type": "button", "align": "bottom_right", "w": 168, "h": 56, "text": "Stop",
+      "style": { "bg_color": "#c62828" },
+      "on_click": [ { "action": "set", "tag": "run", "value": false }, { "action": "close" } ] }
+  ]
+}
