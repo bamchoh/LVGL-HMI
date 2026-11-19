@@ -247,3 +247,34 @@ Object.assign(I18N.TEXT_JA, {
   'Move by 1 px (with Shift: 10 px)': '1 px 移動（Shift で 10 px）', 'Move without snapping to other widgets': 'ほかの部品に吸着させずに移動',
   'Clear the selection / close a dialog': '選択を解除 / ダイアログを閉じる', 'This list': 'この一覧',
 });
+
+// ---- screen tabs, context menu, tag uses
+Object.assign(I18N.KEYS_JA, { used: '使用箇所', lua: 'Lua コード', bind: '連動', data_log: '変数ロギング', alarms: 'アラーム', items: '項目' });
+Object.assign(I18N.TEXT_JA, {
+  'Close the tab (the screen stays in the project)': 'タブを閉じる（画面はプロジェクトに残ります）', 'Open another screen in a tab': '別の画面をタブで開く',
+  'Cut': '切り取り', 'Copy': 'コピー', 'Paste': '貼り付け', 'Bring to front': '最前面へ', 'Send to back': '最背面へ', 'Select all in this panel': 'このパネル内をすべて選択',
+  'Show where this tag is used': 'このタグの使用箇所を表示', 'This tag is not used anywhere': 'このタグはどこでも使われていません',
+  'Tag "{0}" is used in {1} place(s). Delete it anyway?': 'タグ「{0}」は {1} か所で使われています。削除しますか？',
+  '{0} place(s) that use the tag were changed with it': 'このタグを使っている {0} か所も新しい名前に変更しました',
+  'Tag "{0}" is used here ({1})': 'タグ「{0}」の使用箇所 ({1})',
+  'Next / previous screen tab': '次 / 前の画面タブ', 'Drag on the background': '背景をドラッグ', 'Select the widgets inside the rectangle': '囲んだ部品を選択',
+  'Right click': '右クリック', 'Menu: copy, paste, order …': 'メニュー（コピー、貼り付け、重なり順 …）',
+  'No tags yet. Tags are the named values that widgets bind to and drivers read / write.': 'タグがまだありません。タグは名前の付いた値で、部品が連動し、ドライバが読み書きします。',
+});
+I18N.PATTERNS_JA.push([/^duplicate tag names: (.*)$/, '重複しているタグ名: $1']);
+
+// ---- style copy, lock / hide, tag import, recovery
+Object.assign(I18N.TEXT_JA, {
+  'Copy style': 'スタイルをコピー', 'Paste style': 'スタイルを貼り付け', 'Style copied': 'スタイルをコピーしました',
+  'Copy / paste the style (look) of a widget': '部品のスタイル（見た目）をコピー / 貼り付け',
+  'Lock (cannot be clicked on the canvas)': 'ロック（キャンバスで選択・移動できなくする）', 'Unlock': 'ロックを解除',
+  'Hide on the canvas (designer only)': 'キャンバスで隠す（デザイナー上だけ）', 'Show on the canvas': 'キャンバスに表示する',
+  'Show all / unlock all': 'すべて表示 / すべてロック解除', 'Locked on the canvas': 'キャンバスでロック中',
+  'Hidden on the canvas (designer only)': 'キャンバスで非表示（デザイナー上だけ。装置では表示されます）',
+  'Import / export …': '取り込み / 書き出し …', 'Tags: import / export': 'タグの取り込み / 書き出し', 'Import': '取り込む',
+  'One tag per line: name, type, init, min, max. Copy this into a spreadsheet, or paste lines from one here (commas or tabs) and press Import. A tag that already exists is updated; nothing is deleted.':
+    '1 行に 1 タグ: 名前, 型, 初期値, 最小値, 最大値。これを表計算ソフトへコピーするか、表計算ソフトの行をここへ貼り付けて（カンマ区切りでもタブ区切りでも可）「取り込む」を押してください。すでにあるタグは更新され、削除されるタグはありません。',
+  'Nothing was imported:': '取り込みませんでした:',
+  '{0} tag(s) added, {1} updated': 'タグを {0} 個追加、{1} 個更新しました',
+  'Changes that were not saved were found ({0}). Restore them?': '保存されていない変更が見つかりました（{0}）。復元しますか？',
+});

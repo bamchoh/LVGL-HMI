@@ -151,7 +151,145 @@
     eq(left, [], 'untranslated');
   });
 
+  await test('screen tabs: opening, switching with the keyboard, closing', async () => {
+    const bar = document.getElementById('screen-tabs');
+    const names = () => [...bar.querySelectorAll('.stab')].map(t => t.firstChild.textContent.replace('● ', ''));
+    App.tabs = [M.st.screens[0].file]; App.doRefresh();
+    eq(names(), [M.st.screens[0].data.name]);
+    const more = bar.querySelector('select.stab-more');
+    more.value = M.st.screens[1].file; more.dispatchEvent(new Event('change'));
+    App.doRefresh();
+    eq(names(), [M.st.screens[0].data.name, M.st.screens[1].data.name]);
+    eq(M.st.cur, 1);
+    key('Tab', { ctrlKey: true }); App.doRefresh();
+    eq(M.st.cur, 0, 'Ctrl+Tab goes round');
+    bar.querySelectorAll('.stab')[1].click(); App.doRefresh();
+    eq(M.st.cur, 1, 'a click on a tab');
+    bar.querySelector('.stab.active .x').click(); App.doRefresh();
+    eq([names().length, M.st.cur], [1, 0], 'closed: the other tab is shown');
+    eq(M.st.screens.length > 1, true, 'the screen is still in the project');
+    Panels.showView('tags'); App.doRefresh();
+    ok(bar.hidden, 'no tabs on the other pages');
+  });
+
+  await test('a rectangle dragged on the background selects the widgets it touches', async () => {
+    const a = el('1').getBoundingClientRect(), b = el('2').getBoundingClientRect();
+    const x0 = a.left + 10, y0 = a.bottom + 3;                              // on the background, just below the first panel
+    ok(document.elementFromPoint(x0, y0) === Canvas.root || Canvas.root.contains(document.elementFromPoint(x0, y0)), 'the start is on the canvas');
+    const start = document.elementFromPoint(x0, y0);
+    mouse(start, 'mousedown', x0, y0);
+    mouse(document, 'mousemove', b.left + 20, a.top + 20);
+    eq(document.querySelectorAll('.hd-band').length, 1, 'the rectangle is drawn');
+    mouse(document, 'mouseup', b.left + 20, a.top + 20);
+    eq(document.querySelectorAll('.hd-band').length, 0);
+    eq(M.selection(), [[1], [2]]);
+    eq(M.st.undo.length, 0, 'selecting is not an undo step');
+  });
+
+  await test('right click: menu with copy / paste / order', async () => {
+    const r = el('2').getBoundingClientRect();
+    el('2').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5 }));
+    eq(M.selection(), [[2]], 'the widget under the mouse is selected');
+    const items = [...document.querySelectorAll('#ctx-menu .mi')];
+    ok(items.length >= 8, 'menu items');
+    const n = M.screen().children.length, w = M.get([2]);
+    items.find(i => /最前面/.test(i.textContent)).click();                   // bring to front
+    ok(!document.getElementById('ctx-menu'), 'the menu closed');
+    eq(M.screen().children[n - 1] === w, true, 'now the last one');
+    el(String(n - 1)).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    key('Escape');
+    ok(!document.getElementById('ctx-menu'), 'Esc closes the menu');
+  });
+
+  await test('tree: a row dropped on a panel moves the widget into it', async () => {
+    const row = p => document.querySelector('#tree .tr-row[data-path="' + p + '"]');
+    const dt = new DataTransfer();
+    const n1 = M.get([1]).children.length, w = M.get([2]);
+    row('2').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    const r = row('1').getBoundingClientRect();
+    row('1').dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 20, clientY: r.top + r.height / 2 }));
+    ok(row('1').classList.contains('drop-into'), 'the panel is marked');
+    row('1').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 20, clientY: r.top + r.height / 2 }));
+    await frame();
+    eq(M.get([1]).children.length, n1 + 1);
+    eq(M.get([1]).children[n1] === w, true, 'moved into the panel');
+    eq(M.st.undo.length, 1, 'undo steps');
+  });
+
+  await test('tags page: where a tag is used, and renaming updates the uses', async () => {
+    Panels.showView('tags'); App.doRefresh();
+    const name = M.st.project.tags[0].name, uses = M.tagUses().get(name).length;
+    ok(uses > 0, 'the first tag of the demo is used');
+    const rowEl = document.querySelector('#view-tags table.grid tr:nth-child(2)');
+    eq(rowEl.querySelector('td.uses button').textContent, String(uses));
+    rowEl.querySelector('td.uses button').click();
+    eq(document.querySelectorAll('#modal .prob-list .item').length, uses, 'listed uses');
+    closeModal();
+    const inp = rowEl.querySelector('input[type=text]');
+    inp.value = name + '_renamed'; inp.dispatchEvent(new Event('change'));
+    App.doRefresh();
+    eq(M.tagUses().get(name + '_renamed').length, uses, 'the uses follow');
+    eq(App.problems.length, 0, 'nothing is left pointing at the old name');
+    eq(M.st.undo.length, 1, 'undo steps');
+  });
+
+  await test('style copy / paste, lock and hide on the canvas', async () => {
+    clickAt('1');
+    const st = JSON.stringify(M.styleOf(M.get([1])));
+    key('c', { ctrlKey: true, altKey: true });
+    clickAt('2'); clickAt('3', { ctrlKey: true });
+    M.get([2]).style = { bg_color: '#ff0000' }; M.get([2]).style_pressed = { bg_color: '#00ff00' };
+    key('v', { ctrlKey: true, altKey: true });
+    eq([JSON.stringify(M.styleOf(M.get([2]))), JSON.stringify(M.styleOf(M.get([3])))], [st, st], 'both have the copied style, and only that');
+    clickAt('1');
+    M.setFlag('locked', true); App.doRefresh();
+    ok(el('1').classList.contains('hd-locked'), 'marked as locked');
+    eq(getComputedStyle(el('1')).pointerEvents, 'none', 'clicks go through');
+    ok(document.querySelector('#tree .tr-row[data-path="1"] .tr-mark'), 'the tree shows the lock');
+    App.select([2]); M.setFlag('hidden', true); App.select([]); App.doRefresh();
+    eq(getComputedStyle(el('2')).display, 'none', 'not drawn');
+    M.clearFlag(); App.doRefresh();
+    ok(getComputedStyle(el('2')).display !== 'none' && !el('1').classList.contains('hd-locked'), 'all back');
+    eq(M.get([1]).designer, undefined, 'no mark is left in the data');
+  });
+
+  await test('tags: export and import through the dialog; unsaved work is kept aside', async () => {
+    Panels.showView('tags'); App.doRefresh();
+    const n = M.st.project.tags.length;
+    [...document.querySelectorAll('#view-tags .page-head button')].find(b => /取り込み/.test(b.textContent)).click();
+    const ta = document.querySelector('#modal textarea.csv');
+    eq(ta.value.trim().split('\n').length, n + 1, 'one line per tag and a heading');
+    const btn = t => [...document.querySelectorAll('#modal button')].find(b => b.textContent === t);
+    ta.value = 'new_one\tbool\ttrue\nbad name,int';
+    btn('取り込む').click();
+    eq(M.st.project.tags.length, n, 'an error: nothing is imported');
+    ok(document.querySelector('#modal .warn'), 'the error is shown');
+    ta.value = 'new_one\tbool\ttrue\n' + M.st.project.tags[0].name + ',float,5,0,100';
+    btn('取り込む').click();
+    eq(M.st.project.tags.length, n + 1);
+    eq([M.st.project.tags[n], M.st.project.tags[0].max], [{ name: 'new_one', type: 'bool', init: true }, 100]);
+    eq(M.st.undo.length, 1, 'undo steps');
+    App.autosave(true);
+    const rec = JSON.parse(localStorage.getItem(App.recKey(M.st.path)));
+    eq(rec.project.tags.length, n + 1, 'the safety copy has the change');
+    // as after a crash: the project is opened again, and the unsaved work is offered
+    const ask = App.ask, file = M.st.path;
+    try {
+      let asked = 0;
+      App.ask = () => { asked++; return true; };
+      await App.open(file);
+      eq([asked, M.st.project.tags.length, M.st.dirty], [1, n + 1, true], 'restored');
+      App.ask = () => { asked++; return false; };
+      await App.open(file);
+      eq([asked, M.st.project.tags.length, M.st.dirty], [2, n, false], 'declined: the saved project');
+      eq(localStorage.getItem(App.recKey(file)), null, 'declined: the safety copy is gone');
+    } finally { App.ask = ask; }
+    M.st.dirty = false; App.autosave(true);
+    eq(localStorage.getItem(App.recKey(M.st.path)), null, 'nothing unsaved: no safety copy');
+  });
+
   reset();
+  M.st.dirty = false; App.autosave(true);
   setLang(lang);
   return results;
 })()

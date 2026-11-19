@@ -9,7 +9,12 @@ const Canvas = {
     this.root = document.getElementById('canvas');
     this.wrap = document.getElementById('canvas-wrap');
     this.root.addEventListener('mousedown', e => this.onDown(e));
-    this.wrap.addEventListener('mousedown', e => { if (e.target === this.wrap || e.target === this.wrap.firstElementChild) App.select(null); });
+    this.wrap.addEventListener('mousedown', e => {
+      if (e.target !== this.wrap && e.target !== this.wrap.firstElementChild) return;
+      App.select(null);
+      if (e.button === 0) { this.drag = { mode: 'band', sx: e.clientX, sy: e.clientY }; e.preventDefault(); }
+    });
+    this.root.addEventListener('contextmenu', e => { const path = this.widgetAt(e.target); if (path) { e.preventDefault(); App.widgetMenu(e, path); } });
     document.addEventListener('mousemove', e => this.onMove(e));
     document.addEventListener('mouseup', e => this.onUp(e));
   },
@@ -195,6 +200,9 @@ const Canvas = {
     if (U.samePath(M.st.sel, path)) el.classList.add('hd-selected');
     else if (also) el.classList.add('hd-selected', 'hd-also');
     if (w.hidden) el.classList.add('lv-hidden');
+    // designer-only marks: a locked widget lets clicks through, a hidden one is not drawn (unless it is selected)
+    if (M.flag(w, 'locked')) el.classList.add('hd-locked');
+    if (M.flag(w, 'hidden') && !el.classList.contains('hd-selected')) el.classList.add('hd-ghost');
     if (w.disabled) el.classList.add('lv-disabled');
     if (!this.condVisible(w)) el.classList.add('lv-cond-hidden');
     this.place(el, w, parentFlex);
@@ -405,9 +413,11 @@ const Canvas = {
     // a click on one of several selected widgets keeps them selected, so that they can be dragged together
     const sels = M.selection(), together = sels.length > 1 && sels.some(p => U.samePath(p, path));
     if (!together) App.select(path);
-    if (!path.length) return;
+    // on the screen's background: drag a rectangle around the widgets to select
+    if (!path.length) { this.drag = { mode: 'band', sx: e.clientX, sy: e.clientY }; e.preventDefault(); return; }
     const parent = M.parent(path), w = M.get(path);
     if (!w || (parent && parent.flex)) return;
+    if ((together ? sels : [path]).some(p => M.flag(M.get(p), 'locked'))) return;      // locked: stays where it is
     const items = (together ? sels : [path]).map(p => { const it = M.get(p); return { w: it, x0: U.num(it.x, 0), y0: U.num(it.y, 0) }; });
     this.drag = { mode: 'move', path, w, items, together, sx: e.clientX, sy: e.clientY, pushed: false, moved: false, snap: this.snapInfo(together ? sels : [path]) };
     e.preventDefault();
@@ -458,6 +468,13 @@ const Canvas = {
   },
   onMove(e) {
     const d = this.drag; if (!d) return;
+    if (d.mode === 'band') {
+      if (!d.box && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) < 4) return;
+      if (!d.box) { d.box = U.el('div', { class: 'hd-band' }); document.body.append(d.box); }
+      d.x = Math.min(d.sx, e.clientX); d.y = Math.min(d.sy, e.clientY); d.w = Math.abs(e.clientX - d.sx); d.h = Math.abs(e.clientY - d.sy);
+      Object.assign(d.box.style, { left: d.x + 'px', top: d.y + 'px', width: d.w + 'px', height: d.h + 'px' });
+      return;
+    }
     const z = M.st.zoom;
     let dx = Math.round((e.clientX - d.sx) / z), dy = Math.round((e.clientY - d.sy) / z);
     if (!dx && !dy) return;
@@ -484,6 +501,20 @@ const Canvas = {
   onUp() {
     const d = this.drag; if (!d) return;
     this.drag = null;
+    if (d.mode === 'band') {
+      if (!d.box) return;
+      d.box.remove();
+      // the widgets of the screen that the rectangle touches
+      const hit = [];
+      ((M.screen() && M.screen().children) || []).forEach((c, i) => {
+        const el = this.root.querySelector('[data-path="' + i + '"]'); if (!el) return;
+        const r = el.getBoundingClientRect();
+        if (M.flag(c, 'locked')) return;
+        if (r.width && r.height && r.left < d.x + d.w && r.right > d.x && r.top < d.y + d.h && r.bottom > d.y) hit.push([i]);
+      });
+      if (hit.length) { M.st.sel = hit[0]; M.st.more = hit.slice(1); App.selectionChanged(); }
+      return;
+    }
     if (d.moved) App.refresh();
     else if (d.together) App.select(d.path);          // a plain click on one of several: just that one
   },

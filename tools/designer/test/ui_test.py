@@ -41,8 +41,7 @@ def main():
     proj = os.path.join(work, "demo")
     shutil.copytree(os.path.join(ROOT, "projects", "demo"), proj, ignore=shutil.ignore_patterns("logs", "project.local.json"))
     project = os.path.join(proj, "project.json").replace("\\", "/")
-    env = dict(os.environ, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f"--remote-debugging-port={PORT}",
-               WEBVIEW2_USER_DATA_FOLDER=os.path.join(work, "webview"))
+    env = dict(os.environ, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f"--remote-debugging-port={PORT}")
     p = subprocess.Popen([exe, project], env=env)
     failed = 1
     try:
@@ -54,7 +53,8 @@ def main():
             except Exception:
                 pass
             if time.time() > deadline or p.poll() is not None:
-                print("the designer page did not come up"); return 2
+                print("the designer page did not come up. Close other designer windows first: they share the "
+                      "browser process, and the debugging port only works for the first one."); return 2
             time.sleep(1)
         time.sleep(1)
         results = asyncio.run(evaluate(open(os.path.join(HERE, "ui_tests.js"), encoding="utf-8").read()))

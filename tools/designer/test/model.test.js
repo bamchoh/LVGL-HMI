@@ -837,3 +837,108 @@ test('I18N: values of choices keep the value visible', () => {
   assert.equal(I18N.value('center'), 'center');
   assert.equal(I18N.action('goto'), 'goto');
 });
+
+// ---------------------------------------------------------------- tag uses, rename, moving in the tree
+function tagProject() {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  const p = M.st.project;
+  p.tags = [{ name: 'temp', type: 'float' }, { name: 'run', type: 'bool' }, { name: 'spare', type: 'int' }];
+  M.screen().children = [
+    { type: 'label', bind: { text: 'temp', hidden: { tag: 'run', eq: { tag: 'temp' } } } },
+    { type: 'button', bind: 'run', on_click: [{ action: 'toggle', tag: 'run' }, { action: 'script', code: 'tag.temp = tag.temp + 1  -- tag.temperature stays' }] },
+    { type: 'chart', series: [{ tag: 'temp' }] },
+    { type: 'panel', children: [{ type: 'label', text: 'a' }, { type: 'label', text: 'b' }] },
+  ];
+  p.drivers = [{ type: 'modbus_tcp', status_tag: 'run', map: [{ tag: 'temp', addr: 0 }] }, { type: 'opcua_server', tags: ['temp'] }];
+  p.scripts = [{ name: 's', trigger: 'tag', tags: ['run'], code: 'if tag.run then tag.temp = 0 end' }];
+  p.data_log = { groups: [{ name: 'g', tags: ['temp', 'run'], trigger_tag: 'run' }] };
+  p.alarms = { items: [{ name: 'a', tag: 'temp', value_tag: 'temp' }] };
+  return { M, p };
+}
+
+test('M tagUses: every place that names a tag', () => {
+  const { M } = tagProject();
+  const uses = M.tagUses();
+  assert.equal(uses.get('temp').length, 10);
+  assert.equal(uses.get('run').length, 8);
+  assert.equal(uses.has('spare'), false);
+  deq(uses.get('temp')[0], { loc: { screen: 0, path: [0] }, what: 'text' });
+  assert.equal(M.problems().length, 0);
+  M.st.project.tags.pop(); M.st.project.tags.pop();                      // "run" is gone: reported, but not from Lua code
+  const pr = M.problems().map(x => x.text);
+  assert.equal(pr.length, 7, pr.join(' | '));
+  assert.ok(pr.every(t => /unknown tag "run"/.test(t)));
+});
+
+test('M renameTag: everything that uses the tag follows, in one undo step', () => {
+  const { M, p } = tagProject();
+  const before = JSON.stringify(M.st.screens) + JSON.stringify(p);
+  assert.equal(M.renameTag(0, 'temp_pv'), 10);
+  const s = M.screen().children;
+  deq(s[0].bind, { text: 'temp_pv', hidden: { tag: 'run', eq: { tag: 'temp_pv' } } });
+  assert.equal(s[1].on_click[1].code, 'tag.temp_pv = tag.temp_pv + 1  -- tag.temperature stays');
+  assert.equal(s[2].series[0].tag, 'temp_pv');
+  deq([p.drivers[0].map[0].tag, p.drivers[1].tags[0], p.scripts[0].code], ['temp_pv', 'temp_pv', 'if tag.run then tag.temp_pv = 0 end']);
+  deq([p.data_log.groups[0].tags, p.alarms.items[0].tag, p.alarms.items[0].value_tag], [['temp_pv', 'run'], 'temp_pv', 'temp_pv']);
+  assert.equal(M.problems().length, 0);
+  M.undo();
+  assert.equal(JSON.stringify(M.st.screens) + JSON.stringify(M.st.project), before);   // (undo replaces the project object)
+  assert.equal(M.renameTag(1, 'temp'), 0);                               // the name is taken: only the tag itself changes
+  assert.equal(M.screen().children[1].bind, 'run');
+  M.undo();
+  assert.equal(M.renameTag(1, 'run'), 0);                                // unchanged: nothing happens
+  assert.equal(M.st.undo.length, 0);
+});
+
+test('M moveWidgets: reorder, into a panel and out again; never into itself', () => {
+  const { M } = tagProject();
+  const types = () => M.screen().children.map(w => w.type);
+  assert.equal(M.moveWidgets([[0]], [], 3), true);                       // before the panel
+  deq(types(), ['button', 'chart', 'label', 'panel']);
+  deq(M.selection(), [[2]]);
+  assert.equal(M.moveWidgets([[0], [1]], [3]), true);                    // two widgets into the panel, at the end
+  deq(types(), ['label', 'panel']);
+  deq(M.get([1]).children.map(w => w.type), ['label', 'label', 'button', 'chart']);
+  deq(M.selection(), [[1, 2], [1, 3]]);
+  assert.equal(M.moveWidgets([[1, 3]], [], 0), true);                    // out again, to the front of the list
+  deq(types(), ['chart', 'label', 'panel']);
+  assert.equal(M.moveWidgets([[2]], [2]), false);                        // a panel into itself
+  assert.equal(M.moveWidgets([[0]], [1]), false);                        // into something that is not a panel
+  M.st.sel = [0]; M.st.more = [];
+  M.orderSelection('front');
+  deq(types(), ['label', 'panel', 'chart']);
+  M.orderSelection('back');
+  deq(types(), ['chart', 'label', 'panel']);
+});
+
+test('M importTags / exportTags, pasteStyle, designer marks', () => {
+  const { M } = tagProject();
+  assert.equal(M.exportTags(), 'name,type,init,min,max\ntemp,float,,,\nrun,bool,,,\nspare,int,,,\n');
+  let r = M.importTags('name\ttype\tinit\tmin\tmax\nlevel\tfloat\t1.5\t0\t10\ntemp,int\n"text",string,"a ""b"""\nflag\n');
+  deq([r.added, r.updated, r.errors], [3, 1, []]);
+  const tags = M.st.project.tags;
+  deq(tags.find(t => t.name === 'level'), { name: 'level', type: 'float', init: 1.5, min: 0, max: 10 });
+  deq([tags[0], tags.find(t => t.name === 'text').init, tags.find(t => t.name === 'flag').type], [{ name: 'temp', type: 'int' }, 'a "b"', 'int']);
+  const n = tags.length, undo = M.st.undo.length;
+  r = M.importTags('ok,int\n1bad,int\nx,word\ny,int,abc');
+  assert.equal(r.errors.length, 3);
+  deq([M.st.project.tags.length, M.st.undo.length], [n, undo]);            // nothing changed
+  M.undo();
+  assert.equal(M.st.project.tags.length, 3);
+
+  const s = M.screen().children;
+  s[0].style = { bg_color: '#111' }; s[0].style_pressed = { bg_color: '#222' }; s[1].style = { radius: 9 }; s[1].style_checked = { opa: 1 };
+  const clip = M.styleOf(s[0]);
+  M.st.sel = [1]; M.st.more = [[2]];
+  M.pasteStyle(clip);
+  for (const i of [1, 2]) deq(M.styleOf(M.screen().children[i]), { style: { bg_color: '#111' }, style_pressed: { bg_color: '#222' } });
+  assert.equal(M.screen().children[1].bind, 'run');                        // nothing but the style
+
+  M.setFlag('locked', true);
+  deq([M.flag(M.get([1]), 'locked'), M.flag(M.get([2]), 'locked'), M.flag(M.get([0]), 'locked'), M.anyFlag('locked')], [true, true, false, true]);
+  M.setFlag('hidden', true); M.setFlag('locked', false);
+  deq(M.get([1]).designer, { hidden: true });
+  M.clearFlag();
+  deq([M.get([1]).designer, M.anyFlag('hidden')], [undefined, false]);
+});

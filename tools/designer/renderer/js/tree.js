@@ -37,13 +37,34 @@ const Tree = {
     const row = U.el('div', {
       class: 'tr-row' + (selected ? ' sel' : '') + (w.hidden ? ' hidden-w' : ''),
       dataset: { path: U.pathStr(path) },
+      draggable: !isRoot,
+      ondragstart: e => {
+        // one of several selected rows: they all move
+        const sels = M.selection();
+        Tree.dragPaths = sels.some(p => U.samePath(p, path)) ? sels : [path];
+        e.dataTransfer.setData('text/plain', 'widget'); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation();
+      },
+      ondragend: () => { Tree.dragPaths = null; Tree.mark(null); },
+      ondragover: e => { const z = Tree.zone(e, row, w, isRoot); if (!z) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; Tree.mark(row, z); },
+      ondragleave: () => Tree.mark(null),
+      ondrop: e => {
+        const z = Tree.zone(e, row, w, isRoot), paths = Tree.dragPaths;
+        Tree.dragPaths = null; Tree.mark(null);
+        if (!z || !paths) return;
+        e.preventDefault();
+        if (z === 'into') M.moveWidgets(paths, path);
+        else M.moveWidgets(paths, path.slice(0, -1), path[path.length - 1] + (z === 'after' ? 1 : 0));
+      },
+      oncontextmenu: e => { e.preventDefault(); e.stopPropagation(); App.widgetMenu(e, path); },
       onclick: e => {
         e.stopPropagation();
         if ((e.ctrlKey || e.shiftKey || e.metaKey) && !isRoot) { M.toggleSelect(path); App.selectionChanged(); }
         else App.select(path);
       },
       ondblclick: e => { e.stopPropagation(); if (!isRoot) Props.focusFirst(); },
-    }, U.el('span', { class: 'tr-icon' }, this.icon(w, isRoot)), U.el('span', { class: 'tr-label' }, this.label(w, isRoot)));
+    }, U.el('span', { class: 'tr-icon' }, this.icon(w, isRoot)), U.el('span', { class: 'tr-label' }, this.label(w, isRoot)),
+      M.flag(w, 'locked') ? U.el('span', { class: 'tr-mark', title: 'Locked on the canvas' }, '🔒') : null,
+      M.flag(w, 'hidden') ? U.el('span', { class: 'tr-mark', title: 'Hidden on the canvas (designer only)' }, '🚫') : null);
     li.append(row);
     if (w.children && w.children.length) {
       const ul = U.el('ul');
@@ -51,6 +72,20 @@ const Tree = {
       li.append(ul);
     }
     return li;
+  },
+
+  // ---- drag and drop: reorder, and move into / out of panels
+  dragPaths: null,
+  // where a drop on this row would go: 'before' / 'after' the widget, or 'into' it (a panel)
+  zone(e, row, w, isRoot) {
+    if (!this.dragPaths) return null;
+    if (isRoot) return 'into';
+    const r = row.getBoundingClientRect(), f = (e.clientY - r.top) / Math.max(1, r.height), box = M.isContainer(w);
+    return box ? (f < 0.25 ? 'before' : f > 0.75 ? 'after' : 'into') : (f < 0.5 ? 'before' : 'after');
+  },
+  mark(row, z) {
+    for (const r of this.el.querySelectorAll('.drop-before, .drop-after, .drop-into')) r.classList.remove('drop-before', 'drop-after', 'drop-into');
+    if (row && z) row.classList.add('drop-' + z);
   },
 
   icon(w, isRoot) {
