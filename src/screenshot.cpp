@@ -11,8 +11,9 @@ bool save_screenshot_bmp(lv_display_t* disp, const std::string& path)
     lv_draw_buf_t* buf = lv_snapshot_take(lv_display_get_screen_active(disp), LV_COLOR_FORMAT_XRGB8888);
     if(!buf) { HML_WARN("screenshot: snapshot failed"); return false; }
     const uint32_t w = buf->header.w, h = buf->header.h;
-    // what is on the top layer (dialogs) is drawn over the screen, as on the display
-    lv_obj_t* top = lv_display_get_layer_top(disp);
+    // what is on the top layer (dialogs) and the system layer (screen saver) is drawn over the
+    // screen, as on the display
+    for(lv_obj_t* top : { lv_display_get_layer_top(disp), lv_display_get_layer_sys(disp) }) {
     if(top && lv_obj_get_child_count(top) > 0) {
         if(lv_draw_buf_t* ov = lv_snapshot_take(top, LV_COLOR_FORMAT_ARGB8888)) {
             const uint32_t ow = ov->header.w < w ? ov->header.w : w, oh = ov->header.h < h ? ov->header.h : h;
@@ -26,6 +27,7 @@ bool save_screenshot_bmp(lv_display_t* disp, const std::string& path)
             }
             lv_draw_buf_destroy(ov);
         }
+    }
     }
     const uint32_t row = (w * 3 + 3) & ~3u;
     FILE* f = std::fopen(path.c_str(), "wb");

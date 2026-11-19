@@ -257,6 +257,7 @@
         ] }
     ]
   },
+  "screen_saver": { "after_s": 600, "wake_on_alarm": true },
   "languages": ["ja", "en"],
   "language": "ja",
   "font": { "file": "assets/fonts/NotoSansJP-subset.otf" },

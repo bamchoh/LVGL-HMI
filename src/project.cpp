@@ -6,6 +6,7 @@
 #include "script.hpp"
 #include "system_settings.hpp"
 #include "texts.hpp"
+#include "screen_saver.hpp"
 #include <algorithm>
 #include "recipe.hpp"
 #include "alarm_view.hpp"
@@ -55,6 +56,7 @@ void Project::apply_local_overlay()
 {
     base_drivers_ = root_.is_object() && root_.contains("drivers") ? root_["drivers"] : json();
     local_users_ = json();
+    local_screen_saver_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
@@ -62,6 +64,7 @@ void Project::apply_local_overlay()
     json overlay = parse_json_file(path);
     if(!overlay.is_object()) return;
     if(const json* lu = jget(overlay, "users")) local_users_ = *lu;
+    if(const json* ls = jget(overlay, "screen_saver")) local_screen_saver_ = *ls;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
     if(!od || !od->is_object() || !drivers) return;
@@ -201,6 +204,9 @@ bool Project::load(const std::string& path)
 
     // users and levels ("users"); a list edited on the device comes from project.local.json
     users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());
+
+    // the screen goes dark after a while without input ("screen_saver")
+    screen_saver().configure(jget(root_, "screen_saver"), local_screen_saver_.is_null() ? nullptr : &local_screen_saver_, local_overlay_path());
 
     // languages and texts ("@id"), and the font they are drawn with
     texts().load(root_);
@@ -369,6 +375,7 @@ int Project::build_screens()
 
 void Project::unload()
 {
+    screen_saver().clear();
     root_ = nullptr;
 }
 

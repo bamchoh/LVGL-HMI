@@ -384,3 +384,14 @@ I18N.PATTERNS_JA.push(
   [/^no text "(.*)" \(shown as "(.*)"\)$/, 'テキスト「$1」がありません（「$2」と表示されます）'],
   [/^the start language "(.*)" is not one of the languages$/, '起動時の言語「$1」が言語の一覧にありません'],
 );
+
+// ---- screen saver
+Object.assign(I18N.KEYS_JA, { after_s: '消灯までの時間 (秒)', wake_on_alarm: 'アラームで点灯', logout: '消灯時にログアウト' });
+Object.assign(I18N.TEXT_JA, {
+  'Screen saver': '画面消灯',
+  'the screen goes dark after this many seconds without a touch (0 / empty = never). The touch that wakes it presses nothing. Can be changed on the device: System > Display':
+    '操作がないままこの秒数が経つと画面を消します（0 / 空欄 = 消さない）。点灯させるタッチではボタンは押されません。装置でも変更できます（System > Display）',
+  'a new alarm wakes the screen': '新しいアラームで画面を点ける', 'log the user out when the screen goes dark': '画面が消えたらログアウトする',
+  'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.':
+    'Raspberry Pi: 表示器が対応していればバックライトを消します（/sys/class/backlight）。対応していなければ黒い画面にするだけです。タグ sys.screen.off は消灯中 1。1 を書くとすぐに消えます。',
+});

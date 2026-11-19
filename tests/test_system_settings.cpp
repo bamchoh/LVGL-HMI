@@ -255,7 +255,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
         ]
     })json")));
     SystemSettings& sys = system_settings();
-    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "driver_sim", "driver_plc", "driver_sim_2" });
+    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "display", "driver_sim", "driver_plc", "driver_sim_2" });
     json arr = json::parse(R"([{"type":"sim"},{"type":"modbus_tcp","name":"PLC"},{"type":"sim"}])");
     CHECK(driver_keys(&arr) == std::vector<std::string>{ "sim", "PLC", "sim#2" });
     CHECK(driver_keys(nullptr).empty());
@@ -274,7 +274,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
 
     // screens are generated alongside the project's own
     REQUIRE(p.build_screens() == 0);                           // no project screens -> fallback label, but...
-    CHECK(ui().screen_count() == 6);                           // ...menu + 5 pages exist
+    CHECK(ui().screen_count() == 7);                           // ...menu + 6 pages exist
     CHECK(ui().show_screen("__system_driver_plc", "none"));
 
     SUBCASE("applying a driver page writes project.local.json and restarts the drivers") {
