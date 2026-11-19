@@ -1095,3 +1095,21 @@ test('M mqtt driver: missing host, no TLS, password in the project, wildcards; t
   deq(M.st.project.drivers[0].publish, ['temperature']);
   deq(M.st.project.drivers[0].subscribe, [{ tag: 'speed' }]);
 });
+
+test('M opcua_client driver: endpoint, no security, verify off, nothing to trust, password; tag renames follow', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'temp', type: 'float' }];
+  M.st.project.drivers = [{ type: 'opcua_client', name: 'plc', endpoint: 'http://x', security: 'none', password: 'p', cert_file: 'c.der', map: [{ tag: 'temp', node: 'ns=2;s=T' }] }];
+  deq(M.problems().map(p => p.text).sort(), [
+    'plc: cert_file and key_file go together', 'plc: no security: values can be read and changed on the network',
+    'plc: the endpoint is not opc.tcp://host:port', 'plc: the password is in project.json; better enter it on the device (System > Driver)'].sort());
+  M.st.project.drivers = [{ type: 'opcua_client', endpoint: 'opc.tcp://a:4840', map: [{ tag: 'temp', node: 'ns=2;s=T' }] }];
+  deq(M.problems().map(p => p.text), ['opcua_client: no server certificate to trust (server_cert); put one in pki/trusted/ on the device, or it does not connect']);
+  M.st.project.drivers[0].verify = false;
+  deq(M.problems().map(p => p.text), ["opcua_client: the server's certificate is not checked (verify off)"]);
+  M.st.project.drivers[0].verify = undefined; M.st.project.drivers[0].server_cert = 'certs/s.der';
+  deq(M.problems(), []);
+  M.renameTag(0, 'temperature');
+  assert.equal(M.st.project.drivers[0].map[0].tag, 'temperature');
+});

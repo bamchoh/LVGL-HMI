@@ -25,6 +25,7 @@ add_executable(hml_tests
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp
   test_driver_opcua.cpp
+  test_driver_opcua_client.cpp
   test_screenshot.cpp
   test_demo_projects.cpp
   test_project.cpp

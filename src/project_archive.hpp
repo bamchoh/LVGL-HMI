@@ -5,7 +5,7 @@
 // Everything that works on a project (the runtime, Run / Preview and Deploy in the designer)
 // keeps working on a folder: a project file is unpacked into a working folder first, one per
 // project file, in the user's cache folder. What a machine adds while a project runs there
-// (recorded logs, project.local.json with that machine's settings) stays in the working
+// (recorded logs, project.local.json with that machine's settings, pki/ with its certificates) stays in the working
 // folder and never gets into the project file.
 //
 // No dependency on the rest of the runtime: the designer host uses this file too.
@@ -35,7 +35,7 @@ std::vector<ProjectFile> project_files(const std::filesystem::path& dir);
 bool pack_project(const std::filesystem::path& dir, const std::filesystem::path& archive, std::string* error = nullptr);
 
 // Unpack a project file into `dir` (created if needed). What was in `dir` before is removed,
-// except logs/ and project.local.json. Entries that would land outside `dir` are refused.
+// except logs/, pki/ and project.local.json. Entries that would land outside `dir` are refused.
 bool unpack_project(const std::filesystem::path& archive, const std::filesystem::path& dir, std::string* error = nullptr);
 
 // The working folder of a project file on this machine: always the same one for the same file.

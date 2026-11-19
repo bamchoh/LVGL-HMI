@@ -323,6 +323,34 @@ Object.assign(I18N.TEXT_JA, {
   'D100 / M0 / X1F / D10.3': 'D100 / M0 / X1F / D10.3',
 });
 I18N.PATTERNS_JA.push([/^(.*): "(.*)" is not a device address$/, '$1: 「$2」はデバイスの書き方ではありません'], [/^(.*): no host is set$/, '$1: ホストが設定されていません']);
+// ---- OPC UA client driver
+Object.assign(I18N.KEYS_JA, { endpoint: 'エンドポイント', security: 'セキュリティ', policy: 'セキュリティポリシー', server_cert: 'サーバー証明書',
+  application_uri: 'アプリケーション URI', publish_ms: '更新の間隔 (ms)', node: 'ノード' });
+Object.assign(I18N.VALUES_JA, { sign_encrypt: '署名と暗号化', sign: '署名のみ' });
+Object.assign(I18N.TEXT_JA, {
+  'OPC UA client': 'OPC UA クライアント',
+  'sign_encrypt (default)': '署名と暗号化（既定）',
+  'OPC UA client (opcua_client)': 'OPC UA クライアント (opcua_client)',
+  'Nodes': 'ノード',
+  'opc.tcp://host:4840 of the server': 'サーバーの opc.tcp://ホスト:4840',
+  'none: values can be read and changed on the network': 'none: 値がネットワーク上で読めて、書き換えられます',
+  '(the best both have)': '（両方が使える最も強いもの）',
+  'e.g. Basic256Sha256, Aes128_Sha256_RsaOaep': '例: Basic256Sha256, Aes128_Sha256_RsaOaep',
+  "the server's certificate (DER / PEM) to trust, relative to project.json; more can be put in pki/trusted/ on the device": '信頼するサーバーの証明書（DER / PEM、project.json からの相対パス）。装置の pki/trusted/ にも置けます',
+  "check the server's certificate. Without it anybody on the way can pretend to be the server": 'サーバーの証明書を確認する。切ると途中の誰でもサーバーになりすませます',
+  "this client's certificate (DER). Empty: the device makes one at the first start (pki/own/opcua_client.der); the server has to trust it": 'このクライアントの証明書（DER）。空欄なら装置が初回に作ります（pki/own/opcua_client.der）。サーバー側で信頼させてください',
+  'must be the URI in the client certificate': 'クライアント証明書の URI と同じにする',
+  'how often the server sends changes (default 500)': 'サーバーが変化を送る間隔（既定 500）',
+  'connect (default 5000)': '接続の時間制限（既定 5000）',
+  'ns=2;s=Temp / nsu=urn:...;i=5': 'ns=2;s=Temp / nsu=urn:...;i=5',
+});
+I18N.PATTERNS_JA.push(
+  [/^(.*): the endpoint is not opc.tcp:\/\/host:port$/, '$1: エンドポイントが opc.tcp://ホスト:ポート の形ではありません'],
+  [/^(.*): no security: values can be read and changed on the network$/, '$1: セキュリティなし: 値がネットワーク上で読めて、書き換えられます'],
+  [/^(.*): the server's certificate is not checked \(verify off\)$/, '$1: サーバーの証明書を確認していません（verify がオフ）'],
+  [/^(.*): no server certificate to trust \(server_cert\); put one in pki\/trusted\/ on the device, or it does not connect$/, '$1: 信頼するサーバー証明書（server_cert）がありません。装置の pki/trusted/ に置かないと接続しません'],
+  [/^(.*): cert_file and key_file go together$/, '$1: cert_file と key_file は両方とも指定します'],
+);
 // ---- MQTT driver
 Object.assign(I18N.KEYS_JA, { tls: 'TLS（暗号化）', verify: '証明書を確認', ca_file: 'CA 証明書', cert_file: 'クライアント証明書', key_file: '秘密鍵',
   client_id: 'クライアント ID', topic_prefix: 'トピックの前置き', status_topic: '状態トピック', payload: '送る形式', qos: 'QoS', retain: '保持 (retain)',

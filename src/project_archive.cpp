@@ -68,7 +68,7 @@ std::vector<ProjectFile> project_files(const fs::path& dir)
     auto add = [&](const std::string& rel_in) {
         std::string rel;
         if(!safe_rel(rel_in, rel)) return false;
-        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0) return false;
+        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0 || rel.rfind("pki/", 0) == 0) return false;
         fs::path file = dir / fs::u8path(rel);
         if(!fs::is_regular_file(file, ec)) return false;
         for(const auto& o : out) if(o.rel == rel) return true;
@@ -165,7 +165,7 @@ bool unpack_project(const fs::path& archive, const fs::path& dir, std::string* e
         std::string rel;
         if(!safe_rel(st.m_filename, rel)) { bad = std::string("the project file contains a path that leads outside the project: ") + st.m_filename; break; }
         if(st.m_uncomp_size > 512ull * 1024 * 1024) { bad = "the project file contains a file that is too large: " + rel; break; }
-        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0) continue;      // a machine's own files: never taken from a project file
+        if(rel == "project.local.json" || rel.rfind("logs/", 0) == 0 || rel.rfind("pki/", 0) == 0) continue;      // a machine's own files: never taken from a project file
         if(rel == "project.json") has_project = true;
         entries.push_back({ i, rel });
     }
@@ -176,7 +176,7 @@ bool unpack_project(const fs::path& archive, const fs::path& dir, std::string* e
     fs::create_directories(dir, ec);
     for(const auto& e : fs::directory_iterator(dir, ec)) {
         const std::string name = ustr(e.path().filename());
-        if(name == "logs" || name == "project.local.json") continue;                 // what this machine added stays
+        if(name == "logs" || name == "pki" || name == "project.local.json") continue;   // what this machine added stays
         std::error_code rec;
         fs::remove_all(e.path(), rec);
     }

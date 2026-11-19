@@ -169,6 +169,7 @@ const Panels = {
     if (d.type === 'sim') return (d.items || []).length + ' items';
     if (d.type === 'modbus_tcp') return (d.host || '') + ':' + (d.port || 502) + ', ' + (d.map || []).length + ' regs';
     if (d.type === 'opcua_server') return 'port ' + (d.port || 4840);
+    if (d.type === 'opcua_client') return (d.endpoint || '') + (d.security === 'none' ? ' (no security)' : '') + ', ' + (d.map || []).length + ' nodes';
     if (d.type === 'mqtt') return (d.host || '') + (d.tls === false ? ' (no TLS)' : '') + ', ' + (d.publish || []).length + ' out / ' + (d.subscribe || []).length + ' in';
     return '';
   },

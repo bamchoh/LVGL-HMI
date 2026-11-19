@@ -19,6 +19,7 @@ void DriverRegistry::register_builtins()
     register_type("mqtt", make_mqtt_driver);
     register_type("opcua_server", make_opcua_server_driver);
     register_type("opcua", make_opcua_server_driver);
+    register_type("opcua_client", make_opcua_client_driver);
 }
 
 int DriverRegistry::load(const json* array)

@@ -7,3 +7,5 @@
 *.bmp binary
 *.otf binary
 *.ttf binary
+*.der binary
+tests/assets/opcua/*.key binary

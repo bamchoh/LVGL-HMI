@@ -565,7 +565,8 @@ private:
 // (credentials): shown even when the project does not have them.
 std::vector<const char*> device_only_keys(const json& cfg)
 {
-    if(iequals(jstr(cfg, "type", ""), "mqtt")) return { "username", "password" };
+    const std::string type = jstr(cfg, "type", "");
+    if(iequals(type, "mqtt") || iequals(type, "opcua_client")) return { "username", "password" };
     return {};
 }
 
