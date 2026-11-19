@@ -286,6 +286,16 @@ const M = {
     for (const g of (p.data_log && p.data_log.groups) || []) { if (!g) continue; list(g.tags, logs, 'data_log'); prop(g, 'trigger_tag', logs); }
     for (const al of (p.alarms && p.alarms.items) || []) { if (!al) continue; prop(al, 'tag', logs, 'alarms'); prop(al, 'value_tag', logs); }
     if (p.operation_log) prop(p.operation_log, 'user_tag', logs);
+    this.recipeBooks().forEach((b, bi) => {
+      const loc = { view: 'recipes', index: bi };
+      list(b.items, loc, 'items');
+      // the values of the recipes are keyed by tag name: a rename moves them
+      for (const r of Array.isArray(b.recipes) ? b.recipes : []) {
+        const vals = r && r.values;
+        if (!vals || typeof vals !== 'object') continue;
+        for (const k of Object.keys(vals)) cb(k, n => { if (n !== k && !(n in vals)) { vals[n] = vals[k]; delete vals[k]; } }, loc, 'recipe', true);
+      }
+    });
   },
   // name -> [{ loc, what }]
   tagUses() {
@@ -383,6 +393,143 @@ const M = {
     return res;
   },
 
+  // ---- recipes ---------------------------------------------------------------------
+  recipeBooks() { const r = this.st.project && this.st.project.recipes; return r && Array.isArray(r.books) ? r.books : []; },
+  validRecipeName(n) { return typeof n === 'string' && n.length >= 1 && n.length <= 32 && !/[\x00-\x1f\x7f]/.test(n) && n.trim() === n; },
+  validBookName(n) { return this.validRecipeName(n) && !/[\/\\:*?"<>|.]/.test(n); },
+  addRecipeBook() {
+    const p = this.st.project, books = this.recipeBooks();
+    let n = 1;
+    while (books.some(b => b.name === 'book' + n)) n++;
+    const name = 'book' + n;
+    this.mutate(() => {
+      p.recipes = p.recipes || {};
+      p.recipes.books = p.recipes.books || [];
+      p.recipes.books.push({ name, items: this.tagNames().slice(0, 3), recipes: [] });
+    });
+    return name;
+  },
+  renameRecipeBook(i, name) {
+    name = String(name || '').trim();
+    const books = this.recipeBooks(), b = books[i];
+    if (!b || !this.validBookName(name) || books.some((x, j) => j !== i && x.name === name)) return false;
+    const old = b.name;
+    this.mutate(() => {
+      b.name = name;
+      // recipe tables on the screens follow
+      const walk = w => { if (w.type === 'recipe_table' && w.book === old) w.book = name; (w.children || []).forEach(walk); };
+      this.st.screens.forEach(s => walk(s.data));
+    });
+    return true;
+  },
+  addRecipe(bi) {
+    const b = this.recipeBooks()[bi];
+    if (!b) return;
+    b.recipes = b.recipes || [];
+    let n = b.recipes.length + 1;
+    while (b.recipes.some(r => r.name === 'Recipe ' + n)) n++;
+    this.mutate(() => b.recipes.push({ name: 'Recipe ' + n, values: {} }));
+  },
+  // text from a cell: as the tag's type ('' removes the value)
+  setRecipeValue(bi, ri, tag, text) {
+    const b = this.recipeBooks()[bi], r = b && b.recipes[ri];
+    if (!r) return;
+    const t = ((this.st.project.tags) || []).find(x => x.name === tag), s = String(text).trim();
+    this.mutate(() => {
+      r.values = r.values || {};
+      if (s === '') { delete r.values[tag]; return; }
+      if (t && t.type === 'string') r.values[tag] = s;
+      else if (t && t.type === 'bool') r.values[tag] = /^(true|1|on)$/i.test(s);
+      else r.values[tag] = Number.isFinite(Number(s)) ? Number(s) : s;      // (kept as typed: the problems list says what is wrong)
+    });
+  },
+  // what the runtime would refuse
+  recipeProblems() {
+    const out = [], tags = (this.st.project && this.st.project.tags) || [];
+    const books = this.recipeBooks(), seen = new Set();
+    books.forEach((b, bi) => {
+      const at = { view: 'recipes', index: bi }, bn = b.name || '';
+      if (!this.validBookName(bn)) out.push(Object.assign({ text: 'recipe book "' + bn + '": 1-32 characters, no / \\ : * ? " < > | .' }, at));
+      if (seen.has(bn)) out.push(Object.assign({ text: 'recipe book "' + bn + '" is defined twice' }, at));
+      seen.add(bn);
+      const names = new Set();
+      for (const r of Array.isArray(b.recipes) ? b.recipes : []) {
+        if (!this.validRecipeName(r.name)) out.push(Object.assign({ text: 'recipe book "' + bn + '": a recipe name is 1 to 32 characters' }, at));
+        else if (names.has(r.name)) out.push(Object.assign({ text: 'recipe book "' + bn + '": recipe "' + r.name + '" is defined twice' }, at));
+        names.add(r.name);
+        for (const [k, v] of Object.entries(r.values || {})) {
+          const t = tags.find(x => x.name === k);
+          if (!t) continue;
+          if (t.type !== 'string' && t.type !== 'bool' && typeof v !== 'number') out.push(Object.assign({ text: 'recipe "' + r.name + '": ' + k + ' is not a number' }, at));
+          else if (typeof v === 'number' && ((t.min !== undefined && v < t.min) || (t.max !== undefined && v > t.max)))
+            out.push(Object.assign({ text: 'recipe "' + r.name + '": ' + k + ' = ' + v + ' is outside ' + (t.min === undefined ? '' : t.min) + '..' + (t.max === undefined ? '' : t.max) }, at));
+        }
+      }
+    });
+    const level = this.st.project && this.st.project.recipes && U.num(this.st.project.recipes.level, 0);
+    if (level > 0 && !this.usersOn()) out.push({ text: 'recipes: a level is set, but user management is off (Users tab)', view: 'recipes' });
+    // recipe tables need a book that exists
+    this.st.screens.forEach((s, si) => {
+      const walk = (w, path) => {
+        if (w.type === 'recipe_table' && !books.some(b => b.name === w.book)) out.push({ text: 'recipe table: no recipe book "' + (w.book || '') + '"', screen: si, path });
+        (w.children || []).forEach((c, i) => walk(c, path.concat(i)));
+      };
+      walk(s.data, []);
+    });
+    return out;
+  },
+  recipesCsv(bi) {
+    const b = this.recipeBooks()[bi];
+    if (!b) return '';
+    const cell = v => { let s = v === undefined || v === null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const items = b.items || [];
+    return [['name'].concat(items).map(cell).join(',')].concat((b.recipes || []).map(r => [r.name].concat(items.map(t => (r.values || {})[t])).map(cell).join(','))).join('\n') + '\n';
+  },
+  // replace the recipes of a book with lines of a table (first line: name,<tag>...). { count, errors }
+  importRecipesCsv(bi, text) {
+    const b = this.recipeBooks()[bi], res = { count: 0, errors: [] };
+    if (!b) return res;
+    const rows = [];
+    let row = [], cell = '', q = false;
+    const src = String(text || '').replace(/^\uFEFF/, '');
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (q) { if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; continue; }
+      if (c === '"') q = true;
+      else if (c === ',' || c === '\t') { row.push(cell); cell = ''; }
+      else if (c === '\r') continue;
+      else if (c === '\n') { row.push(cell); if (row.some(x => x !== '')) rows.push(row); row = []; cell = ''; }
+      else cell += c;
+    }
+    row.push(cell); if (row.some(x => x !== '')) rows.push(row);
+    if (!rows.length || rows[0][0] !== 'name') { res.errors.push('the first line must be: name,<tag>,<tag>...'); return res; }
+    const cols = rows[0].slice(1);
+    for (const c of cols) if (!(b.items || []).includes(c)) res.errors.push('column "' + c + '" is not an item of the book');
+    const list = [], names = new Set();
+    rows.slice(1).forEach((r, i) => {
+      const name = String(r[0] || '').replace(/^'/, '');
+      if (!this.validRecipeName(name)) res.errors.push('line ' + (i + 2) + ': a recipe name is 1 to 32 characters');
+      else if (names.has(name)) res.errors.push('line ' + (i + 2) + ': recipe "' + name + '" twice');
+      names.add(name);
+      const values = {};
+      cols.forEach((c, ci) => {
+        let v = r[ci + 1];
+        if (v === undefined || v === '') return;
+        v = v.replace(/^'/, '');
+        const t = ((this.st.project.tags) || []).find(x => x.name === c);
+        if (t && t.type === 'string') values[c] = v;
+        else if (t && t.type === 'bool') values[c] = /^(true|1|on)$/i.test(v);
+        else if (Number.isFinite(Number(v))) values[c] = Number(v);
+        else res.errors.push('line ' + (i + 2) + ': ' + c + ' "' + v + '" is not a number');
+      });
+      list.push({ name, values });
+    });
+    if (res.errors.length) return res;
+    this.mutate(() => { b.recipes = list; });
+    res.count = list.length;
+    return res;
+  },
+
   // ---- moving widgets in the tree ----------------------------------------------
   pathOf(obj) {
     let found = null;
@@ -473,6 +620,7 @@ const M = {
     });
     if (p.alarms && U.num(p.alarms.ack_level, 0) > 0 && !usersOn) out.push({ text: 'alarms: ack_level is set, but user management is off (Users tab)', view: 'logs' });
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
+    for (const r of this.recipeProblems()) out.push(r);
     return out;
   },
 

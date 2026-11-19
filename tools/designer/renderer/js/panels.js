@@ -21,6 +21,7 @@ const Panels = {
     document.getElementById('view-scripts').hidden = v !== 'scripts';
     document.getElementById('view-logs').hidden = v !== 'logs';
     document.getElementById('view-users').hidden = v !== 'users';
+    document.getElementById('view-recipes').hidden = v !== 'recipes';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
     App.refresh();
   },
@@ -39,6 +40,7 @@ const Panels = {
     this.renderScripts();
     this.renderLogs();
     this.renderUsers();
+    this.renderRecipes();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
     for (const t of M.tagChoices()) dl.append(U.el('option', { value: t.name, label: t.note }));
@@ -263,6 +265,47 @@ const Panels = {
       items.push(it);
     }) }, '+ row');
     return U.el('div', null, U.el('h4', null, tdef.label), tbl, U.el('div', { class: 'row' }, add));
+  },
+
+  // ---- recipes: books of named value sets (project.json "recipes"). The device keeps its own
+  // copy once something is saved there (recipes/<book>.json); a deploy does not replace it.
+  renderRecipes() {
+    const page = document.getElementById('view-recipes'); page.innerHTML = '';
+    const p = M.st.project; if (!p) return;
+    const r = p.recipes || {}, books = Array.isArray(r.books) ? r.books : [], fk = 'rec';
+    page.append(U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, 'Recipes'), U.el('span', { class: 'grow' }),
+      U.el('button', { class: 'primary', onclick: () => { const n = M.addRecipeBook(); if (!n) App.toast('name already used or invalid'); } }, '+ Add recipe book')));
+    page.append(U.el('div', { class: 'hint' }, 'A recipe book is a list of tags (items) and named sets of values for them. On the device, the "Recipe table" widget shows a book: pick a recipe, compare it with the current values, write it to the PLC, save the current values as a recipe. Values are checked against the tags\' min / max before anything is written.'));
+    if (books.length) {
+      page.append(U.el('div', { class: 'drv-fields' },
+        Props.row('level', Props.editor(r, 'level', { t: 'number' }, fk), 'user level needed to write, save or delete recipes on the device (0 / empty = everybody)'),
+        Props.row('verify_ms', Props.editor(r, 'verify_ms', { t: 'number' }, fk), 'after a write: compare the tags with what was written after this many ms (default 2000, 0 = do not check)')));
+    }
+    books.forEach((b, bi) => {
+      const bfk = fk + '.' + bi, items = Array.isArray(b.items) ? b.items : (b.items = []), list = Array.isArray(b.recipes) ? b.recipes : (b.recipes = []);
+      const sec = U.el('div', { class: 'log-sec' });
+      sec.append(U.el('div', { class: 'page-head' },
+        U.el('h4', { style: { margin: 0 } }, U.el('span', null, I18N.t('Recipe book') + ': '), U.el('input', { type: 'text', value: b.name || '', dataset: { fk: bfk + '.name' },
+          onchange: e => { if (!M.renameRecipeBook(bi, e.target.value)) { App.toast('name already used or invalid'); App.doRefresh(); } } })),
+        U.el('span', { class: 'grow' }),
+        U.el('button', { onclick: () => App.recipesCsvDialog(bi) }, 'Import / export …'),
+        U.el('button', { class: 'mini danger', title: 'delete', onclick: () => { if (App.ask(I18N.f('Delete recipe book "{0}"?', b.name))) M.mutate(() => books.splice(bi, 1)); } }, '×')));
+      sec.append(Props.row('items', Props.editor(b, 'items', { t: 'csv' }, bfk), 'the tags of this book, comma separated'));
+      const tbl = U.el('table', { class: 'grid' });
+      tbl.append(U.el('tr', null, U.el('th', null, I18N.label('name')), ...items.map(t => U.el('th', null, t)), U.el('th')));
+      list.forEach((rc, ri) => {
+        rc.values = rc.values && typeof rc.values === 'object' ? rc.values : {};
+        const rfk = bfk + '.r' + ri;
+        tbl.append(U.el('tr', null,
+          U.el('td', null, U.el('input', { type: 'text', value: rc.name || '', dataset: { fk: rfk + '.name' }, onchange: e => M.mutate(() => { rc.name = e.target.value.trim(); }) })),
+          ...items.map(t => U.el('td', null, U.el('input', { type: 'text', value: rc.values[t] === undefined ? '' : String(rc.values[t]), dataset: { fk: rfk + '.' + t },
+            onchange: e => M.setRecipeValue(bi, ri, t, e.target.value) }))),
+          U.el('td', { class: 'act' }, U.el('button', { class: 'mini danger', title: 'delete', onclick: () => M.mutate(() => list.splice(ri, 1)) }, '×'))));
+      });
+      sec.append(tbl, U.el('div', { class: 'row' }, U.el('button', { class: 'mini', onclick: () => M.addRecipe(bi) }, '+ Add recipe')));
+      page.append(sec);
+    });
+    if (!books.length) page.append(U.el('div', { class: 'hint' }, 'No recipe books yet.'));
   },
 
   // ---- users: who may log in on the device, with which level. Screens and widgets ask for a

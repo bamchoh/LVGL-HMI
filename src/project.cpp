@@ -5,6 +5,7 @@
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "system_settings.hpp"
+#include "recipe.hpp"
 #include "alarm_view.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
@@ -226,6 +227,8 @@ void Project::start_logs(bool read_only)
     alarms().load(jget(root_, "alarms"), info_.dir, read_only);
     operation_log().load(jget(root_, "operation_log"), info_.dir, read_only);
     if(read_only) return;
+    recipes().load(jget(root_, "recipes"), info_.dir);
+    register_recipe_actions();
 
     // { "action": "call", "fn": "data_log.export", "arg": "<group>" } or "<group>,<file.csv>";
     // without a file the CSV goes next to the database. The other two take the file (or nothing).
@@ -255,6 +258,7 @@ void Project::stop_logs()
     data_log().clear();
     alarms().clear();
     operation_log().clear();
+    recipes().clear();
 }
 
 int Project::build_screens()

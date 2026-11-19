@@ -279,6 +279,32 @@ Object.assign(I18N.TEXT_JA, {
   'Changes that were not saved were found ({0}). Restore them?': '保存されていない変更が見つかりました（{0}）。復元しますか？',
 });
 
+// ---- recipes
+Object.assign(I18N.KEYS_JA, { book: 'レシピブック', verify_ms: '書き込み後の確認 (ms)', items: '項目', row_height: '行の高さ' });
+Object.assign(I18N.TEXT_JA, {
+  'Recipes': 'レシピ', 'Recipe table': 'レシピ表', 'Recipe book': 'レシピブック', '+ Add recipe book': '+ レシピブックを追加', '+ Add recipe': '+ レシピを追加',
+  'No recipe books yet.': 'レシピブックはまだありません。',
+  'Recipes: sets of values written to the PLC in one go (Ctrl+7)': 'レシピ: まとめて PLC に書き込む値の組 (Ctrl+7)',
+  'A recipe book is a list of tags (items) and named sets of values for them. On the device, the "Recipe table" widget shows a book: pick a recipe, compare it with the current values, write it to the PLC, save the current values as a recipe. Values are checked against the tags\' min / max before anything is written.':
+    'レシピブックは、タグ（項目）の一覧と、それぞれの値の組（レシピ）に名前を付けたものです。装置では部品「レシピ表」で表示し、レシピを選んで現在値と比べ、PLC へ書き込み、現在値をレシピとして保存できます。書き込む前に、すべての値をタグの最小値・最大値で確かめます（1 つでも外れていれば何も書きません）。',
+  'user level needed to write, save or delete recipes on the device (0 / empty = everybody)': '装置でレシピを書き込む・保存する・削除するのに必要なレベル（0 / 空欄 = 誰でも）',
+  'after a write: compare the tags with what was written after this many ms (default 2000, 0 = do not check)': '書き込んだあと、この時間 (ms) が経ったらタグの値と書いた値を比べる（既定 2000、0 = 比べない）',
+  'the tags of this book, comma separated': 'このブックのタグ（カンマ区切り）',
+  'One recipe per line: name, then one value per item. Copy this into a spreadsheet, or paste lines from one here (commas or tabs) and press Import: the recipes of the book are replaced. Cells that a spreadsheet would read as a formula get a leading apostrophe.':
+    '1 行に 1 レシピ: 名前、続けて項目ごとの値。表計算ソフトへコピーするか、表計算ソフトの行をここへ貼り付けて（カンマ区切りでもタブ区切りでも可）「取り込む」を押すと、このブックのレシピが置き換わります。表計算ソフトが数式と読むセルには、先頭にアポストロフィを付けます。',
+  '{0} recipe(s) imported': '{0} 個のレシピを取り込みました',
+  'Screen editor, tags, drivers, scripts, logs, users, recipes': '画面の編集・タグ・ドライバ・スクリプト・ログ・ユーザー・レシピ',
+  'recipes: a level is set, but user management is off (Users tab)': 'レシピ: 必要レベルが設定されていますが、ユーザー管理がオフです（ユーザー タブ）',
+});
+I18N.PATTERNS_JA.push(
+  [/^Delete recipe book "(.*)"\?$/, 'レシピブック「$1」を削除しますか？'], [/^Recipes "(.*)": import \/ export$/, 'レシピ「$1」の取り込み / 書き出し'],
+  [/^recipe table: no recipe book "(.*)"$/, 'レシピ表: レシピブック「$1」がありません'],
+  [/^recipe "(.*)": (.*) = (.*) is outside (.*)$/, 'レシピ「$1」: $2 = $3 は範囲 $4 の外です'],
+  [/^recipe "(.*)": (.*) is not a number$/, 'レシピ「$1」: $2 が数値ではありません'],
+  [/^recipe book "(.*)": recipe "(.*)" is defined twice$/, 'レシピブック「$1」: レシピ「$2」が 2 回定義されています'],
+  [/^recipe book "(.*)": a recipe name is 1 to 32 characters$/, 'レシピブック「$1」: レシピ名は 1〜32 文字です'],
+  [/^recipe book "(.*)" is defined twice$/, 'レシピブック「$1」が 2 回定義されています'],
+);
 // ---- SLMP driver
 Object.assign(I18N.KEYS_JA, { frame: 'フレーム', network: 'ネットワーク番号', pc: 'PC 番号', io: '要求先ユニット I/O 番号', station: '要求先局番',
   write_ranges: '書き込みを許す範囲', allow_system_write: 'SM / SD にも書き込む', length: '文字数' });
