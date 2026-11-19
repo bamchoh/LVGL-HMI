@@ -72,6 +72,11 @@ public:
     // values always go through binds, never into the SQL text. offset skips rows (paging).
     std::vector<LogRow> query(const std::string& where = "", const LogRow& binds = {}, int limit = 0, bool newest_first = false, int offset = 0);
     int64_t count(const std::string& where = "", const LogRow& binds = {});
+    // "SELECT <columns> FROM <table> [WHERE <where>] <tail>": for aggregates. columns / where /
+    // tail are written by the program; every value goes through binds.
+    // from: what to select from instead of the table (a sub query; the program writes it too).
+    std::vector<LogRow> select(const std::string& columns, const std::string& where, const LogRow& binds, const std::string& tail = "",
+                               const std::string& from = "");
 
     // "<database dir>/<stem>-YYYYMMDD-HHMMSS.csv"
     std::string export_path(const std::string& stem) const;

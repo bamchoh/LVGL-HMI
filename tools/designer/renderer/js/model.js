@@ -264,6 +264,10 @@ const M = {
           }
         }
         for (const s2 of Array.isArray(w.series) ? w.series : []) prop(s2, 'tag', loc, 'series');
+        if (w.type === 'trend' && Array.isArray(w.tags)) w.tags.forEach((x, i) => {
+          if (typeof x === 'string') { if (x) cb(x, n => { w.tags[i] = n; }, loc, 'trend', false); }
+          else prop(x, 'tag', loc, 'trend');
+        });
         (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
       };
       visit(s.data, []);
@@ -468,6 +472,22 @@ const M = {
     });
     const level = this.st.project && this.st.project.recipes && U.num(this.st.project.recipes.level, 0);
     if (level > 0 && !this.usersOn()) out.push({ text: 'recipes: a level is set, but user management is off (Users tab)', view: 'recipes' });
+    // trends need a data log group that exists, and tags that it records
+    const groups = (this.st.project && this.st.project.data_log && this.st.project.data_log.groups) || [];
+    this.st.screens.forEach((s, si) => {
+      const walk = (w, path) => {
+        if (w.type === 'trend') {
+          const g = groups.find(x => x.name === w.group);
+          if (!g) out.push({ text: 'trend: no data log group "' + (w.group || '') + '"', screen: si, path });
+          else for (const t of Array.isArray(w.tags) ? w.tags : []) {
+            const n = typeof t === 'string' ? t : t && t.tag;
+            if (n && !(g.tags || []).includes(n)) out.push({ text: 'trend: data log group "' + g.name + '" does not record "' + n + '"', screen: si, path });
+          }
+        }
+        (w.children || []).forEach((c, i) => walk(c, path.concat(i)));
+      };
+      walk(s.data, []);
+    });
     // recipe tables need a book that exists
     this.st.screens.forEach((s, si) => {
       const walk = (w, path) => {

@@ -358,6 +358,20 @@
     M.st.project.users = users; delete M.st.project.alarms.ack_level;
   });
 
+  await test('trend: in the palette, group chosen from the data log, preview with the legend', async () => {
+    ok([...document.querySelectorAll('#tab-widgets button.pal')].some(b => /トレンド/.test(b.textContent)), 'palette');
+    App.addWidget('trend'); await frame();
+    const sel = [...document.querySelectorAll('#props select')].find(s => [...s.options].some(o => o.value === 'process'));
+    ok(sel, 'group select offers the data log groups');
+    sel.value = 'process'; sel.dispatchEvent(new Event('change')); App.doRefresh(); await frame();
+    const el2 = Canvas.root.querySelector('[data-path="' + U.pathStr(M.st.sel) + '"]');
+    ok(el2.classList.contains('lv-trend') && el2.querySelectorAll('path').length === 5, 'one line per tag of the group');
+    ok(el2.textContent.includes('temp') && el2.textContent.includes('1 h'), 'legend and window');
+    eq(App.problems.filter(p => /trend/.test(p.text)).length, 0, 'no problems');
+    M.mutate(() => { M.selected().tags = ['run']; }); App.doRefresh();
+    ok(App.problems.some(p => /does not record "run"/.test(p.text)), 'a tag the group does not record');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

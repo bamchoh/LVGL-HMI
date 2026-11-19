@@ -334,3 +334,11 @@ Object.assign(I18N.TEXT_JA, {
     '確認が必要（既定）: 確認 (ACK) されるまでアラーム一覧に残ります。画面には部品「アラーム一覧」「アラームバナー」で表示します。タグ sys.alarm.active（発生中の数）・sys.alarm.unacked（未確認の数）・sys.alarm.latest（最新のメッセージ）、動作 call "alarm.ack" / "alarm.ack_all" も使えます。',
   'alarms: ack_level is set, but user management is off (Users tab)': 'アラーム: 確認に必要なレベルが設定されていますが、ユーザー管理がオフです（ユーザー タブ）',
 });
+
+// ---- trend
+Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表示する期間 (秒)', buckets: '横の点数', refresh_ms: '更新周期 (ms)' });
+Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
+I18N.PATTERNS_JA.push(
+  [/^trend: no data log group "(.*)"$/, 'トレンド: ロギンググループ「$1」がありません'],
+  [/^trend: data log group "(.*)" does not record "(.*)"$/, 'トレンド: ロギンググループ「$1」は「$2」を記録していません'],
+);
