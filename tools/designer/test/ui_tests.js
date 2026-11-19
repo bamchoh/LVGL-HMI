@@ -410,6 +410,20 @@
     Panels.show('widgets');
   });
 
+  await test('screen saver: set on the Project tab; nothing is written while it is empty', async () => {
+    Panels.show('project'); App.doRefresh();
+    const f = document.querySelector('[data-fk="proj.ss.after_s"]');
+    ok(f, 'after_s field');
+    eq(f.value, '600', 'the demo value');
+    f.value = '120'; f.dispatchEvent(new Event('change')); App.doRefresh();
+    eq(M.st.project.screen_saver.after_s, 120);
+    const g = document.querySelector('[data-fk="proj.ss.after_s"]');
+    g.value = ''; g.dispatchEvent(new Event('change')); App.doRefresh();
+    eq(M.st.project.screen_saver.after_s, undefined, 'emptied');
+    ok(M.tagChoices().some(t => t.name === 'sys.screen.off'), 'sys.screen.off in the tag list');
+    Panels.show('widgets');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

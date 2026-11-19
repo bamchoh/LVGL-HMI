@@ -456,6 +456,19 @@ const Panels = {
     el.append(Props.section('Boot splash (Raspberry Pi)', false,
       ...Props.fields(d, [{ k: 'splash', t: 'image' }, { k: 'splash_bg', t: 'color' }], fk + '.display'),
       U.el('div', { class: 'hint' }, 'Shown during boot by hml-splash.service (hml_runtime --splash) until the HMI starts. PNG, centred and shrunk to fit; empty = the project title. Background default: black.')));
+    // "screen_saver" exists only while it says something
+    const ssHolder = new Proxy({}, {
+      get: (t, k) => (p.screen_saver || {})[k],
+      set: (t, k, v) => { p.screen_saver = Object.assign({}, p.screen_saver, { [k]: v }); return true; },
+      deleteProperty: (t, k) => { if (p.screen_saver) { delete p.screen_saver[k]; if (!Object.keys(p.screen_saver).length) delete p.screen_saver; } return true; },
+      has: (t, k) => !!p.screen_saver && k in p.screen_saver,
+    });
+    el.append(Props.section('Screen saver', false,
+      ...Props.fields(ssHolder, [
+        { k: 'after_s', t: 'number', hint: 'the screen goes dark after this many seconds without a touch (0 / empty = never). The touch that wakes it presses nothing. Can be changed on the device: System > Display' },
+        { k: 'wake_on_alarm', t: 'bool', hint: 'a new alarm wakes the screen' },
+        { k: 'logout', t: 'bool', hint: 'log the user out when the screen goes dark' }], fk + '.ss'),
+      U.el('div', { class: 'hint' }, 'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.')));
     // "font" exists only while it names a file
     const fontHolder = new Proxy({}, {
       get: (t, k) => (k === 'file' ? (p.font && p.font.file) : undefined),

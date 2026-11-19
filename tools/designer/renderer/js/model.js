@@ -79,6 +79,7 @@ const M = {
   // The tags a tag field offers: the project's (with their type), then those the runtime makes.
   tagChoices() {
     const out = ((this.st.project && this.st.project.tags) || []).filter(t => t && t.name).map(t => ({ name: t.name, note: t.type || '' }));
+    out.push({ name: 'sys.screen.off', note: 'bool (system)' }, { name: 'sys.lang', note: 'string (system)' });
     if (this.usersOn()) for (const [n, ty] of [['sys.user.name', 'string'], ['sys.user.level', 'int'], ['sys.user.level_name', 'string'], ['sys.user.logged_in', 'bool']]) out.push({ name: n, note: ty + ' (system)' });
     for (const [n, ty] of [['sys.alarm.active', 'int'], ['sys.alarm.unacked', 'int'], ['sys.alarm.latest', 'string'], ['sys.alarm.latest_severity', 'string']]) out.push({ name: n, note: ty + ' (system)' });
     return out;

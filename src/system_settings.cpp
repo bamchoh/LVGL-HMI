@@ -1,4 +1,5 @@
 #include "system_settings.hpp"
+#include "screen_saver.hpp"
 #include "project.hpp"
 #include "serial_ports.hpp"
 #include "tag.hpp"
@@ -712,6 +713,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     s.clear();
     s.add_page(make_about_page(proj));
     s.add_page(make_network_page());
+    s.add_page(make_display_page());
     if(auto up = make_users_page()) s.add_page(std::move(up));
     if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
