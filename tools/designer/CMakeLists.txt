@@ -26,6 +26,7 @@ target_link_libraries(hml_designer PRIVATE webview::core hml_json hml_miniz)
 target_compile_definitions(hml_designer PRIVATE
   HML_DESIGNER_VERSION="0.1"
   HML_DESIGNER_RENDERER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/renderer"
+  HML_DESIGNER_SKILL_DIR="${CMAKE_SOURCE_DIR}/tools/skill/hml-screens"
 )
 if(MSVC)
   target_compile_definitions(hml_designer PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
@@ -42,8 +43,11 @@ endif()
 # HTML / JS only.
 add_custom_target(hml_designer_renderer ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/renderer $<TARGET_FILE_DIR:hml_designer>/designer
+  # the AI skill (tools/skill): shipped with the designer so that both are the same version
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/tools/skill/hml-screens $<TARGET_FILE_DIR:hml_designer>/skills/hml-screens
   COMMENT "Copying designer renderer files")
 add_dependencies(hml_designer_renderer hml_designer)
 
 install(TARGETS hml_designer RUNTIME DESTINATION bin)
 install(DIRECTORY renderer/ DESTINATION bin/designer)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/tools/skill/hml-screens/ DESTINATION bin/skills/hml-screens)

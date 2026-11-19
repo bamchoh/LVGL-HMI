@@ -465,6 +465,66 @@
     Panels.show('widgets');
   });
 
+  await test('AI: the dialog gives the skill, the project folder and the runtime', async () => {
+    document.getElementById('b-ai').click();
+    const t = document.querySelector('[data-fk="ai.prompt"]');
+    ok(t, 'the text for the assistant');
+    ok(/hml-screens\/SKILL\.md/.test(t.value), 'names the skill: ' + t.value);
+    ok(t.value.includes(M.st.dir), 'names the project folder');
+    ok(/hml_runtime/.test(t.value), 'names the runtime');
+    ok(App.info.skillDir, 'the host found the skill folder');
+    [...document.querySelectorAll('#modal-buttons button')].pop().click();
+  });
+
+  await test('files changed outside: loaded again; with unsaved changes the user is asked', async () => {
+    reset();
+    M.st.dirty = false;
+    await App.takeStamp();
+    const st = M.st, file = st.screens[st.cur].file, name = st.screens[st.cur].data.name;
+    const original = JSON.stringify(st.screens[st.cur].data, null, 2);
+    const withLabel = text => { const d = JSON.parse(original); d.children.push({ type: 'label', x: 1, y: 1, text }); return JSON.stringify(d, null, 2); };
+    const has = text => M.st.screens[M.st.cur].data.children.some(c => c.text === text);
+    // (the designer also checks by itself every few seconds: wait for whichever check sees the change)
+    const until = async cond => { for (let i = 0; i < 60 && !cond(); i++) { await App.checkOutside(); await new Promise(r => setTimeout(r, 50)); } };
+
+    // another program writes the screen file: nothing unsaved here, so it is simply loaded
+    await host.writeFiles(st.dir, [{ rel: file, text: withLabel('from outside 1') }]);
+    await until(() => has('from outside 1'));
+    ok(has('from outside 1'), 'the change is in the model');
+    eq(M.st.screens[M.st.cur].data.name, name, 'still on the same screen');
+    eq(M.st.dirty, false, 'nothing to save');
+    await App.checkOutside();
+    ok(document.getElementById('modal').hidden, 'not asked again without a new change');
+
+    // with unsaved changes: asked; keeping them leaves the model alone
+    M.mutate(() => { M.st.project.title = 'edited here'; });
+    await host.writeFiles(M.st.dir, [{ rel: file, text: withLabel('from outside 2') }]);
+    await until(() => !document.getElementById('modal').hidden);
+    ok(!document.getElementById('modal').hidden, 'asked');
+    const btn = label => [...document.querySelectorAll('#modal-buttons button')].find(b => b.dataset.label === label);
+    ok(btn('Keep my changes') && btn('Load the files'), 'both choices');
+    btn('Keep my changes').click();
+    ok(!has('from outside 2') && M.st.project.title === 'edited here', 'kept');
+
+    // ... and loading the files discards them
+    await host.writeFiles(M.st.dir, [{ rel: file, text: withLabel('from outside 3') }]);
+    await until(() => !document.getElementById('modal').hidden);
+    btn('Load the files').click();
+    for (let i = 0; i < 50 && !has('from outside 3'); i++) await new Promise(r => setTimeout(r, 50));
+    ok(has('from outside 3'), 'loaded');
+    ok(M.st.project.title !== 'edited here', 'the change made here is gone');
+
+    // a file that cannot be read keeps what is open
+    const before = App.stamp;
+    await host.writeFiles(M.st.dir, [{ rel: file, text: '{ broken' }]);
+    await until(() => App.stamp !== before);
+    ok(has('from outside 3'), 'the broken file is not taken');
+
+    await host.writeFiles(M.st.dir, [{ rel: file, text: original }]);
+    await until(() => !has('from outside 3'));
+    ok(!has('from outside 3'), 'back to the original');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);
