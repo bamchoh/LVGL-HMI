@@ -279,6 +279,24 @@ Object.assign(I18N.TEXT_JA, {
   'Changes that were not saved were found ({0}). Restore them?': '保存されていない変更が見つかりました（{0}）。復元しますか？',
 });
 
+// ---- SLMP driver
+Object.assign(I18N.KEYS_JA, { frame: 'フレーム', network: 'ネットワーク番号', pc: 'PC 番号', io: '要求先ユニット I/O 番号', station: '要求先局番',
+  write_ranges: '書き込みを許す範囲', allow_system_write: 'SM / SD にも書き込む', length: '文字数' });
+Object.assign(I18N.TEXT_JA, {
+  'Mitsubishi SLMP / MC protocol (MELSEC)': '三菱電機 SLMP / MC プロトコル (MELSEC)',
+  'Mitsubishi SLMP / MC protocol (MELSEC) (slmp)': '三菱電機 SLMP / MC プロトコル (MELSEC) (slmp)',
+  'Device map': 'デバイスの割り付け',
+  'the SLMP port of the CPU or of the Ethernet unit (Karakuri: 5007)': 'CPU または Ethernet ユニットの SLMP のポート番号（Karakuri は 5007）',
+  'how long to wait for an answer (default 1000)': '応答を待つ時間（既定 1000）',
+  'route: network number (default 0 = the station itself)': '経路: ネットワーク番号（既定 0 = 接続した局そのもの）',
+  'route: PC number (default 255)': '経路: PC 番号（既定 255）',
+  'route: request destination module I/O number (default 1023 = 0x3FF, the CPU)': '経路: 要求先ユニット I/O 番号（既定 1023 = 0x3FF、CPU）',
+  'route: request destination station number (default 0)': '経路: 要求先局番（既定 0）',
+  'only these may be written, e.g. D0-D999, M0-M99 (empty = everything except SM / SD)': 'ここに書いた範囲だけ書き込める。例: D0-D999, M0-M99（空欄 = SM / SD 以外すべて）',
+  "also write SM / SD (the CPU's own relays and registers)": 'SM / SD（CPU 自身の特殊リレー・特殊レジスタ）にも書き込む',
+  'D100 / M0 / X1F / D10.3': 'D100 / M0 / X1F / D10.3',
+});
+I18N.PATTERNS_JA.push([/^(.*): "(.*)" is not a device address$/, '$1: 「$2」はデバイスの書き方ではありません'], [/^(.*): no host is set$/, '$1: ホストが設定されていません']);
 // ---- alarm widgets
 Object.assign(I18N.KEYS_JA, { rows: '行数', row_height: '行の高さ', columns: '表示する列', ack_on_tap: 'タップで確認', severity: '重要度', days: '期間 (日)',
   blink: '点滅', ack: '確認が必要', ack_level: '確認に必要なレベル', labels: '表示文字' });

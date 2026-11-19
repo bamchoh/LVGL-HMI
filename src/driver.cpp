@@ -15,6 +15,7 @@ void DriverRegistry::register_builtins()
     register_type("modbus_tcp", make_modbus_tcp_driver);
     register_type("modbus_rtu", make_modbus_rtu_driver);
     register_type("modbus_ascii", make_modbus_ascii_driver);
+    register_type("slmp", make_slmp_driver);
     register_type("opcua_server", make_opcua_server_driver);
     register_type("opcua", make_opcua_server_driver);
 }

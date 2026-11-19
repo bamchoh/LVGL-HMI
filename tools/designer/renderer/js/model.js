@@ -461,6 +461,12 @@ const M = {
     });
     (p.drivers || []).forEach((d, i) => {
       if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
+      if (d.type === 'slmp') {
+        if (!d.host) out.push({ text: (d.name || d.type) + ': no host is set', view: 'drivers', index: i });
+        for (const row of Array.isArray(d.map) ? d.map : []) {
+          if (row && row.addr !== undefined && !U.slmpAddress(row.addr)) out.push({ text: (d.name || d.type) + ': "' + row.addr + '" is not a device address', view: 'drivers', index: i });
+        }
+      }
     });
     (p.scripts || []).forEach((s, i) => {
       if (/^screen_/.test(s.trigger || '') && s.screen && !screens.has(s.screen)) out.push({ text: 'script "' + (s.name || '') + '": unknown screen "' + s.screen + '"', view: 'scripts', index: i });
