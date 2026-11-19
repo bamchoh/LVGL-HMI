@@ -58,6 +58,14 @@ const Props = {
       case 'script': return this.editor(obj, k, { t: 'select', o: [''].concat(M.scriptNames()), empty: '(inline code)' }, fk);
       case 'code': return U.el('textarea', Object.assign(attrs, { rows: 3, class: 'mono code', spellcheck: false, placeholder: 'Lua, e.g.  tag.count = tag.count + 1',
         value: Array.isArray(v) ? v.join('\n') : (v || ''), onkeydown: U.tabKey, onchange: e => this.setVal(obj, k, e.target.value) }));
+      case 'loggroup': {
+        const p = M.st.project, names = ((p && p.data_log && p.data_log.groups) || []).map(g => g.name).filter(Boolean);
+        const s = U.el('select', Object.assign(attrs, { onchange: e => this.setVal(obj, k, e.target.value || undefined) }));
+        s.append(U.el('option', { value: '' }, '-'));
+        for (const n of names) s.append(U.el('option', { value: n, selected: v === n }, n));
+        if (v && !names.includes(v)) s.append(U.el('option', { value: v, selected: true }, v + ' (?)'));
+        return s;
+      }
       case 'recipebook': {
         const names = M.recipeBooks().map(b => b.name);
         const s = U.el('select', Object.assign(attrs, { onchange: e => this.setVal(obj, k, e.target.value || undefined) }));

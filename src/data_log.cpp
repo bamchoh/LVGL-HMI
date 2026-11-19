@@ -1,4 +1,7 @@
 #include "data_log.hpp"
+#include <array>
+#include <climits>
+#include <map>
 #include "lvgl.h"
 #include "tag.hpp"
 #include "util.hpp"
@@ -19,12 +22,27 @@ struct Group {
     bool        edge_was_on = false;        // TagEdge: previous state of trigger_tag
     uint32_t    last_sample = 0;            // millis()
     bool        sampled = false;
+    // the minute being summarised: tag -> min, max, last (numbers and bools)
+    int64_t     minute = -1;
+    std::map<std::string, std::array<double, 3>> acc;
 };
 
 } // namespace
 
 struct DataLog::Impl {
     LogDb db{ "data log", "sample", { { "grp", "TEXT NOT NULL" }, { "data", "TEXT NOT NULL" } }, "grp, ts" };
+    // One row per group and minute: { "tag": [min, max, last] }. A trend over a long time reads
+    // these instead of every sample (same file, table "minute").
+    LogDb sum{ "data log summary", "minute", { { "grp", "TEXT NOT NULL" }, { "data", "TEXT NOT NULL" } }, "grp, ts" };
+
+    void flush_minute(Group& g)
+    {
+        if(g.minute < 0 || g.acc.empty() || !sum.is_open()) { g.acc.clear(); return; }
+        json o = json::object();
+        for(const auto& [k, v] : g.acc) o[k] = json::array({ v[0], v[1], v[2] });
+        sum.add(g.minute, { g.name, o.dump() });
+        g.acc.clear();
+    }
     std::vector<std::unique_ptr<Group>> groups;
     lv_timer_t* poll = nullptr;             // samples the groups marked dirty by tag changes
 
@@ -46,7 +64,16 @@ struct DataLog::Impl {
                 case TagType::String: o[t->name()] = v.str; break;
             }
         }
-        db.add({ g.name, o.dump() });
+        const int64_t now = LogDb::now_ms(), minute = now / 60000 * 60000;
+        if(minute != g.minute) { flush_minute(g); g.minute = minute; }
+        for(Tag* t : g.tags) {
+            if(t->type() == TagType::String) continue;
+            const double x = t->type() == TagType::Bool ? (t->get().num != 0 ? 1 : 0) : t->get().num;
+            auto it = g.acc.find(t->name());
+            if(it == g.acc.end()) g.acc[t->name()] = { x, x, x };
+            else { it->second[0] = std::min(it->second[0], x); it->second[1] = std::max(it->second[1], x); it->second[2] = x; }
+        }
+        db.add(now, { g.name, o.dump() });
         g.dirty = false;
         g.sampled = true;
         g.last_sample = millis();
@@ -74,8 +101,10 @@ void DataLog::clear()
     }
     m.poll = nullptr;
     if(!m.groups.empty()) tags().unsubscribe_group(SubGroup::DataLog);
+    for(auto& g : m.groups) m.flush_minute(*g);              // (the minute so far)
     m.groups.clear();
     m.db.close();
+    m.sum.close();
 }
 
 int DataLog::load(const json* section, const std::string& base_dir, bool read_only)
@@ -143,6 +172,9 @@ int DataLog::load(const json* section, const std::string& base_dir, bool read_on
         clear();
         return 0;
     }
+    LogDbConfig scfg = cfg;
+    if(scfg.max_rows > 0) scfg.max_rows = std::max(1000, scfg.max_rows / 10);
+    m.sum.open(scfg, read_only);
     if(!read_only) {
         m.poll = lv_timer_create([](lv_timer_t*) { data_log().impl_->poll_dirty(); }, 50, nullptr);
         HML_INFO("data log: %d group(s), recording to '%s'", static_cast<int>(m.groups.size()), cfg.path.c_str());
@@ -151,6 +183,7 @@ int DataLog::load(const json* section, const std::string& base_dir, bool read_on
 }
 
 bool DataLog::enabled() const { return impl_->db.is_open(); }
+LogDb& DataLog::summary_db() { return impl_->sum; }
 LogDb& DataLog::db() { return impl_->db; }
 
 std::vector<std::string> DataLog::groups() const
@@ -166,6 +199,115 @@ bool DataLog::sample(const std::string& group)
     if(!g || g->tags.empty() || !impl_->db.is_open()) { HML_WARN("data log: cannot sample unknown group '%s'", group.c_str()); return false; }
     impl_->take(*g);
     return true;
+}
+
+std::vector<std::vector<TrendBucket>> DataLog::trend(const std::string& group, const std::vector<std::string>& tags,
+                                                       int64_t from_ms, int64_t to_ms, int buckets)
+{
+    std::vector<std::vector<TrendBucket>> out(tags.size(), std::vector<TrendBucket>(static_cast<size_t>(std::max(0, buckets))));
+    if(buckets <= 0 || to_ms <= from_ms || tags.empty()) return out;
+    // Long windows (a slice of a minute or more) read the per-minute summary where it exists and
+    // the samples only for what it does not cover yet (the current minute, data from before it).
+    std::vector<std::vector<int64_t>> last_ts(tags.size(), std::vector<int64_t>(static_cast<size_t>(buckets), INT64_MIN));
+    const bool use_sum = (to_ms - from_ms) / buckets >= 60000 && impl_->sum.is_open();
+    std::pair<int64_t, int64_t> covered{ 0, 0 };
+    if(use_sum) {
+        auto rows = impl_->sum.select("MIN(ts), MAX(ts)", "grp = ?1 AND ts >= ?2 AND ts < ?3", { group, from_ms, to_ms });
+        if(!rows.empty() && rows[0][0].type == LogCell::Int) covered = { rows[0][0].i, rows[0][1].i + 60000 };
+    }
+    if(covered.second > covered.first) {
+        trend_part(true, group, tags, from_ms, to_ms, buckets, covered.first, covered.second, out, last_ts);
+        if(covered.first > from_ms) trend_part(false, group, tags, from_ms, to_ms, buckets, from_ms, covered.first, out, last_ts);
+        if(covered.second < to_ms) trend_part(false, group, tags, from_ms, to_ms, buckets, covered.second, to_ms, out, last_ts);
+    }
+    else trend_part(false, group, tags, from_ms, to_ms, buckets, from_ms, to_ms, out, last_ts);
+    return out;
+}
+
+// One part [part_from, part_to) of a trend, from the samples or from the summary, merged into out.
+// bucket = (ts - from) * buckets / (to - from). Two queries: MIN / MAX per bucket (the inner query
+// takes each value out of the JSON once: ->> gives numbers, 1 / 0 for bools, text for text, which
+// typeof() leaves out), and the newest row of each bucket for "last" (SQLite takes bare columns
+// from the MAX(ts) row only when MAX is the one aggregate, so that is a query of its own; it
+// reads no JSON, the few rows it returns are parsed here).
+void DataLog::trend_part(bool summary, const std::string& group, const std::vector<std::string>& tags, int64_t from_ms, int64_t to_ms,
+                         int buckets, int64_t part_from, int64_t part_to, std::vector<std::vector<TrendBucket>>& out,
+                         std::vector<std::vector<int64_t>>& last_ts)
+{
+    const LogRow base_binds = { group, from_ms, to_ms, static_cast<int64_t>(buckets), part_from, part_to };
+    const std::string table = summary ? "minute" : "sample";
+    const std::string where = " FROM " + table + " WHERE grp = ?1 AND ts >= ?5 AND ts < ?6)";
+    LogDb& db = summary ? impl_->sum : impl_->db;
+    auto num = [](const LogCell& c) { return c.type == LogCell::Int ? static_cast<double>(c.i) : c.type == LogCell::Real ? c.d : 0.0; };
+
+    LogRow binds = base_binds;
+    std::string inner = "(SELECT (ts - ?2) * ?4 / (?3 - ?2) AS b";
+    std::string cols = "b";
+    for(size_t i = 0; i < tags.size(); i++) {
+        // the path as a parameter: tag names never become SQL. '$."name"' also takes dots in names.
+        std::string esc;
+        for(char c : tags[i]) { if(c == '"' || c == '\\') esc += '\\'; esc += c; }
+        const std::string path = "$.\"" + esc + "\"";
+        auto col = [&](const std::string& p, const std::string& name) {
+            binds.emplace_back(p);
+            inner += ", data ->> ?" + std::to_string(binds.size()) + " AS " + name;
+            return "CASE WHEN typeof(" + name + ") IN ('integer', 'real') THEN " + name + " END";
+        };
+        const std::string n = std::to_string(i);
+        if(summary) cols += ", MIN(" + col(path + "[0]", "a" + n) + "), MAX(" + col(path + "[1]", "z" + n) + ")";
+        else { const std::string v = col(path, "r" + n); cols += ", MIN(" + v + "), MAX(" + v + ")"; }
+    }
+    for(const LogRow& r : db.select(cols, "", binds, "GROUP BY b", inner + where)) {
+        if(r.size() < 1 + tags.size() * 2 || r[0].type != LogCell::Int) continue;
+        const int64_t b = r[0].i;
+        if(b < 0 || b >= buckets) continue;
+        for(size_t i = 0; i < tags.size(); i++) {
+            const LogCell& mn = r[1 + i * 2];
+            const LogCell& mx = r[2 + i * 2];
+            if(mn.type == LogCell::Null || mx.type == LogCell::Null) continue;
+            TrendBucket& t = out[i][static_cast<size_t>(b)];
+            if(!t.has) { t.has = true; t.min = num(mn); t.max = num(mx); t.last = t.max; continue; }
+            t.min = std::min(t.min, num(mn));
+            t.max = std::max(t.max, num(mx));
+        }
+    }
+    // the newest row of each bucket
+    for(const LogRow& r : db.select("b, MAX(ts), data", "", base_binds, "GROUP BY b", "(SELECT ts, (ts - ?2) * ?4 / (?3 - ?2) AS b, data" + where)) {
+        if(r.size() < 3 || r[0].type != LogCell::Int || r[1].type != LogCell::Int || r[2].type != LogCell::Text) continue;
+        const int64_t b = r[0].i, ts = r[1].i;
+        if(b < 0 || b >= buckets) continue;
+        const json d = json::parse(r[2].s, nullptr, false);
+        if(!d.is_object()) continue;
+        for(size_t i = 0; i < tags.size(); i++) {
+            TrendBucket& t = out[i][static_cast<size_t>(b)];
+            int64_t& lt = last_ts[i][static_cast<size_t>(b)];
+            if(!t.has || ts < lt) continue;
+            const json* v = jget(d, tags[i].c_str());
+            if(v && summary) v = v->is_array() && v->size() >= 3 ? &(*v)[2] : nullptr;
+            if(!v) continue;
+            if(v->is_number()) t.last = v->get<double>();
+            else if(v->is_boolean()) t.last = v->get<bool>() ? 1 : 0;
+            else continue;
+            lt = ts;
+        }
+    }
+}
+
+std::pair<int64_t, int64_t> DataLog::time_range(const std::string& group)
+{
+    auto rows = impl_->db.select("MIN(ts), MAX(ts)", "grp = ?1", { group });
+    if(rows.empty() || rows[0].size() < 2 || rows[0][0].type != LogCell::Int) return { 0, 0 };
+    return { rows[0][0].i, rows[0][1].i };
+}
+
+std::vector<std::string> DataLog::group_tags(const std::string& group) const
+{
+    for(const auto& g : impl_->groups) if(g->name == group) {
+        std::vector<std::string> out;
+        for(const std::string& n : g->tag_names) out.push_back(n);
+        return out;
+    }
+    return {};
 }
 
 std::vector<DataSample> DataLog::query(const std::string& group, int limit, bool newest_first)

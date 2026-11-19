@@ -1010,3 +1010,18 @@ test('U.slmpAddress agrees with the runtime parser; M.problems names wrong SLMP 
   const texts = M.problems().map(p => p.text);
   deq(texts.sort(), ['plc: "D1A" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
 });
+
+test('M trend widgets: group and tags are checked, tag renames follow', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'temp', type: 'float' }, { name: 'p', type: 'float' }];
+  M.st.project.data_log = { groups: [{ name: 'g', trigger: 'interval', tags: ['temp', 'p'] }] };
+  M.screen().children = [{ type: 'trend', group: 'g', tags: ['temp', { tag: 'p', color: '#f00' }] }, { type: 'trend', group: 'nope' }, { type: 'trend', group: 'g', tags: ['ghost'] }];
+  const texts = M.problems().map(p => p.text).sort();
+  deq(texts, ['trend: data log group "g" does not record "ghost"', 'trend: no data log group "nope"', 'unknown tag "ghost" (trend)'].sort());
+  M.renameTag(0, 'temperature');
+  deq(M.screen().children[0].tags, ['temperature', { tag: 'p', color: '#f00' }]);
+  M.renameTag(1, 'pressure');
+  assert.equal(M.screen().children[0].tags[1].tag, 'pressure');
+  deq(M.st.project.data_log.groups[0].tags, ['temperature', 'pressure']);
+});

@@ -339,6 +339,18 @@
             },
             {
               "type": "button",
+              "text": "Trend",
+              "style": {
+                "bg_color": "#5e35b1"
+              },
+              "on_click": {
+                "action": "goto",
+                "screen": "trend",
+                "anim": "slide_left"
+              }
+            },
+            {
+              "type": "button",
               "text": "Recipes",
               "style": {
                 "bg_color": "#00838f"

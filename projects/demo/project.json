@@ -261,6 +261,7 @@
     "screens/main.json",
     "screens/settings.json",
     "screens/recipes.json",
-    "screens/alarms.json"
+    "screens/alarms.json",
+    "screens/trend.json"
   ]
 }

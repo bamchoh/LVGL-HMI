@@ -111,6 +111,7 @@ const Canvas = {
       case 'text_display': case 'password_display': return [160, null];
       case 'keyboard': return ['100%', '50%'];
       case 'recipe_table': return ['100%', 300];
+      case 'trend': return ['100%', 300];
       case 'alarm_list': return ['100%', 240];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
@@ -388,6 +389,27 @@ const Canvas = {
     }
     el.append(U.el('div', { class: 'lv-kbrow' }, U.el('div', { class: 'lv-key' }, '×'), U.el('div', { class: 'lv-key lv-key-wide' }, 'space'), U.el('div', { class: 'lv-key' }, '✓')));
   },
+  // a trend: sample lines in the colours the device uses, the window and the legend
+  TREND_COLORS: ['#2196f3', '#ff9800', '#4caf50', '#e91e63', '#9c27b0', '#009688', '#ffc107', '#f44336'],
+  w_trend(el, w) {
+    const p = M.st.project, g = ((p && p.data_log && p.data_log.groups) || []).find(x => x.name === w.group);
+    const list = (Array.isArray(w.tags) && w.tags.length ? w.tags : (g && g.tags) || []).slice(0, 8)
+      .map((t, i) => typeof t === 'string' ? { tag: t, color: this.TREND_COLORS[i % 8] } : { tag: t.tag, color: t.color || this.TREND_COLORS[i % 8] });
+    const range = U.num(w.range_s, 3600), span = range >= 86400 ? (range / 86400) + ' d' : range >= 3600 ? (range / 3600) + ' h' : (range / 60) + ' min';
+    el.append(U.el('div', null, g ? (w.group + '  ·  ' + span + '  (live)') : "no data log group '" + (w.group || '') + "'"));
+    const W = 300, H = 100, svg = U.svg('svg', { class: 'lv-tr-svg', viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none' });
+    for (let i = 1; i < 5; i++) svg.append(U.svg('line', { x1: 0, x2: W, y1: i * H / 5, y2: i * H / 5, stroke: 'rgba(158,158,158,.25)', 'stroke-width': 0.5 }));
+    list.forEach((t, k) => {
+      let d = '';
+      for (let x = 0; x <= W; x += 5) d += (x ? 'L' : 'M') + x + ',' + (H / 2 + Math.sin(x / 25 + k * 1.7) * (H / 3 - k * 6)).toFixed(1);
+      svg.append(U.svg('path', { d, fill: 'none', stroke: t.color, 'stroke-width': 1.5, 'vector-effect': 'non-scaling-stroke' }));
+    });
+    el.append(svg);
+    el.append(U.el('div', { class: 'lv-rt-foot' }, ...['◀', '▶', '−', '+'].map(s => U.el('span', { class: 'lv-al-btn' }, s)),
+      U.el('span', { class: 'lv-al-btn', style: { background: '#ff9800', width: 'auto', padding: '0 14px' } }, (w.labels && w.labels.now) || 'Now'),
+      ...list.map(t => U.el('span', { style: { color: t.color, alignSelf: 'center' } }, t.tag))));
+  },
+
   // the book's own recipes as the device will show them (current values: from the tags' init)
   w_recipe_table(el, w) {
     const b = M.recipeBooks().find(x => x.name === w.book);

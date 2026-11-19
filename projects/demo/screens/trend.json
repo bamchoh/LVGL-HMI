@@ -1,0 +1,18 @@
+{
+  "name": "trend",
+  "scrollable": false,
+  "style": { "bg_color": "#141a22", "pad": 0 },
+  "children": [
+    {
+      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
+      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
+      "children": [
+        { "type": "label", "text": "Trend", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
+        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "Back", "style_label": { "font": 14 },
+          "on_click": { "action": "back" } }
+      ]
+    },
+    { "type": "trend", "group": "process", "x": 16, "y": 68, "w": 768, "h": 400, "range_s": 300,
+      "tags": ["temp", "pressure", { "tag": "speed_pv", "color": "#66bb6a" }] }
+  ]
+}

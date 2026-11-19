@@ -338,6 +338,39 @@ void LogDb::add(int64_t ts_ms, LogRow row)
 
 void LogDb::flush() { impl_->write_pending(); }
 
+std::vector<LogRow> LogDb::select(const std::string& columns, const std::string& where, const LogRow& binds, const std::string& tail,
+                                  const std::string& from)
+{
+    Impl& m = *impl_;
+    flush();
+    std::vector<LogRow> out;
+    std::lock_guard<std::mutex> dl(m.dbmu);
+    if(!m.db) return out;
+    std::string sql = "SELECT " + columns + " FROM " + (from.empty() ? m.table : from) + (where.empty() ? "" : " WHERE " + where) + (tail.empty() ? "" : " " + tail);
+    sqlite3_stmt* st = nullptr;
+    if(sqlite3_prepare_v2(m.db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
+        if(!m.ro) HML_ERROR("%s: query failed: %s", m.label.c_str(), sqlite3_errmsg(m.db));
+        sqlite3_finalize(st);
+        return out;
+    }
+    for(size_t i = 0; i < binds.size(); i++) bind_cell(st, static_cast<int>(i) + 1, binds[i]);
+    const int ncol = sqlite3_column_count(st);
+    while(sqlite3_step(st) == SQLITE_ROW) {
+        LogRow row;
+        for(int c = 0; c < ncol; c++) {
+            switch(sqlite3_column_type(st, c)) {
+                case SQLITE_INTEGER: row.emplace_back(static_cast<int64_t>(sqlite3_column_int64(st, c))); break;
+                case SQLITE_FLOAT:   row.emplace_back(sqlite3_column_double(st, c)); break;
+                case SQLITE_TEXT:    row.emplace_back(std::string(reinterpret_cast<const char*>(sqlite3_column_text(st, c)))); break;
+                default:             row.emplace_back(); break;
+            }
+        }
+        out.push_back(std::move(row));
+    }
+    sqlite3_finalize(st);
+    return out;
+}
+
 int64_t LogDb::count(const std::string& where, const LogRow& binds)
 {
     Impl& m = *impl_;
