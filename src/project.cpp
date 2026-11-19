@@ -233,6 +233,11 @@ void Project::apply_theme(lv_display_t* disp)
     const lv_font_t* f = font ? font_from_json(font) : has_font_file() && font_of_size(16) ? font_of_size(16) : LV_FONT_DEFAULT;
     lv_theme_t* th = lv_theme_default_init(disp, info_.primary, info_.secondary, info_.dark, f);
     lv_display_set_theme(disp, th);
+    // The theme gives its font to screens only. What is put on the layers above them (popups,
+    // dialogs) inherits from the layer: without this, text there is in the built-in font, which
+    // has no Japanese.
+    for(lv_obj_t* layer : { lv_display_get_layer_top(disp), lv_display_get_layer_sys(disp) })
+        if(layer) lv_obj_set_style_text_font(layer, f, LV_PART_MAIN);
 }
 
 int Project::start_drivers()
@@ -240,11 +245,12 @@ int Project::start_drivers()
     return drivers().load(jget(root_, "drivers"));
 }
 
-void Project::start_logs(bool read_only)
+void Project::start_logs(bool read_only, const std::string& log_dir)
 {
-    data_log().load(jget(root_, "data_log"), info_.dir, read_only);
-    alarms().load(jget(root_, "alarms"), info_.dir, read_only);
-    operation_log().load(jget(root_, "operation_log"), info_.dir, read_only);
+    const std::string& dir = log_dir.empty() ? info_.dir : log_dir;
+    data_log().load(jget(root_, "data_log"), dir, read_only);
+    alarms().load(jget(root_, "alarms"), dir, read_only);
+    operation_log().load(jget(root_, "operation_log"), dir, read_only);
     if(read_only) return;
     recipes().load(jget(root_, "recipes"), info_.dir);
     register_recipe_actions();

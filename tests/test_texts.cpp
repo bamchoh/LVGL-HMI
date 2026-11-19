@@ -224,6 +224,12 @@ TEST_CASE("font: the demo project with its font and texts renders every screen m
         if(!ui().show_screen(s, "none")) continue;
         for(int i = 0; i < 5; i++) { rt.advance(50); hmltest::Lvgl::get().render(); }
     }
+    // what is on the layers above the screens (popups, dialogs) is in the project's font too
+    REQUIRE(ui().open_popup("temp_detail"));
+    rt.advance(50);
+    CHECK(lv_obj_get_style_text_font(lv_layer_top(), LV_PART_MAIN) == lv_obj_get_style_text_font(lv_screen_active(), LV_PART_MAIN));
+    CHECK(lv_obj_get_style_text_font(lv_layer_top(), LV_PART_MAIN) != LV_FONT_DEFAULT);
+    ui().close_popup();
     MESSAGE("6 screens x 5 frames with the font file: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count() << " ms");
     CHECK(texts().set_language("en"));
     rt.advance(100);

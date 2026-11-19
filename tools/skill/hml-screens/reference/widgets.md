@@ -137,7 +137,7 @@ Events: `on_click`, `on_press`, `on_release`, `on_long_press`, `on_long_press_re
 | `call` | `fn` (text), `arg` (text) |
 | `script` | `name` (script name), `code` (Lua code) |
 
-An event can be put on any widget. A screen file itself takes `name`, `style`, `children`, `level`, and for a popup `popup`, `dim`, `w`, `h`, `x`, `y`, `align`.
+An event can be put on any widget. A screen file itself takes `name`, `children`, the style objects, the common keys (`scrollable`, `flex` ..., `level`) and, for a popup, `popup`, `dim`, `w`, `h`, `x`, `y`, `align`. It takes no `bind` and no events.
 
 Screen change animations (`"anim"`): `none`, `fade`, `slide_left`, `slide_right`, `slide_top`, `slide_bottom`, `over_left`, `over_right`, `move_left`, `move_right`, `move_top`, `move_bottom`.
 

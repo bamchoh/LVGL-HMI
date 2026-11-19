@@ -40,9 +40,36 @@
 | `map` | 値 → 色。`default` がその他。bool は `"true"` / `"false"` |
 | `part` | `bg_color` を付ける場所: `main`（既定）/ `indicator` / `knob` |
 
+- 短い形と一緒にほかの種類も付けたいときは、長い形で書く:
+  `"bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } }`。
+- `enabled` / `disabled` はどの部品にも付けられ、無効のあいだは薄く表示されて押せない。親の `panel` に付けても
+  子は無効にならないので、操作する部品それぞれに付ける。
+- 条件は 1 つのタグだけ（「A かつ B」は書けない）。要るときは、条件をまとめた bool のタグを作り、スクリプトで
+  計算する。`project.json` の `scripts` に
+  `{ "name": "can_run", "trigger": "tag", "tags": ["auto_mode", "run"], "code": "tag.can_run = not tag.auto_mode and not tag.run" }`。
+- 文字列のタグの値を訳して出す仕組みはない。値ごとの `label` を重ねて `visible` と `eq` で出し分ける
+  （`{ "type": "label", "text": "@running", "bind": { "visible": { "tag": "state", "eq": 2 } } }`）。
 - `checked` に `eq` を付けたボタン（`"checkable": true`）は、押すとその値をタグに書く。同じタグで値を変えて並べると
   択一（ラジオボタン）になる。
 - 同じ場所に条件違いの `panel` を重ねて `visible` で切り替えると、状態ごとの表示になる。
+
+## スタイルを付ける場所
+
+`style` は部品の本体。ほかは部品の一部や状態に付く。
+
+| キー | 付く所 |
+| --- | --- |
+| `style_label` | `button` / `checkbox` の中の文字（ボタンの文字の大きさは `"style_label": { "font": 20 }`） |
+| `style_indicator` | `bar` / `slider` / `arc` の値の部分、`switch` / `checkbox` の印 |
+| `style_indicator_checked` | ON のときのその部分 |
+| `style_knob` | `slider` / `arc` / `switch` のつまみ |
+| `style_items` | `keyboard` のキー、`dropdown` / `roller` の項目 |
+| `style_selected` | `roller` / `dropdown` の選ばれている項目 |
+| `style_pressed` `style_checked` `style_disabled` `style_focused` | 押されている / ON / 無効 / 入力中 のときの本体 |
+| `style_scrollbar` | スクロールバー |
+
+`w` `h` を省くと、大きさは中身とテーマで決まる。並べてそろえるもの、押すものには `w` `h` を書く。`panel` の内側の余白も
+テーマで決まるので、位置を計算で合わせたいときは `"style": { "pad": 12 }` のように自分で決める。
 
 ## 動作
 
@@ -63,6 +90,7 @@
 ]
 ```
 
+- `set` の `value` は、タグの型に合わせて JSON の値で書く（`true` / `false`、数値、文字列）。
 - 押している間だけ ON: `on_press` で `set` true、`on_release` で `set` false。
 - イベントはどの部品にも書ける（`panel` や `label` も、イベントを書けば押せるようになる）。
 - `call` の `fn`（ランタイムに登録された動作）: `alarm.ack_all`（すべてのアラームを確認）、`data_log.sample`（`arg` に
@@ -89,6 +117,7 @@
 ```
 
 - 開くのは `{ "action": "popup", "screen": "confirm_stop" }`。開いている間、下の画面は触れない。
+- 確かめるときは `--render <開く元の画面>+confirm_stop,<ファイル.png>`。
 - 大きさと位置は `w` `h` `x` `y` `align`（既定は 60% × 60%、中央）。
 - 確認が要る操作（停止、削除）や、1 台分の詳細表示に使う。`"set"` で「どの装置か」をタグに渡せる。
 - ポップアップも `project.json` の `"screens"` に足す。

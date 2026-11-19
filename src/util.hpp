@@ -17,6 +17,7 @@ void log(LogLevel level, const std::string& msg);
 // log() may be called from any thread, so the sink must be thread-safe. nullptr = none.
 using LogSink = void (*)(LogLevel level, const std::string& msg);
 void set_log_sink(LogSink sink);
+void set_log_quiet(bool quiet);     // true: nothing is printed (the sink still gets every line)
 
 #if defined(__GNUC__)
 __attribute__((format(printf, 1, 2)))

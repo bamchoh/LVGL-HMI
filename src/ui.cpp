@@ -1510,6 +1510,9 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         const bool input = jbool(w, "input", password);       // a password field is for entering one
         obj = lv_textarea_create(parent);
         lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
+        // one line of a value: no scrollbar (a stub of it showed at the edge of taller boxes);
+        // "scrollbar" in the JSON still sets it
+        if(jbool(w, "one_line", true)) lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
         lv_textarea_set_password_mode(obj, jbool(w, "password", password));
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
         if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());
