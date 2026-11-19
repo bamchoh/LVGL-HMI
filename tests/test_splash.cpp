@@ -36,7 +36,7 @@ struct SplashProject {
     }
     void copy_asset(const std::string& from, const std::string& to)
     {
-        fs::copy_file(fs::path(HML_TEST_SOURCE_DIR) / from, dir / "assets" / to, fs::copy_options::overwrite_existing);
+        fs::copy_file(hmltest::source_dir() / from, dir / "assets" / to, fs::copy_options::overwrite_existing);
     }
 };
 

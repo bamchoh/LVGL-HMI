@@ -71,13 +71,14 @@ FetchContent_Declare(nlohmann_json
 )
 
 # ---------------------------------------------------------------- LVGL
-set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "" FORCE)
-# LVGL 9.4 option names: do not compile examples / demos / ThorVG (big build-time saving on a Pi)
+set(LV_BUILD_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE PATH "" FORCE)
+# LVGL 9.6 option names: do not compile examples / demos / ThorVG (big build-time saving on a Pi)
 set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_USE_THORVG OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(lvgl
-  URL https://github.com/lvgl/lvgl/archive/refs/tags/v9.4.0.tar.gz
+  URL https://github.com/lvgl/lvgl/archive/refs/tags/v9.6.0.tar.gz
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 

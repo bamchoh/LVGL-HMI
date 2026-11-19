@@ -1,13 +1,17 @@
 // What a TTF / OTF file has: its characters (the "cmap" table, formats 4 and 12) and their
 // advance widths ("head", "hhea", "hmtx").
 //
-// Why the runtime reads this itself instead of trusting TinyTTF (LVGL 9.4):
+// Why the runtime reads this itself instead of trusting TinyTTF. These were bugs of LVGL 9.4:
 //  - TinyTTF must only be asked for characters the font has: LVGL frees a cache entry twice when
 //    a glyph is missing (lv_cache_acquire_or_create -> remove_cb + lv_cache_entry_delete), which
 //    corrupts the heap. With has(), a missing character goes straight to the fallback font.
 //  - TinyTTF's kerning cache uses a freed entry on eviction (found with AddressSanitizer) and,
 //    even with kerning off, gives some glyphs the advance of another one ("oper ator"). The
 //    fonts are made without kerning and the advance comes from advance_px().
+// With LVGL 9.6 none of them shows any more (AddressSanitizer build with each of these switched
+// off, 2026-11-20: a missing glyph is no error in TinyTTF, its advances are those of hmtx, the
+// kerning cache evicts cleanly). They stay: has() and advance_px() cost a table lookup, and
+// kerning made text layout many times slower with the CFF font of the demo for no visible gain.
 #pragma once
 #include <cstdint>
 #include <string>

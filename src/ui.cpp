@@ -111,8 +111,9 @@ const lv_font_t* font_of_size(int size)
     if(!s_font_file.empty() && !s_font_failed && size >= 6 && size <= 200) {
         auto it = s_ttf.find(size);
         if(it != s_ttf.end()) return &it->second->use;
-        // (no kerning: LVGL 9.4 uses a freed entry when TinyTTF's kerning cache evicts one -
-        // found with AddressSanitizer; kerning matters little at HMI sizes, not at all for Japanese)
+        // (no kerning: it matters little at HMI sizes, not at all for Japanese, and looking pairs up
+        // in a CFF font is slow. LVGL 9.4 also used a freed entry when the kerning cache evicted
+        // one - found with AddressSanitizer, fixed in 9.6)
         lv_font_t* f = lv_tiny_ttf_create_file_ex(("A:" + s_font_file).c_str(), size, LV_FONT_KERNING_NONE, LV_TINY_TTF_CACHE_GLYPH_CNT);
         if(f) {
             auto t = std::make_unique<TtfFont>();
@@ -304,12 +305,15 @@ bool is_tap(lv_obj_t* obj)
 // which lv_textarea_set_text would otherwise apply to the displayed value too ("42.3 rpm").
 void ta_show(lv_obj_t* ta, const std::string& text)
 {
-    const char* accepted = lv_textarea_get_accepted_chars(ta);
+    // a copy: LVGL (9.6) owns its list and frees it when another one is set
+    const char* list = lv_textarea_get_accepted_chars(ta);
+    const bool filtered = list != nullptr;
+    const std::string accepted = filtered ? list : "";
     uint32_t max_len = lv_textarea_get_max_length(ta);
     lv_textarea_set_accepted_chars(ta, nullptr);
     lv_textarea_set_max_length(ta, 0);
     lv_textarea_set_text(ta, text.c_str());
-    lv_textarea_set_accepted_chars(ta, accepted);
+    if(filtered) lv_textarea_set_accepted_chars(ta, accepted.c_str());
     lv_textarea_set_max_length(ta, max_len);
 }
 
@@ -1005,7 +1009,7 @@ struct Ui::Impl {
         b->on_tag_changed(b->tag->get(), nullptr);
     }
     // Data display edit session, tracked with object flags:
-    //   USER_2 = "tap pending": focused by a pointer, waiting for the CLICKED that is not a scroll
+    //   USER_2 = "tap pending": pressed (or focused) by a pointer, waiting for the CLICKED that is not a scroll
     //   USER_3 = "editing": the session started (the text was selected once); later taps only move the cursor
     //   USER_4 = "replace pending": the whole text is selected, the next insert replaces it
     // READY / CANCEL / DEFOCUSED end the session.
@@ -1015,6 +1019,14 @@ struct Ui::Impl {
         if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
         if(focus_comes_from_pointer()) { lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2); return; }
         select_all(ta);                                           // keypad / encoder: start editing right away
+    }
+    // LVGL 9.6 sends FOCUSED only when the focus moves: a press on the field that already has the
+    // focus (the usual case after an edit was confirmed) must start the wait for the tap too.
+    static void on_widget_press(lv_event_t* e)
+    {
+        lv_obj_t* ta = lv_event_get_target_obj(e);
+        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
+        if(focus_comes_from_pointer()) lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2);
     }
     static void on_widget_click(lv_event_t* e)
     {
@@ -1344,6 +1356,7 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
     }
     if(two_way && raw->commit_on_ready) {
         lv_obj_add_event_cb(obj, &Impl::on_widget_focus, LV_EVENT_FOCUSED, raw);
+        lv_obj_add_event_cb(obj, &Impl::on_widget_press, LV_EVENT_PRESSED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_click, LV_EVENT_CLICKED, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_insert, LV_EVENT_INSERT, raw);
         lv_obj_add_event_cb(obj, &Impl::on_widget_edited, LV_EVENT_VALUE_CHANGED, raw);
@@ -1781,6 +1794,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
         if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());
         lv_textarea_set_one_line(obj, jbool(w, "one_line", true));
+        if(jbool(w, "one_line", true)) lv_obj_set_scroll_dir(obj, LV_DIR_HOR);   // see the data displays below
         lv_textarea_set_password_mode(obj, jbool(w, "password", false));
         if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
         if(auto acc = jstr_opt(w, "accepted_chars")) {
@@ -1809,6 +1823,10 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         // one line of a value: no scrollbar (a stub of it showed at the edge of taller boxes);
         // "scrollbar" in the JSON still sets it
         if(jbool(w, "one_line", true)) lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
+        // ... and it scrolls sideways only. A line taller than the box (a big font, a font file with
+        // tall lines) would make the field scrollable by a few pixels up and down, and LVGL 9.6 then
+        // gives it the drag instead of the list around it.
+        if(jbool(w, "one_line", true)) lv_obj_set_scroll_dir(obj, LV_DIR_HOR);
         lv_textarea_set_password_mode(obj, jbool(w, "password", password));
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
         if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());

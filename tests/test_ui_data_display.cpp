@@ -511,6 +511,48 @@ TEST_CASE("touch: a scroll gesture over an input field neither opens the keyboar
     }
 }
 
+TEST_CASE("touch: a field whose text is taller than its box still lets the list scroll")
+{
+    // A big font (or a font file with tall lines, e.g. Japanese) in a low field: the text overflows the
+    // box by a few pixels. The field must not take the vertical drag for itself (LVGL 9.6 does not
+    // pass it on to the list then): one line of a value only scrolls sideways.
+    Runtime rt;
+    rt.tag("n", TagType::Float, 42);
+    json children = json::array();
+    for(int i = 0; i < 2; i++) children.push_back(json{ { "type", "label" }, { "text", "head " + std::to_string(i) }, { "h", 30 } });
+    children.push_back(json{ { "type", "numeric_display" }, { "bind", "n" }, { "input", true }, { "w", 200 }, { "h", 40 }, { "style", { { "font", 28 } } } });
+    children.push_back(json{ { "type", "textarea" }, { "text", "abc" }, { "w", 200 }, { "h", 40 }, { "style", { { "font", 28 } } } });
+    for(int i = 0; i < 12; i++) children.push_back(json{ { "type", "label" }, { "text", "filler " + std::to_string(i) }, { "h", 40 } });
+    json scr = { { "name", "s" }, { "children", json::array({
+        json{ { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", 320 }, { "h", 240 }, { "flex", "column" }, { "style", { { "pad", 10 }, { "pad_row", 6 } } }, { "children", children } },
+    }) } };
+    lv_obj_t* s = ui().build_screen(scr, "");
+    REQUIRE(s);
+    REQUIRE(ui().show_screen("s", "none"));
+    lv_obj_t* list = nth(s, 0);
+    rt.advance(50);
+    lv_obj_update_layout(s);
+
+    ScriptedPointer ptr;
+    for(int idx : { 2, 3 }) {
+        CAPTURE(idx);
+        lv_obj_t* field = nth(list, idx);
+        // the case this is about: the text does not fit the box
+        REQUIRE(lv_obj_get_height(lv_textarea_get_label(field)) > lv_obj_get_content_height(field));
+        lv_obj_scroll_to_y(list, 0, LV_ANIM_OFF);
+        rt.advance(50);
+        lv_area_t a;
+        lv_obj_get_coords(field, &a);
+        const int32_t cx = (a.x1 + a.x2) / 2, cy = (a.y1 + a.y2) / 2;
+        ptr.press(cx, cy, rt);
+        ptr.move(cx, cy - 25, rt);
+        ptr.move(cx, cy - 60, rt);
+        ptr.release(rt);
+        CHECK(lv_obj_get_scroll_y(list) > 0);                    // the list scrolled
+        rt.advance(800);                                         // let the scroll momentum settle
+    }
+}
+
 TEST_CASE("the keyboard moves to the top edge when it would cover the field")
 {
     Runtime rt;

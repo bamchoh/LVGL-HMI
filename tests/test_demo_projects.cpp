@@ -29,12 +29,12 @@ namespace {
 std::vector<fs::path> shipped_projects()
 {
     std::vector<fs::path> out;
-    fs::path root = fs::path(HML_TEST_SOURCE_DIR) / "projects";
+    fs::path root = hmltest::source_dir() / "projects";
     for(const auto& e : fs::directory_iterator(root)) {
         if(e.is_directory() && fs::exists(e.path() / "project.json")) out.push_back(e.path() / "project.json");
     }
     // the example of the AI skill (tools/skill/hml-screens): what it shows as correct must be correct
-    out.push_back(fs::path(HML_TEST_SOURCE_DIR) / "tools" / "skill" / "hml-screens" / "examples" / "project.json");
+    out.push_back(hmltest::source_dir() / "tools" / "skill" / "hml-screens" / "examples" / "project.json");
     std::sort(out.begin(), out.end());
     return out;
 }
@@ -110,7 +110,7 @@ TEST_CASE("every shipped project loads and builds all of its screens")
 
 TEST_CASE("the demo project's drivers reference existing tags")
 {
-    fs::path path = fs::path(HML_TEST_SOURCE_DIR) / "projects" / "demo" / "project.json";
+    fs::path path = hmltest::source_dir() / "projects" / "demo" / "project.json";
     json raw = read_json(path);
     std::vector<std::string> tag_names;
     for(const json& t : *jget(raw, "tags")) tag_names.push_back(jstr(t, "name", ""));
