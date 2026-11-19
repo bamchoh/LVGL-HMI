@@ -387,6 +387,29 @@
     ok(App.problems.some(p => /is not a popup/.test(p.text)), 'popup to a normal screen is a problem');
   });
 
+  await test('texts: the canvas shows @id in the preview language; the Texts page edits them', async () => {
+    App.select([]); App.doRefresh(); await frame();
+    ok(Canvas.root.textContent.includes('ポンプ場 1号'), 'Japanese on the canvas');
+    key('8', { ctrlKey: true }); App.doRefresh();
+    eq(Panels.view, 'texts');
+    const page = document.getElementById('view-texts');
+    ok(page.querySelectorAll('table.grid tr').length > 10, 'the demo texts are listed');
+    const sel = [...page.querySelectorAll('select')].find(s => [...s.options].some(o => o.value === 'en'));
+    sel.value = 'en'; sel.dispatchEvent(new Event('change')); App.doRefresh();
+    Panels.showView('screen'); App.doRefresh(); await frame();
+    ok(Canvas.root.textContent.includes('Pump Station #1'), 'English preview');
+    M.st.previewLang = null;
+    eq(App.problems.length, 0, 'the demo has no text problems');
+    Panels.showView('texts'); App.doRefresh();
+    const cell = document.querySelector('#view-texts input[data-fk="txt.title.en"]');
+    ok(cell, 'translation cell');
+    cell.value = ''; cell.dispatchEvent(new Event('change')); App.doRefresh();
+    ok(App.problems.some(p => /title.*has no en/.test(p.text)), 'a missing translation is a problem');
+    Panels.showView('screen'); Panels.show('project'); App.doRefresh();
+    ok(document.querySelector('[data-fk="proj.font.file"]').value.includes('NotoSansJP'), 'the font file on the Project tab');
+    Panels.show('widgets');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

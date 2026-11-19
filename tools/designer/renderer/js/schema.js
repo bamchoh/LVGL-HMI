@@ -127,6 +127,7 @@ const SCHEMA = {
     goto:   [{ k: 'screen', t: 'screen' }, { k: 'anim', t: 'anim' }],
     popup:  [{ k: 'screen', t: 'screen' }],          // + "set": { tag: value } in the JSON: written before it opens
     close:  [{ k: 'screen', t: 'screen', empty: '(the top one)' }],
+    language: [{ k: 'lang', t: 'text', hint: 'a language code of the project, or "next"' }],
     back:   [], reload: [], exit: [],
     restart: [{ k: 'what', t: 'select', o: ['', 'app', 'system'] }],
     system: [{ k: 'anim', t: 'anim' }],

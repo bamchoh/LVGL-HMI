@@ -1039,3 +1039,41 @@ test('M popups: actions must name a popup screen, the start screen must not be o
   M.st.project.start_screen = 'detail';
   assert.ok(M.problems().some(p => p.text === 'the start screen "detail" is a popup'));
 });
+
+test('M texts: @id in the preview language, checks, renames, CSV both ways', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  const p = M.st.project;
+  p.languages = ['ja', 'en'];
+  p.texts = { title: { ja: 'ポンプ場', en: 'Pump station' }, only_ja: { ja: '日本語' }, long: { ja: '停止', en: 'Emergency stop pressed' } };
+  assert.equal(M.resolveText('@title'), 'ポンプ場');
+  M.st.previewLang = 'en';
+  assert.equal(M.resolveText('@title'), 'Pump station');
+  assert.equal(M.resolveText('@only_ja'), '日本語');                     // falls back to the first language
+  assert.equal(M.resolveText('@nope'), '@nope');
+  assert.equal(M.resolveText('@@x'), '@x');
+  assert.equal(M.resolveText('plain'), 'plain');
+  M.screen().children = [{ type: 'label', text: '@title' }, { type: 'button', text: '@missing' }, { type: 'dropdown', options: ['@title', 'x'] }];
+  const texts = M.problems().map(x => x.text).sort();
+  deq(texts, ['no text "missing" (shown as "@missing")', 'text "long" in en is much longer than in ja: it may not fit', 'text "only_ja" has no en'].sort());
+
+  assert.equal(M.renameText('title', 'heading'), true);
+  assert.equal(M.screen().children[0].text, '@heading');
+  assert.equal(M.screen().children[2].options[0], '@heading');
+  deq(Object.keys(p.texts), ['heading', 'only_ja', 'long']);           // the order is kept
+  assert.equal(M.renameText('heading', 'only_ja'), false);
+  assert.equal(M.addText('9bad'), false);
+  assert.equal(M.addText('new.one'), true);
+
+  const csv = M.textsCsv();
+  assert.equal(csv.split('\n')[0], 'id,ja,en');
+  let r = M.importTextsCsv(csv.replace('id,ja,en', 'id,ja,en,de') + 'x\t=1\tone\teins\n');
+  deq([r.count, r.errors], [5, []]);
+  deq(p.languages, ['ja', 'en', 'de']);
+  assert.equal(p.texts.x.ja, '=1');
+  r = M.importTextsCsv('nope,ja\n');
+  assert.ok(r.errors.length);
+  r = M.importTextsCsv('id,ja\na,1\na,2\n');
+  assert.ok(r.errors.some(e => /twice/.test(e)));
+  assert.equal(Object.keys(p.texts).length, 5);                        // nothing replaced by the bad ones
+});

@@ -22,6 +22,7 @@ const Panels = {
     document.getElementById('view-logs').hidden = v !== 'logs';
     document.getElementById('view-users').hidden = v !== 'users';
     document.getElementById('view-recipes').hidden = v !== 'recipes';
+    document.getElementById('view-texts').hidden = v !== 'texts';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
     App.refresh();
   },
@@ -41,6 +42,7 @@ const Panels = {
     this.renderLogs();
     this.renderUsers();
     this.renderRecipes();
+    this.renderTexts();
     this.renderProject();
     const dl = document.getElementById('dl-tags'); dl.innerHTML = '';
     for (const t of M.tagChoices()) dl.append(U.el('option', { value: t.name, label: t.note }));
@@ -267,6 +269,38 @@ const Panels = {
     return U.el('div', null, U.el('h4', null, tdef.label), tbl, U.el('div', { class: 'row' }, add));
   },
 
+  // ---- texts: "@id" in widget texts, alarm messages, labels -> the text in the current language
+  renderTexts() {
+    const page = document.getElementById('view-texts'); page.innerHTML = '';
+    const p = M.st.project; if (!p) return;
+    const langs = M.languages(), texts = p.texts || {}, fk = 'txt';
+    const preview = U.el('select', { onchange: e => { M.st.previewLang = e.target.value; App.doRefresh(); } },
+      ...langs.map(l => U.el('option', { value: l, selected: l === M.previewLanguage() }, l)));
+    page.append(U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, 'Texts'), U.el('span', { class: 'dim' }, Object.keys(texts).length + ' texts'),
+      U.el('span', { class: 'grow' }), langs.length ? U.el('label', null, 'Preview in', ' ', preview) : null,
+      U.el('button', { onclick: () => App.textsCsvDialog() }, 'Import / export …'),
+      U.el('button', { class: 'primary', onclick: async () => { const id = await App.prompt('Text id (letters, digits, _ . -)', 'text' + (Object.keys(texts).length + 1)); if (id && !M.addText(id)) App.toast('name already used or invalid'); } }, '+ Add text')));
+    page.append(U.el('div', { class: 'hint' }, 'Write "@id" as the text of a widget (text, placeholder, options, labels) or as an alarm message: the device shows the text in its language. The language is the tag sys.lang; switch it with the action "language" (or a widget bound to sys.lang). Japanese, Chinese ... need a font that has them: Project tab > Font.'));
+    page.append(U.el('div', { class: 'drv-fields' },
+      Props.row('languages', Props.editor(p, 'languages', { t: 'csv' }, fk), 'language codes, the first is the default (and what a missing translation falls back to), e.g. ja, en'),
+      Props.row('language', Props.editor(p, 'language', { t: 'select', o: [''].concat(langs), empty: langs[0] || '' }, fk), 'the language at start')));
+    const tbl = U.el('table', { class: 'grid' });
+    tbl.append(U.el('tr', null, U.el('th', null, 'id'), ...langs.map(l => U.el('th', null, l)), U.el('th')));
+    for (const [id, t] of Object.entries(texts)) {
+      const row = U.el('tr', null, U.el('td', null, U.el('input', { type: 'text', value: id, dataset: { fk: fk + '.id.' + id },
+        onchange: e => { if (!M.renameText(id, e.target.value)) { App.toast('name already used or invalid'); App.doRefresh(); } } })));
+      for (const l of langs) {
+        const v = (t || {})[l];
+        row.append(U.el('td', { class: v ? '' : 'missing' }, U.el('input', { type: 'text', value: v || '', dataset: { fk: fk + '.' + id + '.' + l },
+          onchange: e => M.mutate(() => { p.texts[id] = p.texts[id] || {}; if (e.target.value === '') delete p.texts[id][l]; else p.texts[id][l] = e.target.value; }) })));
+      }
+      row.append(U.el('td', { class: 'act' }, U.el('button', { class: 'mini danger', title: 'delete', onclick: () => M.mutate(() => { delete p.texts[id]; }) }, '×')));
+      tbl.append(row);
+    }
+    page.append(tbl);
+    if (!Object.keys(texts).length) page.append(U.el('div', { class: 'hint' }, 'No texts yet.'));
+  },
+
   // ---- recipes: books of named value sets (project.json "recipes"). The device keeps its own
   // copy once something is saved there (recipes/<book>.json); a deploy does not replace it.
   renderRecipes() {
@@ -422,6 +456,17 @@ const Panels = {
     el.append(Props.section('Boot splash (Raspberry Pi)', false,
       ...Props.fields(d, [{ k: 'splash', t: 'image' }, { k: 'splash_bg', t: 'color' }], fk + '.display'),
       U.el('div', { class: 'hint' }, 'Shown during boot by hml-splash.service (hml_runtime --splash) until the HMI starts. PNG, centred and shrunk to fit; empty = the project title. Background default: black.')));
+    // "font" exists only while it names a file
+    const fontHolder = new Proxy({}, {
+      get: (t, k) => (k === 'file' ? (p.font && p.font.file) : undefined),
+      set: (t, k, v) => { if (k === 'file') { if (v) p.font = Object.assign({}, p.font, { file: v }); else delete p.font; } return true; },
+      deleteProperty: (t, k) => { if (k === 'file') delete p.font; return true; },
+      has: (t, k) => k === 'file' && !!(p.font && p.font.file),
+    });
+    el.append(Props.section('Font', false,
+      Props.row('file', Props.editor(fontHolder, 'file', { t: 'text', placeholder: 'assets/fonts/NotoSansJP-subset.otf' }, fk + '.font'),
+        'a TTF / OTF file in the project for every text (any size); empty = the built-in font (Latin letters only). tools/subset_font.py makes a small copy with the characters the project needs'),
+      U.el('div', { class: 'hint' }, 'Keep the license of the font next to it (Noto Sans JP: SIL Open Font License, OFL.txt).')));
     el.append(Props.section('Theme', true,
       ...Props.fields(th, [{ k: 'dark', t: 'bool' }, { k: 'primary', t: 'color' }, { k: 'secondary', t: 'color' }, { k: 'font', t: 'font' }], fk + '.theme')));
     const raw = U.el('textarea', { rows: 10, class: 'mono', value: JSON.stringify(Object.assign({}, p, { screens: M.st.screens.map(s => s.file) }), null, 2), onchange: e => {

@@ -218,8 +218,8 @@
   },
   "alarms": {
     "items": [
-      { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi", "severity": "warning", "message": "Temperature high" },
-      { "name": "temp_low", "tag": "temp", "condition": "lt", "value_tag": "temp_lo", "severity": "warning", "message": "Temperature low" }
+      { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi", "severity": "warning", "message": "@alarm_temp_high" },
+      { "name": "temp_low", "tag": "temp", "condition": "lt", "value_tag": "temp_lo", "severity": "warning", "message": "@alarm_temp_low" }
     ]
   },
   "users": {
@@ -256,6 +256,43 @@
           { "name": "Cleaning", "values": { "speed_sp": 90, "setpoint": 10, "temp_lo": 10, "temp_hi": 45, "auto_mode": false } }
         ] }
     ]
+  },
+  "languages": ["ja", "en"],
+  "language": "ja",
+  "font": { "file": "assets/fonts/NotoSansJP-subset.otf" },
+  "texts": {
+    "title": { "ja": "ポンプ場 1号", "en": "Pump Station #1" },
+    "alarms": { "ja": "アラーム", "en": "Alarms" },
+    "setup": { "ja": "設定", "en": "Setup" },
+    "temperature": { "ja": "温度", "en": "Temperature" },
+    "pressure": { "ja": "圧力", "en": "Pressure" },
+    "alarm": { "ja": "警報", "en": "Alarm" },
+    "trend_panel": { "ja": "トレンド（温度 / 液位）", "en": "Trend (temperature / level)" },
+    "pump_control": { "ja": "ポンプ操作", "en": "Pump control" },
+    "run": { "ja": "運転", "en": "Run" },
+    "stop": { "ja": "停止", "en": "Stop" },
+    "auto_mode": { "ja": "自動（スライダーをロック）", "en": "Auto mode (locks slider)" },
+    "back": { "ja": "戻る", "en": "Back" },
+    "back_arrow": { "ja": "< 戻る", "en": "< Back" },
+    "settings": { "ja": "設定", "en": "Settings" },
+    "main": { "ja": "メイン", "en": "Main" },
+    "recipes": { "ja": "レシピ", "en": "Recipes" },
+    "trend": { "ja": "トレンド", "en": "Trend" },
+    "system": { "ja": "システム", "en": "System" },
+    "restart": { "ja": "再起動", "en": "Restart" },
+    "reload": { "ja": "再読み込み", "en": "Reload" },
+    "exit": { "ja": "終了", "en": "Exit" },
+    "ack_all": { "ja": "すべて確認", "en": "ACK all" },
+    "close": { "ja": "閉じる", "en": "Close" },
+    "current_alarms": { "ja": "発生中（行をタップで確認）", "en": "Current (tap a row to acknowledge)" },
+    "history": { "ja": "履歴", "en": "History" },
+    "low_limit": { "ja": "下限", "en": "Low limit" },
+    "high_limit": { "ja": "上限", "en": "High limit" },
+    "operation_mode": { "ja": "運転モード", "en": "Operation mode" },
+    "operator_name": { "ja": "オペレーター名", "en": "Operator name" },
+    "language": { "ja": "English", "en": "日本語" },
+    "alarm_temp_high": { "ja": "温度が高い", "en": "Temperature high" },
+    "alarm_temp_low": { "ja": "温度が低い", "en": "Temperature low" }
   },
   "screens": [
     "screens/main.json",

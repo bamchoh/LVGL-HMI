@@ -46,6 +46,26 @@ const U = {
     }
     return null;
   },
+  // the width of a text in "half-width" units (a CJK character counts 2): for "may not fit"
+  textWidth(s) { let n = 0; for (const c of String(s)) n += /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(c) ? 2 : 1; return n; },
+  // rows of a pasted table: commas or tabs, "..." with "" inside
+  parseTable(text) {
+    const rows = [];
+    let row = [], cell = '', q = false;
+    const src = String(text || '').replace(/^\uFEFF/, '');
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (q) { if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; continue; }
+      if (c === '"') q = true;
+      else if (c === ',' || c === '\t') { row.push(cell); cell = ''; }
+      else if (c === '\r') continue;
+      else if (c === '\n') { row.push(cell); if (row.some(x => x !== '')) rows.push(row); row = []; cell = ''; }
+      else cell += c;
+    }
+    row.push(cell);
+    if (row.some(x => x !== '')) rows.push(row);
+    return rows;
+  },
   CHROME_TAGS: ['button', 'summary', 'h3', 'h4', 'th', 'label'],
 
   svg(tag, attrs, ...children) {

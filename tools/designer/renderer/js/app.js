@@ -211,6 +211,22 @@ const App = {
   styleClip: null,
   copyStyle() { const w = M.selected(); if (w && M.st.sel.length) { this.styleClip = M.styleOf(w); this.toast('Style copied', 1200); } },
 
+  // ---- texts to and from a spreadsheet (translators work in one) ---------------------
+  textsCsvDialog() {
+    const ta = U.el('textarea', { class: 'csv', spellcheck: false, value: M.textsCsv() });
+    const out = U.el('div');
+    const body = U.el('div', null, U.el('div', { class: 'hint' }, 'One text per line: id, then one column per language (the first line names them). Copy this into a spreadsheet for the translators, or paste their lines here (commas or tabs) and press Import: the texts are replaced, new languages are added.'), ta, out);
+    this.modal({ title: 'Texts: import / export', body, buttons: [
+      { label: 'Copy', onclick: () => { ta.select(); try { document.execCommand('copy'); } catch (_) {} return false; } },
+      { label: 'Close' },
+      { label: 'Import', primary: true, onclick: () => {
+        const r = M.importTextsCsv(ta.value);
+        out.innerHTML = '';
+        if (r.errors.length) { out.append(U.el('div', { class: 'warn' }, I18N.t('Nothing was imported:')), U.el('pre', null, r.errors.join('\n'))); return false; }
+        this.toast(I18N.f('{0} text(s) imported', r.count), 2500);
+      } }] });
+  },
+
   // ---- recipes to and from a spreadsheet ----------------------------------------
   recipesCsvDialog(bi) {
     const b = M.recipeBooks()[bi];
@@ -292,7 +308,7 @@ const App = {
   // a place in the project, in words: Screen "main" › label "x" / Drivers
   whereText(pr) {
     const scr = pr.screen !== undefined ? M.st.screens[pr.screen] : null;
-    if (!scr) return I18N.t({ tags: 'Tags', drivers: 'Drivers', scripts: 'Scripts', logs: 'Logs', users: 'Users', recipes: 'Recipes', project: 'Project' }[pr.view] || '')
+    if (!scr) return I18N.t({ tags: 'Tags', drivers: 'Drivers', scripts: 'Scripts', logs: 'Logs', users: 'Users', recipes: 'Recipes', texts: 'Texts', project: 'Project' }[pr.view] || '')
       + (pr.view === 'drivers' && pr.index !== undefined ? ' › ' + ((M.st.project.drivers[pr.index] || {}).name || (M.st.project.drivers[pr.index] || {}).type || '')
         : pr.view === 'scripts' && pr.index !== undefined ? ' › ' + ((M.st.project.scripts[pr.index] || {}).name || '') : '');
     let w = scr.data; for (const i of pr.path) w = (w.children || [])[i];
@@ -444,7 +460,7 @@ const App = {
   },
   SHORTCUTS: [
     ['Ctrl+N / Ctrl+O / Ctrl+S', 'New / open / save (Ctrl+Shift+S: save as)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
-    ['Ctrl+1 … Ctrl+7', 'Screen editor, tags, drivers, scripts, logs, users, recipes'], ['Ctrl+Tab / Ctrl+Shift+Tab', 'Next / previous screen tab'],
+    ['Ctrl+1 … Ctrl+8', 'Screen editor, tags, drivers, scripts, logs, users, recipes, texts'], ['Ctrl+Tab / Ctrl+Shift+Tab', 'Next / previous screen tab'],
     ['Drag on the background', 'Select the widgets inside the rectangle'], ['Right click', 'Menu: copy, paste, order …'],
     ['Ctrl+click, Shift+click', 'Add a widget to the selection, or take it out'], ['Ctrl+A', 'Select everything in the same panel'],
     ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste widgets (also onto another screen)'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy / paste the style (look) of a widget'], ['Ctrl+D', 'Duplicate'], ['Del', 'Delete'],
@@ -807,7 +823,7 @@ const App = {
     }
     if (e.key === 'F1') { e.preventDefault(); this.shortcutsDialog(); return; }
     if (ctrl && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProjectDialog(); return; }
-    if (ctrl && /^[1234567]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs', 'users', 'recipes'][Number(e.key) - 1]); return; }
+    if (ctrl && /^[12345678]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs', 'users', 'recipes', 'texts'][Number(e.key) - 1]); return; }
     if (ctrl && e.key.toLowerCase() === 'z' && !inInput) { e.preventDefault(); if (e.shiftKey) M.redo(); else M.undo(); return; }
     if (ctrl && e.key.toLowerCase() === 'y' && !inInput) { e.preventDefault(); M.redo(); return; }
     if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') document.getElementById('modal').hidden = true; return; }

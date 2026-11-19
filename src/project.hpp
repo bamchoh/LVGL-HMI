@@ -61,6 +61,7 @@ public:
     // Build (or rebuild) every screen from its JSON file and show the start screen
     // (or the previously shown one on a reload). Returns the number of screens built.
     int  build_screens();
+    void rebuild_screens();         // after a language switch (texts.hpp)
 
     void unload();
 

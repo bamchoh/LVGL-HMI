@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include "alarm.hpp"
+#include "texts.hpp"
 #include "operation_log.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -48,7 +49,7 @@ struct Labels {
     {
         const json* l = jget(w, "labels");
         if(!l || !l->is_object()) return;
-        for(auto it = l->begin(); it != l->end(); ++it) if(it.value().is_string()) m[it.key()] = alarm_text_line(it.value().get<std::string>(), 64);
+        for(auto it = l->begin(); it != l->end(); ++it) if(it.value().is_string()) m[it.key()] = alarm_text_line(texts().resolve(it.value().get<std::string>()), 64);
     }
     const std::string& operator[](const std::string& k) const { static const std::string none; auto it = m.find(k); return it == m.end() ? none : it->second; }
 };
