@@ -877,6 +877,15 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 python -I tools/subset_font.py NotoSansJP-Regular.otf projects/myhmi/assets/fonts/NotoSansJP-subset.otf --text projects/myhmi/project.json projects/myhmi/screens/*.json
 ```
 
+**デザイナーには日本語フォント（Noto Sans JP のサブセット、SIL Open Font License）が付いています**（`<デザイナーのフォルダー>/fonts/`）。
+ランタイムの組み込みフォントは欧文だけなので、日本語を出すプロジェクトには次のどちらかで入れます。フォントとライセンス文が
+プロジェクトの `assets/fonts/` にコピーされ、`font.file` が設定されます（デプロイやプロジェクトファイルにも一緒に入ります）。
+
+- 新規作成のダイアログの「日本語フォント」（デザイナーを日本語で表示しているときは既定でオン）
+- プロジェクト タブ > フォント の「日本語フォントを入れる（Noto Sans JP）」
+
+日本語の文字があるのにフォントが未設定のプロジェクトは、問題一覧に出ます。
+
 デザイナーでは「多言語テキスト」タブ（Ctrl+8）で ID と各言語の訳を表で編集でき、表計算ソフトとの取り込み / 書き出し
 （翻訳者に渡す用）、キャンバスに表示する言語の切り替えもできます。訳がないテキスト、`texts` にない `"@ID"`、元の言語より
 かなり長い訳（収まらないかもしれない）は問題一覧に出ます。フォントはプロジェクト タブの「フォント」で指定します。

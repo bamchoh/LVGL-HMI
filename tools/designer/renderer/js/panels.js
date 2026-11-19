@@ -481,6 +481,8 @@ const Panels = {
     el.append(Props.section('Font', false,
       Props.row('file', Props.editor(fontHolder, 'file', { t: 'text', placeholder: 'assets/fonts/NotoSansJP-subset.otf' }, fk + '.font'),
         'a TTF / OTF file in the project for every text (any size); empty = the built-in font (Latin letters only). tools/subset_font.py makes a small copy with the characters the project needs'),
+      U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.font.add' }, disabled: !(App.info && App.info.fontsDir), onclick: () => App.addBundledFont() }, 'Add the Japanese font (Noto Sans JP)'),
+        U.el('span', { class: 'dim' }, 'copies it into assets/fonts/ of the project, with its license, and sets it here')),
       U.el('div', { class: 'hint' }, 'Keep the license of the font next to it (Noto Sans JP: SIL Open Font License, OFL.txt).')));
     el.append(Props.section('Theme', true,
       ...Props.fields(th, [{ k: 'dark', t: 'bool' }, { k: 'primary', t: 'color' }, { k: 'secondary', t: 'color' }, { k: 'font', t: 'font' }], fk + '.theme')));

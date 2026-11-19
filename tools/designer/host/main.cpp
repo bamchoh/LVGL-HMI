@@ -628,6 +628,7 @@ std::string save_file_dialog(void* parent, const std::string& title, const std::
 struct Host {
     webview::webview* w = nullptr;
     fs::path exe, renderer, runtime, settings_path;
+    fs::path fonts;                    // fonts shipped with the designer (<exe dir>/fonts), or empty
     fs::path skill;                    // the AI skill shipped with the designer (<exe dir>/skills/hml-screens), or empty
     std::string argv_project;
     json settings = json::object();
@@ -673,6 +674,7 @@ struct Host {
             },
             { "exeDir", ustr(exe) }, { "rendererDir", ustr(renderer) },
             { "skillDir", skill.empty() ? json(nullptr) : json(ustr(skill)) },
+            { "fontsDir", fonts.empty() ? json(nullptr) : json(ustr(fonts)) },
             { "runtime", runtime.empty() ? json(nullptr) : json(ustr(runtime)) },
             { "argvProject", argv_project }, { "version", HML_DESIGNER_VERSION },
             { "targetRuntimes", target_runtimes() },
@@ -768,6 +770,22 @@ struct Host {
         if(!launch_detached("xdg-open", { ustr(p) }, p, &e)) return err(e);
 #endif
         return json{ { "ok", true } };
+    }
+
+    // Put the font that comes with the designer into a project: assets/fonts/<file> and its
+    // license next to it. Returns the path to write into "font": { "file": ... }.
+    json add_font(const std::string& project_dir)
+    {
+        static const char* kFile = "NotoSansJP-subset.otf";
+        if(fonts.empty()) return err("no font was found next to the designer");
+        const fs::path to = upath(project_dir) / "assets" / "fonts";
+        std::error_code ec;
+        fs::create_directories(to, ec);
+        for(const char* name : { kFile, "OFL.txt" }) {
+            fs::copy_file(fonts / name, to / name, fs::copy_options::overwrite_existing, ec);
+            if(ec) return err(std::string("cannot copy ") + name + " into " + ustr(to) + ": " + ec.message());
+        }
+        return json{ { "ok", true }, { "rel", std::string("assets/fonts/") + kFile } };
     }
 
     // Copy the skill to where Claude Code looks for the user's skills (~/.claude/skills/hml-screens).
@@ -1373,6 +1391,7 @@ struct Host {
             return project_stamp(str(a, 0), a.size() > 1 ? a[1] : json::array()).dump(-1, ' ', false, json::error_handler_t::replace);
         });
         w->bind("hml_openFolder", [this, args_of, str](const std::string& req) { return open_folder(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
+        w->bind("hml_addFont", [this, args_of, str](const std::string& req) { return add_font(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_installSkill", [this](const std::string&) { return install_skill().dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_writeFiles", [this, args_of, str](const std::string& req) {
             json a = args_of(req);
@@ -1572,6 +1591,11 @@ int app_main(const std::vector<std::string>& args)
         skills.push_back(upath(HML_DESIGNER_SKILL_DIR));
 #endif
         for(const auto& c : skills) if(fs::exists(c / "SKILL.md", ec)) { h.skill = fs::absolute(c); break; }
+        std::vector<fs::path> font_dirs{ exe_dir() / "fonts" };
+#ifdef HML_DESIGNER_FONTS_DIR
+        font_dirs.push_back(upath(HML_DESIGNER_FONTS_DIR));
+#endif
+        for(const auto& c : font_dirs) if(fs::exists(c / "NotoSansJP-subset.otf", ec)) { h.fonts = fs::absolute(c); break; }
     }
     if(h.renderer.empty()) {
         std::fprintf(stderr, "hml_designer: renderer/index.html not found (looked next to the executable in designer/)\n");

@@ -481,6 +481,22 @@
     void w;
   });
 
+  await test('font: the Japanese font that comes with the designer is put into the project', async () => {
+    ok(App.info.fontsDir, 'the host found the fonts');
+    const before = M.st.project.font;
+    M.mutate(() => { delete M.st.project.font; }); Panels.show('project'); App.doRefresh();
+    ok(App.problems.some(p => /no font for it/.test(p.text)), 'the demo has Japanese texts: a problem without a font');
+    const btn = document.querySelector('[data-fk$=".font.add"]');
+    ok(btn && !btn.disabled, 'the button');
+    await App.addBundledFont(); App.doRefresh();
+    eq(M.st.project.font.file, 'assets/fonts/NotoSansJP-subset.otf');
+    ok(!App.problems.some(p => /no font for it/.test(p.text)), 'the problem is gone');
+    const s = await host.projectStamp(M.st.dir, ['assets/fonts/NotoSansJP-subset.otf', 'assets/fonts/OFL.txt']);
+    ok(!/NotoSansJP-subset\.otf:-;/.test(s.stamp) && !/OFL\.txt:-;/.test(s.stamp), 'the font and its license are in the project: ' + s.stamp);
+    M.mutate(() => { M.st.project.font = before; });
+    Panels.show('widgets');
+  });
+
   await test('AI: the dialog gives the skill, the project folder and the runtime', async () => {
     document.getElementById('b-ai').click();
     const t = document.querySelector('[data-fk="ai.prompt"]');

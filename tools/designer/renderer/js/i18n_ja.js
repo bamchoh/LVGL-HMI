@@ -455,6 +455,16 @@ Object.assign(I18N.TEXT_JA, {
   'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.':
     'Raspberry Pi: 表示器が対応していればバックライトを消します（/sys/class/backlight）。対応していなければ黒い画面にするだけです。タグ sys.screen.off は消灯中 1。1 を書くとすぐに消えます。',
 });
+// ---- the font that comes with the designer
+Object.assign(I18N.TEXT_JA, {
+  'Japanese font': '日本語フォント',
+  'put Noto Sans JP into the project (about 1.2 MB). Without a font Japanese text is shown as empty boxes': 'Noto Sans JP をプロジェクトに入れます（約 1.2 MB）。フォントがないと日本語は □ で表示されます',
+  'Add the Japanese font (Noto Sans JP)': '日本語フォントを入れる（Noto Sans JP）',
+  'copies it into assets/fonts/ of the project, with its license, and sets it here': 'プロジェクトの assets/fonts/ にライセンス文と一緒にコピーし、ここに設定します',
+  'font added: {0}': 'フォントを入れました: {0}',
+});
+I18N.PATTERNS_JA.push([/^Japanese text is used \((.*)\), but the project has no font for it: it is shown as empty boxes\. Project tab > Font$/,
+  '日本語の文字が使われていますが、プロジェクトにフォントがありません（□ で表示されます）。プロジェクト タブ > フォント']);
 // ---- animation
 Object.assign(I18N.KEYS_JA, { animate: 'アニメーション' });
 Object.assign(I18N.TEXT_JA, {
