@@ -191,7 +191,9 @@ const Canvas = {
   build(w, path, th, parentFlex) {
     const type = w.type || 'panel';
     const el = U.el('div', { class: 'lv lv-' + type, dataset: { path: U.pathStr(path) } });
+    const also = !U.samePath(M.st.sel, path) && (M.st.more || []).some(p => U.samePath(p, path)) && M.selection().some(p => U.samePath(p, path));
     if (U.samePath(M.st.sel, path)) el.classList.add('hd-selected');
+    else if (also) el.classList.add('hd-selected', 'hd-also');
     if (w.hidden) el.classList.add('lv-hidden');
     if (w.disabled) el.classList.add('lv-disabled');
     if (!this.condVisible(w)) el.classList.add('lv-cond-hidden');
@@ -200,7 +202,7 @@ const Canvas = {
     const fn = this['w_' + type] || this.w_panel;
     fn.call(this, el, w, st, th, path);
     this.applyStyle(el, st, th, {});
-    if (U.samePath(M.st.sel, path) && !parentFlex) el.append(U.el('div', { class: 'hd-rs', title: 'drag to resize' }));
+    if (U.samePath(M.st.sel, path) && !parentFlex && M.selection().length < 2) el.append(U.el('div', { class: 'hd-rs', title: 'drag to resize' }));
     return el;
   },
 
@@ -398,33 +400,91 @@ const Canvas = {
     const path = this.widgetAt(e.target);
     if (!path) return;
     e.stopPropagation();
-    App.select(path);
+    // Ctrl / Shift + click: several widgets (of one parent) at once
+    if ((e.ctrlKey || e.shiftKey || e.metaKey) && path.length) { M.toggleSelect(path); App.selectionChanged(); e.preventDefault(); return; }
+    // a click on one of several selected widgets keeps them selected, so that they can be dragged together
+    const sels = M.selection(), together = sels.length > 1 && sels.some(p => U.samePath(p, path));
+    if (!together) App.select(path);
     if (!path.length) return;
     const parent = M.parent(path), w = M.get(path);
     if (!w || (parent && parent.flex)) return;
-    this.drag = { mode: 'move', path, w, sx: e.clientX, sy: e.clientY, x0: U.num(w.x, 0), y0: U.num(w.y, 0), pushed: false, moved: false };
+    const items = (together ? sels : [path]).map(p => { const it = M.get(p); return { w: it, x0: U.num(it.x, 0), y0: U.num(it.y, 0) }; });
+    this.drag = { mode: 'move', path, w, items, together, sx: e.clientX, sy: e.clientY, pushed: false, moved: false, snap: this.snapInfo(together ? sels : [path]) };
     e.preventDefault();
+  },
+  // What a drag can snap to: the edges and centres of the other widgets in the same parent, and
+  // of the parent itself. Measured once, when the drag starts.
+  snapInfo(paths) {
+    const rects = paths.map(p => this.rect(p)).filter(Boolean);
+    const el = this.root.querySelector('[data-path="' + U.pathStr(paths[0]) + '"]'), host = el && el.offsetParent;
+    if (!rects.length || !host) return null;
+    const x = Math.min(...rects.map(r => r.x)), y = Math.min(...rects.map(r => r.y));
+    const box = { x, y, w: Math.max(...rects.map(r => r.x + r.w)) - x, h: Math.max(...rects.map(r => r.y + r.h)) - y };
+    const cp = paths[0].slice(0, -1), parent = M.get(cp), others = [{ x: 0, y: 0, w: host.clientWidth, h: host.clientHeight }];
+    (parent.children || []).forEach((c, i) => {
+      if (paths.some(p => p[p.length - 1] === i)) return;
+      const r = this.rect(cp.concat(i)); if (r && r.w && r.h) others.push(r);
+    });
+    return { box, others };
+  },
+  guides(d) {
+    const el = this.root.querySelector('[data-path="' + U.pathStr(d.path) + '"]'), host = el && el.offsetParent;
+    if (!host || !d.guide) return;
+    if (d.guide.gx !== null) host.append(U.el('div', { class: 'hd-guide v', style: { left: d.guide.gx + 'px' } }));
+    if (d.guide.gy !== null) host.append(U.el('div', { class: 'hd-guide h', style: { top: d.guide.gy + 'px' } }));
+  },
+  // a widget dragged from the palette is dropped where the mouse is
+  dragType: null,
+  onDragOver(e) { if (this.dragType && this.widgetAt(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } },
+  onDrop(e) {
+    const type = this.dragType; this.dragType = null;
+    const at = this.widgetAt(e.target);
+    if (!type || !at) return;
+    e.preventDefault();
+    const cp = M.containerPathFor(at.length ? at : []), w0 = M.get(at);
+    const into = at.length && !M.isContainer(w0) ? cp : at;                       // dropped on a widget: next to it
+    const host = this.root.querySelector('[data-path="' + U.pathStr(into) + '"]') || this.root;
+    const r = host.getBoundingClientRect(), z = M.st.zoom, cs = getComputedStyle(host);
+    const def = (SCHEMA.types[type] || {}).def || {};
+    const hw = typeof def.w === 'number' ? def.w / 2 : 40, hh = typeof def.h === 'number' ? def.h / 2 : 15;   // the mouse is at its middle
+    M.st.sel = into;
+    M.addWidget(type, into, { x: (e.clientX - r.left) / z - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.borderLeftWidth || 0) - hw,
+      y: (e.clientY - r.top) / z - parseFloat(cs.paddingTop || 0) - parseFloat(cs.borderTopWidth || 0) - hh });
+  },
+  // where a widget is drawn, in screen pixels relative to its parent's content (for lining up)
+  rect(path) {
+    const el = this.root.querySelector('[data-path="' + U.pathStr(path) + '"]');
+    return el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : null;
   },
   onMove(e) {
     const d = this.drag; if (!d) return;
-    const z = M.st.zoom, dx = Math.round((e.clientX - d.sx) / z), dy = Math.round((e.clientY - d.sy) / z);
+    const z = M.st.zoom;
+    let dx = Math.round((e.clientX - d.sx) / z), dy = Math.round((e.clientY - d.sy) / z);
     if (!dx && !dy) return;
+    d.guide = null;
+    if (d.mode === 'move' && d.snap && !e.altKey) {            // Alt: move freely
+      const s = M.snap({ x: d.snap.box.x + dx, y: d.snap.box.y + dy, w: d.snap.box.w, h: d.snap.box.h }, d.snap.others, 5 / z);
+      dx += s.dx; dy += s.dy; d.guide = s;
+    }
     if (!d.pushed) { M.pushUndo(); d.pushed = true; }
     d.moved = true;
     if (d.mode === 'move') {
-      if (U.num(d.w.x, 0) !== d.x0 + dx) d.w.x = d.x0 + dx;
-      if (U.num(d.w.y, 0) !== d.y0 + dy) d.w.y = d.y0 + dy;
-      if (d.w.x === 0 && d.w.align === undefined) delete d.w.x;
-      if (d.w.y === 0 && d.w.align === undefined) delete d.w.y;
+      for (const it of d.items) {
+        if (U.num(it.w.x, 0) !== it.x0 + dx) it.w.x = it.x0 + dx;
+        if (U.num(it.w.y, 0) !== it.y0 + dy) it.w.y = it.y0 + dy;
+        if (it.w.x === 0 && it.w.align === undefined) delete it.w.x;
+        if (it.w.y === 0 && it.w.align === undefined) delete it.w.y;
+      }
     } else {
       d.w.w = Math.max(4, d.w0 + dx); d.w.h = Math.max(4, d.h0 + dy);
     }
     M.st.dirty = true;
-    if (!d.raf) d.raf = requestAnimationFrame(() => { d.raf = 0; this.render(); App.status(); });
+    if (!d.raf) d.raf = requestAnimationFrame(() => { d.raf = 0; this.render(); if (this.drag === d) this.guides(d); App.status(); });
   },
   onUp() {
     const d = this.drag; if (!d) return;
     this.drag = null;
     if (d.moved) App.refresh();
+    else if (d.together) App.select(d.path);          // a plain click on one of several: just that one
   },
 };

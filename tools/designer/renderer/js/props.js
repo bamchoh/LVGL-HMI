@@ -48,7 +48,7 @@ const Props = {
       case 'select': {
         const o = f.o || [];
         const s = U.el('select', Object.assign(attrs, { onchange: e => this.setVal(obj, k, e.target.value) }));
-        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? I18N.t(f.empty || '(default)') : opt));
+        for (const opt of o) s.append(U.el('option', { value: opt, selected: String(v === undefined ? '' : v) === String(opt) }, opt === '' ? I18N.t(f.empty || '(default)') : I18N.value(opt)));
         if (v !== undefined && !o.map(String).includes(String(v))) s.append(U.el('option', { value: v, selected: true }, v));
         return s;
       }
@@ -97,7 +97,7 @@ const Props = {
   // label: a property key or a fixed text. It is shown by its display name in the chosen
   // language; the tooltip then names the key (what is written in the project files).
   row(label, input, hint) {
-    const tip = I18N.named(label) ? label + (hint ? '\n' + hint : '') : (hint || '');
+    const tip = I18N.named(label) ? label + (hint ? '\n' + I18N.t(hint) : '') : I18N.t(hint || '');
     return U.el('div', { class: 'row', title: tip }, U.el('label', null, I18N.label(label)), input);
   },
   fields(obj, defs, fk) { return defs.map(f => this.row(f.label || f.k, this.editor(obj, f.k, f, fk), f.hint)); },
@@ -108,6 +108,8 @@ const Props = {
     const el = this.el; el.innerHTML = '';
     const path = M.st.sel, w = path ? M.get(path) : null;
     if (!w) { el.append(U.el('div', { class: 'hint' }, I18N.t('Select a widget on the canvas or in the tree.'))); return; }
+    const sels = M.selection();
+    if (sels.length > 1) { this.renderSeveral(el, sels); return; }
     const isRoot = path.length === 0, fk = 'w:' + U.pathStr(path);
     const common = SCHEMA.common.map(f => f.k === 'align' ? Object.assign({}, f, { o: SCHEMA.aligns }) : f);
 
@@ -137,6 +139,21 @@ const Props = {
   },
 
   focusFirst() { const i = this.el.querySelector('input,select,textarea'); if (i) i.focus(); },
+
+  // several widgets selected: line them up, space them out, make them the same size
+  renderSeveral(el, sels) {
+    const parent = M.parent(sels[0]), flex = !!(parent && parent.flex);
+    el.append(U.el('div', { class: 'props-head' }, I18N.f('{0} widgets selected', sels.length)));
+    const go = kind => M.arrange(kind, sels.map(p => Object.assign({ path: p }, Canvas.rect(p))).filter(r => r.w !== undefined));
+    const btn = (icon, kind, title, min) => U.el('button', { class: 'arr', title, disabled: flex || sels.length < (min || 2), onclick: () => go(kind) }, icon);
+    el.append(this.section('Align', true,
+      U.el('div', { class: 'arr-row' }, btn('⇤', 'left', 'Align left edges'), btn('⇹', 'hcenter', 'Align centers horizontally'), btn('⇥', 'right', 'Align right edges'),
+        btn('⤒', 'top', 'Align top edges'), btn('⇳', 'vcenter', 'Align centers vertically'), btn('⤓', 'bottom', 'Align bottom edges')),
+      U.el('div', { class: 'arr-row' }, btn('⋯', 'hdist', 'Space out horizontally (equal gaps)', 3), btn('⋮', 'vdist', 'Space out vertically (equal gaps)', 3),
+        btn('↔', 'samew', 'Same width as the first selected'), btn('↕', 'sameh', 'Same height as the first selected')),
+      flex ? U.el('div', { class: 'hint' }, 'These widgets are placed by their panel\'s layout (flex); change the order in the tree instead.') : null));
+    el.append(U.el('div', { class: 'hint' }, 'Drag one of them to move all. Arrow keys move by 1 px (Shift: 10). Ctrl+C / Ctrl+V copy and paste, Ctrl+D duplicates, Del deletes. Ctrl+click adds or removes a widget.'));
+  },
 
   // ---- style -------------------------------------------------------------
   styleSection(w, fk) {
@@ -196,7 +213,7 @@ const Props = {
     entries.forEach((e, i) => {
       const cfg = e.cfg, bfk = fk + '.bind.' + i;
       const kind = U.el('select', { onchange: ev => { e.kind = ev.target.value; commit(); } });
-      for (const k of SCHEMA.bindKinds) kind.append(U.el('option', { value: k, selected: k === e.kind }, k));
+      for (const k of SCHEMA.bindKinds) kind.append(U.el('option', { value: k, selected: k === e.kind }, I18N.named(k) ? I18N.label(k) + '  (' + k + ')' : I18N.value(k)));
       const tag = U.el('input', { type: 'text', list: 'dl-tags', value: cfg.tag || '', placeholder: 'tag', dataset: { fk: bfk + '.tag' }, onchange: ev => { cfg.tag = ev.target.value.trim(); commit(); } });
       const del = U.el('button', { class: 'mini danger', onclick: () => { entries.splice(i, 1); commit(); } }, '×');
       const head = U.el('div', { class: 'row bind-head' }, kind, tag, del);
@@ -246,7 +263,7 @@ const Props = {
       const commit = () => M.mutate(() => { w[ev] = acts; if (!acts.length) delete w[ev]; });
       const rows = acts.map((a, i) => {
         const sel = U.el('select', { onchange: e => { const kind = e.target.value; for (const k of Object.keys(a)) delete a[k]; a.action = kind; commit(); } });
-        for (const k of Object.keys(SCHEMA.actions)) sel.append(U.el('option', { value: k, selected: k === a.action }, k));
+        for (const k of Object.keys(SCHEMA.actions)) sel.append(U.el('option', { value: k, selected: k === a.action }, I18N.action(k)));
         const fieldsEls = (SCHEMA.actions[a.action] || []).map(f => U.el('span', { class: 'inline' }, U.el('span', { class: 'dim' }, f.k), this.editor(a, f.k, f, fk + '.' + ev + '.' + i)));
         const del = U.el('button', { class: 'mini danger', onclick: () => { acts.splice(i, 1); commit(); } }, '×');
         return U.el('div', { class: 'row act' }, sel, ...fieldsEls, del);
@@ -256,7 +273,7 @@ const Props = {
       blocks.push(U.el('div', { class: 'ev-block' }, U.el('div', { class: 'row ev-head' }, U.el('b', null, ev), delEv), ...rows, U.el('div', { class: 'row' }, U.el('label'), add)));
     }
     const addEv = U.el('select', { onchange: e => { const ev = e.target.value; if (ev) M.mutate(() => { w[ev] = [{ action: 'set', tag: M.tagNames()[0] || '', value: true }]; }); } }, U.el('option', { value: '' }, '+ add event…'));
-    for (const ev of SCHEMA.events) if (w[ev] === undefined) addEv.append(U.el('option', { value: ev }, ev));
+    for (const ev of SCHEMA.events) if (w[ev] === undefined) addEv.append(U.el('option', { value: ev }, I18N.value(ev)));
     return this.section('Events / actions', blocks.length > 0, ...blocks, U.el('div', { class: 'row' }, U.el('label'), addEv));
   },
 

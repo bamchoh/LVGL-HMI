@@ -679,3 +679,161 @@ test('M display presets and touch calibration', () => {
   assert.equal(M.st.project.display.touch, undefined);           // a display that needs no correction
   assert.equal(M.st.project.display.width, 800);
 });
+
+// ---------------------------------------------------------------- several widgets, clipboard, problems
+function threeButtons() {
+  const { M, U } = load();
+  M.newProject('T', 800, 480);
+  M.screen().children = [
+    { type: 'button', x: 10, y: 10, w: 100, h: 40 },
+    { type: 'button', x: 200, y: 30, w: 60, h: 20 },
+    { type: 'button', x: 500, y: 90, w: 80, h: 50 },
+    { type: 'panel', x: 0, y: 200, children: [{ type: 'label', text: 'in' }] },
+  ];
+  return { M, U };
+}
+const rectsOf = (M, sels) => sels.map(p => { const w = M.get(p); return { path: p, x: w.x || 0, y: w.y || 0, w: w.w, h: w.h }; });
+
+test('M selection: Ctrl+click adds and removes widgets of one parent', () => {
+  const { M } = threeButtons();
+  M.st.sel = [0]; M.st.more = [];
+  M.toggleSelect([2]);
+  deq(M.selection(), [[0], [2]]);
+  M.toggleSelect([3, 0]);                                        // another parent: a new selection
+  deq(M.selection(), [[3, 0]]);
+  M.st.sel = [0]; M.st.more = [];
+  M.toggleSelect([1]); M.toggleSelect([0]);                      // taking the first one out
+  deq(M.selection(), [[1]]);
+  M.toggleSelect([1]);                                           // the last one stays
+  deq(M.selection(), [[1]]);
+  M.selectSiblings();
+  assert.equal(M.selection().length, 4);
+  M.st.sel = []; deq(M.selection(), []);                         // the screen itself is not part of it
+});
+
+test('M arrange: align, distribute, same size - one undo step', () => {
+  const { M } = threeButtons();
+  const sels = [[0], [1], [2]];
+  M.arrange('left', rectsOf(M, sels));
+  deq(M.screen().children.slice(0, 3).map(w => w.x), [10, 10, 10]);
+  M.undo();
+  deq(M.screen().children.slice(0, 3).map(w => w.x), [10, 200, 500]);
+  M.arrange('right', rectsOf(M, sels));
+  deq(M.screen().children.slice(0, 3).map(w => w.x + w.w), [580, 580, 580]);
+  M.undo();
+  M.arrange('vcenter', rectsOf(M, sels));                        // box: y 10 .. 140, centre 75
+  deq(M.screen().children.slice(0, 3).map(w => w.y + w.h / 2), [75, 75, 75]);
+  M.undo();
+  M.arrange('hdist', rectsOf(M, sels));                          // 10..580, widths 240 -> gaps of 165
+  deq(M.screen().children.slice(0, 3).map(w => w.x), [10, 275, 500]);
+  M.undo();
+  M.arrange('samew', rectsOf(M, sels));
+  deq(M.screen().children.slice(0, 3).map(w => w.w), [100, 100, 100]);
+  const undos = M.st.undo.length;
+  M.arrange('samew', rectsOf(M, sels));                          // nothing to do: no undo step
+  M.arrange('left', rectsOf(M, [[0]]));
+  assert.equal(M.st.undo.length, undos);
+});
+
+test('M copy and paste: several widgets, onto another screen, not on top of each other', () => {
+  const { M } = threeButtons();
+  M.st.sel = [1]; M.st.more = [[0]];
+  const clip = M.copySelection();
+  deq(clip.map(w => w.x), [10, 200]);                            // in the order on the screen
+  M.paste(clip);                                                 // next to the selected widget: same container
+  assert.equal(M.screen().children.length, 6);
+  deq(M.screen().children.slice(4).map(w => [w.x, w.y]), [[20, 20], [210, 40]]);
+  deq(M.selection(), [[4], [5]]);
+  M.addScreen('second'); M.selectScreen(1);
+  M.paste(clip);
+  deq(M.screen().children.map(w => [w.x, w.y]), [[10, 10], [200, 30]]);
+  clip[0].x = 999;                                               // the clipboard is a copy
+  assert.equal(M.screen().children[0].x, 10);
+  M.selectScreen(0); M.st.sel = [3];                             // a panel is selected: into it
+  M.paste(clip.slice(1));
+  assert.equal(M.get([3]).children.length, 2);
+});
+
+test('M delete / duplicate / nudge work on the whole selection', () => {
+  const { M } = threeButtons();
+  M.st.sel = [0]; M.st.more = [[2]];
+  M.nudgeSelection(5, -2);
+  deq([M.get([0]).x, M.get([0]).y, M.get([2]).x, M.get([2]).y, M.get([1]).x], [15, 8, 505, 88, 200]);
+  deq(M.selection(), [[0], [2]]);                                // still selected
+  M.duplicateSelection();
+  assert.equal(M.screen().children.length, 6);
+  deq(M.selection(), [[3], [4]]);
+  M.deleteSelection();
+  assert.equal(M.screen().children.length, 4);
+  M.undo(); M.undo();
+  assert.equal(M.screen().children.length, 4);
+  deq(M.selection(), [[0], [2]]);                                // undo brings the selection back
+});
+
+test('M problems: names that do not exist', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  assert.equal(M.problems().length, 0);
+  M.st.project.tags = [{ name: 'a', type: 'int' }, { name: 'a', type: 'int' }];
+  M.screen().children = [
+    { type: 'label', bind: { text: 'nope' } },
+    { type: 'button', bind: { hidden: { tag: 'a', eq: { tag: 'gone' } } }, on_click: [{ action: 'set', tag: 'a', value: 1 }, { action: 'goto', screen: 'nowhere' }, { action: 'script', name: 'x' }] },
+    { type: 'label', bind: { text: 'sys.user.name' }, level: 2 },
+  ];
+  const texts = M.problems().map(p => p.text);
+  for (const t of ['tag "a" is defined twice', 'unknown tag "nope" (text)', 'unknown tag "gone" (hidden)', 'unknown screen "nowhere" (goto)', 'unknown script "x"',
+    'a level is set, but user management is off (Users tab)']) assert.ok(texts.includes(t), t + ' / ' + texts.join(' | '));
+  assert.equal(texts.length, 6);
+  const p = M.problems().find(x => /nope/.test(x.text));
+  deq([p.screen, p.path], [0, [0]]);
+});
+
+test('I18N: texts with values in them, and every problem text has a Japanese form', () => {
+  const ctx = vm.createContext({ console, navigator: { language: 'ja-JP' } });
+  for (const f of ['i18n.js', 'i18n_ja.js']) vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
+  const I18N = vm.runInContext('I18N', ctx);
+  I18N.init();
+  assert.equal(I18N.t('saved D:/x/project.json'), '保存しました: D:/x/project.json');
+  assert.equal(I18N.f('{0} problem(s)', 3), '問題 3 件');
+  for (const t of ['tag "a" is defined twice', 'unknown tag "nope" (text)', 'unknown screen "nowhere" (goto)', 'unknown script "x"', 'plc: unknown tag "t"',
+    'start screen "s" does not exist', 'script "s": unknown tag "t"', 'plc: no serial port (device) is set']) assert.notEqual(I18N.t(t), t, t);
+  I18N.set('en');
+  assert.equal(I18N.t('saved D:/x/project.json'), 'saved D:/x/project.json');
+  assert.equal(I18N.f('{0} problem(s)', 3), '3 problem(s)');
+});
+
+test('M snap: edges and centres of the other widgets, within the tolerance', () => {
+  const { M } = load();
+  const others = [{ x: 0, y: 0, w: 800, h: 480 }, { x: 100, y: 50, w: 200, h: 40 }];
+  deq(M.snap({ x: 103, y: 200, w: 50, h: 30 }, others, 5), { dx: -3, dy: 0, gx: 100, gy: null });      // left edges
+  deq(M.snap({ x: 252, y: 91, w: 50, h: 30 }, others, 5), { dx: -2, dy: -1, gx: 300, gy: 90 });         // right edge to right edge, top to bottom
+  deq(M.snap({ x: 373, y: 223, w: 50, h: 30 }, others, 5), { dx: 2, dy: 2, gx: 400, gy: 240 });         // the middle of the screen
+  deq(M.snap({ x: 500, y: 300, w: 50, h: 30 }, others, 5), { dx: 0, dy: 0, gx: null, gy: null });
+});
+
+test('M addWidget at a position (dropped from the palette); tag choices', () => {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.addWidget('button', [], { x: 120.4, y: -3 });
+  const w = M.screen().children[0];
+  deq([w.type, w.x, w.y, w.align], ['button', 120, 0, undefined]);
+  M.undo();
+  assert.equal((M.screen().children || []).length, 0);
+  M.st.project.tags = [{ name: 'temp', type: 'float' }, { type: 'int' }];
+  deq(M.tagChoices(), [{ name: 'temp', note: 'float' }]);
+  M.setUsers(true);
+  assert.ok(M.tagChoices().some(t => t.name === 'sys.user.name'));
+});
+
+test('I18N: values of choices keep the value visible', () => {
+  const ctx = vm.createContext({ console, navigator: { language: 'ja-JP' } });
+  for (const f of ['i18n.js', 'i18n_ja.js']) vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), ctx, { filename: f });
+  const I18N = vm.runInContext('I18N', ctx);
+  I18N.init();
+  assert.equal(I18N.value('center'), '中央  (center)');
+  assert.equal(I18N.value('int16'), 'int16');
+  assert.equal(I18N.action('goto'), '画面を切り替える  (goto)');
+  I18N.set('en');
+  assert.equal(I18N.value('center'), 'center');
+  assert.equal(I18N.action('goto'), 'goto');
+});

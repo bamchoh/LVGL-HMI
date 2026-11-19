@@ -9,6 +9,8 @@
 <div id="toolbar">
   <button id="b-new" title="New project (Ctrl+N)">New</button>
   <button id="b-open" title="Open project.json (Ctrl+O)">Open</button>
+  <button id="b-recent" title="Recent projects">&#9662;</button>
+  <button id="b-keys" title="Keyboard shortcuts (F1)">?</button>
   <button id="b-save" title="Save (Ctrl+S)">Save</button>
   <button id="b-saveas" title="Save as">Save As</button>
   <span class="sep"></span>
@@ -76,7 +78,7 @@
   </div>
 </div>
 
-<div id="status"></div>
+<div id="status"><span id="status-text"></span><span id="status-prob"></span></div>
 <datalist id="dl-tags"></datalist>
 
 <div id="modal" hidden>
@@ -90,6 +92,7 @@
 
 <script src="js/util.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/i18n_ja.js"></script>
 <script src="js/schema.js"></script>
 <script src="js/model.js"></script>
 <script src="js/canvas.js"></script>

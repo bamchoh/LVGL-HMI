@@ -38,6 +38,10 @@ const App = {
     const q = id => document.getElementById(id);
     q('b-new').onclick = () => this.newProjectDialog();
     q('b-open').onclick = () => this.openDialog();
+    q('b-recent').onclick = () => this.recentDialog();
+    q('b-keys').onclick = () => this.shortcutsDialog();
+    q('canvas-wrap').addEventListener('dragover', e => Canvas.onDragOver(e));
+    q('canvas-wrap').addEventListener('drop', e => Canvas.onDrop(e));
     q('b-save').onclick = () => this.save(false);
     q('b-saveas').onclick = () => this.save(true);
     q('b-undo').onclick = () => M.undo();
@@ -50,8 +54,9 @@ const App = {
     q('b-run').onclick = () => this.run();
     q('b-deploy').onclick = () => this.deployDialog();
     q('sel-screen').onchange = e => { Panels.showView('screen'); M.selectScreen(Number(e.target.value)); };
-    q('t-dup').onclick = () => M.duplicateWidget(M.st.sel);
-    q('t-del').onclick = () => M.deleteWidget(M.st.sel);
+    q('t-dup').onclick = () => M.duplicateSelection();
+    q('t-del').onclick = () => M.deleteSelection();
+    q('status-prob').onclick = () => this.problemsDialog();
     q('t-up').onclick = () => M.moveWidget(M.st.sel, -1);
     q('t-down').onclick = () => M.moveWidget(M.st.sel, 1);
     q('t-in').onclick = () => M.reparentWidget(M.st.sel, 'in');
@@ -63,6 +68,7 @@ const App = {
     // the language of the designer: what was chosen before, else the system's
     const saved = (await host.settings()) || {};
     I18N.init(saved.lang);
+    this.recent = Array.isArray(saved.recent) ? saved.recent.filter(p => typeof p === 'string') : [];
     const langSel = q('sel-lang');
     for (const [code, name] of Object.entries(I18N.LANGS)) langSel.append(U.el('option', { value: code, selected: code === I18N.lang }, name));
     langSel.onchange = () => { I18N.set(langSel.value); host.settings({ lang: I18N.lang }); this.staticTexts(); this.doRefresh(); };
@@ -79,6 +85,15 @@ const App = {
       if (b.dataset.i18n === undefined) b.dataset.i18n = b.textContent;
       if (/[A-Za-z]/.test(b.dataset.i18n)) b.textContent = I18N.t(b.dataset.i18n);       // (not the arrow / symbol buttons)
     }
+    for (const b of document.querySelectorAll('#toolbar [title], #center-tabs [title], #tree-tools [title]')) {
+      if (b.dataset.i18nTitle === undefined) b.dataset.i18nTitle = b.title;
+      b.title = I18N.t(b.dataset.i18nTitle);
+    }
+    const scr = document.querySelector('#toolbar label');                                 // "Screen <select>"
+    if (scr && scr.firstChild && scr.firstChild.nodeType === 3) {
+      if (scr.dataset.i18n === undefined) scr.dataset.i18n = scr.firstChild.textContent;
+      scr.firstChild.textContent = I18N.t(scr.dataset.i18n.trim()) + ' ';
+    }
   },
 
   // ---- refresh -----------------------------------------------------------
@@ -88,10 +103,55 @@ const App = {
   },
   doRefresh() {
     const ae = document.activeElement, fk = ae && ae.dataset ? ae.dataset.fk : null;
+    this.problems = M.problems();
     Canvas.render(); Tree.render(); Props.render(); Panels.render(); this.toolbar(); this.status();
     if (fk) { const e = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]'); if (e) e.focus(); }
   },
-  select(path) { M.st.sel = path; Canvas.render(); Tree.render(); Props.render(); this.status(); },
+  select(path) { M.st.sel = path; M.st.more = []; this.selectionChanged(); },
+  selectionChanged() { Canvas.render(); Tree.render(); Props.render(); this.status(); },
+
+  // ---- copy and paste (also from one screen to another) -------------------
+  clip: null,
+  copy() {
+    const ws = M.copySelection();
+    if (!ws.length) return false;
+    this.clip = ws;
+    this.toast(I18N.f('{0} widget(s) copied', ws.length), 1200);
+    return true;
+  },
+  cut() { if (this.copy()) M.deleteSelection(); },
+  paste() { if (this.clip) M.paste(this.clip); },
+
+  // ---- problems: what will not work on the device --------------------------
+  problems: [],
+  problemsDialog() {
+    const list = this.problems;
+    if (!list.length) return;
+    const body = U.el('div', { class: 'prob-list' });
+    let close = null;
+    for (const pr of list) {
+      const scr = pr.screen !== undefined ? M.st.screens[pr.screen] : null;
+      const w = scr ? (() => { let o = scr.data; for (const i of pr.path) o = (o.children || [])[i]; return o; })() : null;
+      const where = scr ? I18N.t('Screen') + ' "' + scr.data.name + '"' + (pr.path.length && w ? ' › ' + Tree.label(w, false) : '')
+        : I18N.t({ tags: 'Tags', drivers: 'Drivers', scripts: 'Scripts', logs: 'Logs', users: 'Users', project: 'Project' }[pr.view] || '');
+      body.append(U.el('div', { class: 'item', onclick: () => { close(); this.gotoProblem(pr); } },
+        U.el('div', null, I18N.t(pr.text)), U.el('div', { class: 'where' }, where)));
+    }
+    close = this.modal({ title: I18N.f('Problems ({0})', list.length), body, buttons: [{ label: 'Close' }] });
+  },
+  gotoProblem(pr) {
+    if (pr.screen !== undefined) {
+      Panels.showView('screen');
+      M.st.cur = pr.screen; M.st.sel = pr.path; M.st.more = [];
+    } else if (pr.view === 'project') {
+      Panels.showView('screen'); Panels.show('project');
+    } else {
+      if (pr.view === 'drivers' && pr.index !== undefined) Panels.driverSel = pr.index;
+      if (pr.view === 'scripts' && pr.index !== undefined) Panels.scriptSel = pr.index;
+      Panels.showView(pr.view);
+    }
+    this.doRefresh();
+  },
   addWidget(type) { Panels.showView('screen'); M.addWidget(type, M.st.sel); },
 
   toolbar() {
@@ -109,11 +169,16 @@ const App = {
     document.getElementById('b-preview').disabled = noRt; document.getElementById('b-run').disabled = noRt;
   },
   status(msg) {
-    const el = document.getElementById('status');
+    const el = document.getElementById('status-text');
     if (msg) { el.textContent = msg; return; }
-    const w = M.selected(), d = M.display();
+    const prob = document.getElementById('status-prob'), n = this.problems.length;
+    prob.textContent = n ? '⚠ ' + I18N.f('{0} problem(s)', n) : I18N.t('no problems');
+    prob.className = n ? '' : 'none';
+    prob.title = n ? I18N.t('Show what will not work on the device') : '';
+    const w = M.selected(), d = M.display(), many = M.selection().length;
     let s = d.w + '×' + d.h;
-    if (w) {
+    if (many > 1) s += '  |  ' + I18N.f('{0} widgets selected', many);
+    else if (w) {
       if (M.st.sel.length) s += '  |  ' + (w.type || 'panel') + ' #' + U.pathStr(M.st.sel) + '  x=' + U.num(w.x, 0) + ' y=' + U.num(w.y, 0) + (w.w !== undefined ? ' w=' + w.w : '') + (w.h !== undefined ? ' h=' + w.h : '') + (w.align ? ' align=' + w.align : '');
       else s += '  |  screen "' + (w.name || '') + '"';
     }
@@ -122,7 +187,7 @@ const App = {
   },
   toast(msg, ms) {
     const t = document.getElementById('toast');
-    t.textContent = msg; t.hidden = false;
+    t.textContent = I18N.t(msg); t.hidden = false;
     clearTimeout(this._toast); this._toast = setTimeout(() => { t.hidden = true; }, ms || 3500);
   },
 
@@ -151,7 +216,9 @@ const App = {
   },
 
   // ---- project files -----------------------------------------------------
-  confirmDiscard() { return !M.st.dirty || confirm('Discard unsaved changes?'); },
+  // a yes / no question, in the chosen language
+  ask(question) { return confirm(I18N.t(question)); },
+  confirmDiscard() { return !M.st.dirty || this.ask('Discard unsaved changes?'); },
 
   newProjectDialog() {
     if (!this.confirmDiscard()) return;
@@ -183,8 +250,40 @@ const App = {
     if (!r || !r.ok) { this.toast('open failed: ' + (r && r.error)); return; }
     try { M.loadFromHost(r); } catch (e) { this.toast('parse error: ' + e.message, 6000); return; }
     await this.loadLocal();
+    this.remember(path);
     this.refresh();
     setTimeout(() => this.zoomFit(), 50);
+  },
+  // ---- recently used projects (kept in the designer's settings on this PC)
+  recent: [],
+  remember(path) {
+    if (!path) return;
+    const same = p => p.replace(/\\/g, '/').toLowerCase() === path.replace(/\\/g, '/').toLowerCase();
+    this.recent = [path].concat(this.recent.filter(p => !same(p))).slice(0, 10);
+    host.settings({ recent: this.recent });
+  },
+  SHORTCUTS: [
+    ['Ctrl+N / Ctrl+O / Ctrl+S', 'New / open / save (Ctrl+Shift+S: save as)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
+    ['Ctrl+1 … Ctrl+6', 'Screen editor, tags, drivers, scripts, logs, users'],
+    ['Ctrl+click, Shift+click', 'Add a widget to the selection, or take it out'], ['Ctrl+A', 'Select everything in the same panel'],
+    ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste widgets (also onto another screen)'], ['Ctrl+D', 'Duplicate'], ['Del', 'Delete'],
+    ['← ↑ → ↓', 'Move by 1 px (with Shift: 10 px)'], ['Alt + drag', 'Move without snapping to other widgets'], ['Esc', 'Clear the selection / close a dialog'],
+    ['F1', 'This list'],
+  ],
+  shortcutsDialog() {
+    const tb = U.el('table', { class: 'keys' });
+    for (const [k, what] of this.SHORTCUTS) tb.append(U.el('tr', null, U.el('td', { class: 'k' }, k), U.el('td', null, I18N.t(what))));
+    this.modal({ title: 'Keyboard shortcuts', body: tb, buttons: [{ label: 'Close' }] });
+  },
+  recentDialog() {
+    const body = U.el('div', { class: 'recent' });
+    let close = null;
+    if (!this.recent.length) body.append(U.el('div', { class: 'hint' }, 'No project was opened yet.'));
+    for (const p of this.recent) {
+      body.append(U.el('div', { class: 'item', onclick: async () => { if (!this.confirmDiscard()) return; close(); await this.open(p); } },
+        U.el('div', null, U.basename(/project\.json$/i.test(p) ? U.dirname(p) : p)), U.el('div', { class: 'where' }, p)));
+    }
+    close = this.modal({ title: 'Recent projects', body, buttons: [{ label: 'Close' }] });
   },
   async save(as) {
     const st = M.st;
@@ -223,6 +322,7 @@ const App = {
     if (as) await this.loadLocal();
     this.refresh();
     this.toast('saved ' + st.path, 1500);
+    this.remember(st.path);
     return true;
   },
   // A project is its folder (project.json, screens/, assets/), and the folder's name is the
@@ -519,26 +619,27 @@ const App = {
     const ctrl = e.ctrlKey || e.metaKey;
     if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
     if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
+    if (e.key === 'F1') { e.preventDefault(); this.shortcutsDialog(); return; }
     if (ctrl && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProjectDialog(); return; }
     if (ctrl && /^[123456]$/.test(e.key)) { e.preventDefault(); Panels.showView(['screen', 'tags', 'drivers', 'scripts', 'logs', 'users'][Number(e.key) - 1]); return; }
     if (ctrl && e.key.toLowerCase() === 'z' && !inInput) { e.preventDefault(); if (e.shiftKey) M.redo(); else M.undo(); return; }
     if (ctrl && e.key.toLowerCase() === 'y' && !inInput) { e.preventDefault(); M.redo(); return; }
     if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') document.getElementById('modal').hidden = true; return; }
     if (inInput || Panels.view !== 'screen') return;   // widget shortcuts only act on the canvas
-    const sel = M.st.sel, w = M.selected();
-    if (ctrl && e.key.toLowerCase() === 'd') { e.preventDefault(); M.duplicateWidget(sel); return; }
-    if (e.key === 'Delete' || e.key === 'Backspace') { if (sel && sel.length) { e.preventDefault(); M.deleteWidget(sel); } return; }
+    const sel = M.st.sel, key = e.key.toLowerCase();
+    if (ctrl && key === 'd') { e.preventDefault(); M.duplicateSelection(); return; }
+    if (ctrl && key === 'a') { e.preventDefault(); M.selectSiblings(); this.selectionChanged(); return; }
+    if (ctrl && (key === 'c' || key === 'x')) {
+      if (String(window.getSelection() || '')) return;            // text is marked somewhere: the normal copy
+      e.preventDefault(); if (key === 'c') this.copy(); else this.cut(); return;
+    }
+    if (ctrl && key === 'v') { e.preventDefault(); this.paste(); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') { if (sel && sel.length) { e.preventDefault(); M.deleteSelection(); } return; }
     if (e.key === 'Escape') { this.select(null); return; }
-    if (/^Arrow/.test(e.key) && w && sel && sel.length) {
-      const parent = M.parent(sel); if (parent && parent.flex) return;
+    if (/^Arrow/.test(e.key) && sel && sel.length) {
       e.preventDefault();
       const step = e.shiftKey ? 10 : 1;
-      M.mutate(() => {
-        if (e.key === 'ArrowLeft') w.x = U.num(w.x, 0) - step;
-        if (e.key === 'ArrowRight') w.x = U.num(w.x, 0) + step;
-        if (e.key === 'ArrowUp') w.y = U.num(w.y, 0) - step;
-        if (e.key === 'ArrowDown') w.y = U.num(w.y, 0) + step;
-      });
+      M.nudgeSelection(e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0, e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0);
     }
   },
 };

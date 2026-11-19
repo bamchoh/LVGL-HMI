@@ -114,6 +114,23 @@ const I18N = {
   t(text) {
     if (this.lang !== 'ja') return text;
     const s = String(text);
-    return Object.prototype.hasOwnProperty.call(this.TEXT_JA, s) ? this.TEXT_JA[s] : text;
+    if (Object.prototype.hasOwnProperty.call(this.TEXT_JA, s)) return this.TEXT_JA[s];
+    // texts with values in them ("saved D:/x/project.json")
+    for (const [re, to] of this.PATTERNS_JA) if (re.test(s)) return s.replace(re, to);
+    if (this.collect && /[A-Za-z]{3}/.test(s) && /\s/.test(s.trim())) this.collect.add(s);   // development aid: phrases without a translation
+    return text;
   },
+  // a text with values in it: I18N.f('Delete screen "{0}"?', name)
+  f(template, ...args) {
+    return this.t(template).replace(/\{(\d)\}/g, (m, i) => (args[Number(i)] === undefined ? '' : String(args[Number(i)])));
+  },
+  // a value of a choice (align: center): "中央 (center)". The value itself stays visible, since
+  // it is what the project file and the documentation say.
+  value(v) {
+    const s = String(v);
+    return this.lang === 'ja' && Object.prototype.hasOwnProperty.call(this.VALUES_JA, s) ? this.VALUES_JA[s] + '  (' + s + ')' : s;
+  },
+  VALUES_JA: {},                                    // filled by i18n_ja.js
+  collect: null,
+  PATTERNS_JA: [],                                  // filled by i18n_ja.js
 };
