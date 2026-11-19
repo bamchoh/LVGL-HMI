@@ -22,6 +22,7 @@
 //
 // SDL: F5 = reload screens, Esc = quit.  Linux fbdev/drm: SIGHUP/SIGUSR1 = reload, SIGUSR2 = restart,
 // SIGINT/SIGTERM = quit.
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -124,7 +125,7 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
     hml::set_log_sink(check_log_sink);
     bool loaded = hml::project().load(project_path);
     int rendered = 0;
-    std::vector<std::string> notes;
+    std::vector<std::string> notes, glyphs;
     if(loaded) {
         const hml::ProjectInfo& info = hml::project().info();
         lv_init();
@@ -157,9 +158,34 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
             for(int i = 0; i < passes; i++) { hml::tags().dispatch(false); lv_timer_handler(); hml::sleep_ms(5); }
         };
         // every screen once: screens are built when they are first shown
+        // characters the font has no glyph for (drawn as empty boxes): every text of "texts" in every
+        // language, then what each screen shows now (texts written into the screens, in their fonts)
+        const lv_font_t* theme_font = lv_obj_get_style_text_font(lv_layer_top(), LV_PART_MAIN);
+        std::vector<std::string> text_misses;
+        if(const hml::json* tx = hml::project().section("texts"); tx && tx->is_object()) {
+            for(auto id = tx->begin(); id != tx->end(); ++id) {
+                if(!id.value().is_object()) continue;
+                for(auto l = id.value().begin(); l != id.value().end(); ++l) {
+                    if(!l.value().is_string()) continue;
+                    const std::string miss = hml::missing_glyphs(theme_font, l.value().get<std::string>());
+                    if(miss.empty()) continue;
+                    glyphs.push_back("project.json: texts." + id.key() + "." + l.key() + ": no glyph in the font for: " + miss);
+                    text_misses.push_back(l.value().get<std::string>());
+                }
+            }
+        }
         for(const std::string& name : screen_names) {
             if(!hml::ui().show_screen(name, "none")) s_check_log.push_back("screen '" + name + "' cannot be shown");
             settle(3);
+            for(lv_obj_t* root : { lv_screen_active(), lv_layer_top() }) {
+                for(const std::string& m : hml::missing_glyphs_on(root)) {
+                    // (a text of "texts" is reported there, once)
+                    bool known = false;
+                    for(const std::string& t : text_misses) if(m.rfind("\"" + t + "\"", 0) == 0) known = true;
+                    const std::string line = "screen \"" + name + "\": text " + m;
+                    if(!known && std::find(glyphs.begin(), glyphs.end(), line) == glyphs.end()) glyphs.push_back(line);
+                }
+            }
         }
         for(const Render& r : renders) {
             while(hml::ui().close_popup()) {}
@@ -185,9 +211,10 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
     for(const hml::CheckProblem& p : problems) std::printf("%s\n", p.line().c_str());
     if(!loaded && problems.empty()) std::printf("project.json: cannot be loaded\n");
     for(const std::string& m : s_check_log) std::printf("runtime: %s\n", m.c_str());
+    for(const std::string& m : glyphs) std::printf("%s (drawn as an empty box)\n", m.c_str());
     for(const std::string& m : notes) std::printf("%s\n", m.c_str());
     for(const Render& r : renders) std::printf("rendered: %s%s%s -> %s\n", r.screen.c_str(), r.popup.empty() ? "" : "+", r.popup.c_str(), r.path.c_str());
-    const size_t n = problems.size() + s_check_log.size() + notes.size() + ((!loaded && problems.empty()) ? 1 : 0);
+    const size_t n = problems.size() + s_check_log.size() + notes.size() + glyphs.size() + ((!loaded && problems.empty()) ? 1 : 0);
     if(n) std::printf("%d problem(s)\n", static_cast<int>(n));
     else std::printf("no problems\n");
     (void)rendered;

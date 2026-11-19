@@ -3,6 +3,7 @@
 #include <map>
 #include <set>
 #include "jsonutil.hpp"
+#include "src/misc/lv_text_private.h"
 #include "util.hpp"
 
 namespace hml {
@@ -291,6 +292,51 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         c.walk(s.def, s.file == pj ? "screen \"" + jstr(s.def, "name", "") + "\"" : "", true);
     }
     return c.out;
+}
+
+std::string missing_glyphs(const lv_font_t* font, const std::string& text)
+{
+    std::string out;
+    std::set<uint32_t> seen;
+    uint32_t i = 0;
+    while(i < text.size()) {
+        const uint32_t start = i;
+        const uint32_t c = lv_text_encoded_next(text.c_str(), &i);
+        if(i <= start) break;
+        if(c < 0x20 || c == 0x7F || !seen.insert(c).second) continue;
+        lv_font_glyph_dsc_t g;
+        if(lv_font_get_glyph_dsc(font, &g, c, 0) && !g.is_placeholder) continue;
+        out += (out.empty() ? "" : " ") + text.substr(start, i - start);
+    }
+    return out;
+}
+
+std::vector<std::string> missing_glyphs_on(lv_obj_t* root)
+{
+    std::vector<std::string> out;
+    std::set<std::string> seen;
+    auto look = [&](lv_obj_t* o, const char* text, lv_part_t part) {
+        if(!text || !*text) return;
+        const std::string miss = missing_glyphs(lv_obj_get_style_text_font(o, part), text);
+        if(miss.empty()) return;
+        std::string shown = text;
+        for(char& ch : shown) if(ch == '\n') ch = ' ';
+        if(shown.size() > 40) { size_t n = 40; while(n > 0 && (static_cast<unsigned char>(shown[n]) & 0xC0) == 0x80) n--; shown = shown.substr(0, n) + "..."; }
+        const std::string line = "\"" + shown + "\": no glyph for: " + miss;
+        if(seen.insert(line).second) out.push_back(line);
+    };
+    std::vector<lv_obj_t*> todo{ root };
+    while(!todo.empty()) {
+        lv_obj_t* o = todo.back();
+        todo.pop_back();
+        if(!o || lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) continue;          // (what is hidden now is not drawn)
+        if(lv_obj_check_type(o, &lv_label_class)) look(o, lv_label_get_text(o), LV_PART_MAIN);
+        else if(lv_obj_check_type(o, &lv_checkbox_class)) look(o, lv_checkbox_get_text(o), LV_PART_MAIN);
+        else if(lv_obj_check_type(o, &lv_dropdown_class)) look(o, lv_dropdown_get_options(o), LV_PART_MAIN);
+        else if(lv_obj_check_type(o, &lv_textarea_class)) look(o, lv_textarea_get_placeholder_text(o), LV_PART_MAIN);
+        for(uint32_t i = 0; i < lv_obj_get_child_count(o); i++) todo.push_back(lv_obj_get_child(o, static_cast<int32_t>(i)));
+    }
+    return out;
 }
 
 } // namespace hml
