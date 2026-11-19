@@ -81,5 +81,7 @@ const lv_font_t* font_from_json(const json* v);                        // 16 or 
 void             set_font_file(const std::string& path);
 bool             has_font_file();
 const lv_font_t* font_of_size(int size);                               // nullptr without a font file
+// Does this text field of a screen take numbers (numeric_display)? Its keyboard is the number pad.
+bool             ui_number_pad(lv_obj_t* textarea);
 
 } // namespace hml

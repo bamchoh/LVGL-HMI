@@ -244,8 +244,25 @@ bool focus_comes_from_pointer()
     return indev && lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER;
 }
 
+// ---- marks on a text field ----
+// LVGL 9.6 has a setter per object flag and none for the LV_OBJ_FLAG_USER_x ones (the functions
+// that take a flag are deprecated), so the runtime keeps its own bits in the user data of the
+// text area, which nothing else uses.
+enum : uintptr_t {
+    MARK_NUMBER_PAD  = 1,   // numeric_display: its keyboard is the number pad
+    MARK_TAP_PENDING = 2,   // edit session, see Ui::Impl::on_widget_focus and friends
+    MARK_EDITING     = 4,
+    MARK_REPLACE     = 8,
+};
+bool has_mark(lv_obj_t* obj, uintptr_t m) { return (reinterpret_cast<uintptr_t>(lv_obj_get_user_data(obj)) & m) != 0; }
+void set_mark(lv_obj_t* obj, uintptr_t m, bool on)
+{
+    uintptr_t v = reinterpret_cast<uintptr_t>(lv_obj_get_user_data(obj));
+    lv_obj_set_user_data(obj, reinterpret_cast<void*>(on ? (v | m) : (v & ~m)));
+}
+
 // ---- data display edit session (see Ui::Impl::on_widget_focus and friends) ----
-// Flags on the textarea: USER_2 tap pending, USER_3 editing, USER_4 whole text selected (next insert replaces).
+// Marks on the textarea: tap pending, editing, replace (whole text selected, the next insert replaces).
 void select_all(lv_obj_t* ta)
 {
     lv_textarea_set_cursor_pos(ta, LV_TEXTAREA_CURSOR_LAST);
@@ -253,7 +270,7 @@ void select_all(lv_obj_t* ta)
     lv_obj_t* label = lv_textarea_get_label(ta);
     lv_label_set_text_selection_start(label, 0);
     lv_label_set_text_selection_end(label, len);
-    lv_obj_add_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_3 | LV_OBJ_FLAG_USER_4));
+    set_mark(ta, MARK_EDITING | MARK_REPLACE, true);
 }
 
 void clear_selection(lv_obj_t* ta)
@@ -261,13 +278,13 @@ void clear_selection(lv_obj_t* ta)
     lv_obj_t* label = lv_textarea_get_label(ta);
     lv_label_set_text_selection_start(label, LV_DRAW_LABEL_NO_TXT_SEL);
     lv_label_set_text_selection_end(label, LV_DRAW_LABEL_NO_TXT_SEL);
-    lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_4);
+    set_mark(ta, MARK_REPLACE, false);
 }
 
 void end_edit_session(lv_obj_t* ta)
 {
     clear_selection(ta);
-    lv_obj_remove_flag(ta, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_USER_2 | LV_OBJ_FLAG_USER_3 | LV_OBJ_FLAG_USER_4));
+    set_mark(ta, MARK_TAP_PENDING | MARK_EDITING | MARK_REPLACE, false);
 }
 
 // LVGL keeps the pressed object until the finger is lifted (PRESS_LOCK), so CLICKED also arrives
@@ -657,8 +674,8 @@ void Binding::on_tag_changed(const Value& v, const void* source)
                 if(file.rfind("A:", 0) == 0) lv_image_set_src(obj, keep_path(file));
                 else {
                     const std::string path = image_path(base_dir, file);
-                    if(path.empty()) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);          // nothing to show for this value
-                    else { lv_image_set_src(obj, keep_path(path)); lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN); }
+                    if(path.empty()) lv_obj_set_hidden(obj, true);          // nothing to show for this value
+                    else { lv_image_set_src(obj, keep_path(path)); lv_obj_set_hidden(obj, false); }
                 }
             }
             else lv_label_set_text(obj, text.c_str());
@@ -675,8 +692,8 @@ void Binding::on_tag_changed(const Value& v, const void* source)
             break;
         }
         case BindKind::Visible:
-            if(condition(v)) lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
-            else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+            if(condition(v)) lv_obj_set_hidden(obj, false);
+            else lv_obj_set_hidden(obj, true);
             break;
         case BindKind::Enabled:
             if(condition(v)) lv_obj_remove_state(obj, LV_STATE_DISABLED);
@@ -1008,16 +1025,16 @@ struct Ui::Impl {
         end_edit_session(lv_event_get_target_obj(e));
         b->on_tag_changed(b->tag->get(), nullptr);
     }
-    // Data display edit session, tracked with object flags:
-    //   USER_2 = "tap pending": pressed (or focused) by a pointer, waiting for the CLICKED that is not a scroll
-    //   USER_3 = "editing": the session started (the text was selected once); later taps only move the cursor
-    //   USER_4 = "replace pending": the whole text is selected, the next insert replaces it
+    // Data display edit session, tracked with marks on the textarea (has_mark / set_mark):
+    //   MARK_TAP_PENDING = "tap pending": pressed (or focused) by a pointer, waiting for the CLICKED that is not a scroll
+    //   MARK_EDITING = "editing": the session started (the text was selected once); later taps only move the cursor
+    //   MARK_REPLACE = "replace pending": the whole text is selected, the next insert replaces it
     // READY / CANCEL / DEFOCUSED end the session.
     static void on_widget_focus(lv_event_t* e)
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
-        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
-        if(focus_comes_from_pointer()) { lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2); return; }
+        if(has_mark(ta, MARK_EDITING)) return;
+        if(focus_comes_from_pointer()) { set_mark(ta, MARK_TAP_PENDING, true); return; }
         select_all(ta);                                           // keypad / encoder: start editing right away
     }
     // LVGL 9.6 sends FOCUSED only when the focus moves: a press on the field that already has the
@@ -1025,21 +1042,21 @@ struct Ui::Impl {
     static void on_widget_press(lv_event_t* e)
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
-        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_3)) return;
-        if(focus_comes_from_pointer()) lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_2);
+        if(has_mark(ta, MARK_EDITING)) return;
+        if(focus_comes_from_pointer()) set_mark(ta, MARK_TAP_PENDING, true);
     }
     static void on_widget_click(lv_event_t* e)
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
-        if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_2)) return;
+        if(!has_mark(ta, MARK_TAP_PENDING)) return;
         if(!is_tap(ta)) return;                                   // slid or dragged off: keep waiting for a real tap
-        lv_obj_remove_flag(ta, LV_OBJ_FLAG_USER_2);
+        set_mark(ta, MARK_TAP_PENDING, false);
         select_all(ta);
     }
     static void on_widget_insert(lv_event_t* e)   // first key after select-all replaces the old text
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
-        if(!lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_4)) return;
+        if(!has_mark(ta, MARK_REPLACE)) return;
         const char* txt = static_cast<const char*>(lv_event_get_param(e));
         clear_selection(ta);
         lv_textarea_set_text(ta, "");                             // the pending insert then lands in the empty field
@@ -1049,7 +1066,7 @@ struct Ui::Impl {
     static void on_widget_edited(lv_event_t* e)   // any other change (e.g. backspace) just drops the selection
     {
         lv_obj_t* ta = lv_event_get_target_obj(e);
-        if(lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_4)) clear_selection(ta);
+        if(has_mark(ta, MARK_REPLACE)) clear_selection(ta);
     }
     static void on_widget_blur(lv_event_t* e) { end_edit_session(lv_event_get_target_obj(e)); }
     static void on_action_event(lv_event_t* e);
@@ -1065,14 +1082,14 @@ struct Ui::Impl {
         if(code == LV_EVENT_CLICKED && !is_tap(ta)) return;                  // finger slid or left the field: not a tap
         if(code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
             lv_keyboard_set_textarea(scr->keyboard, ta);
-            // numeric_display marks itself with USER_1: give it the number pad
-            lv_keyboard_set_mode(scr->keyboard, lv_obj_has_flag(ta, LV_OBJ_FLAG_USER_1) ? LV_KEYBOARD_MODE_NUMBER : LV_KEYBOARD_MODE_TEXT_LOWER);
-            lv_obj_remove_flag(scr->keyboard, LV_OBJ_FLAG_HIDDEN);
+            // numeric_display marks itself: give it the number pad
+            lv_keyboard_set_mode(scr->keyboard, has_mark(ta, MARK_NUMBER_PAD) ? LV_KEYBOARD_MODE_NUMBER : LV_KEYBOARD_MODE_TEXT_LOWER);
+            lv_obj_set_hidden(scr->keyboard, false);
             place_keyboard(scr, ta);
         }
         else if(code == LV_EVENT_DEFOCUSED || code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
-            lv_obj_add_flag(scr->keyboard, LV_OBJ_FLAG_HIDDEN);
-            if(scr->kb_echo) lv_obj_add_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_hidden(scr->keyboard, true);
+            if(scr->kb_echo) lv_obj_set_hidden(scr->kb_echo, true);
         }
     }
     // A keyboard aligned to the bottom (or top) edge moves to the opposite edge when it would hide
@@ -1105,7 +1122,7 @@ struct Ui::Impl {
             covered = a.y2 >= k.y1 && a.y1 <= k.y2;
         }
 
-        if(!covered) { if(scr->kb_echo) lv_obj_add_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN); return; }
+        if(!covered) { if(scr->kb_echo) lv_obj_set_hidden(scr->kb_echo, true); return; }
         if(!scr->kb_echo) {
             lv_obj_t* echo = lv_label_create(scr->obj);
             lv_obj_set_width(echo, lv_pct(100));
@@ -1115,11 +1132,11 @@ struct Ui::Impl {
             lv_obj_set_style_text_color(echo, lv_color_white(), LV_PART_MAIN);
             lv_obj_set_style_pad_all(echo, 8, LV_PART_MAIN);
             lv_obj_set_style_text_align(echo, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-            lv_obj_remove_flag(echo, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_clickable(echo, false);
             scr->kb_echo = echo;
         }
         lv_obj_set_style_text_font(scr->kb_echo, lv_obj_get_style_text_font(ta, LV_PART_MAIN), LV_PART_MAIN);
-        lv_obj_remove_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(scr->kb_echo, false);
         lv_obj_move_foreground(scr->kb_echo);
         update_echo(scr, ta);
         lv_obj_update_layout(scr->obj);
@@ -1127,7 +1144,7 @@ struct Ui::Impl {
     }
     static void update_echo(Screen* scr, lv_obj_t* ta)
     {
-        if(!scr->kb_echo || lv_obj_has_flag(scr->kb_echo, LV_OBJ_FLAG_HIDDEN)) return;
+        if(!scr->kb_echo || lv_obj_is_hidden(scr->kb_echo)) return;
         if(!scr->keyboard || lv_keyboard_get_textarea(scr->keyboard) != ta) return;
         std::string text = lv_textarea_get_text(ta);
         if(lv_textarea_get_password_mode(ta)) text = std::string(text.size(), '*');
@@ -1136,7 +1153,7 @@ struct Ui::Impl {
     static void on_keyboard_done(lv_event_t* e)
     {
         // Only hide. Re-focusing the textarea here would send LV_EVENT_FOCUSED and re-open it.
-        lv_obj_add_flag(lv_event_get_target_obj(e), LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(lv_event_get_target_obj(e), true);
     }
 
     // ---- bindings ----
@@ -1484,7 +1501,7 @@ void Ui::Impl::parse_access(lv_obj_t* obj, const json& w)
     else if(iequals(deny, "login")) r->deny = AccessRule::Deny::Login;
     else if(!iequals(deny, "disable")) HML_WARN("level_deny: unknown value '%s' (disable | hide | login)", deny.c_str());
     r->base_disabled = lv_obj_has_state(obj, LV_STATE_DISABLED);
-    r->base_hidden = lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    r->base_hidden = lv_obj_is_hidden(obj);
     lv_obj_add_event_cb(obj, &Impl::on_access_press, static_cast<lv_event_code_t>(LV_EVENT_PRESSED | LV_EVENT_PREPROCESS), r.get());
     apply_access(*r);
     access_rules.push_back(std::move(r));
@@ -1498,8 +1515,8 @@ void Ui::Impl::apply_access(const AccessRule& r)
         else if(!r.base_disabled) lv_obj_remove_state(r.obj, LV_STATE_DISABLED);
     }
     else if(r.deny == AccessRule::Deny::Hide) {
-        if(!ok) lv_obj_add_flag(r.obj, LV_OBJ_FLAG_HIDDEN);
-        else if(!r.base_hidden) lv_obj_remove_flag(r.obj, LV_OBJ_FLAG_HIDDEN);
+        if(!ok) lv_obj_set_hidden(r.obj, true);
+        else if(!r.base_hidden) lv_obj_set_hidden(r.obj, false);
     }
 }
 
@@ -1613,7 +1630,7 @@ void Ui::Impl::parse_actions(lv_obj_t* obj, const json& w)
         else if(acts->is_object()) {
             if(auto a = parse_action(*acts)) list->actions.push_back(std::move(*a));
         }
-        lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_clickable(obj, true);
         lv_obj_add_event_cb(obj, &Impl::on_action_event, t.ev, list.get());
         action_lists.push_back(std::move(list));
     }
@@ -1680,16 +1697,16 @@ void Ui::Impl::apply_common(lv_obj_t* obj, const json& w)
     if(const json* x = jget(w, "x")) lv_obj_set_x(obj, parse_size(x, 0));
     if(const json* y = jget(w, "y")) lv_obj_set_y(obj, parse_size(y, 0));
 
-    if(jbool(w, "hidden", false)) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    if(jbool(w, "hidden", false)) lv_obj_set_hidden(obj, true);
     if(jhas(w, "clickable")) {
-        if(jbool(w, "clickable", true)) lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
-        else lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+        if(jbool(w, "clickable", true)) lv_obj_set_clickable(obj, true);
+        else lv_obj_set_clickable(obj, false);
     }
-    if(jhas(w, "scrollable") && !jbool(w, "scrollable", true)) lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    if(jhas(w, "scrollable") && !jbool(w, "scrollable", true)) lv_obj_set_scrollable(obj, false);
     if(auto sb = jstr_opt(w, "scrollbar")) {
         lv_obj_set_scrollbar_mode(obj, iequals(*sb, "off") ? LV_SCROLLBAR_MODE_OFF : iequals(*sb, "on") ? LV_SCROLLBAR_MODE_ON : iequals(*sb, "active") ? LV_SCROLLBAR_MODE_ACTIVE : LV_SCROLLBAR_MODE_AUTO);
     }
-    if(jbool(w, "checkable", false)) lv_obj_add_flag(obj, LV_OBJ_FLAG_CHECKABLE);
+    if(jbool(w, "checkable", false)) lv_obj_set_checkable(obj, true);
     if(jbool(w, "checked", false)) lv_obj_add_state(obj, LV_STATE_CHECKED);
     if(jbool(w, "disabled", false)) lv_obj_add_state(obj, LV_STATE_DISABLED);
 
@@ -1765,7 +1782,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_arc_set_rotation(obj, static_cast<int32_t>(jnum(w, "rotation", 0)));
         lv_arc_set_value(obj, static_cast<int32_t>(jnum(w, "value", 0)));
         if(!jbool(w, "adjustable", true)) {
-            lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_clickable(obj, false);
             lv_obj_remove_style(obj, nullptr, LV_PART_KNOB);
         }
     }
@@ -1842,7 +1859,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         bind_opts.commit_on_ready = input;
         if(numeric) {
             lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_USER_1);          // number pad, see on_textarea_event
+            set_mark(obj, MARK_NUMBER_PAD, true);            // number pad, see on_textarea_event
             std::string fmt = jstr(w, "format", "");
             if(fmt.empty() && jhas(w, "decimals")) fmt = vformat("%%.%df", static_cast<int>(jnum(w, "decimals", 0)));
             if(fmt.empty()) fmt = "%s";                       // default rendering of the tag type
@@ -1863,7 +1880,8 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
             }
         }
         else {
-            lv_obj_remove_flag(obj, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_CLICK_FOCUSABLE));
+            lv_obj_set_clickable(obj, false);
+            lv_obj_set_click_focusable(obj, false);
             lv_textarea_set_cursor_click_pos(obj, false);
             lv_obj_set_style_opa(obj, LV_OPA_TRANSP, LV_PART_CURSOR);
         }
@@ -1922,7 +1940,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         install_keyboard_maps(obj);
         lv_group_remove_obj(obj);                            // pointer-operated: keep it out of the focus group
         lv_obj_remove_state(obj, LV_STATE_FOCUSED);
-        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(obj, true);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_READY, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_CANCEL, nullptr);
         if(building) building->keyboard = obj;
@@ -1982,7 +2000,7 @@ bool Ui::Impl::open_popup(const std::string& name)
     while(screens[static_cast<size_t>(idx)].get() != scr) idx++;
     popups.erase(std::remove(popups.begin(), popups.end(), idx), popups.end());     // open already: to the top
     popups.push_back(idx);
-    lv_obj_remove_flag(scr->backdrop, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(scr->backdrop, false);
     lv_obj_move_foreground(scr->backdrop);
     const bool was = scr->shown;
     scr->shown = true;
@@ -2004,7 +2022,7 @@ bool Ui::Impl::close_popup(const std::string& name)
     }
     popups.erase(std::remove(popups.begin(), popups.end(), idx), popups.end());
     Screen& scr = *screens[static_cast<size_t>(idx)];
-    lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(scr.backdrop, true);
     scr.shown = false;
     update_anims();
     scripts().on_screen(scr.name, false);
@@ -2116,8 +2134,8 @@ void Ui::Impl::ensure_built(Screen& scr)
         lv_obj_set_size(scr.backdrop, lv_pct(100), lv_pct(100));
         lv_obj_set_style_bg_color(scr.backdrop, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(scr.backdrop, jbool(def, "dim", true) ? LV_OPA_50 : LV_OPA_TRANSP, 0);
-        lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_flag(scr.backdrop, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_clickable(scr.backdrop, true);
+        lv_obj_set_hidden(scr.backdrop, true);
         scr.obj = lv_obj_create(scr.backdrop);
         lv_obj_set_size(scr.obj, lv_pct(60), lv_pct(60));
         lv_obj_center(scr.obj);
@@ -2133,7 +2151,7 @@ void Ui::Impl::ensure_built(Screen& scr)
         apply_layout(scr.obj, def);
         apply_styles(scr.obj, def);
     }
-    if(jhas(def, "scrollable") && !jbool(def, "scrollable", true)) lv_obj_remove_flag(scr.obj, LV_OBJ_FLAG_SCROLLABLE);
+    if(jhas(def, "scrollable") && !jbool(def, "scrollable", true)) lv_obj_set_scrollable(scr.obj, false);
     build_children(scr.obj, def);
 
     building = outer;
@@ -2290,5 +2308,7 @@ Ui& ui()
     static Ui instance;
     return instance;
 }
+
+bool ui_number_pad(lv_obj_t* textarea) { return has_mark(textarea, MARK_NUMBER_PAD); }
 
 } // namespace hml

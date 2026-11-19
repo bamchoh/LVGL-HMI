@@ -159,13 +159,13 @@ TEST_CASE("images: the picture follows a tag (map of values, or the file name in
         { "type": "image", "x": 120, "bind": { "src": "file" } } ])~");
     lv_obj_t *a = lv_obj_get_child(scr, 0), *b = lv_obj_get_child(scr, 1), *c = lv_obj_get_child(scr, 2);
     CHECK(ends_with(src_of(a), "/pic.png"));
-    CHECK(lv_obj_has_flag(b, LV_OBJ_FLAG_HIDDEN));               // no picture for false: nothing is shown
+    CHECK(lv_obj_is_hidden(b));               // no picture for false: nothing is shown
     CHECK(ends_with(src_of(c), "/pic.bmp"));
 
     state->set_number(1, nullptr); run->set_number(1, nullptr); file->set_string("pic.png", nullptr);
     rt.advance(30);
     CHECK(ends_with(src_of(a), "/pic.jpg"));
-    CHECK_FALSE(lv_obj_has_flag(b, LV_OBJ_FLAG_HIDDEN));
+    CHECK_FALSE(lv_obj_is_hidden(b));
     CHECK(ends_with(src_of(b), "/pic.jpg"));
     CHECK(ends_with(src_of(c), "/pic.png"));
     state->set_number(7, nullptr);
@@ -175,7 +175,7 @@ TEST_CASE("images: the picture follows a tag (map of values, or the file name in
     // a file name from a tag cannot leave the project folder either
     file->set_string("../../secret.png", nullptr);
     rt.advance(30);
-    CHECK(lv_obj_has_flag(c, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_is_hidden(c));
     CHECK(log.has("only files inside the project folder"));
     hmltest::Lvgl::get().render();
 }

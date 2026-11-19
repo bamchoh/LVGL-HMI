@@ -68,7 +68,7 @@ void dialog(const std::string& question, const std::string* input, bool number, 
     lv_obj_set_size(d->back, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_color(d->back, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(d->back, LV_OPA_50, 0);
-    lv_obj_add_flag(d->back, LV_OBJ_FLAG_CLICKABLE);                     // modal: nothing below can be touched
+    lv_obj_set_clickable(d->back, true);                     // modal: nothing below can be touched
     lv_obj_add_event_cb(d->back, &Dialog::on_delete, LV_EVENT_DELETE, d);
 
     lv_obj_t* box = lv_obj_create(d->back);
@@ -219,7 +219,7 @@ struct TableCtx {
             // a value that will change when the recipe is written: colour and a sign (not only colour;
             // "*" because the built-in fonts have no "≠")
             lv_obj_t* v = cell(row, (differs ? std::string("* ") : std::string()) + one_line(val), 32, differs ? lv_palette_main(LV_PALETTE_ORANGE) : fg);
-            lv_obj_add_flag(v, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_clickable(v, true);
             lv_obj_set_height(v, row_h);
             lv_obj_set_style_pad_top(v, row_h / 2 - 10, 0);
             lv_obj_add_event_cb(v, &TableCtx::on_value, LV_EVENT_CLICKED, this);
@@ -313,14 +313,14 @@ lv_obj_t* build_recipe_table(lv_obj_t* parent, const json& w)
     lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(obj, 6, 0);
     lv_obj_set_style_pad_column(obj, 8, 0);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(obj, false);
 
     c->list = lv_obj_create(obj);
     lv_obj_remove_style_all(c->list);
     lv_obj_set_size(c->list, lv_pct(30), lv_pct(100));
     lv_obj_set_flex_flow(c->list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(c->list, 4, 0);
-    lv_obj_add_flag(c->list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(c->list, true);
 
     lv_obj_t* right = lv_obj_create(obj);
     lv_obj_remove_style_all(right);
@@ -334,7 +334,7 @@ lv_obj_t* build_recipe_table(lv_obj_t* parent, const json& w)
     lv_obj_set_width(c->rows, lv_pct(100));
     lv_obj_set_flex_grow(c->rows, 1);
     lv_obj_set_flex_flow(c->rows, LV_FLEX_FLOW_COLUMN);
-    lv_obj_add_flag(c->rows, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(c->rows, true);
     lv_obj_t* foot = lv_obj_create(right);
     lv_obj_remove_style_all(foot);
     lv_obj_set_size(foot, lv_pct(100), LV_SIZE_CONTENT);

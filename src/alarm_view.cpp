@@ -64,7 +64,7 @@ lv_obj_t* make_label(lv_obj_t* parent, const std::string& text, lv_color_t color
         lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
         lv_obj_set_width(l, 10);                           // (grows; dots instead of wrapping)
     }
-    lv_obj_remove_flag(l, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_clickable(l, false);
     return l;
 }
 
@@ -122,8 +122,8 @@ struct ListCtx {
         lv_obj_set_style_border_width(r, 6, 0);
         lv_obj_set_style_border_color(r, edge, 0);
         lv_obj_set_style_radius(r, 4, 0);
-        lv_obj_remove_flag(r, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_flag(r, LV_OBJ_FLAG_EVENT_BUBBLE);
+        lv_obj_set_scrollable(r, false);
+        lv_obj_set_event_bubble(r, true);
         return r;
     }
 
@@ -159,7 +159,7 @@ struct ListCtx {
                 make_label(r, st, fg);
             }
             row_names.push_back(a.name);
-            if(ack_on_tap && unacked) lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
+            if(ack_on_tap && unacked) lv_obj_set_clickable(r, true);
             lv_obj_add_event_cb(r, &ListCtx::on_row_click, LV_EVENT_CLICKED, this);
         }
         if(list.size() > shown) {
@@ -340,7 +340,7 @@ lv_obj_t* build_alarm_list(lv_obj_t* parent, const json& w)
     lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(obj, 4, 0);
     lv_obj_set_style_pad_row(obj, 4, 0);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(obj, false);
 
     c->body = lv_obj_create(obj);
     lv_obj_remove_style_all(c->body);
@@ -348,7 +348,7 @@ lv_obj_t* build_alarm_list(lv_obj_t* parent, const json& w)
     lv_obj_set_flex_grow(c->body, 1);
     lv_obj_set_flex_flow(c->body, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(c->body, 3, 0);
-    lv_obj_add_flag(c->body, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(c->body, true);
     lv_obj_set_scroll_dir(c->body, LV_DIR_VER);
 
     if(c->history) {
@@ -390,7 +390,7 @@ lv_obj_t* build_alarm_banner(lv_obj_t* parent, const json& w)
     lv_obj_set_size(obj, lv_pct(100), 36);
     lv_obj_set_style_pad_hor(obj, 10, 0);
     lv_obj_set_style_pad_ver(obj, 0, 0);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(obj, false);
     c->label = lv_label_create(obj);
     lv_label_set_long_mode(c->label, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_width(c->label, lv_pct(100));
