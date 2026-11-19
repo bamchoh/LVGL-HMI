@@ -942,3 +942,17 @@ test('M importTags / exportTags, pasteStyle, designer marks', () => {
   M.clearFlag();
   deq([M.get([1]).designer, M.anyFlag('hidden')], [undefined, false]);
 });
+
+test('U.slmpAddress agrees with the runtime parser; M.problems names wrong SLMP addresses', () => {
+  const { U, M } = load();
+  const ok = s => !!U.slmpAddress(s);
+  for (const s of ['D100', 'x1f', 'W 1A', 'SM400', 'SD0', 'SB0', 'DX10', 'ZR0FFFF', 'S5', 'TN3', 'D10.F', 'M0010', 'D16777215']) assert.ok(ok(s), s);
+  for (const s of ['', 'Q10', 'D1A', 'D16777216', 'M10.1', 'D10.G', 'D10.10', 'D', 'D-1', 'D'.repeat(100), null, undefined]) assert.ok(!ok(s), String(s));
+  deq(U.slmpAddress('d10.3'), { dev: 'D', number: 10, bit: 3 });
+  deq(U.slmpAddress('X1F'), { dev: 'X', number: 31, bit: -1 });
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'a', type: 'int' }];
+  M.st.project.drivers = [{ type: 'slmp', name: 'plc', map: [{ tag: 'a', addr: 'D100' }, { tag: 'a', addr: 'D1A' }, { tag: 'b', addr: 'M0' }] }];
+  const texts = M.problems().map(p => p.text);
+  deq(texts.sort(), ['plc: "D1A" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
+});

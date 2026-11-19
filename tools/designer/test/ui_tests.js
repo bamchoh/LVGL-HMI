@@ -288,6 +288,22 @@
     eq(localStorage.getItem(App.recKey(M.st.path)), null, 'nothing unsaved: no safety copy');
   });
 
+  await test('drivers: an SLMP driver can be added and its map shows address problems', async () => {
+    Panels.showView('drivers'); App.doRefresh();
+    const sel = [...document.querySelectorAll('#view-drivers select')].find(s => [...s.options].some(o => o.value === 'slmp'));
+    ok(sel, 'slmp is offered');
+    ok([...sel.options].find(o => o.value === 'slmp').textContent.includes('三菱電機'), 'named in Japanese');
+    sel.value = 'slmp';
+    [...document.querySelectorAll('#view-drivers button')].find(b => b.textContent.includes('追加')).click();
+    App.doRefresh();
+    const d = M.st.project.drivers[M.st.project.drivers.length - 1];
+    eq([d.type, d.port, d.frame], ['slmp', 5007, '3e']);
+    ok(document.querySelector('#view-drivers').textContent.includes('デバイスの割り付け'), 'map table');
+    M.mutate(() => { d.map.push({ tag: M.st.project.tags[0].name, addr: 'D1A' }); }); App.doRefresh();
+    ok(App.problems.some(p => /D1A/.test(p.text)), 'a wrong address is a problem');
+    ok(document.querySelector('#view-drivers input[placeholder="D100 / M0 / X1F / D10.3"]'), 'the address field shows examples');
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);

@@ -39,6 +39,7 @@ build.cmd Debug
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
 | `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
 | `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
@@ -548,6 +549,51 @@ PC でのポート名は、デザイナーのドライバ設定の **device on t
   どのユニットも応答しなくなるとオフになり、間隔を空けながら（最大 5 秒）問い合わせを続けます。
 - Linux では、ランタイムを動かすユーザーがシリアルポートに読み書きできる必要があります（通常は `dialout` グループ）。
 - 応答のチェックサム（RTU は CRC-16、ASCII は LRC）が合わないフレームは捨てます。
+
+### ドライバ: slmp（三菱電機 MELSEC: SLMP / MC プロトコル）
+
+SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP）で MELSEC の CPU または Ethernet ユニットと読み書きします。
+
+```json
+{
+  "type": "slmp",
+  "host": "192.168.3.39", "port": 5007, "frame": "3e",
+  "poll_ms": 200, "timeout_ms": 1000, "status_tag": "plc_online",
+  "write_ranges": ["D0-D999", "M0-M99"],
+  "map": [
+    { "tag": "speed", "addr": "D100" },
+    { "tag": "total", "addr": "D102", "dtype": "int32" },
+    { "tag": "temp",  "addr": "D110", "dtype": "float" },
+    { "tag": "run",   "addr": "M0" },
+    { "tag": "in3",   "addr": "X1F", "access": "ro" },
+    { "tag": "ready", "addr": "D120.3" },
+    { "tag": "name",  "addr": "D200", "dtype": "string", "length": 16 }
+  ]
+}
+```
+
+| キー                 | 内容                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `host` / `port`      | CPU（または Ethernet ユニット）のアドレスと SLMP のポート。GX Works の「外部機器接続設定」で開けたポート |
+| `frame`              | `3e`（既定）/ `4e`（要求ごとにシリアル番号が付き、応答の取り違えを防げる）                              |
+| `network` `pc` `io` `station` | 経路（既定 0 / 255 / 0x3FF / 0 = 接続した局の CPU）                                          |
+| `write_ranges`       | 書き込みを許す範囲（`"D0-D999"` のように）。省略時は SM / SD 以外すべて書き込める                      |
+| `allow_system_write` | `true` のときだけ SM / SD に書き込む（既定 `false`）                                                    |
+| `addr`               | GX Works の書き方: `D100` `W1A` `R0` `ZR100` `M0` `X1F` `Y20` `B0` `L0` `F0` `V0` `S0` `TS0` `TC0` `TN0` `SS0` `SC0` `SN0` `CS0` `CC0` `CN0` `SM400` `SD0` `SB0` `SW0` `DX0` `DY0` `Z0`。X Y B W SB SW DX DY ZR は 16 進。`D10.3` はワードのビット（読み取りのみ） |
+| `dtype`              | ワードデバイス: `int16`（既定）`uint16` `int32` `uint32` `float` `string`（`length` 文字、下位バイトが先）。ビットデバイスは bool |
+| `scale` / `offset`   | 値 = 生の値 × scale + offset（書き込みは逆算）                                                          |
+| `access`             | `rw`（既定）/ `ro` / `wo`                                                                               |
+| `swap_words`         | 32 ビットの値の上位ワードが先（既定は MELSEC と同じく下位ワードが先）                                   |
+
+- 読み出しは、同じデバイスでまとめて一括読み出し（ワード単位、1 回 960 ワードまで、32 ワードまでの隙間は続けて読む）
+  にするので、1000 点でも数回の要求で済みます。ビットデバイスは 16 点ずつワード単位で読みます。
+- 書き込みは、ワードデバイスはワード単位、ビットデバイスはビット単位の一括書き込みです。ワードのビット（`D10.3`）は
+  書き込みません（PLC が同時に同じワードを書くと消えてしまう読み書きになるため）。
+- 応答はヘッダー・長さ（最大 960 ワード分）・4E のシリアル番号を確かめ、合わないもの・途中で切れたもの・時間内に
+  来ないものは捨てて接続し直します。終了コード（`C056` など）が返ったときは、接続を保ったまま値を変えずに警告を
+  1 度出します。
+- SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
+  範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
 
 ### ドライバ: opcua_server（OPC UA サーバー）
 
