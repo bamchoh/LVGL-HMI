@@ -42,6 +42,7 @@ build.cmd Debug
 | `test_animate.cpp`                                   | アニメーション（点滅がタグで始まり止まると元に戻る、移動・回転・拡大・色、コマ送り、回数、**表示していない画面と閉じたポップアップでは動かない**、**1 秒に 3 回より速く点滅しない**、書き間違いの警告、動作中に画面を消しても安全） |
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
+| `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
 | `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
 | `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
 | `test_driver_opcua_client.cpp`                       | OPC UA クライアント（同じプロセスの open62541 サーバーを相手に: ノードの読み込みとサブスクリプション、`rw` の行だけ書き込み、**署名と暗号化**、**別の証明書のサーバーを拒否**、verify なしの警告、信頼する証明書がないと起動しない、平文で暗号化専用サーバーにつながらない、ユーザー名とパスワード（間違いの拒否、ログに出ない）、型に入らない値を書かない、サーバーの停止と復帰、停止がすぐ終わる、装置の証明書を 1 度だけ作る） |
@@ -74,6 +75,28 @@ Linux では `./build.sh` のあとに `build-<backend>/bin/hml_tests` を実行
 
 GitHub Actions（`.github/workflows/ci.yml`）が push / PR ごとに Windows (MSVC, sdl) と Linux (gcc, fbdev) で
 テストを実行し、続けてランタイムとデザイナーのフルビルドも行います。
+
+### PLC シミュレーターとの接続確認（Karakuri）
+
+単体テストの通信相手は、このリポジトリで書いた模擬です。同じ思い違いが両方に入ると気づけないので、別の実装である
+PLC シミュレーター [Karakuri](https://github.com/bamchoh/karakuri) を相手にした確認も用意しています（CTest には入りません。
+Karakuri を起動しておく必要があります）。
+
+```
+python -I tools/karakuri_check.py --api http://localhost:8765/api          # すべて
+python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slmp / fins / modbus / opcua / opcua-secure
+```
+
+プロトコルごとに、Karakuri のサーバーを起動し、REST API でメモリに値を入れ、ランタイムを数秒動かしてタグの値を
+出力させ、続けてタグに書かせた値を Karakuri のメモリから読み戻して比べます。
+
+| 確認          | 内容                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `fins`        | FINS/TCP。DM・CIO・WR・HR・EM・タイマ・カウンタ、int16 / uint16 / int32 / float / bcd16 / string、ビットの読み書き |
+| `slmp`        | 3E / 4E フレーム。D・W（16 進）・M・X・Y、int16 / uint16 / int32 / float / string、ワードのビット |
+| `modbus`      | Modbus TCP。保持・入力レジスタ、コイル、ディスクリート入力、u16 / s16 / u32 / s32 / float         |
+| `opcua`       | OPC UA クライアント（暗号なし）。INT / DINT / UINT / REAL / LREAL / BOOL / STRING の購読と書き込み |
+| `opcua-secure`| 同じ内容を Basic256Sha256 の Sign & Encrypt で（Karakuri の OPC UA サーバーにエンドポイントを足します） |
 
 ## ビルド（Raspberry Pi / Linux）
 
@@ -715,6 +738,53 @@ SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP�
   1 度出します。
 - SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
   範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
+
+### ドライバ: fins（オムロン: FINS/TCP）
+
+FINS/TCP でオムロンの PLC（CS / CJ / CP / NJ / NX）のメモリを読み書きします。
+
+```json
+{
+  "type": "fins",
+  "host": "192.168.250.1", "port": 9600,
+  "poll_ms": 200, "timeout_ms": 1000, "status_tag": "plc_online",
+  "write_ranges": ["D0-D999", "W0-W99"],
+  "map": [
+    { "tag": "speed", "addr": "D100" },
+    { "tag": "total", "addr": "D102", "dtype": "int32" },
+    { "tag": "temp",  "addr": "D110", "dtype": "float" },
+    { "tag": "count", "addr": "D120", "dtype": "bcd16" },
+    { "tag": "run",   "addr": "W0.00" },
+    { "tag": "in3",   "addr": "CIO1.03", "access": "ro" },
+    { "tag": "name",  "addr": "D200", "dtype": "string", "length": 16 }
+  ]
+}
+```
+
+| キー                 | 内容                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `host` / `port`      | CPU（または Ethernet ユニット）のアドレスと FINS/TCP のポート（既定 9600）                              |
+| `dest_network` `dest_node` `dest_unit` | 経路（既定 0 / 0 / 0 = 接続した PLC の CPU。ノードアドレスは接続時に PLC から受け取る） |
+| `node`               | 自分のノードアドレス（既定 0 = PLC が割り当てる）                                                       |
+| `write_ranges`       | 書き込みを許す範囲（`"D0-D999"` のように）。省略時は特殊補助リレー（A）以外すべて書き込める            |
+| `allow_system_write` | `true` のときだけ特殊補助リレー（A）に書き込む（既定 `false`）                                          |
+| `addr`               | CX-Programmer の書き方: `D100`（`DM100` も可）`CIO10`（数字だけの `10` も CIO）`W5` `H7` `A440` `E0_100`（EM のバンク 0。バンクは 16 進で 0〜18）`T3` `C4`（タイマ・カウンタの現在値）。`D100.03` `W0.15` はビット（00〜15） |
+| `dtype`              | ワード: `int16`（既定）`uint16` `int32` `uint32` `float` `bcd16` `bcd32` `string`（`length` 文字、上位バイトが先）。ビットは bool |
+| `scale` / `offset`   | 値 = 生の値 × scale + offset（書き込みは逆算）                                                          |
+| `access`             | `rw`（既定）/ `ro` / `wo`                                                                               |
+| `swap_words`         | 32 ビットの値の上位ワードが先（既定は下位ワードが先）                                                   |
+
+- 読み出しは、同じエリアでまとめて「メモリエリア読み出し」（1 回 990 ワードまで、32 ワードまでの隙間は続けて読む）に
+  します。ビットは、読んだワードから取り出します。
+- 書き込みは「メモリエリア書き込み」で、ワードはワード単位、ビットは 1 ビット単位です（PLC がそのビットだけを変えるので、
+  同じワードのほかのビットは消えません）。
+- `bcd16` / `bcd32` は、PLC の中の `0x1234` を 1234 として扱います。PLC の値が BCD でないとき（桁に A〜F がある）は
+  タグを変えずに警告を 1 度出し、入らない値（負の数、9999 を超える数）は書き込みません。
+- 応答は FINS/TCP のヘッダー・長さ・サービス ID・コマンドコードを確かめ、合わないもの・途中で切れたもの・時間内に
+  来ないものは捨てて接続し直します。終了コード（`1103` など）が返ったときは、接続を保ったまま値を変えずに警告を 1 度出します。
+- FINS は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
+  範囲を絞ってください。FINS/UDP とシリアル（Host Link）にはまだ対応していません。
+- 確認は、テスト内の模擬の相手と PLC シミュレーター Karakuri の FINS サーバーで行っています。**実機での確認はまだです。**
 
 ### ドライバ: mqtt（MQTT クライアント）
 
@@ -1719,6 +1789,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `test.cmd` / `tests/`          | 単体テスト（doctest）: `test_jsonutil.cpp`, `test_tag.cpp`。`hml_tests` にビルドされ CTest にも登録 |
 | `cmake/toolchain-*.cmake`      | aarch64 / armhf クロスコンパイル用ツールチェーンファイル                                            |
 | `tools/modbus_server.py`       | テスト用 Modbus TCP サーバー（標準ライブラリのみ）                                                  |
+| `tools/karakuri_check.py`      | PLC シミュレーター Karakuri を相手にしたドライバの接続確認（SLMP / FINS / Modbus / OPC UA）         |
 | `tools/opcua_client_test.py`   | OPC UA 動作確認クライアント（asyncua）                                                              |
 | `tools/bmp2png.py`             | スクリーンショット BMP → PNG 変換                                                                   |
 | `tools/designer/host/main.cpp` | デザイナーのホスト（webview、ファイルダイアログ、ランタイム起動）                                   |

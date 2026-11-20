@@ -1023,6 +1023,21 @@ test('U.slmpAddress agrees with the runtime parser; M.problems names wrong SLMP 
   deq(texts.sort(), ['plc: "D1A" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
 });
 
+test('U.finsAddress agrees with the runtime parser; M.problems names wrong FINS addresses', () => {
+  const { U, M } = load();
+  const ok = s => !!U.finsAddress(s);
+  for (const s of ['D100', 'dm 100', 'CIO10', '10', '10.5', 'W5', 'H7', 'A440', 'W5.15', 'E0_100', 'EC_0', 'ED_0', 'E18_0', 'E1_5.03', 'EM2_7', 'T3', 'C4', 'D65535']) assert.ok(ok(s), s);
+  for (const s of ['', 'Q10', 'D1A', 'D65536', 'T32768', 'D10.16', 'D10.', 'T1.00', 'E19_0', 'E_0', 'D', 'D-1', '1'.repeat(40), null, undefined]) assert.ok(!ok(s), String(s));
+  deq(U.finsAddress('d10.03'), { area: 'D', number: 10, bit: 3 });
+  deq(U.finsAddress('10.15'), { area: 'CIO', number: 10, bit: 15 });
+  deq(U.finsAddress('e1_050'), { area: 'E1', number: 50, bit: -1 });
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'a', type: 'int' }];
+  M.st.project.drivers = [{ type: 'fins', name: 'plc', map: [{ tag: 'a', addr: 'D100' }, { tag: 'a', addr: 'Q5' }, { tag: 'b', addr: 'W0.00' }] }];
+  const texts = M.problems().map(p => p.text);
+  deq(texts.sort(), ['plc: "Q5" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
+});
+
 test('M trend widgets: group and tags are checked, tag renames follow', () => {
   const { M } = load();
   M.newProject('T', 800, 480);

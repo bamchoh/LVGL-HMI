@@ -24,6 +24,7 @@ add_executable(hml_tests
   test_check.cpp
   test_images.cpp
   test_animate.cpp
+  test_driver_fins.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp

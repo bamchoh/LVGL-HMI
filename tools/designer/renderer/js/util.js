@@ -46,6 +46,30 @@ const U = {
     }
     return null;
   },
+  // A FINS (OMRON) address as the runtime reads it (src/fins.cpp): { area, number, bit } or null.
+  finsAddress(text) {
+    const s = String(text === undefined || text === null ? '' : text).replace(/\s+/g, '').toUpperCase();
+    if (!s || s.length > 16) return null;
+    let area, rest, max = 65535;
+    let m = /^E(?:M)?([0-9A-F]{1,2})_(.*)$/.exec(s);
+    if (/^[0-9]/.test(s)) { area = 'CIO'; rest = s; }
+    else if (s[0] === 'E' && s.includes('_')) {
+      if (!m || parseInt(m[1], 16) > 0x18) return null;
+      area = 'E' + m[1]; rest = m[2];
+    }
+    else {
+      m = /^(CIO|DM|W|H|A|D|T|C)([0-9].*)$/.exec(s);
+      if (!m) return null;
+      area = m[1] === 'DM' ? 'D' : m[1]; rest = m[2];
+      if (area === 'T' || area === 'C') max = 32767;
+    }
+    m = /^([0-9]{1,6})(?:\.([0-9]{1,2}))?$/.exec(rest);
+    if (!m) return null;
+    const number = parseInt(m[1], 10);
+    if (number > max) return null;
+    if (m[2] !== undefined && (parseInt(m[2], 10) > 15 || area === 'T' || area === 'C')) return null;
+    return { area, number, bit: m[2] === undefined ? -1 : parseInt(m[2], 10) };
+  },
   // the width of a text in "half-width" units (a CJK character counts 2): for "may not fit"
   textWidth(s) { let n = 0; for (const c of String(s)) n += /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(c) ? 2 : 1; return n; },
   // rows of a pasted table: commas or tabs, "..." with "" inside

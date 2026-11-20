@@ -781,6 +781,12 @@ const M = {
           }
         }
       }
+      if (d.type === 'fins') {
+        if (!d.host) out.push({ text: (d.name || d.type) + ': no host is set', view: 'drivers', index: i });
+        for (const row of Array.isArray(d.map) ? d.map : []) {
+          if (row && row.addr !== undefined && !U.finsAddress(row.addr)) out.push({ text: (d.name || d.type) + ': "' + row.addr + '" is not a device address', view: 'drivers', index: i });
+        }
+      }
       if (d.type === 'slmp') {
         if (!d.host) out.push({ text: (d.name || d.type) + ': no host is set', view: 'drivers', index: i });
         for (const row of Array.isArray(d.map) ? d.map : []) {
