@@ -813,6 +813,29 @@ TEST_CASE("visible / hidden / enabled / disabled bindings")
     CHECK(hidden(4));
 }
 
+TEST_CASE("the short bind of a panel and a spinner is visible; a text bound to a widget without one does nothing")
+{
+    // { "type": "spinner", "bind": "run" } set a label text on the spinner: a crash.
+    Runtime rt;
+    Tag* run = rt.tag("run", TagType::Bool, 0);
+    lv_obj_t* first = build_widgets(J(R"json([
+        { "type": "spinner", "bind": "run" },
+        { "type": "panel", "bind": "run" },
+        { "type": "slider", "bind": { "text": "run" } },
+        { "type": "chart", "bind": "run" }
+    ])json"));
+    REQUIRE(first);
+    lv_obj_t* scr = lv_obj_get_parent(first);
+    CHECK(lv_obj_is_hidden(nth(scr, 0)));
+    CHECK(lv_obj_is_hidden(nth(scr, 1)));
+    run->set_number(1, nullptr);
+    rt.pump();
+    CHECK_FALSE(lv_obj_is_hidden(nth(scr, 0)));
+    CHECK_FALSE(lv_obj_is_hidden(nth(scr, 1)));
+    CHECK_FALSE(lv_obj_is_hidden(nth(scr, 2)));
+    hmltest::Lvgl::get().render();
+}
+
 TEST_CASE("color map bindings")
 {
     Runtime rt;

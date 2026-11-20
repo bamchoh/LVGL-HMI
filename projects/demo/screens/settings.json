@@ -1,6 +1,5 @@
 {
   "name": "settings",
-  "level": 2,
   "scrollable": false,
   "style": {
     "bg_color": "#141a22",
@@ -12,45 +11,88 @@
       "x": 0,
       "y": 0,
       "w": "100%",
-      "h": 56,
+      "h": 48,
       "scrollable": false,
       "style": {
         "bg_color": "#1f2a38",
         "radius": 0,
         "border_width": 0,
+        "pad": 0,
         "pad_left": 16,
         "pad_right": 16
       },
       "children": [
         {
-          "type": "button",
+          "type": "image",
+          "src": "assets/logo.png",
           "align": "left_mid",
-          "text": "@back_arrow",
-          "w": 90,
+          "x": -8,
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "@title",
+          "align": "left_mid",
+          "x": 32,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "w": 304,
           "h": 36,
-          "on_click": {
-            "action": "back"
+          "labels": {
+            "idle": "@no_alarms",
+            "more": "@alarm_more"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -176,
+          "w": 14,
+          "h": 14,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
           }
         },
         {
           "type": "label",
-          "text": "@settings",
-          "align": "center",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -140,
           "style": {
-            "font": 24,
-            "text_color": "#ffffff"
+            "font": 14
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
           }
         },
         {
           "type": "label",
           "align": "right_mid",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
           "style": {
             "text_color": "#9fb3c8",
             "font": 14
           },
-          "clickable": true, "on_click": { "action": "login" }, "bind": {
+          "bind": {
             "text": {
-              "tag": "sys.user.name", "format": "User: %s"
+              "tag": "sys.user.name",
+              "format": "User: %s"
             }
           }
         }
@@ -59,21 +101,23 @@
     {
       "type": "panel",
       "x": 16,
-      "y": 72,
-      "w": 370,
-      "h": 300,
+      "y": 56,
+      "w": 248,
+      "h": 360,
       "scrollable": false,
-      "flex": "column",
       "style": {
         "bg_color": "#1b2430",
         "radius": 10,
         "border_width": 0,
-        "pad_row": 6
+        "pad": 12,
+        "pad_row": 8
       },
+      "flex": "column",
       "children": [
         {
           "type": "label",
           "text": "@operation_mode",
+          "w": "100%",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -82,36 +126,11 @@
           "type": "dropdown",
           "w": "100%",
           "options": [
-            "Manual",
-            "Automatic",
-            "Maintenance"
+            "@mode_manual",
+            "@mode_auto",
+            "@mode_maint"
           ],
           "bind": "mode"
-        },
-        {
-          "type": "label",
-          "style": {
-            "text_color": "#ffffff"
-          },
-          "bind": {
-            "text": {
-              "tag": "mode",
-              "format": "mode tag = %d"
-            }
-          }
-        },
-        {
-          "type": "label",
-          "text": "Maintenance mode is active!",
-          "style": {
-            "text_color": "#f44336"
-          },
-          "bind": {
-            "visible": {
-              "tag": "mode",
-              "eq": 2
-            }
-          }
         },
         {
           "type": "label",
@@ -123,14 +142,13 @@
         {
           "type": "text_display",
           "w": "100%",
-          "placeholder": "type a name, Enter to confirm",
-          "max_length": 24,
+          "max_length": 16,
           "input": true,
           "bind": "operator"
         },
         {
           "type": "label",
-          "text": "Maintenance PIN (1234 unlocks)",
+          "text": "@temp_limits",
           "style": {
             "text_color": "#9fb3c8"
           }
@@ -146,42 +164,29 @@
             "bg_opa": 0,
             "border_width": 0,
             "pad": 0,
-            "pad_column": 10
+            "pad_column": 0
           },
+          "flex_main": "space_between",
           "children": [
             {
-              "type": "password_display",
-              "w": 120,
-              "max_length": 4,
-              "accepted_chars": "0123456789",
-              "placeholder": "PIN",
-              "bind": "pin"
+              "type": "numeric_display",
+              "w": 106,
+              "input": true,
+              "min": 0,
+              "max": 50,
+              "decimals": 1,
+              "unit": " C",
+              "bind": "temp_lo"
             },
             {
-              "type": "label",
-              "text": "unlocked",
-              "style": {
-                "text_color": "#4caf50"
-              },
-              "bind": {
-                "visible": {
-                  "tag": "pin",
-                  "eq": "1234"
-                }
-              }
-            },
-            {
-              "type": "label",
-              "text": "locked",
-              "style": {
-                "text_color": "#f44336"
-              },
-              "bind": {
-                "hidden": {
-                  "tag": "pin",
-                  "eq": "1234"
-                }
-              }
+              "type": "numeric_display",
+              "w": 106,
+              "input": true,
+              "min": 0,
+              "max": 50,
+              "decimals": 1,
+              "unit": " C",
+              "bind": "temp_hi"
             }
           ]
         }
@@ -189,31 +194,33 @@
     },
     {
       "type": "panel",
-      "x": 402,
-      "y": 72,
-      "w": 382,
-      "h": 300,
+      "x": 276,
+      "y": 56,
+      "w": 248,
+      "h": 360,
       "scrollable": false,
-      "flex": "column",
-      "flex_cross": "center",
       "style": {
         "bg_color": "#1b2430",
         "radius": 10,
         "border_width": 0,
-        "pad_row": 6
+        "pad": 12,
+        "pad_row": 8
       },
+      "flex": "column",
+      "flex_cross": "center",
       "children": [
         {
           "type": "label",
-          "text": "Setpoint (holding reg 1)",
+          "text": "@setpoint",
+          "w": "100%",
           "style": {
             "text_color": "#9fb3c8"
           }
         },
         {
           "type": "arc",
-          "w": 150,
-          "h": 150,
+          "w": 144,
+          "h": 144,
           "min": 0,
           "max": 100,
           "bind": "setpoint",
@@ -226,34 +233,37 @@
         },
         {
           "type": "numeric_display",
-          "w": 140,
+          "w": 128,
           "input": true,
           "min": 0,
           "max": 100,
           "unit": " %",
+          "bind": "setpoint",
           "style": {
-            "font": 28,
+            "font": 24,
             "text_color": "#ffffff"
-          },
-          "bind": "setpoint"
+          }
         },
         {
           "type": "panel",
           "w": "100%",
           "h": "content",
           "flex": "row",
-          "flex_main": "space_evenly",
+          "flex_cross": "center",
           "scrollable": false,
           "style": {
             "bg_opa": 0,
             "border_width": 0,
-            "pad": 0
+            "pad": 0,
+            "pad_column": 0
           },
+          "flex_main": "space_between",
           "children": [
             {
               "type": "button",
               "text": "0",
-              "w": 60,
+              "w": 68,
+              "h": 48,
               "on_click": {
                 "action": "set",
                 "tag": "setpoint",
@@ -263,7 +273,8 @@
             {
               "type": "button",
               "text": "50",
-              "w": 60,
+              "w": 68,
+              "h": 48,
               "on_click": {
                 "action": "set",
                 "tag": "setpoint",
@@ -273,7 +284,8 @@
             {
               "type": "button",
               "text": "100",
-              "w": 60,
+              "w": 68,
+              "h": 48,
               "on_click": {
                 "action": "set",
                 "tag": "setpoint",
@@ -286,84 +298,86 @@
     },
     {
       "type": "panel",
-      "x": 16,
-      "y": 388,
-      "w": 768,
-      "h": 76,
+      "x": 536,
+      "y": 56,
+      "w": 248,
+      "h": 360,
       "scrollable": false,
-      "flex": "row",
-      "flex_main": "space_between",
-      "flex_cross": "center",
       "style": {
         "bg_color": "#1b2430",
         "radius": 10,
-        "border_width": 0
+        "border_width": 0,
+        "pad": 12,
+        "pad_row": 8
       },
+      "flex": "column",
       "children": [
         {
           "type": "label",
+          "text": "@user_and_system",
+          "w": "100%",
           "style": {
-            "text_color": "#9fb3c8",
-            "font": 14
-          },
-          "text": "F5 = reload screens, Esc = quit"
+            "text_color": "#9fb3c8"
+          }
         },
         {
           "type": "panel",
-          "w": "content",
+          "w": "100%",
           "h": "content",
           "flex": "row",
+          "flex_cross": "center",
           "scrollable": false,
           "style": {
             "bg_opa": 0,
             "border_width": 0,
             "pad": 0,
-            "pad_column": 8
+            "pad_column": 0
           },
+          "flex_main": "space_between",
           "children": [
             {
               "type": "button",
-              "text": "@reload",
+              "text": "@login",
+              "w": 108,
+              "h": 48,
               "on_click": {
-                "action": "reload"
+                "action": "login"
               }
             },
             {
               "type": "button",
-              "text": "@main",
-              "on_click": {
-                "action": "goto",
-                "screen": "main",
-                "anim": "slide_right"
-              }
-            },
-            {
-              "type": "button",
-              "text": "@trend",
+              "text": "@logout",
+              "w": 108,
+              "h": 48,
               "style": {
-                "bg_color": "#5e35b1"
+                "bg_color": "#455a64"
               },
               "on_click": {
-                "action": "goto",
-                "screen": "trend",
-                "anim": "slide_left"
+                "action": "logout"
               }
-            },
-            {
-              "type": "button",
-              "text": "@recipes",
-              "style": {
-                "bg_color": "#00838f"
-              },
-              "on_click": {
-                "action": "goto",
-                "screen": "recipes",
-                "anim": "slide_left"
-              }
-            },
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
+          "children": [
             {
               "type": "button",
               "text": "@language",
+              "w": 108,
+              "h": 48,
               "style": {
                 "bg_color": "#6d4c41"
               },
@@ -374,34 +388,186 @@
             {
               "type": "button",
               "text": "@system",
+              "w": 108,
+              "h": 48,
               "style": {
                 "bg_color": "#455a64"
               },
               "on_click": {
                 "action": "system"
               }
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "text": "@maintenance",
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
+          "children": [
+            {
+              "type": "button",
+              "text": "@reload",
+              "w": 108,
+              "h": 48,
+              "style": {
+                "bg_color": "#455a64"
+              },
+              "on_click": {
+                "action": "reload"
+              },
+              "level": 2,
+              "level_deny": "login"
             },
             {
               "type": "button",
               "text": "@restart",
+              "w": 108,
+              "h": 48,
               "style": {
                 "bg_color": "#ef6c00"
               },
               "on_click": {
                 "action": "restart"
-              }
-            },
-            {
-              "type": "button",
-              "text": "@exit",
-              "style": {
-                "bg_color": "#455a64"
               },
-              "on_click": {
-                "action": "exit"
-              }
+              "level": 2,
+              "level_deny": "login"
             }
           ]
+        },
+        {
+          "type": "button",
+          "text": "@exit",
+          "w": 108,
+          "h": 48,
+          "style": {
+            "bg_color": "#c62828"
+          },
+          "on_click": {
+            "action": "exit"
+          },
+          "level": 2,
+          "level_deny": "login"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 424,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 8
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "@main",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@trend",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@alarms",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@recipes",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@widgets",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@settings",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "fade"
+          }
         }
       ]
     },

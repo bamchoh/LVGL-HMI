@@ -1,0 +1,767 @@
+{
+  "name": "widgets",
+  "scrollable": false,
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
+  "children": [
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 48,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 16,
+        "pad_right": 16
+      },
+      "children": [
+        {
+          "type": "image",
+          "src": "assets/logo.png",
+          "align": "left_mid",
+          "x": -8,
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "@title",
+          "align": "left_mid",
+          "x": 32,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "w": 304,
+          "h": 36,
+          "labels": {
+            "idle": "@no_alarms",
+            "more": "@alarm_more"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -176,
+          "w": 14,
+          "h": 14,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -140,
+          "style": {
+            "font": 14
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 14
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "User: %s"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 16,
+      "y": 56,
+      "w": 248,
+      "h": 360,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0,
+        "pad": 12,
+        "pad_row": 8
+      },
+      "flex": "column",
+      "children": [
+        {
+          "type": "label",
+          "text": "@g_select",
+          "style": {
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "dropdown",
+          "w": "100%",
+          "options": [
+            "@mode_manual",
+            "@mode_auto",
+            "@mode_maint"
+          ],
+          "bind": "mode"
+        },
+        {
+          "type": "roller",
+          "w": "100%",
+          "options": [
+            "@mode_manual",
+            "@mode_auto",
+            "@mode_maint"
+          ],
+          "visible_rows": 3,
+          "bind": "mode"
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
+          "children": [
+            {
+              "type": "button",
+              "text": "@mode_manual_s",
+              "w": 70,
+              "h": 48,
+              "checkable": true,
+              "bind": {
+                "checked": {
+                  "tag": "mode",
+                  "eq": 0
+                }
+              },
+              "style_label": {
+                "font": 14
+              }
+            },
+            {
+              "type": "button",
+              "text": "@mode_auto_s",
+              "w": 70,
+              "h": 48,
+              "checkable": true,
+              "bind": {
+                "checked": {
+                  "tag": "mode",
+                  "eq": 1
+                }
+              },
+              "style_label": {
+                "font": 14
+              }
+            },
+            {
+              "type": "button",
+              "text": "@mode_maint_s",
+              "w": 70,
+              "h": 48,
+              "checkable": true,
+              "bind": {
+                "checked": {
+                  "tag": "mode",
+                  "eq": 2
+                }
+              },
+              "style_label": {
+                "font": 14
+              }
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "bind": {
+            "text": {
+              "tag": "mode",
+              "format": "mode = %d"
+            }
+          },
+          "style": {
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "label",
+          "text": "@maint_active",
+          "style": {
+            "text_color": "#ef5350"
+          },
+          "bind": {
+            "visible": {
+              "tag": "mode",
+              "eq": 2
+            }
+          },
+          "animate": {
+            "preset": "pulse",
+            "when": {
+              "tag": "mode",
+              "eq": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 276,
+      "y": 56,
+      "w": 248,
+      "h": 360,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0,
+        "pad": 12,
+        "pad_row": 8
+      },
+      "flex": "column",
+      "children": [
+        {
+          "type": "label",
+          "text": "@g_input",
+          "style": {
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "text_display",
+          "w": "100%",
+          "input": true,
+          "max_length": 16,
+          "placeholder": "@operator_name",
+          "bind": "operator"
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 8
+          },
+          "children": [
+            {
+              "type": "password_display",
+              "w": 104,
+              "max_length": 4,
+              "accepted_chars": "0123456789",
+              "placeholder": "PIN 1234",
+              "bind": "pin"
+            },
+            {
+              "type": "label",
+              "text": "@unlocked",
+              "style": {
+                "text_color": "#66bb6a"
+              },
+              "bind": {
+                "visible": {
+                  "tag": "pin",
+                  "eq": "1234"
+                }
+              }
+            },
+            {
+              "type": "label",
+              "text": "@locked",
+              "style": {
+                "text_color": "#ef5350"
+              },
+              "bind": {
+                "hidden": {
+                  "tag": "pin",
+                  "eq": "1234"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "text": "@g_counter",
+          "style": {
+            "font": 14,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
+          "children": [
+            {
+              "type": "numeric_display",
+              "w": 88,
+              "input": true,
+              "min": 0,
+              "max": 999,
+              "bind": "counter"
+            },
+            {
+              "type": "button",
+              "text": "+1",
+              "w": 56,
+              "h": 48,
+              "on_click": {
+                "action": "inc",
+                "tag": "counter",
+                "by": 1
+              },
+              "on_long_press_repeat": {
+                "action": "inc",
+                "tag": "counter",
+                "by": 1
+              }
+            },
+            {
+              "type": "button",
+              "text": "0",
+              "w": 56,
+              "h": 48,
+              "style": {
+                "bg_color": "#455a64"
+              },
+              "on_click": {
+                "action": "set",
+                "tag": "counter",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "text": "@g_jog",
+          "style": {
+            "font": 14,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 16
+          },
+          "children": [
+            {
+              "type": "button",
+              "text": "@jog",
+              "w": 144,
+              "h": 48,
+              "on_press": {
+                "action": "set",
+                "tag": "jog",
+                "value": true
+              },
+              "on_release": {
+                "action": "set",
+                "tag": "jog",
+                "value": false
+              }
+            },
+            {
+              "type": "led",
+              "w": 24,
+              "h": 24,
+              "color": "#4caf50",
+              "bind": {
+                "on": "jog"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 536,
+      "y": 56,
+      "w": 248,
+      "h": 360,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 10,
+        "border_width": 0,
+        "pad": 12,
+        "pad_row": 8
+      },
+      "flex": "column",
+      "children": [
+        {
+          "type": "label",
+          "text": "@g_show",
+          "style": {
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 12
+          },
+          "children": [
+            {
+              "type": "led",
+              "w": 24,
+              "h": 24,
+              "color": "#ffb300",
+              "bind": {
+                "on": "blink"
+              }
+            },
+            {
+              "type": "spinner",
+              "w": 32,
+              "h": 32,
+              "bind": "run",
+              "style": {
+                "arc_width": 5
+              },
+              "style_indicator": {
+                "arc_width": 5
+              }
+            },
+            {
+              "type": "image",
+              "src": "assets/logo.png",
+              "zoom": 0.7,
+              "animate": {
+                "preset": "spin",
+                "when": "run"
+              }
+            },
+            {
+              "type": "label",
+              "text": "@g_run_hint",
+              "style": {
+                "font": 14,
+                "text_color": "#9fb3c8"
+              }
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "text": "@g_scroll",
+          "w": "100%",
+          "h": 22,
+          "long_mode": "circular"
+        },
+        {
+          "type": "chart",
+          "w": "100%",
+          "h": 96,
+          "chart_type": "bar",
+          "points": 12,
+          "min": 0,
+          "max": 10,
+          "sample_ms": 500,
+          "hdiv": 3,
+          "vdiv": 0,
+          "series": [
+            {
+              "tag": "noise",
+              "color": "#ab47bc"
+            }
+          ],
+          "style": {
+            "bg_color": "#10151c",
+            "border_width": 0,
+            "radius": 6,
+            "pad": 6
+          }
+        },
+        {
+          "type": "bar",
+          "w": "100%",
+          "h": 10,
+          "min": 0,
+          "max": 10,
+          "bind": {
+            "value": "noise"
+          },
+          "style_indicator": {
+            "bg_color": "#ab47bc"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": 32,
+          "scrollable": false,
+          "style": {
+            "bg_opa": 100,
+            "border_width": 0,
+            "pad": 0,
+            "bg_color": "#10151c",
+            "radius": 6
+          },
+          "children": [
+            {
+              "type": "line",
+              "x": 8,
+              "y": 15,
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  208,
+                  0
+                ]
+              ],
+              "style": {
+                "line_color": "#37474f",
+                "line_width": 2
+              }
+            },
+            {
+              "type": "panel",
+              "x": 4,
+              "y": 8,
+              "w": 16,
+              "h": 16,
+              "scrollable": false,
+              "style": {
+                "bg_color": "#26a69a",
+                "radius": 8,
+                "border_width": 0
+              },
+              "animate": {
+                "prop": "x",
+                "from": 4,
+                "to": 204,
+                "time": 1500,
+                "playback": true,
+                "path": "ease_in_out",
+                "when": "run"
+              }
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": 32,
+          "scrollable": false,
+          "style": {
+            "bg_color": "#37474f",
+            "radius": 6,
+            "border_width": 0,
+            "pad": 0
+          },
+          "animate": {
+            "prop": "bg_color",
+            "to": "#c62828",
+            "time": 700,
+            "playback": true,
+            "when": {
+              "tag": "temp",
+              "gt": {
+                "tag": "temp_hi"
+              }
+            }
+          },
+          "children": [
+            {
+              "type": "label",
+              "text": "@g_color",
+              "align": "center",
+              "style": {
+                "font": 14,
+                "text_color": "#ffffff"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 424,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 8
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "@main",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@trend",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@alarms",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@recipes",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@widgets",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@settings",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "fade"
+          }
+        }
+      ]
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 220,
+      "style_items": {
+        "font": 18
+      }
+    }
+  ]
+}

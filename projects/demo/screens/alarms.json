@@ -1,28 +1,309 @@
 {
   "name": "alarms",
   "scrollable": false,
-  "style": { "bg_color": "#141a22", "pad": 0 },
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
   "children": [
     {
-      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
-      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 48,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 16,
+        "pad_right": 16
+      },
       "children": [
-        { "type": "label", "text": "@alarms", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
-        { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#9fb3c8" },
-          "bind": { "text": { "tag": "sys.alarm.unacked", "format": "Not acknowledged: %d" } } },
-        { "type": "button", "align": "right_mid", "x": -90, "w": 110, "h": 36, "text": "@ack_all",
-          "style": { "bg_color": "#c62828" }, "style_label": { "font": 14 },
-          "on_click": { "action": "call", "fn": "alarm.ack_all" } },
-        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "@back", "style_label": { "font": 14 },
-          "on_click": { "action": "back" } }
+        {
+          "type": "image",
+          "src": "assets/logo.png",
+          "align": "left_mid",
+          "x": -8,
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "@title",
+          "align": "left_mid",
+          "x": 32,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "w": 304,
+          "h": 36,
+          "labels": {
+            "idle": "@no_alarms",
+            "more": "@alarm_more"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -176,
+          "w": 14,
+          "h": 14,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -140,
+          "style": {
+            "font": 14
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 14
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "User: %s"
+            }
+          }
+        }
       ]
     },
-    { "type": "alarm_banner", "x": 16, "y": 64, "w": 768, "h": 36 },
-    { "type": "label", "x": 16, "y": 108, "text": "@current_alarms", "style": { "text_color": "#9fb3c8", "font": 14 } },
-    { "type": "alarm_list", "x": 16, "y": 128, "w": 768, "h": 150, "rows": 20,
-      "columns": ["time", "severity", "message", "state"] },
-    { "type": "label", "x": 16, "y": 286, "text": "@history", "style": { "text_color": "#9fb3c8", "font": 14 } },
-    { "type": "alarm_list", "x": 16, "y": 306, "w": 768, "h": 166, "mode": "history", "rows": 2, "row_height": 32,
-      "columns": ["time", "severity", "message", "state"] }
+    {
+      "type": "label",
+      "text": "@current_alarms",
+      "x": 16,
+      "y": 70,
+      "style": {
+        "text_color": "#9fb3c8"
+      }
+    },
+    {
+      "type": "label",
+      "x": 330,
+      "y": 70,
+      "style": {
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "sys.alarm.unacked",
+          "format": "%d"
+        }
+      }
+    },
+    {
+      "type": "label",
+      "text": "@unacked_count",
+      "x": 216,
+      "y": 70,
+      "w": 108,
+      "style": {
+        "text_align": "right",
+        "text_color": "#9fb3c8"
+      }
+    },
+    {
+      "type": "button",
+      "text": "@ack_all",
+      "w": 144,
+      "h": 48,
+      "on_click": {
+        "action": "call",
+        "fn": "alarm.ack_all"
+      },
+      "x": 640,
+      "y": 56
+    },
+    {
+      "type": "alarm_list",
+      "x": 16,
+      "y": 112,
+      "w": 768,
+      "h": 104,
+      "rows": 20,
+      "columns": [
+        "time",
+        "severity",
+        "message",
+        "state"
+      ],
+      "labels": {
+        "unacked": "@al_unacked",
+        "active": "@al_active",
+        "cleared": "@al_cleared",
+        "empty": "@no_alarms",
+        "raised": "@al_raised",
+        "cleared_event": "@al_cleared",
+        "acked_event": "@al_acked"
+      }
+    },
+    {
+      "type": "label",
+      "text": "@history",
+      "x": 16,
+      "y": 224,
+      "style": {
+        "text_color": "#9fb3c8"
+      }
+    },
+    {
+      "type": "alarm_list",
+      "x": 16,
+      "y": 248,
+      "w": 768,
+      "h": 168,
+      "mode": "history",
+      "rows": 50,
+      "row_height": 32,
+      "columns": [
+        "time",
+        "severity",
+        "message",
+        "state"
+      ],
+      "labels": {
+        "unacked": "@al_unacked",
+        "active": "@al_active",
+        "cleared": "@al_cleared",
+        "empty": "@no_alarms",
+        "raised": "@al_raised",
+        "cleared_event": "@al_cleared",
+        "acked_event": "@al_acked"
+      }
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 424,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 8
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "@main",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@trend",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@alarms",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@recipes",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@widgets",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@settings",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "fade"
+          }
+        }
+      ]
+    }
   ]
 }

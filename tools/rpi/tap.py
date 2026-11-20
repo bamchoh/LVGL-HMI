@@ -4,9 +4,9 @@
     python3 tap.py [--project <project.json>] X,Y[,WAIT_MS] ...
 
 X,Y are screen coordinates; WAIT_MS is the pause after the tap (default 400). Example, on the
-3.5" LCD project: press "Setup", then the first user of the login screen:
+3.5" LCD project: go to "Setup" (bottom right), then press "Log in":
 
-    python3 tools/rpi/tap.py --project projects/lcd35/project.json 440,20,900 95,70
+    python3 tools/rpi/tap.py --project projects/lcd35/project.json 435,298,900 363,84
 
 How it works: an input event written to /dev/input/eventN is delivered to everything that reads
 the device, so the runtime sees a real touch. The user needs write access to the device (group

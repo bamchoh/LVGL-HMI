@@ -1,79 +1,603 @@
 {
   "name": "settings",
-  "level": 2,
   "scrollable": false,
-  "style": { "bg_color": "#141a22", "pad": 0 },
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
   "children": [
     {
-      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 40, "scrollable": false,
-      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 36,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 8,
+        "pad_right": 8
+      },
       "children": [
-        { "type": "button", "align": "left_mid", "text": "< Back", "w": 70, "h": 30, "style_label": { "font": 12 },
-          "on_click": { "action": "back" } },
-        { "type": "label", "text": "Settings", "align": "center", "style": { "font": 18, "text_color": "#ffffff" } },
-        { "type": "label", "align": "right_mid", "style": { "text_color": "#9fb3c8", "font": 12 },
-          "clickable": true, "on_click": { "action": "login" }, "bind": { "text": { "tag": "sys.user.name", "format": "User: %s" } } }
+        {
+          "type": "label",
+          "text": "Pump Station",
+          "align": "left_mid",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "x": 2,
+          "w": 240,
+          "h": 28,
+          "style": {
+            "font": 12
+          },
+          "labels": {
+            "idle": "No alarms",
+            "more": "+%d"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -84,
+          "w": 12,
+          "h": 12,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -58,
+          "style": {
+            "font": 12
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "w": 54,
+          "long_mode": "dots",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 12,
+            "text_align": "right"
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "%s"
+            }
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 8, "y": 48, "w": 228, "h": 208, "scrollable": false,
-      "flex": "column", "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8, "pad_row": 4 },
+      "type": "panel",
+      "x": 8,
+      "y": 44,
+      "w": 149,
+      "h": 224,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8,
+        "pad_row": 6
+      },
+      "flex": "column",
       "children": [
-        { "type": "label", "text": "Operation mode", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "dropdown", "w": "100%", "options": ["Manual", "Automatic", "Maintenance"], "bind": "mode" },
-        { "type": "label", "text": "Maintenance mode is active!", "style": { "font": 12, "text_color": "#f44336" },
-          "bind": { "visible": { "tag": "mode", "eq": 2 } } },
-        { "type": "label", "text": "Operator name", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "text_display", "w": "100%", "placeholder": "tap to type", "max_length": 16, "input": true, "bind": "operator" },
-        { "type": "label", "text": "Maintenance PIN (1234)", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 8 },
-          "children": [
-            { "type": "password_display", "w": 90, "max_length": 4, "accepted_chars": "0123456789", "placeholder": "PIN", "bind": "pin" },
-            { "type": "label", "text": "unlocked", "style": { "font": 12, "text_color": "#4caf50" }, "bind": { "visible": { "tag": "pin", "eq": "1234" } } },
-            { "type": "label", "text": "locked", "style": { "font": 12, "text_color": "#f44336" }, "bind": { "hidden": { "tag": "pin", "eq": "1234" } } }
-          ] }
+        {
+          "type": "label",
+          "text": "Operation mode",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "dropdown",
+          "w": "100%",
+          "h": 32,
+          "options": [
+            "Manual",
+            "Automatic",
+            "Maintenance"
+          ],
+          "bind": "mode",
+          "style": {
+            "pad_top": 6,
+            "pad_bottom": 6
+          }
+        },
+        {
+          "type": "label",
+          "text": "Alarm low",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "numeric_display",
+          "w": "100%",
+          "h": 30,
+          "bind": "temp_lo",
+          "style": {
+            "pad_top": 5,
+            "pad_bottom": 5,
+            "pad_left": 6,
+            "pad_right": 6
+          },
+          "input": true,
+          "min": 0,
+          "max": 50,
+          "decimals": 1,
+          "unit": " C"
+        },
+        {
+          "type": "label",
+          "text": "Alarm high",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "numeric_display",
+          "w": "100%",
+          "h": 30,
+          "bind": "temp_hi",
+          "style": {
+            "pad_top": 5,
+            "pad_bottom": 5,
+            "pad_left": 6,
+            "pad_right": 6
+          },
+          "input": true,
+          "min": 0,
+          "max": 50,
+          "decimals": 1,
+          "unit": " C"
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 244, "y": 48, "w": 228, "h": 208, "scrollable": false,
-      "flex": "column", "flex_cross": "center", "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8, "pad_row": 2 },
+      "type": "panel",
+      "x": 165,
+      "y": 44,
+      "w": 150,
+      "h": 224,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8,
+        "pad_row": 8
+      },
+      "flex": "column",
+      "flex_cross": "center",
       "children": [
-        { "type": "label", "text": "Setpoint (holding reg 1)", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "arc", "w": 104, "h": 104, "min": 0, "max": 100, "bind": "setpoint",
-          "style": { "arc_width": 8 }, "style_indicator": { "arc_color": "#2196f3", "arc_width": 8 }, "style_knob": { "bg_color": "#2196f3", "pad": 4 } },
-        { "type": "numeric_display", "w": 96, "input": true, "min": 0, "max": 100, "unit": " %",
-          "style": { "font": 20, "text_color": "#ffffff", "pad": 4 }, "bind": "setpoint" },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+        {
+          "type": "label",
+          "text": "Setpoint",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          },
+          "w": "100%"
+        },
+        {
+          "type": "arc",
+          "w": 96,
+          "h": 96,
+          "min": 0,
+          "max": 100,
+          "bind": "setpoint",
+          "style": {
+            "arc_width": 8
+          },
+          "style_indicator": {
+            "arc_color": "#2196f3",
+            "arc_width": 8
+          },
+          "style_knob": {
+            "bg_color": "#2196f3",
+            "pad": 3
+          }
+        },
+        {
+          "type": "numeric_display",
+          "w": 88,
+          "h": 30,
+          "bind": "setpoint",
+          "style": {
+            "pad_top": 5,
+            "pad_bottom": 5,
+            "pad_left": 6,
+            "pad_right": 6
+          },
+          "input": true,
+          "min": 0,
+          "max": 100,
+          "unit": " %"
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
           "children": [
-            { "type": "button", "text": "0",   "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 0 } },
-            { "type": "button", "text": "50",  "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 50 } },
-            { "type": "button", "text": "100", "w": 52, "h": 30, "on_click": { "action": "set", "tag": "setpoint", "value": 100 } }
-          ] }
+            {
+              "type": "button",
+              "text": "0",
+              "w": 40,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "set",
+                "tag": "setpoint",
+                "value": 0
+              }
+            },
+            {
+              "type": "button",
+              "text": "50",
+              "w": 40,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "set",
+                "tag": "setpoint",
+                "value": 50
+              }
+            },
+            {
+              "type": "button",
+              "text": "100",
+              "w": 40,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "set",
+                "tag": "setpoint",
+                "value": 100
+              }
+            }
+          ]
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 8, "y": 264, "w": 464, "h": 48, "scrollable": false,
-      "flex": "row", "flex_main": "space_between", "flex_cross": "center",
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
+      "type": "panel",
+      "x": 323,
+      "y": 44,
+      "w": 149,
+      "h": 224,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8,
+        "pad_row": 8
+      },
+      "flex": "column",
       "children": [
-        { "type": "panel", "w": "content", "h": "content", "flex": "row", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 6 },
+        {
+          "type": "label",
+          "text": "User and system",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
           "children": [
-            { "type": "button", "text": "Reload", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "reload" } },
-            { "type": "button", "text": "Main", "h": 32, "style_label": { "font": 12 }, "on_click": { "action": "goto", "screen": "main", "anim": "slide_right" } },
-            { "type": "button", "text": "System", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#455a64" }, "on_click": { "action": "system" } },
-            { "type": "button", "text": "Reboot", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#ef6c00" }, "on_click": { "action": "restart" } },
-            { "type": "button", "text": "Exit", "h": 32, "style_label": { "font": 12 }, "style": { "bg_color": "#455a64" }, "on_click": { "action": "exit" } }
-          ] }
+            {
+              "type": "button",
+              "text": "Log in",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "login"
+              }
+            },
+            {
+              "type": "button",
+              "text": "Log out",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0,
+                "bg_color": "#455a64"
+              },
+              "on_click": {
+                "action": "logout"
+              }
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "text": "System",
+          "w": "100%",
+          "h": 32,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#455a64"
+          },
+          "on_click": {
+            "action": "system"
+          }
+        },
+        {
+          "type": "label",
+          "text": "Maintenance (level 2)",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
+          "children": [
+            {
+              "type": "button",
+              "text": "Reload",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0,
+                "bg_color": "#455a64"
+              },
+              "on_click": {
+                "action": "reload"
+              },
+              "level": 2,
+              "level_deny": "login"
+            },
+            {
+              "type": "button",
+              "text": "Reboot",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0,
+                "bg_color": "#ef6c00"
+              },
+              "on_click": {
+                "action": "restart"
+              },
+              "level": 2,
+              "level_deny": "login"
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "text": "Exit",
+          "w": 64,
+          "h": 32,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#c62828"
+          },
+          "on_click": {
+            "action": "exit"
+          },
+          "level": 2,
+          "level_deny": "login"
+        }
       ]
     },
-
-    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 190,
-      "style": { "pad": 4, "pad_gap": 4 }, "style_items": { "font": 18 } }
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 276,
+      "w": "100%",
+      "h": 44,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 6
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "Main",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Trend",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Alarms",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Recipes",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Widgets",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Setup",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "none"
+          }
+        }
+      ]
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 190,
+      "style": {
+        "pad": 4,
+        "pad_gap": 4
+      },
+      "style_items": {
+        "font": 18
+      }
+    }
   ]
 }

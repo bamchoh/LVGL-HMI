@@ -648,7 +648,7 @@ void Binding::apply_value(double n)
             std::string text = Value::number(n * scale + offset).format(format);
             if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
-            else lv_label_set_text(obj, text.c_str());
+            else if(lv_obj_check_type(obj, &lv_label_class)) lv_label_set_text(obj, text.c_str());   // (nothing else has a text)
             break;
         }
     }
@@ -678,7 +678,7 @@ void Binding::on_tag_changed(const Value& v, const void* source)
                     else { lv_image_set_src(obj, keep_path(path)); lv_obj_set_hidden(obj, false); }
                 }
             }
-            else lv_label_set_text(obj, text.c_str());
+            else if(lv_obj_check_type(obj, &lv_label_class)) lv_label_set_text(obj, text.c_str());   // (nothing else has a text)
             break;
         }
         case BindKind::Value:
@@ -1412,6 +1412,7 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
             case Widget::Slider: case Widget::Bar: case Widget::Arc: case Widget::Dropdown: case Widget::Roller:
                 add_binding(obj, wk, BindKind::Value, *bind, wk != Widget::Bar); break;
             case Widget::Textarea: add_binding(obj, wk, BindKind::Text, *bind, true); break;
+            case Widget::Panel: case Widget::Spinner: add_binding(obj, wk, BindKind::Visible, *bind, false); break;
             default: add_binding(tobj, wk, BindKind::Text, *bind, false); break;
         }
         return;

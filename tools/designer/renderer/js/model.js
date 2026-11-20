@@ -236,8 +236,17 @@ const M = {
     if (!p) return;
     const prop = (o, k, loc, what) => { if (o && typeof o[k] === 'string' && o[k] !== '') cb(o[k], v => { o[k] = v; }, loc, what || k, false); };
     const list = (arr, loc, what) => { if (Array.isArray(arr)) arr.forEach((v, i) => { if (typeof v === 'string' && v) cb(v, n => { arr[i] = n; }, loc, what, false); }); };
+    // a condition: "tag" or { "tag": ..., "gt": { "tag": ... } }
+    const cond = (o, k, loc, what, soft) => {
+      const c = o && o[k];
+      const one = (h, key) => { if (h && typeof h[key] === 'string' && h[key] !== '') cb(h[key], v => { h[key] = v; }, loc, what, soft); };
+      if (typeof c === 'string') one(o, k);
+      else if (c && typeof c === 'object') { one(c, 'tag'); for (const op of ['eq', 'ne', 'gt', 'lt', 'ge', 'le']) if (c[op] && typeof c[op] === 'object') one(c[op], 'tag'); }
+    };
     const lua = (o, k, loc) => {
-      if (!o || typeof o[k] !== 'string') return;
+      if (!o) return;
+      if (Array.isArray(o[k])) { o[k].forEach((line, i) => lua(o[k], i, loc)); return; }     // code as a list of lines
+      if (typeof o[k] !== 'string') return;
       for (const name of new Set([...o[k].matchAll(/\btag\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(m => m[1]))) {
         cb(name, n => { if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)) o[k] = o[k].replace(new RegExp('\\btag\\.' + name + '\\b', 'g'), 'tag.' + n); }, loc, 'lua', true);
       }
@@ -264,6 +273,8 @@ const M = {
             if (act.action === 'script') lua(act, 'code', loc);
           }
         }
+        // "animate": { "when": ... } (an unknown tag there is reported with the other animate problems)
+        for (const a of Array.isArray(w.animate) ? w.animate : [w.animate]) if (a && typeof a === 'object') cond(a, 'when', loc, 'animate', true);
         for (const s2 of Array.isArray(w.series) ? w.series : []) prop(s2, 'tag', loc, 'series');
         if (w.type === 'trend' && Array.isArray(w.tags)) w.tags.forEach((x, i) => {
           if (typeof x === 'string') { if (x) cb(x, n => { w.tags[i] = n; }, loc, 'trend', false); }
