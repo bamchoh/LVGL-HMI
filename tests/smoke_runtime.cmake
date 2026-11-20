@@ -6,6 +6,16 @@ if(NOT EXE OR NOT PROJECT OR NOT OUT)
   message(FATAL_ERROR "usage: cmake -DEXE=... -DPROJECT=... -DOUT=... -P smoke_runtime.cmake")
 endif()
 file(MAKE_DIRECTORY "${OUT}")
+
+# The runtime records while it runs (data log, alarms, operations, system log, next to the
+# project). Run a copy, so that the test leaves nothing in the logs of the project itself
+# (its trend would show a second of data for every test run).
+get_filename_component(project_dir "${PROJECT}" DIRECTORY)
+get_filename_component(project_file "${PROJECT}" NAME)
+file(REMOVE_RECURSE "${OUT}/project")
+file(COPY "${project_dir}/" DESTINATION "${OUT}/project"
+     PATTERN "logs" EXCLUDE PATTERN "pki" EXCLUDE PATTERN "project.local.json" EXCLUDE)
+set(PROJECT "${OUT}/project/${project_file}")
 set(shot "${OUT}/smoke.bmp")
 file(REMOVE "${shot}")
 
