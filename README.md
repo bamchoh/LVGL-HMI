@@ -248,6 +248,15 @@ python tools\modbus_server.py --port 5020
 ./build/bin/hml_runtime projects/metro/project.json
 ```
 
+`projects/factory` は、生産ラインを斜め上から見た監視画面です（アイソメトリック。3D ではなく、斜め視点で描いた絵を
+奥から手前の順に重ねています）。コンベアの上を製品が流れ、プレスが上下し、検査の光が点滅し、搬送車がパレットを
+運びます。機械に触れると詳細が開き、故障を起こしたり復旧したりできます。絵は `tools/gen_factory_demo.py` が描いた
+単純な立体で（Pillow が要ります）、画面ファイルも同じスクリプトが書きます。走行の模擬は `scripts/line.lua` です。
+
+```bash
+./build/bin/hml_runtime projects/factory/project.json
+```
+
 デモ（`projects/demo`）は、下のナビゲーションで切り替える 6 画面で、できることを一通り動かせます。
 
 | 画面     | 見られるもの                                                                                                   |
