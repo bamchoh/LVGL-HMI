@@ -13,6 +13,10 @@
 // window, "Now" follows the newest data again. A touch on the chart shows the time and the
 // values there. The data is fetched by a background thread (SQLite does the slicing), so a
 // long window does not stop the screen.
+//
+// A slice without a sample breaks the line, except where the group would not have recorded one
+// anyway (see TrendFill): a window so short that the slices are shorter than the interval of the
+// group, or a group that records on change.
 #include "trend_view.hpp"
 #include <algorithm>
 #include <atomic>
@@ -123,6 +127,7 @@ struct TrendCtx {
     bool        fixed_y = false;
     double      ymin = 0, ymax = 100;
     int         buckets = 200;
+    TrendFill   fill;                  // how slices without a sample are drawn
     uint32_t    refresh_ms = 2000, last_fetch = 0;
     bool        want = true;           // fetch again
     bool        bad_group = false;
@@ -144,8 +149,10 @@ struct TrendCtx {
         const std::string g = group;
         const std::vector<std::string> t = tags;
         const int n = buckets;
-        TrendWorker::get().post([sh, g, t, from, to, n] {
+        const TrendFill fl = fill;
+        TrendWorker::get().post([sh, g, t, from, to, n, fl] {
             auto data = data_log().trend(g, t, from, to, n);
+            trend_fill_gaps(data, from, to, fl, LogDb::now_ms());
             std::lock_guard<std::mutex> l(sh->mu);
             sh->data = std::move(data);
             sh->from = from; sh->to = to;
@@ -383,6 +390,7 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
         lv_obj_set_style_text_color(l, c->colors[i], 0);
         lv_obj_set_style_pad_top(l, 10, 0);
     }
+    c->fill = data_log().trend_fill(c->group);
     const auto groups = data_log().groups();
     if(std::find(groups.begin(), groups.end(), c->group) == groups.end()) {
         c->bad_group = true;

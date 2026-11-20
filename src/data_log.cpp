@@ -300,6 +300,47 @@ std::pair<int64_t, int64_t> DataLog::time_range(const std::string& group)
     return { rows[0][0].i, rows[0][1].i };
 }
 
+TrendFill DataLog::trend_fill(const std::string& group) const
+{
+    for(const auto& g : impl_->groups) if(g->name == group) {
+        // an interval may come late or miss one turn: up to 2.5 periods is still one line
+        if(g->trigger == Trigger::Interval) return { TrendFill::Line, static_cast<int64_t>(g->interval_ms) * 5 / 2 };
+        if(g->trigger == Trigger::Change) return { TrendFill::Hold, 0 };
+    }
+    return {};
+}
+
+void trend_fill_gaps(std::vector<std::vector<TrendBucket>>& data, int64_t from_ms, int64_t to_ms, const TrendFill& fill, int64_t now_ms)
+{
+    if(fill.mode == TrendFill::None || to_ms <= from_ms) return;
+    for(auto& series : data) {
+        const int64_t n = static_cast<int64_t>(series.size());
+        if(n < 2) continue;
+        const double slice = static_cast<double>(to_ms - from_ms) / static_cast<double>(n);
+        int64_t prev = -1;                                     // the last slice with a sample
+        for(int64_t k = 0; k < n; k++) {
+            if(!series[static_cast<size_t>(k)].has) continue;
+            if(prev >= 0 && k - prev > 1) {
+                const TrendBucket a = series[static_cast<size_t>(prev)], b = series[static_cast<size_t>(k)];
+                // (the two samples are less than k - prev + 1 slices apart)
+                const bool line = fill.mode == TrendFill::Line && static_cast<double>(k - prev - 1) * slice < static_cast<double>(fill.max_gap_ms);
+                if(line || fill.mode == TrendFill::Hold) for(int64_t j = prev + 1; j < k; j++) {
+                    const double f = static_cast<double>(j - prev) / static_cast<double>(k - prev);
+                    const double v = line ? a.last + (b.last - a.last) * f : a.last;
+                    series[static_cast<size_t>(j)] = { true, v, v, v };
+                }
+            }
+            prev = k;
+        }
+        // on change: the newest value still stands (up to now)
+        if(fill.mode == TrendFill::Hold && prev >= 0) for(int64_t j = prev + 1; j < n; j++) {
+            if(static_cast<double>(from_ms) + static_cast<double>(j) * slice > static_cast<double>(now_ms)) break;
+            const double v = series[static_cast<size_t>(prev)].last;
+            series[static_cast<size_t>(j)] = { true, v, v, v };
+        }
+    }
+}
+
 std::vector<std::string> DataLog::group_tags(const std::string& group) const
 {
     for(const auto& g : impl_->groups) if(g->name == group) {
