@@ -1,0 +1,926 @@
+{
+  "name": "line",
+  "scrollable": false,
+  "style": {
+    "bg_color": "#0e141b",
+    "pad": 0
+  },
+  "children": [
+    {
+      "type": "image",
+      "x": 0,
+      "y": 0,
+      "src": "assets/floor.png"
+    },
+    {
+      "type": "image",
+      "x": 174,
+      "y": 128,
+      "src": "assets/alert2.png",
+      "bind": {
+        "visible": {
+          "tag": "m2_state",
+          "eq": 3
+        }
+      },
+      "animate": {
+        "preset": "pulse",
+        "when": {
+          "tag": "m2_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 182,
+      "y": 73,
+      "src": "assets/machine2.png",
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 2
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 251,
+      "y": 167,
+      "src": "assets/alert3.png",
+      "bind": {
+        "visible": {
+          "tag": "m3_state",
+          "eq": 3
+        }
+      },
+      "animate": {
+        "preset": "pulse",
+        "when": {
+          "tag": "m3_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 259,
+      "y": 117,
+      "src": "assets/machine3.png",
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 92,
+      "y": 101,
+      "src": "assets/belt0.png",
+      "animate": {
+        "prop": "frames",
+        "files": [
+          "assets/belt0.png",
+          "assets/belt1.png",
+          "assets/belt2.png",
+          "assets/belt3.png"
+        ],
+        "time": 400,
+        "when": "line_run"
+      }
+    },
+    {
+      "type": "image",
+      "x": 101,
+      "y": 97,
+      "src": "assets/product_raw.png",
+      "animate": [
+        {
+          "prop": "x",
+          "from": 101,
+          "to": 178,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        },
+        {
+          "prop": "y",
+          "from": 97,
+          "to": 135,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "x": 178,
+      "y": 135,
+      "src": "assets/product_made.png",
+      "animate": [
+        {
+          "prop": "x",
+          "from": 178,
+          "to": 255,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        },
+        {
+          "prop": "y",
+          "from": 135,
+          "to": 174,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "x": 255,
+      "y": 174,
+      "src": "assets/product_ok.png",
+      "animate": [
+        {
+          "prop": "x",
+          "from": 255,
+          "to": 332,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        },
+        {
+          "prop": "y",
+          "from": 174,
+          "to": 212,
+          "time": 3000,
+          "path": "linear",
+          "when": "line_run"
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "x": 178,
+      "y": 121,
+      "src": "assets/press_head.png",
+      "animate": {
+        "prop": "y",
+        "from": 129,
+        "to": 121,
+        "time": 1500,
+        "playback": true,
+        "path": "ease_in_out",
+        "when": {
+          "tag": "m2_state",
+          "eq": 1
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 173,
+      "y": 110,
+      "src": "assets/arm2.png"
+    },
+    {
+      "type": "image",
+      "x": 250,
+      "y": 171,
+      "src": "assets/scan.png",
+      "bind": {
+        "visible": {
+          "tag": "m3_state",
+          "eq": 1
+        }
+      },
+      "animate": {
+        "preset": "pulse",
+        "time": 375,
+        "when": {
+          "tag": "m3_state",
+          "eq": 1
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 250,
+      "y": 154,
+      "src": "assets/arm3.png"
+    },
+    {
+      "type": "image",
+      "x": 72,
+      "y": 102,
+      "src": "assets/alert1.png",
+      "bind": {
+        "visible": {
+          "tag": "m1_state",
+          "eq": 3
+        }
+      },
+      "animate": {
+        "preset": "pulse",
+        "when": {
+          "tag": "m1_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 80,
+      "y": 58,
+      "src": "assets/machine1.png",
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 1
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 302,
+      "y": 217,
+      "src": "assets/alert4.png",
+      "bind": {
+        "visible": {
+          "tag": "m4_state",
+          "eq": 3
+        }
+      },
+      "animate": {
+        "preset": "pulse",
+        "when": {
+          "tag": "m4_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 311,
+      "y": 175,
+      "src": "assets/machine4.png",
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 4
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 346,
+      "y": 223,
+      "src": "assets/pallet0.png",
+      "bind": {
+        "src": {
+          "tag": "pallet",
+          "map": {
+            "0": "assets/pallet0.png",
+            "1": "assets/pallet1.png",
+            "2": "assets/pallet2.png",
+            "3": "assets/pallet3.png",
+            "4": "assets/pallet4.png",
+            "default": "assets/pallet0.png"
+          }
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 84,
+      "y": 64,
+      "src": "assets/lamp_off.png",
+      "bind": {
+        "src": {
+          "tag": "m1_state",
+          "map": {
+            "1": "assets/lamp_green.png",
+            "2": "assets/lamp_yellow.png",
+            "3": "assets/lamp_red.png",
+            "default": "assets/lamp_off.png"
+          }
+        }
+      },
+      "animate": {
+        "preset": "blink",
+        "when": {
+          "tag": "m1_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 186,
+      "y": 78,
+      "src": "assets/lamp_off.png",
+      "bind": {
+        "src": {
+          "tag": "m2_state",
+          "map": {
+            "1": "assets/lamp_green.png",
+            "2": "assets/lamp_yellow.png",
+            "3": "assets/lamp_red.png",
+            "default": "assets/lamp_off.png"
+          }
+        }
+      },
+      "animate": {
+        "preset": "blink",
+        "when": {
+          "tag": "m2_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 263,
+      "y": 122,
+      "src": "assets/lamp_off.png",
+      "bind": {
+        "src": {
+          "tag": "m3_state",
+          "map": {
+            "1": "assets/lamp_green.png",
+            "2": "assets/lamp_yellow.png",
+            "3": "assets/lamp_red.png",
+            "default": "assets/lamp_off.png"
+          }
+        }
+      },
+      "animate": {
+        "preset": "blink",
+        "when": {
+          "tag": "m3_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 315,
+      "y": 182,
+      "src": "assets/lamp_off.png",
+      "bind": {
+        "src": {
+          "tag": "m4_state",
+          "map": {
+            "1": "assets/lamp_green.png",
+            "2": "assets/lamp_yellow.png",
+            "3": "assets/lamp_red.png",
+            "default": "assets/lamp_off.png"
+          }
+        }
+      },
+      "animate": {
+        "preset": "blink",
+        "when": {
+          "tag": "m4_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "image",
+      "x": 302,
+      "y": 230,
+      "src": "assets/agv_full.png",
+      "bind": {
+        "visible": {
+          "tag": "agv",
+          "eq": 1
+        }
+      },
+      "animate": [
+        {
+          "prop": "x",
+          "from": 302,
+          "to": 57,
+          "time": 5000,
+          "repeat": 1,
+          "path": "ease_in_out",
+          "when": {
+            "tag": "agv",
+            "eq": 1
+          }
+        },
+        {
+          "prop": "y",
+          "from": 230,
+          "to": 107,
+          "time": 5000,
+          "repeat": 1,
+          "path": "ease_in_out",
+          "when": {
+            "tag": "agv",
+            "eq": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "x": 57,
+      "y": 107,
+      "src": "assets/agv_empty.png",
+      "bind": {
+        "visible": {
+          "tag": "agv",
+          "eq": 2
+        }
+      },
+      "animate": [
+        {
+          "prop": "x",
+          "from": 57,
+          "to": 302,
+          "time": 5000,
+          "repeat": 1,
+          "path": "ease_in_out",
+          "when": {
+            "tag": "agv",
+            "eq": 2
+          }
+        },
+        {
+          "prop": "y",
+          "from": 107,
+          "to": 230,
+          "time": 5000,
+          "repeat": 1,
+          "path": "ease_in_out",
+          "when": {
+            "tag": "agv",
+            "eq": 2
+          }
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "x": 302,
+      "y": 230,
+      "src": "assets/agv_empty.png",
+      "bind": {
+        "visible": {
+          "tag": "agv",
+          "eq": 0
+        }
+      }
+    },
+    {
+      "type": "panel",
+      "x": 101,
+      "y": 48,
+      "w": 76,
+      "h": 24,
+      "scrollable": false,
+      "style": {
+        "radius": 6,
+        "border_width": 1,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#455a64",
+        "border_color": "#0d1117",
+        "pad_left": 5,
+        "pad_right": 5
+      },
+      "bind": {
+        "bg_color": {
+          "tag": "m1_state",
+          "map": {
+            "0": "#455a64",
+            "1": "#2e7d32",
+            "2": "#f9a825",
+            "3": "#c62828",
+            "default": "#455a64"
+          }
+        }
+      },
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 1
+        }
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "text": "投入",
+          "align": "left_mid"
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "m1_count",
+              "format": "%d"
+            }
+          },
+          "align": "right_mid"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 202,
+      "y": 73,
+      "w": 76,
+      "h": 24,
+      "scrollable": false,
+      "style": {
+        "radius": 6,
+        "border_width": 1,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#455a64",
+        "border_color": "#0d1117",
+        "pad_left": 5,
+        "pad_right": 5
+      },
+      "bind": {
+        "bg_color": {
+          "tag": "m2_state",
+          "map": {
+            "0": "#455a64",
+            "1": "#2e7d32",
+            "2": "#f9a825",
+            "3": "#c62828",
+            "default": "#455a64"
+          }
+        }
+      },
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 2
+        }
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "text": "加工",
+          "align": "left_mid"
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "m2_count",
+              "format": "%d"
+            }
+          },
+          "align": "right_mid"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 279,
+      "y": 118,
+      "w": 76,
+      "h": 24,
+      "scrollable": false,
+      "style": {
+        "radius": 6,
+        "border_width": 1,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#455a64",
+        "border_color": "#0d1117",
+        "pad_left": 5,
+        "pad_right": 5
+      },
+      "bind": {
+        "bg_color": {
+          "tag": "m3_state",
+          "map": {
+            "0": "#455a64",
+            "1": "#2e7d32",
+            "2": "#f9a825",
+            "3": "#c62828",
+            "default": "#455a64"
+          }
+        }
+      },
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 3
+        }
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "text": "検査",
+          "align": "left_mid"
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "m3_count",
+              "format": "%d"
+            }
+          },
+          "align": "right_mid"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 332,
+      "y": 177,
+      "w": 76,
+      "h": 24,
+      "scrollable": false,
+      "style": {
+        "radius": 6,
+        "border_width": 1,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#455a64",
+        "border_color": "#0d1117",
+        "pad_left": 5,
+        "pad_right": 5
+      },
+      "bind": {
+        "bg_color": {
+          "tag": "m4_state",
+          "map": {
+            "0": "#455a64",
+            "1": "#2e7d32",
+            "2": "#f9a825",
+            "3": "#c62828",
+            "default": "#455a64"
+          }
+        }
+      },
+      "on_click": {
+        "action": "popup",
+        "screen": "machine",
+        "set": {
+          "sel": 4
+        }
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "text": "搬出",
+          "align": "left_mid"
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "m4_count",
+              "format": "%d"
+            }
+          },
+          "align": "right_mid"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 32,
+      "scrollable": false,
+      "style": {
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#161d27"
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ffffff"
+          },
+          "text": "第1ライン",
+          "align": "left_mid",
+          "x": 8
+        },
+        {
+          "type": "panel",
+          "align": "left_mid",
+          "x": 88,
+          "w": 68,
+          "h": 24,
+          "scrollable": false,
+          "style": {
+            "radius": 5,
+            "border_width": 0,
+            "pad": 0,
+            "bg_opa": 255,
+            "bg_color": "#455a64"
+          },
+          "bind": {
+            "bg_color": {
+              "tag": "line_state",
+              "map": {
+                "0": "#455a64",
+                "1": "#2e7d32",
+                "2": "#f9a825",
+                "3": "#c62828",
+                "default": "#455a64"
+              }
+            }
+          },
+          "children": [
+            {
+              "type": "label",
+              "style": {
+                "font": 14,
+                "text_color": "#ffffff"
+              },
+              "bind": {
+                "text": "line_text"
+              },
+              "align": "center"
+            }
+          ]
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#90a4ae"
+          },
+          "text": "生産",
+          "align": "left_mid",
+          "x": 168
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "m4_count",
+              "format": "%d"
+            }
+          },
+          "align": "left_mid",
+          "x": 200
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#90a4ae"
+          },
+          "text": "不良",
+          "align": "left_mid",
+          "x": 248
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ff8a80"
+          },
+          "bind": {
+            "text": {
+              "tag": "ng_count",
+              "format": "%d"
+            }
+          },
+          "align": "left_mid",
+          "x": 280
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#90a4ae"
+          },
+          "text": "出荷",
+          "align": "left_mid",
+          "x": 320
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "shipped",
+              "format": "%d"
+            }
+          },
+          "align": "left_mid",
+          "x": 352
+        },
+        {
+          "type": "label",
+          "style": {
+            "font": 14,
+            "text_color": "#cfd8dc"
+          },
+          "bind": {
+            "text": "clock"
+          },
+          "align": "right_mid",
+          "x": -8
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 8,
+      "y": 264,
+      "w": 152,
+      "h": 48,
+      "scrollable": false,
+      "style": {
+        "radius": 8,
+        "border_width": 0,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#161d27",
+        "pad_left": 10,
+        "pad_right": 2
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ffffff"
+          },
+          "text": "運転",
+          "align": "left_mid"
+        },
+        {
+          "type": "switch",
+          "align": "right_mid",
+          "w": 84,
+          "h": 44,
+          "bind": "run",
+          "style_indicator_checked": {
+            "bg_color": "#2e7d32"
+          }
+        }
+      ]
+    }
+  ]
+}

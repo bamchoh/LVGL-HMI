@@ -4,6 +4,9 @@ shapes or colours here and run it again.
 
     python -I tools/gen_factory_demo.py            (needs Pillow: pip install pillow)
 
+Writes projects/factory (800x480) and projects/factory35 (480x320: the same pictures at 0.6 of
+their size, for the 3.5" LCD of the Raspberry Pi).
+
 Geometry: a grid cell is 64 x 32 px on the screen (2:1), one step in z is one px.
     screen x = OX + (gx - gy) * 32        screen y = OY + (gx + gy) * 16 - z
 """
@@ -11,11 +14,11 @@ import json, os, shutil
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, 'projects', 'factory')
-ASSETS = os.path.join(OUT, 'assets')
+OUT = ASSETS = None                     # set by build()
+K = 1.0                                 # the pictures and positions are multiplied by this when written
 SS = 4                                  # drawn 4 times as large and scaled down: smooth edges
 
-W, H = 800, 480
+W, H = 800, 480                         # the size everything is drawn for (before K)
 GW, GD = 16, 6                          # the floor: cells along gx and gy
 OX, OY = 240, 104                       # the screen position of the grid point (0, 0)
 BY0, BY1 = 3.0, 3.6                     # the conveyor runs along gx between these gy
@@ -93,9 +96,11 @@ class Canvas:
         self.poly([pt(gx0 + 0.15, gy0 + 0.1), pt(gx1 + 0.3, gy0 + 0.1), pt(gx1 + 0.3, gy1 + 0.15), pt(gx0 + 0.15, gy1 + 0.15)], (0, 0, 0, a))
 
     def save(self, name):
-        im = self.im.resize((self.w, self.h), Image.LANCZOS)
+        x0, y0 = int(round(self.x0 * K)), int(round(self.y0 * K))
+        w, h = max(1, int(round(self.w * K))), max(1, int(round(self.h * K)))
+        im = self.im.resize((w, h), Image.LANCZOS)
         im.save(os.path.join(ASSETS, name), optimize=True)
-        return {'x': self.x0, 'y': self.y0, 'w': self.w, 'h': self.h, 'src': 'assets/' + name}
+        return {'x': x0, 'y': y0, 'w': w, 'h': h, 'src': 'assets/' + name}
 
 
 def bbox(points, pad=3):
@@ -332,7 +337,15 @@ def label(text=None, tag=None, **kw):
     return w
 
 
-def build():
+def build(small=False):
+    global OUT, ASSETS, K, W, H, OY
+    # The 480x320 screen: everything at 0.6 (800 x 0.6 = 480). 320 / 0.6 = 533 is more than the
+    # 480 the scene needs, so it is moved down a little.
+    K, W, H, OY = (0.6, 800, 534, 126) if small else (1.0, 800, 480, 104)
+    OUT = os.path.join(ROOT, 'projects', 'factory35' if small else 'factory')
+    ASSETS = os.path.join(OUT, 'assets')
+    SW, SH = int(round(W * K)), int(round(H * K))           # the size of the screen
+    def sc(v): return int(round(v * K))
     shutil.rmtree(ASSETS, ignore_errors=True)
     os.makedirs(os.path.join(ASSETS, 'fonts'))
     os.makedirs(os.path.join(OUT, 'screens'), exist_ok=True)
@@ -357,7 +370,7 @@ def build():
         """Where a picture drawn around the grid point (0, 0) goes to stand at (gx, gy, z)."""
         o = pt(0, 0)
         p = pt(gx, gy, z)
-        return int(round(a['x'] + p[0] - o[0])), int(round(a['y'] + p[1] - o[1]))
+        return int(round(a['x'] + (p[0] - o[0]) * K)), int(round(a['y'] + (p[1] - o[1]) * K))
 
     def state(i): return 'm%d_state' % (i + 1)
     def open_machine(i): return {'action': 'popup', 'screen': 'machine', 'set': {'sel': i + 1}}
@@ -386,7 +399,7 @@ def build():
 
     # over the conveyor: the press (down on the product when it arrives, up while it leaves) and the camera
     on2, on3 = {'tag': state(1), 'eq': 1}, {'tag': state(2), 'eq': 1}
-    kids.append(image(head, animate={'prop': 'y', 'from': head['y'] + 13, 'to': head['y'], 'time': CYCLE // 2, 'playback': True,
+    kids.append(image(head, animate={'prop': 'y', 'from': head['y'] + sc(13), 'to': head['y'], 'time': CYCLE // 2, 'playback': True,
                                      'path': 'ease_in_out', 'when': on2}))
     kids.append(image(arms[1]))
     kids.append(image(scan, bind={'visible': on3}, animate={'preset': 'pulse', 'time': 375, 'when': on3}))
@@ -425,36 +438,52 @@ def build():
     for i in range(4):
         x0, x1, y0, y1 = BODY[i]
         p = pt((x0 + x1) / 2, (y0 + y1) / 2, MACHINE_H[i] + (34 if i == 0 else 16))
-        kids.append({'type': 'panel', 'x': int(p[0]) - 16, 'y': int(p[1]) - 30, 'w': 100, 'h': 30, 'scrollable': False,
-                     'style': flat(bg_opa=255, bg_color='#455a64', radius=6, border_width=1, border_color='#0d1117', pad_left=8, pad_right=8),
+        tw, th = (76, 24) if small else (100, 30)
+        kids.append({'type': 'panel', 'x': sc(p[0]) - (10 if small else 16), 'y': sc(p[1]) - th, 'w': tw, 'h': th, 'scrollable': False,
+                     'style': flat(bg_opa=255, bg_color='#455a64', radius=6, border_width=1, border_color='#0d1117',
+                                   pad_left=5 if small else 8, pad_right=5 if small else 8),
                      'bind': {'bg_color': {'tag': state(i), 'map': STATE_COLORS}},
                      'on_click': open_machine(i),
                      'children': [
                          label(NAMES[i], font=14, color='#ffffff', align='left_mid'),
-                         label(tag={'tag': 'm%d_count' % (i + 1), 'format': '%d'}, font=16, color='#ffffff', align='right_mid')]})
+                         label(tag={'tag': 'm%d_count' % (i + 1), 'format': '%d'}, font=14 if small else 16, color='#ffffff', align='right_mid')]})
 
     # the bar at the top and the controls
-    kids.append({'type': 'panel', 'x': 0, 'y': 0, 'w': W, 'h': 48, 'scrollable': False, 'style': flat(bg_opa=255, bg_color='#161d27'),
-                 'children': [
-                     label('第1ライン', font=20, color='#ffffff', align='left_mid', x=16),
-                     {'type': 'panel', 'align': 'left_mid', 'x': 124, 'w': 96, 'h': 32, 'scrollable': False,
-                      'style': flat(bg_opa=255, bg_color='#455a64', radius=6),
-                      'bind': {'bg_color': {'tag': 'line_state', 'map': STATE_COLORS}},
-                      'children': [label(tag='line_text', font=16, color='#ffffff', align='center')]},
-                     label('生産数', font=14, color='#90a4ae', align='left_mid', x=244),
-                     label(tag={'tag': 'm4_count', 'format': '%d'}, font=24, color='#ffffff', align='left_mid', x=296),
-                     label('不良', font=14, color='#90a4ae', align='left_mid', x=384),
-                     label(tag={'tag': 'ng_count', 'format': '%d'}, font=24, color='#ff8a80', align='left_mid', x=420),
-                     label('出荷', font=14, color='#90a4ae', align='left_mid', x=484),
-                     label(tag={'tag': 'shipped', 'format': '%d'}, font=24, color='#ffffff', align='left_mid', x=520),
-                     label(tag='clock', font=20, color='#cfd8dc', align='right_mid', x=-16),
-                 ]})
-    kids.append(label('機械に触れると詳細が開きます', font=14, color='#90a4ae', x=20, y=380))
-    kids.append({'type': 'panel', 'x': 16, 'y': 408, 'w': 216, 'h': 56, 'scrollable': False,
-                 'style': flat(bg_opa=255, bg_color='#161d27', radius=8, pad_left=12, pad_right=4),
-                 'children': [label('運転', font=18, color='#ffffff', align='left_mid'),
-                              {'type': 'switch', 'align': 'right_mid', 'w': 96, 'h': 48, 'bind': 'run',
-                               'style_indicator_checked': {'bg_color': '#2e7d32'}}]})
+    def count(title, tag, x, color='#ffffff'):
+        if small:
+            return [label(title, font=14, color='#90a4ae', align='left_mid', x=x),
+                    label(tag={'tag': tag, 'format': '%d'}, font=16, color=color, align='left_mid', x=x + 32)]
+        return [label(title, font=14, color='#90a4ae', align='left_mid', x=x),
+                label(tag={'tag': tag, 'format': '%d'}, font=24, color=color, align='left_mid', x=x + (52 if len(title) > 2 else 36))]
+    if small:
+        bar = [label('第1ライン', font=16, color='#ffffff', align='left_mid', x=8),
+               {'type': 'panel', 'align': 'left_mid', 'x': 88, 'w': 68, 'h': 24, 'scrollable': False,
+                'style': flat(bg_opa=255, bg_color='#455a64', radius=5),
+                'bind': {'bg_color': {'tag': 'line_state', 'map': STATE_COLORS}},
+                'children': [label(tag='line_text', font=14, color='#ffffff', align='center')]},
+               *count('生産', 'm4_count', 168), *count('不良', 'ng_count', 248, '#ff8a80'), *count('出荷', 'shipped', 320),
+               label(tag='clock', font=14, color='#cfd8dc', align='right_mid', x=-8)]
+        kids.append({'type': 'panel', 'x': 0, 'y': 0, 'w': SW, 'h': 32, 'scrollable': False, 'style': flat(bg_opa=255, bg_color='#161d27'), 'children': bar})
+        kids.append({'type': 'panel', 'x': 8, 'y': SH - 56, 'w': 152, 'h': 48, 'scrollable': False,
+                     'style': flat(bg_opa=255, bg_color='#161d27', radius=8, pad_left=10, pad_right=2),
+                     'children': [label('運転', font=16, color='#ffffff', align='left_mid'),
+                                  {'type': 'switch', 'align': 'right_mid', 'w': 84, 'h': 44, 'bind': 'run',
+                                   'style_indicator_checked': {'bg_color': '#2e7d32'}}]})
+    else:
+        bar = [label('第1ライン', font=20, color='#ffffff', align='left_mid', x=16),
+               {'type': 'panel', 'align': 'left_mid', 'x': 124, 'w': 96, 'h': 32, 'scrollable': False,
+                'style': flat(bg_opa=255, bg_color='#455a64', radius=6),
+                'bind': {'bg_color': {'tag': 'line_state', 'map': STATE_COLORS}},
+                'children': [label(tag='line_text', font=16, color='#ffffff', align='center')]},
+               *count('生産数', 'm4_count', 244), *count('不良', 'ng_count', 384, '#ff8a80'), *count('出荷', 'shipped', 484),
+               label(tag='clock', font=20, color='#cfd8dc', align='right_mid', x=-16)]
+        kids.append({'type': 'panel', 'x': 0, 'y': 0, 'w': SW, 'h': 48, 'scrollable': False, 'style': flat(bg_opa=255, bg_color='#161d27'), 'children': bar})
+        kids.append(label('機械に触れると詳細が開きます', font=14, color='#90a4ae', x=20, y=380))
+        kids.append({'type': 'panel', 'x': 16, 'y': 408, 'w': 216, 'h': 56, 'scrollable': False,
+                     'style': flat(bg_opa=255, bg_color='#161d27', radius=8, pad_left=12, pad_right=4),
+                     'children': [label('運転', font=18, color='#ffffff', align='left_mid'),
+                                  {'type': 'switch', 'align': 'right_mid', 'w': 96, 'h': 48, 'bind': 'run',
+                                   'style_indicator_checked': {'bg_color': '#2e7d32'}}]})
 
     screen = {'name': 'line', 'scrollable': False, 'style': {'bg_color': '#0e141b', 'pad': 0}, 'children': kids}
 
@@ -462,7 +491,10 @@ def build():
         t = tag if fmt is None else {'tag': tag, 'format': fmt}
         return [label(title, font=16, color='#90a4ae', x=0, y=y), label(tag=t, font=20, color='#ffffff', x=150, y=y - 3)]
 
-    popup = {'name': 'machine', 'popup': True, 'w': 420, 'h': 336, 'dim': True,
+    step, top = (32, 44) if small else (40, 60)              # the rows of values
+    by = top + step * 3 + (16 if small else 24)               # the two buttons
+    bw = 186
+    popup = {'name': 'machine', 'popup': True, 'w': 420, 'h': by + 56 + 8 + 48 + 32, 'dim': True,
              'style': {'bg_color': '#1f2a38', 'radius': 10, 'pad': 16, 'border_width': 0},
              'children': [
                  label(tag='sel_name', font=24, color='#ffffff', x=0, y=0),
@@ -470,20 +502,18 @@ def build():
                   'style': flat(bg_opa=255, bg_color='#455a64', radius=6),
                   'bind': {'bg_color': {'tag': 'sel_state', 'map': STATE_COLORS}},
                   'children': [label(tag='sel_text', font=16, color='#ffffff', align='center')]},
-                 *row(60, '処理数', 'sel_count', '%d 個'),
-                 *row(100, 'サイクル', 'sel_cycle', '%.1f 秒'),
-                 *row(140, '稼働率', 'sel_avail', '%d %%'),
-                 {'type': 'bar', 'x': 0, 'y': 176, 'w': 388, 'h': 12, 'min': 0, 'max': 100, 'bind': {'value': 'sel_avail'},
+                 *row(top, '処理数', 'sel_count', '%d 個'),
+                 *row(top + step, 'サイクル', 'sel_cycle', '%.1f 秒'),
+                 *row(top + step * 2, '稼働率', 'sel_avail', '%d %%'),
+                 {'type': 'bar', 'x': 0, 'y': top + step * 3 - (0 if small else 4), 'w': 388, 'h': 10, 'min': 0, 'max': 100, 'bind': {'value': 'sel_avail'},
                   'style_indicator': {'bg_color': '#2e7d32'}},
-                 {'type': 'button', 'text': '故障を起こす', 'x': 0, 'y': 204, 'w': 186, 'h': 56, 'style': {'bg_color': '#c62828'},
+                 {'type': 'button', 'text': '故障を起こす', 'x': 0, 'y': by, 'w': bw, 'h': 56, 'style': {'bg_color': '#c62828'},
                   'on_click': {'action': 'set', 'tag': 'cmd', 'value': 1}, 'bind': {'enabled': {'tag': 'sel_state', 'ne': 3}}},
-                 {'type': 'button', 'text': '復旧する', 'x': 202, 'y': 204, 'w': 186, 'h': 56, 'style': {'bg_color': '#2e7d32'},
+                 {'type': 'button', 'text': '復旧する', 'x': 388 - bw, 'y': by, 'w': bw, 'h': 56, 'style': {'bg_color': '#2e7d32'},
                   'on_click': {'action': 'set', 'tag': 'cmd', 'value': 2}, 'bind': {'enabled': {'tag': 'sel_state', 'eq': 3}}},
-                 {'type': 'button', 'text': '閉じる', 'align': 'bottom_right', 'w': 120, 'h': 40, 'style': {'bg_color': '#455a64'},
+                 {'type': 'button', 'text': '閉じる', 'align': 'bottom_right', 'w': 120, 'h': 48, 'style': {'bg_color': '#455a64'},
                   'on_click': {'action': 'close'}},
              ]}
-    popup['children'][-1]['h'] = 48
-    popup['h'] = 344
 
     def n(name, init=0, lo=None, hi=None):
         t = {'name': name, 'type': 'int', 'init': init}
@@ -499,7 +529,7 @@ def build():
         tags += [n('m%d_state' % i), n('m%d_count' % i)]
     project = {
         'title': '生産ライン監視（デモ）',
-        'display': {'width': W, 'height': H, 'zoom': 1},
+        'display': {'width': SW, 'height': SH, 'zoom': 1},
         'theme': {'dark': True, 'primary': '#1565c0', 'secondary': '#ff9800', 'font': 16},
         'font': {'file': 'assets/fonts/NotoSansJP-subset.otf'},
         'start_screen': 'line',
@@ -508,6 +538,9 @@ def build():
         'scripts': [{'name': 'line', 'trigger': 'interval', 'interval_ms': 200, 'file': 'scripts/line.lua'}],
         'screens': ['screens/line.json', 'screens/machine.json'],
     }
+    shutil.copyfile(os.path.join(ROOT, 'projects', 'factory', 'scripts', 'line.lua'), os.path.join(OUT, 'scripts', 'line.lua')) if small else None
+    if small:      # the LCD of the Raspberry Pi: its framebuffer and its touch panel (as in projects/lcd35)
+        project['display'] = {'width': SW, 'height': SH, 'fbdev': '/dev/fb0', 'touch': {'swap_axes': True, 'calibration': [150, 3850, 3850, 220]}}
     for path, obj in (('project.json', project), ('screens/line.json', screen), ('screens/machine.json', popup)):
         with open(os.path.join(OUT, path), 'w', encoding='utf-8', newline='\n') as f:
             json.dump(obj, f, ensure_ascii=False, indent=2)
@@ -517,3 +550,4 @@ def build():
 
 if __name__ == '__main__':
     build()
+    build(small=True)

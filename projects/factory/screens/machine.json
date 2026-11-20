@@ -2,7 +2,7 @@
   "name": "machine",
   "popup": true,
   "w": 420,
-  "h": 344,
+  "h": 348,
   "dim": true,
   "style": {
     "bg_color": "#1f2a38",
@@ -142,7 +142,7 @@
       "x": 0,
       "y": 176,
       "w": 388,
-      "h": 12,
+      "h": 10,
       "min": 0,
       "max": 100,
       "bind": {
