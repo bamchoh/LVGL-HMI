@@ -503,3 +503,12 @@ Object.assign(I18N.TEXT_JA, {
   'The project was changed outside the designer: loaded again': 'プロジェクトがデザイナーの外で変更されたので、読み直しました',
 });
 I18N.PATTERNS_JA.push([/^The files were changed, but cannot be read: (.*)$/, 'ファイルが変更されましたが、読めません: $1'], [/^reload failed: (.*)$/, '読み直しに失敗しました: $1']);
+// ---- log of the runtime started by Run
+Object.assign(I18N.TEXT_JA, {
+  'Runtime log': 'ランタイムのログ', 'Runtime': 'ランタイム', 'Stop': '停止',
+  'running': '実行中', 'ended (exit code {0})': '終了しました（終了コード {0}）',
+  'Close the runtime that Run started': '「実行」で起動したランタイムを終了します', 'Copy the log': 'ログをコピーします',
+  'Hide the log (the runtime keeps running)': 'ログを隠します（ランタイムは動いたままです）',
+  'Show or hide the log of the runtime': 'ランタイムのログを表示 / 非表示にします',
+  'Copied.': 'コピーしました。', 'Could not copy.': 'コピーできませんでした。',
+});

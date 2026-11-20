@@ -286,3 +286,15 @@ button.arr { width: 34px; height: 28px; padding: 0; font-size: 16px; line-height
 .log-sec .page-head { margin-bottom: 6px; }
 .log-on { display: inline-flex; align-items: center; gap: 4px; margin-left: 12px; }
 .log-sec .drv-fields { max-width: 520px; }
+
+/* log of the runtime started by Run: a panel above the status bar */
+#runlog { flex: none; height: 190px; display: flex; flex-direction: column; background: var(--bg); border-top: 1px solid var(--line); }
+#runlog[hidden] { display: none; }
+#runlog-head { flex: none; display: flex; gap: 8px; align-items: center; padding: 3px 10px; background: var(--bg2); border-bottom: 1px solid var(--line); }
+#runlog-head button { padding: 1px 8px; }
+#runlog-text { flex: 1; overflow: auto; padding: 4px 10px; white-space: pre-wrap; word-break: break-all; user-select: text; }
+#runlog-text .warn { color: #ffb74d; }
+#runlog-text .err { color: #f29e9b; }
+#status-run { cursor: pointer; white-space: nowrap; }
+#status-run[hidden] { display: none; }
+#status-run.on { color: #81c784; }

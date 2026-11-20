@@ -247,6 +247,8 @@ int run_splash(lv_display_t* disp, const hml::ProjectInfo& info, const std::stri
 
 int main(int argc, char** argv)
 {
+    // Every line out at once, also into a pipe (the designer shows the log of the runtime it started).
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
     //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
     if(argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) { usage(argv[0]); return 0; }

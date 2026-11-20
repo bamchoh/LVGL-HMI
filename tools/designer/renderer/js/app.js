@@ -20,6 +20,8 @@ const host = {
   pickImage: dir => host.call('hml_pickImage', dir || ''),
   preview: (p, s) => host.call('hml_preview', p, s),
   launch: p => host.call('hml_launch', p),
+  runLog: from => host.call('hml_runLog', from || 0),
+  runStop: () => host.call('hml_runStop'),
   deploy: o => host.call('hml_deploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
   serialPorts: o => host.call('hml_serialPorts', o || {}),
@@ -56,6 +58,10 @@ const App = {
     q('b-json').onclick = () => this.jsonDialog();
     q('b-preview').onclick = () => this.preview();
     q('b-run').onclick = () => this.run();
+    q('runlog-stop').onclick = () => this.runStop();
+    q('runlog-close').onclick = () => this.runLogShow(false);
+    q('runlog-copy').onclick = () => { navigator.clipboard.writeText(q('runlog-text').textContent).then(() => this.toast('Copied.'), () => this.toast('Could not copy.')); };
+    q('status-run').onclick = () => this.runLogShow(q('runlog').hidden);
     q('b-deploy').onclick = () => this.deployDialog();
     q('b-ai').onclick = () => this.aiDialog();
     // files changed from outside (an AI assistant, a text editor): looked for when the window
@@ -90,14 +96,15 @@ const App = {
 
   // The texts that are part of the page itself (toolbar, tabs): shown in the chosen language.
   staticTexts() {
-    for (const b of document.querySelectorAll('#toolbar button, #left-tabs button, #center-tabs button')) {
+    for (const b of document.querySelectorAll('#toolbar button, #left-tabs button, #center-tabs button, #runlog-head button, #runlog-head b')) {
       if (b.dataset.i18n === undefined) b.dataset.i18n = b.textContent;
       if (/[A-Za-z]/.test(b.dataset.i18n)) b.textContent = I18N.t(b.dataset.i18n);       // (not the arrow / symbol buttons)
     }
-    for (const b of document.querySelectorAll('#toolbar [title], #center-tabs [title], #tree-tools [title]')) {
+    for (const b of document.querySelectorAll('#toolbar [title], #center-tabs [title], #tree-tools [title], #runlog-head [title]')) {
       if (b.dataset.i18nTitle === undefined) b.dataset.i18nTitle = b.title;
       b.title = I18N.t(b.dataset.i18nTitle);
     }
+    this.runLogState();
     const scr = document.querySelector('#toolbar label');                                 // "Screen <select>"
     if (scr && scr.firstChild && scr.firstChild.nodeType === 3) {
       if (scr.dataset.i18n === undefined) scr.dataset.i18n = scr.firstChild.textContent;
@@ -899,8 +906,69 @@ const App = {
   },
   async run() {
     if (!(await this.save(false))) return;
-    const r = await host.launch(M.runPath());
-    if (!r || !r.ok) this.toast('run failed: ' + (r && r.error));
+    const r = await host.launch(M.runPath());       // (a runtime started before is closed first)
+    if (!r || !r.ok) { this.toast('run failed: ' + (r && r.error)); return; }
+    this.runLogStart(r.run);
+  },
+
+  // ---- log of the runtime that Run started --------------------------------
+  // The host keeps what the runtime prints; the page asks for the new lines while it runs.
+  runLog: { run: 0, next: 0, running: false, code: 0, timer: 0, busy: false },
+  runLogStart(run) {
+    const L = this.runLog;
+    L.run = run; L.next = 0; L.running = true; L.code = 0;
+    document.getElementById('runlog-text').textContent = '';
+    this.runLogShow(true);
+    this.runLogState();
+    clearInterval(L.timer);
+    L.timer = setInterval(() => this.runLogPoll(), 300);
+  },
+  runLogShow(on) {
+    document.getElementById('runlog').hidden = !on;
+    if (on) { const t = document.getElementById('runlog-text'); t.scrollTop = t.scrollHeight; }
+  },
+  async runLogPoll() {
+    const L = this.runLog;
+    if (L.busy) return;
+    L.busy = true;
+    const r = await host.runLog(L.next);
+    L.busy = false;
+    if (!r || !r.ok || r.run !== L.run) return;      // (another Run started meanwhile)
+    if (r.text) this.runLogAppend(r.text);
+    L.next = r.next;
+    if (L.running !== r.running || L.code !== r.code) { L.running = r.running; L.code = r.code; this.runLogState(); }
+    if (!r.running) { clearInterval(L.timer); L.timer = 0; }
+  },
+  runLogAppend(text) {
+    const box = document.getElementById('runlog-text');
+    const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+    const frag = document.createDocumentFragment();
+    for (const raw of text.replace(/\r/g, '').replace(/\n$/, '').split('\n')) {
+      const line = raw.replace(/\x1b\[[0-9;]*m/g, '');                       // (colours of the OPC UA library)
+      const cls = /\bERROR\b|\[Error\]|\berror\//.test(line) ? 'err' : /\bWARN\b|\[Warn\]|\bwarn\//.test(line) ? 'warn' : '';
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = line || ' ';
+      frag.append(d);
+    }
+    box.append(frag);
+    while (box.childElementCount > 5000) box.firstChild.remove();
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  },
+  runLogState() {
+    const L = this.runLog, st = document.getElementById('runlog-state'), sb = document.getElementById('status-run');
+    if (!st || !sb) return;
+    const text = !L.run ? '' : L.running ? I18N.t('running') : I18N.f('ended (exit code {0})', L.code);
+    st.textContent = text;
+    sb.hidden = !L.run;
+    sb.textContent = (L.running ? '▶ ' : '■ ') + I18N.t('Runtime') + ': ' + text;
+    sb.className = L.running ? 'on' : 'dim';
+    sb.title = I18N.t('Show or hide the log of the runtime');
+    document.getElementById('runlog-stop').disabled = !L.running;
+  },
+  async runStop() {
+    await host.runStop();
+    this.runLogPoll();
   },
 
   // ---- json --------------------------------------------------------------
