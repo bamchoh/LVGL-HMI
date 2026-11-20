@@ -50,6 +50,7 @@ add_executable(hml_tests
   test_screen_saver.cpp
   test_popup.cpp
   test_project_archive.cpp
+  test_transfer.cpp
   ${HML_TEST_RUNTIME_SOURCES}
 )
 target_include_directories(hml_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${doctest_SOURCE_DIR})

@@ -2188,6 +2188,11 @@ void Ui::rebuild_all()
     for(auto& [def, dir] : defs) add_screen(def, dir);
 }
 
+void Ui::request_restart(RestartTarget what)
+{
+    if(impl_->app.request_restart) impl_->app.request_restart(what);
+}
+
 void Ui::unload_all()
 {
     Impl& m = *impl_;

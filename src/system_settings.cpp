@@ -739,6 +739,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
     s.add_page(make_monitor_page());
+    s.add_page(make_storage_page(proj));
 }
 
 std::vector<std::string> driver_keys(const json* drivers)
