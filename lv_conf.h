@@ -104,6 +104,12 @@
 #define LV_FS_STDIO_LETTER 'A'
 #define LV_FS_STDIO_PATH ""
 #define LV_USE_LODEPNG 1
+/* Decoded images are kept (4 bytes per pixel) instead of being read and unpacked from the file
+   every time they are drawn: a screen made of pictures took a whole CPU core of a Raspberry Pi
+   without it. The least recently used ones go when the limit is reached; Ui::unload_all()
+   empties it, so a picture changed on disk is read again after a reload. */
+#define LV_CACHE_DEF_SIZE (32 * 1024 * 1024)
+#define LV_IMAGE_HEADER_CACHE_DEF_CNT 128
 /* images besides PNG: JPEG (baseline, decoded in blocks), BMP, GIF (animated: the "image" widget plays it) */
 #define LV_USE_TJPGD 1
 #define LV_USE_BMP 1

@@ -252,6 +252,7 @@ python tools\modbus_server.py --port 5020
 奥から手前の順に重ねています）。コンベアの上を製品が流れ、プレスが上下し、検査の光が点滅し、搬送車がパレットを
 運びます。機械に触れると詳細が開き、故障を起こしたり復旧したりできます。絵は `tools/gen_factory_demo.py` が描いた
 単純な立体で（Pillow が要ります）、画面ファイルも同じスクリプトが書きます。走行の模擬は `scripts/line.lua` です。
+`projects/factory35` は同じ画面の 480x320 版（絵を 0.6 倍にしたもの。Raspberry Pi の 3.5 インチ LCD 用）です。
 
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json

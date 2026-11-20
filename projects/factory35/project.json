@@ -1,0 +1,175 @@
+{
+  "title": "生産ライン監視（デモ）",
+  "display": {
+    "width": 480,
+    "height": 320,
+    "fbdev": "/dev/fb0",
+    "touch": {
+      "swap_axes": true,
+      "calibration": [
+        150,
+        3850,
+        3850,
+        220
+      ]
+    }
+  },
+  "theme": {
+    "dark": true,
+    "primary": "#1565c0",
+    "secondary": "#ff9800",
+    "font": 16
+  },
+  "font": {
+    "file": "assets/fonts/NotoSansJP-subset.otf"
+  },
+  "start_screen": "line",
+  "tags": [
+    {
+      "name": "run",
+      "type": "bool",
+      "init": true
+    },
+    {
+      "name": "line_run",
+      "type": "bool",
+      "init": false
+    },
+    {
+      "name": "line_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "line_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "ng_count",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "shipped",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "pallet",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 4
+    },
+    {
+      "name": "agv",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "clock",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "sel",
+      "type": "int",
+      "init": 1,
+      "min": 1,
+      "max": 4
+    },
+    {
+      "name": "sel_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "sel_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "sel_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "sel_count",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "sel_cycle",
+      "type": "float",
+      "init": 0
+    },
+    {
+      "name": "sel_avail",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "cmd",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "m1_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m1_count",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m2_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m2_count",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m3_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m3_count",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m4_state",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "m4_count",
+      "type": "int",
+      "init": 0
+    }
+  ],
+  "drivers": [],
+  "scripts": [
+    {
+      "name": "line",
+      "trigger": "interval",
+      "interval_ms": 200,
+      "file": "scripts/line.lua"
+    }
+  ],
+  "screens": [
+    "screens/line.json",
+    "screens/machine.json"
+  ]
+}

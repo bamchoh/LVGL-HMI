@@ -10,6 +10,7 @@
 #include "tag.hpp"
 #include "users.hpp"
 #include "util.hpp"
+#include "src/misc/cache/instance/lv_image_cache.h"
 #include <algorithm>
 #include <set>
 #include <cmath>
@@ -2206,6 +2207,7 @@ void Ui::unload_all()
     }
     m.screens.clear();
     m.popups.clear();
+    lv_image_cache_drop(nullptr);                            // (the files may have changed: read them again)
     s_some_screen_shown = false;
     m.bindings.clear();
     m.action_lists.clear();

@@ -1,0 +1,213 @@
+{
+  "name": "machine",
+  "popup": true,
+  "w": 420,
+  "h": 300,
+  "dim": true,
+  "style": {
+    "bg_color": "#1f2a38",
+    "radius": 10,
+    "pad": 16,
+    "border_width": 0
+  },
+  "children": [
+    {
+      "type": "label",
+      "style": {
+        "font": 24,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": "sel_name"
+      },
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "panel",
+      "align": "top_right",
+      "w": 120,
+      "h": 36,
+      "scrollable": false,
+      "style": {
+        "radius": 6,
+        "border_width": 0,
+        "pad": 0,
+        "bg_opa": 255,
+        "bg_color": "#455a64"
+      },
+      "bind": {
+        "bg_color": {
+          "tag": "sel_state",
+          "map": {
+            "0": "#455a64",
+            "1": "#2e7d32",
+            "2": "#f9a825",
+            "3": "#c62828",
+            "default": "#455a64"
+          }
+        }
+      },
+      "children": [
+        {
+          "type": "label",
+          "style": {
+            "font": 16,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": "sel_text"
+          },
+          "align": "center"
+        }
+      ]
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 16,
+        "text_color": "#90a4ae"
+      },
+      "text": "処理数",
+      "x": 0,
+      "y": 44
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 20,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "sel_count",
+          "format": "%d 個"
+        }
+      },
+      "x": 150,
+      "y": 41
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 16,
+        "text_color": "#90a4ae"
+      },
+      "text": "サイクル",
+      "x": 0,
+      "y": 76
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 20,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "sel_cycle",
+          "format": "%.1f 秒"
+        }
+      },
+      "x": 150,
+      "y": 73
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 16,
+        "text_color": "#90a4ae"
+      },
+      "text": "稼働率",
+      "x": 0,
+      "y": 108
+    },
+    {
+      "type": "label",
+      "style": {
+        "font": 20,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "sel_avail",
+          "format": "%d %%"
+        }
+      },
+      "x": 150,
+      "y": 105
+    },
+    {
+      "type": "bar",
+      "x": 0,
+      "y": 140,
+      "w": 388,
+      "h": 10,
+      "min": 0,
+      "max": 100,
+      "bind": {
+        "value": "sel_avail"
+      },
+      "style_indicator": {
+        "bg_color": "#2e7d32"
+      }
+    },
+    {
+      "type": "button",
+      "text": "故障を起こす",
+      "x": 0,
+      "y": 156,
+      "w": 186,
+      "h": 56,
+      "style": {
+        "bg_color": "#c62828"
+      },
+      "on_click": {
+        "action": "set",
+        "tag": "cmd",
+        "value": 1
+      },
+      "bind": {
+        "enabled": {
+          "tag": "sel_state",
+          "ne": 3
+        }
+      }
+    },
+    {
+      "type": "button",
+      "text": "復旧する",
+      "x": 202,
+      "y": 156,
+      "w": 186,
+      "h": 56,
+      "style": {
+        "bg_color": "#2e7d32"
+      },
+      "on_click": {
+        "action": "set",
+        "tag": "cmd",
+        "value": 2
+      },
+      "bind": {
+        "enabled": {
+          "tag": "sel_state",
+          "eq": 3
+        }
+      }
+    },
+    {
+      "type": "button",
+      "text": "閉じる",
+      "align": "bottom_right",
+      "w": 120,
+      "h": 48,
+      "style": {
+        "bg_color": "#455a64"
+      },
+      "on_click": {
+        "action": "close"
+      }
+    }
+  ]
+}
