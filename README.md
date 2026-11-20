@@ -1104,6 +1104,7 @@ Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトで
 | Keys | SSH の鍵の管理（Linux の fbdev / drm バックエンドで表示）。デプロイに使う鍵の登録・削除 →「鍵の管理」 |
 | Users | ユーザーの追加・変更・削除（project.json に `users` があるとき）→「ユーザー管理」 |
 | Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
+| Tags | すべてのタグの今の値を一覧で見る（8 件ずつ、名前の一部で絞り込み。`sys.` と入れるとランタイム自身のタグ）。行を押すと、そのタグに値を書き込める。立ち上げと保守で、画面を作っていない値を確かめる・変えるためのもの。書き込みはタグの上下限に従い、ドライバを通って機器にも届き、操作ログに `monitor` として残る。`sys.` のタグには書き込めない |
 
 設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
 `project.local.json` は project.json と同じ場所に書かれ、起動時に `drivers` のスカラー値を上書きします
