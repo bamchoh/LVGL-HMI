@@ -62,6 +62,8 @@ public:
     // it whenever the user changes.
     void refresh_access();
     std::optional<std::string> current_screen() const;
+    // What the action "restart" does (a system page that replaced the project asks for it).
+    void request_restart(RestartTarget what);
     // Navigation history as screen names (oldest first), e.g. to survive a rebuild of the screens.
     std::vector<std::string> history() const;
     void set_history(const std::vector<std::string>& names);   // unknown names are skipped

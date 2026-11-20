@@ -49,6 +49,7 @@
 #include "screenshot.hpp"
 #include "texts.hpp"
 #include "project_archive.hpp"
+#include "transfer.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -337,6 +338,7 @@ int main(int argc, char** argv)
         std::string err;
         if(!hml::unpack_project(archive, work, &err)) { std::fprintf(stderr, "hml_runtime: %s\n", err.c_str()); return 2; }
         archive_note = "project file '" + project_path + "' unpacked into " + work.generic_u8string();
+        hml::transfer_set_archive(archive.generic_u8string());
         project_path = (work / "project.json").generic_u8string();
     }
     if(check) {

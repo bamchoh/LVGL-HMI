@@ -104,6 +104,7 @@ std::unique_ptr<SettingsPage> make_network_page();
 std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
 // Users of the device (system_users.cpp); only with "users" in project.json.
 std::unique_ptr<SettingsPage> make_users_page();
+std::unique_ptr<SettingsPage> make_storage_page(Project& proj);  // System > Storage: backup, a project from a USB memory
 std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags: values of all tags, write one
 void add_driver_pages(SystemSettings& s, Project& proj);
 void register_builtin_pages(SystemSettings& s, Project& proj);
