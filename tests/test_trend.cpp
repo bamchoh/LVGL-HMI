@@ -235,6 +235,55 @@ TEST_CASE("trend: one million samples are sliced quickly")
     CHECK(ms2 < 200);
 }
 
+TEST_CASE("trend: slices between two samples are filled the way the group records")
+{
+    auto series = [](std::initializer_list<double> v) {        // NAN = no sample in the slice
+        std::vector<std::vector<TrendBucket>> d(1);
+        for(double x : v) d[0].push_back(std::isnan(x) ? TrendBucket{} : TrendBucket{ true, x, x, x });
+        return d;
+    };
+    const double N = NAN;
+    // 12 slices of 500 ms; recorded every second: every other slice is empty
+    auto d = series({ 0, N, 10, N, 20, N, N, N, N, N, N, 70 });
+    trend_fill_gaps(d, 0, 6000, { TrendFill::Line, 2500 }, 6000);
+    CHECK(d[0][1].has);
+    CHECK(d[0][1].last == doctest::Approx(5));                 // on the line between its neighbours
+    CHECK(d[0][3].min == doctest::Approx(15));
+    CHECK_FALSE(d[0][5].has);                                  // 3 s without a sample: a real gap
+    CHECK_FALSE(d[0][10].has);
+    // nothing before the first and after the last sample
+    d = series({ N, 1, N, 3, N });
+    trend_fill_gaps(d, 0, 2500, { TrendFill::Line, 2500 }, 2500);
+    CHECK_FALSE(d[0][0].has);
+    CHECK(d[0][2].last == doctest::Approx(2));
+    CHECK_FALSE(d[0][4].has);
+    // recorded on change: the value stays until the next sample, and the newest one up to now
+    d = series({ N, 1, N, N, 0, N, N, N });
+    trend_fill_gaps(d, 0, 8000, { TrendFill::Hold, 0 }, 6500);
+    CHECK_FALSE(d[0][0].has);
+    CHECK(d[0][3].last == 1);
+    CHECK(d[0][6].last == 0);
+    CHECK_FALSE(d[0][7].has);                                  // (that slice starts after now)
+    // other groups (manual, tag): as recorded
+    d = series({ 1, N, 3 });
+    trend_fill_gaps(d, 0, 3000, {}, 3000);
+    CHECK_FALSE(d[0][1].has);
+
+    Runtime rt;
+    TempDir t;
+    rt.tag("temp", TagType::Float);
+    json cfg = json::parse(R"~({ "path": "data.db", "groups": [
+        { "name": "fast", "interval_ms": 200, "tags": ["temp"] },
+        { "name": "chg", "trigger": "change", "tags": ["temp"] },
+        { "name": "man", "trigger": "manual", "tags": ["temp"] } ] })~");
+    REQUIRE(data_log().load(&cfg, t.base()) == 3);
+    CHECK(data_log().trend_fill("fast").mode == TrendFill::Line);
+    CHECK(data_log().trend_fill("fast").max_gap_ms == 500);
+    CHECK(data_log().trend_fill("chg").mode == TrendFill::Hold);
+    CHECK(data_log().trend_fill("man").mode == TrendFill::None);
+    CHECK(data_log().trend_fill("nope").mode == TrendFill::None);
+}
+
 // ================================================================ the widget
 
 TEST_CASE("trend widget: draws, moves, zooms, shows values at a touch")

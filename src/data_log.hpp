@@ -30,6 +30,17 @@ struct TrendBucket {
     double min = 0, max = 0, last = 0;
 };
 
+// How a trend draws the slices that hold no sample, from how the group is recorded:
+// Line = between two samples at most max_gap_ms apart a straight line (a group recorded at an
+// interval, looked at closer than that interval); Hold = the last value stays until the next
+// sample (a group recorded on change). A longer pause (the runtime was off) stays a gap.
+struct TrendFill {
+    enum Mode { None, Line, Hold } mode = None;
+    int64_t max_gap_ms = 0;
+};
+// Fills the empty slices of the result of DataLog::trend() ([from_ms, to_ms), not past now_ms).
+void trend_fill_gaps(std::vector<std::vector<TrendBucket>>& data, int64_t from_ms, int64_t to_ms, const TrendFill& fill, int64_t now_ms);
+
 class DataLog {
 public:
     DataLog();
@@ -54,6 +65,7 @@ public:
     // time of the first / last sample of the group (0 = none)
     std::pair<int64_t, int64_t> time_range(const std::string& group);
     std::vector<std::string> group_tags(const std::string& group) const;
+    TrendFill trend_fill(const std::string& group) const;
     LogDb& summary_db();                // the per-minute summary (tests)
     // CSV: time, then one column per tag. Empty path = next to the database. Returns rows, -1 on failure.
     int64_t export_csv(const std::string& group, std::string path = "");
