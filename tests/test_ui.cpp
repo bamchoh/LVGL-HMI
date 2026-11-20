@@ -283,6 +283,9 @@ TEST_CASE("widget specific properties")
         CHECK(lv_label_get_long_mode(l) == LV_LABEL_LONG_MODE_DOTS);
         lv_obj_t* l2 = ui().build_screen(J(R"({ "name": "s2", "children": [ { "type": "label", "long_mode": "scroll" } ] })"), "");
         CHECK(lv_label_get_long_mode(nth(l2, 0)) == LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+        // "circular" (the designer offers it next to "scroll") is the same: it wrapped the text before
+        lv_obj_t* l3 = ui().build_screen(J(R"({ "name": "s3", "children": [ { "type": "label", "long_mode": "circular" } ] })"), "");
+        CHECK(lv_label_get_long_mode(nth(l3, 0)) == LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
     }
     SUBCASE("button with and without text") {
         lv_obj_t* b = build_widgets(J(R"([ { "type": "button", "text": "Go", "style_label": { "font": 24 } }, { "type": "button" } ])"));

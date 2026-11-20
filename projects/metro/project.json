@@ -1,0 +1,294 @@
+{
+  "title": "車内案内表示（デモ）",
+  "display": {
+    "width": 800,
+    "height": 480,
+    "zoom": 1
+  },
+  "theme": {
+    "dark": true,
+    "primary": "#1565c0",
+    "secondary": "#ff9800",
+    "font": 16
+  },
+  "font": {
+    "file": "assets/fonts/NotoSansJP-subset.otf"
+  },
+  "start_screen": "guide",
+  "tags": [
+    {
+      "name": "line_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "dest",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "car",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "head",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "name_sub",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "name_small",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "phase",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "progress",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "slots",
+      "type": "int",
+      "init": 7
+    },
+    {
+      "name": "lang",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "lang_mode",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "door",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "door_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "xfer_title",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "ticker",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "clock",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "paused",
+      "type": "bool",
+      "init": false
+    },
+    {
+      "name": "cmd",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 3
+    },
+    {
+      "name": "s0_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s0_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s0_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s1_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s1_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s1_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s2_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s2_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s2_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s3_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s3_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s3_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s4_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s4_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s4_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s5_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s5_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s5_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s6_name",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s6_num",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "s6_min",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x1_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x1_color",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "x2_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x2_color",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "x3_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x3_color",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "x4_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x4_color",
+      "type": "int",
+      "init": 0
+    },
+    {
+      "name": "x5_text",
+      "type": "string",
+      "init": ""
+    },
+    {
+      "name": "x5_color",
+      "type": "int",
+      "init": 0
+    }
+  ],
+  "drivers": [],
+  "scripts": [
+    {
+      "name": "guide",
+      "trigger": "interval",
+      "interval_ms": 200,
+      "file": "scripts/guide.lua"
+    }
+  ],
+  "screens": [
+    "screens/guide.json",
+    "screens/crew.json"
+  ]
+}
