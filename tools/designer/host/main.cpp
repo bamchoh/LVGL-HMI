@@ -16,6 +16,8 @@
 #include <filesystem>
 #include <functional>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -241,23 +243,146 @@ ProcResult run_capture(const fs::path& exe, const std::vector<std::string>& args
     return r;
 }
 
-bool launch_detached(const fs::path& exe, const std::vector<std::string>& args, const fs::path& cwd, std::string* err)
-{
+// ---------------------------------------------------------------- the runtime started by "Run"
+// One run of hml_runtime. Its output (stdout + stderr) comes through a pipe - so there is no
+// console window next to the HMI window - and is kept here for the log panel of the page. The
+// reader thread holds a reference of its own; another Run makes another object.
+struct RunSession {
+    static constexpr size_t MAX_TEXT = 1024 * 1024;
+    std::mutex m;
+    std::string text;            // the output; the front is cut off when it grows over MAX_TEXT
+    size_t base = 0;             // where text[0] is in the whole output
+    bool running = false;
+    int code = 0;
 #ifdef _WIN32
+    HANDLE proc = nullptr;       // valid while running
+    DWORD pid = 0;
+#else
+    pid_t pid = 0;
+#endif
+
+    void append(const char* p, size_t n)
+    {
+        std::lock_guard<std::mutex> lk(m);
+        text.append(p, n);
+        if(text.size() <= MAX_TEXT) return;
+        size_t cut = text.find('\n', text.size() - MAX_TEXT / 2);          // whole lines only
+        cut = cut == std::string::npos ? text.size() - MAX_TEXT / 2 : cut + 1;
+        text.erase(0, cut);
+        base += cut;
+    }
+    bool is_running() { std::lock_guard<std::mutex> lk(m); return running; }
+};
+
+std::shared_ptr<RunSession> start_run(const fs::path& exe, const std::vector<std::string>& args, const fs::path& cwd, std::string* err)
+{
+    auto run = std::make_shared<RunSession>();
+#ifdef _WIN32
+    SECURITY_ATTRIBUTES sa{ sizeof(sa), nullptr, TRUE };
+    HANDLE rd = nullptr, wr = nullptr;
+    if(!CreatePipe(&rd, &wr, &sa, 0)) { if(err) *err = "CreatePipe failed"; return nullptr; }
+    SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
     STARTUPINFOW si{};
     si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = wr; si.hStdError = wr; si.hStdInput = nullptr;
     PROCESS_INFORMATION pi{};
     std::wstring cmd = quote_arg(ustr(exe));
     for(const auto& a : args) cmd += L" " + quote_arg(a);
     std::wstring wcwd = cwd.wstring();
-    if(!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, wcwd.empty() ? nullptr : wcwd.c_str(), &si, &pi)) {
-        if(err) *err = "cannot start " + ustr(exe) + " (error " + std::to_string(GetLastError()) + ")";
-        return false;
-    }
-    CloseHandle(pi.hProcess);
+    BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, wcwd.empty() ? nullptr : wcwd.c_str(), &si, &pi);
+    DWORD e = GetLastError();
+    CloseHandle(wr);
+    if(!ok) { CloseHandle(rd); if(err) *err = "cannot start " + ustr(exe) + " (error " + std::to_string(e) + ")"; return nullptr; }
     CloseHandle(pi.hThread);
-    return true;
+    run->proc = pi.hProcess;
+    run->pid = pi.dwProcessId;
+    run->running = true;
+    std::thread([run, rd] {
+        char buf[4096];
+        DWORD n = 0;
+        while(ReadFile(rd, buf, sizeof(buf), &n, nullptr) && n > 0) run->append(buf, n);
+        CloseHandle(rd);
+        WaitForSingleObject(run->proc, INFINITE);
+        DWORD code = 0;
+        GetExitCodeProcess(run->proc, &code);
+        std::lock_guard<std::mutex> lk(run->m);
+        CloseHandle(run->proc);
+        run->proc = nullptr;
+        run->code = static_cast<int>(code);
+        run->running = false;
+    }).detach();
 #else
+    int fds[2];
+    if(pipe(fds) != 0) { if(err) *err = "pipe failed"; return nullptr; }
+    pid_t pid = fork();
+    if(pid < 0) { close(fds[0]); close(fds[1]); if(err) *err = "fork failed"; return nullptr; }
+    if(pid == 0) {
+        setsid();
+        signal(SIGPIPE, SIG_IGN);                 // the designer may be closed first: the HMI keeps running
+        dup2(fds[1], 1); dup2(fds[1], 2);
+        close(fds[0]); close(fds[1]);
+        if(!cwd.empty()) { if(chdir(cwd.c_str()) != 0) _exit(127); }
+        std::vector<std::string> argv_s;
+        argv_s.push_back(ustr(exe));
+        for(const auto& a : args) argv_s.push_back(a);
+        std::vector<char*> argv;
+        for(auto& s : argv_s) argv.push_back(s.data());
+        argv.push_back(nullptr);
+        execvp(argv[0], argv.data());
+        _exit(127);
+    }
+    close(fds[1]);
+    run->pid = pid;
+    run->running = true;
+    const int rd = fds[0];
+    std::thread([run, rd] {
+        char buf[4096];
+        ssize_t n;
+        while((n = read(rd, buf, sizeof(buf))) > 0) run->append(buf, static_cast<size_t>(n));
+        close(rd);
+        int status = 0;
+        waitpid(run->pid, &status, 0);
+        std::lock_guard<std::mutex> lk(run->m);
+        run->code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        run->running = false;
+    }).detach();
+#endif
+    return run;
+}
+
+#ifdef _WIN32
+BOOL CALLBACK close_windows_of(HWND h, LPARAM pid)
+{
+    DWORD p = 0;
+    GetWindowThreadProcessId(h, &p);
+    if(p == static_cast<DWORD>(pid)) PostMessageW(h, WM_CLOSE, 0, 0);
+    return TRUE;
+}
+#endif
+
+// Ask the runtime to quit (as closing its window does), end it if it has not after two seconds.
+void stop_run(const std::shared_ptr<RunSession>& run)
+{
+    if(!run || !run->is_running()) return;
+#ifdef _WIN32
+    EnumWindows(close_windows_of, static_cast<LPARAM>(run->pid));
+#else
+    kill(run->pid, SIGTERM);
+#endif
+    for(int i = 0; i < 40 && run->is_running(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::lock_guard<std::mutex> lk(run->m);
+    if(!run->running) return;
+#ifdef _WIN32
+    if(run->proc) TerminateProcess(run->proc, 1);
+#else
+    kill(run->pid, SIGKILL);
+#endif
+}
+
+#ifndef _WIN32
+bool launch_detached(const fs::path& exe, const std::vector<std::string>& args, const fs::path& cwd, std::string* err)
+{
     pid_t pid = fork();
     if(pid < 0) { if(err) *err = "fork failed"; return false; }
     if(pid == 0) {
@@ -273,8 +398,8 @@ bool launch_detached(const fs::path& exe, const std::vector<std::string>& args, 
         _exit(127);
     }
     return true;
-#endif
 }
+#endif
 
 // ---------------------------------------------------------------- deploy helpers
 // Minimal tar (ustar) writer: the project folder is packed here, so that deploying needs
@@ -1367,12 +1492,41 @@ struct Host {
         }).detach();
     }
 
+    // "Run": one runtime at a time (two of the same project would fight over its ports and its
+    // log files), so the one started before is stopped first.
+    std::shared_ptr<RunSession> session;
+    int run_id = 0;
+
     json launch(const std::string& project)
     {
         if(runtime.empty()) return err("hml_runtime not found");
         fs::path p = upath(project);
         std::string e;
-        if(!launch_detached(runtime, { ustr(p) }, p.parent_path(), &e)) return err(e);
+        stop_run(session);
+        std::shared_ptr<RunSession> r = start_run(runtime, { ustr(p) }, p.parent_path(), &e);
+        if(!r) return err(e);
+        session = r;
+        return json{ { "ok", true }, { "run", ++run_id } };
+    }
+    // The output of the runtime from offset `from` on, whole lines only while it runs.
+    json run_log(size_t from)
+    {
+        json j{ { "ok", true }, { "run", run_id }, { "running", false }, { "code", 0 }, { "text", "" }, { "next", 0 } };
+        if(!session) return j;
+        std::lock_guard<std::mutex> lk(session->m);
+        size_t end = session->text.size();
+        if(session->running) { size_t nl = session->text.rfind('\n'); end = nl == std::string::npos ? 0 : nl + 1; }
+        const size_t start = from > session->base ? std::min(from - session->base, end) : 0;
+        j["text"] = session->text.substr(start, end - start);
+        j["next"] = session->base + end;
+        j["skipped"] = from < session->base;
+        j["running"] = session->running;
+        j["code"] = session->code;
+        return j;
+    }
+    json run_stop()
+    {
+        stop_run(session);
         return json{ { "ok", true } };
     }
 
@@ -1423,6 +1577,12 @@ struct Host {
         });
         w->bind("hml_pickImage", [this, args_of, str](const std::string& req) { return pick_image(str(args_of(req), 0)).dump(); });
         w->bind("hml_launch", [this, args_of, str](const std::string& req) { return launch(str(args_of(req), 0)).dump(); });
+        w->bind("hml_runLog", [this, args_of](const std::string& req) {
+            json a = args_of(req);
+            const size_t from = (a.size() > 0 && a[0].is_number()) ? static_cast<size_t>(std::max(0.0, a[0].get<double>())) : 0;
+            return run_log(from).dump(-1, ' ', false, json::error_handler_t::replace);
+        });
+        w->bind("hml_runStop", [this](const std::string&) { return run_stop().dump(); });
         w->bind("hml_setTitle", [this, args_of, str](const std::string& req) { w->set_title(str(args_of(req), 0)); return std::string("true"); });
         w->bind("hml_settings", [this, args_of](const std::string& req) {
             json a = args_of(req);

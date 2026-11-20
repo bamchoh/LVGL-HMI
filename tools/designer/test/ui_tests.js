@@ -557,6 +557,28 @@
     ok(!has('from outside 3'), 'back to the original');
   });
 
+  await test('Run: the log of the runtime is shown in the designer, Stop ends the runtime', async () => {
+    const wait = async (fn, what) => { for (let i = 0; i < 200; i++) { if (fn()) return; await new Promise(r => setTimeout(r, 100)); } throw new Error('timeout: ' + what); };
+    const box = document.getElementById('runlog-text'), panel = document.getElementById('runlog');
+    ok(panel.hidden && document.getElementById('status-run').hidden, 'nothing before the first Run');
+    document.getElementById('b-run').click();
+    await wait(() => !panel.hidden, 'the panel opens');
+    await wait(() => /running \(/.test(box.textContent), 'the log arrives while the runtime runs');
+    ok(/project '.*' loaded/.test(box.textContent), 'the start of the log is there');
+    ok(App.runLog.running, 'running');
+    eq(document.getElementById('runlog-state').textContent, '実行中');
+    ok(!document.getElementById('status-run').hidden, 'status bar entry');
+    document.getElementById('runlog-close').click();
+    ok(panel.hidden, 'hidden');
+    document.getElementById('status-run').click();
+    ok(!panel.hidden, 'shown again from the status bar');
+    document.getElementById('runlog-stop').click();
+    await wait(() => !App.runLog.running, 'Stop ends the runtime');
+    ok(document.getElementById('runlog-stop').disabled, 'Stop is off');
+    ok(/終了しました/.test(document.getElementById('runlog-state').textContent), 'state says ended');
+    panel.hidden = true;
+  });
+
   reset();
   M.st.dirty = false; App.autosave(true);
   setLang(lang);
