@@ -40,7 +40,7 @@ namespace {
 
 class FakeModbusServer {
 public:
-    FakeModbusServer()
+    explicit FakeModbusServer(uint16_t port = 0)             // 0 = any free port
     {
 #ifdef _WIN32
         WSADATA wsa;
@@ -51,7 +51,7 @@ public:
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        addr.sin_port = 0;
+        addr.sin_port = htons(port);
         REQUIRE(bind(listen_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
         REQUIRE(listen(listen_, 1) == 0);
         socklen_t len = sizeof(addr);
@@ -486,6 +486,32 @@ TEST_CASE("modbus: with nobody listening the driver stays offline and stops prom
     rt.drivers.stop_all();
     CHECK(millis() - t0 < 1500);
     CHECK(tagv("h") == 0);
+}
+
+TEST_CASE("modbus: writes made while offline: the newest value of each tag arrives, however many there were")
+{
+    Runtime rt;
+    uint16_t free_port;
+    { FakeModbusServer probe; free_port = probe.port(); }
+    rt.tag("online", TagType::Bool, 1);
+    rt.tag("h", TagType::Int);
+    rt.tag("g", TagType::Int);
+    json cfg = json{ { "type", "modbus_tcp" }, { "host", "127.0.0.1" }, { "port", free_port }, { "poll_ms", 20 }, { "timeout_ms", 300 },
+                     { "status_tag", "online" }, { "map", json::parse(R"([{ "tag": "h", "area": "holding", "addr": 0 },
+                                                                         { "tag": "g", "area": "holding", "addr": 1 }])") } };
+    REQUIRE(start_modbus(rt, cfg) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 0; }, 3000));
+    // a script that writes a setpoint twice a second, for minutes, with no PLC: far more writes
+    // than the queue holds. One other tag was written once, before all of them.
+    tags().find("g")->set_number(7, nullptr);
+    tags().dispatch(false);
+    for(int i = 1; i <= 300; i++) { tags().find("h")->set_number(i, nullptr); tags().dispatch(false); }
+
+    FakeModbusServer srv(free_port);                           // the PLC comes up
+    REQUIRE(wait_for([&] { auto g = srv.lock(); return srv.holding[0] == 300 && srv.holding[1] == 7; }, 8000));
+    CHECK(srv.count(0x06) <= 64);                              // (what was waiting, not all 301)
+    CHECK(tagv("h") == 300);
+    CHECK(tagv("g") == 7);
 }
 
 TEST_CASE("modbus: configuration defaults and validation")

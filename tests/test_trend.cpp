@@ -309,10 +309,18 @@ TEST_CASE("trend widget: draws, moves, zooms, shows values at a touch")
     CHECK(std::string(lv_label_get_text(range)).find("(live)") != std::string::npos);
     lv_obj_t* chart = lv_obj_get_child(lv_obj_get_child(w, 2), 1);
     REQUIRE(lv_obj_check_type(chart, &lv_chart_class));
-    CHECK(lv_chart_get_point_count(chart) == 60);
+    CHECK(lv_chart_get_point_count(chart) == 120);            // two points per slice: its smallest and largest value
+    CHECK(lv_chart_get_series_next(chart, lv_chart_get_series_next(chart, lv_chart_get_series_next(chart, nullptr))) == nullptr);   // one line per tag
     lv_chart_series_t* s0 = lv_chart_get_series_next(chart, nullptr);
     int drawn = 0;
-    for(uint32_t i = 0; i < 60; i++) drawn += lv_chart_get_series_y_array(chart, s0)[i] != LV_CHART_POINT_NONE;
+    for(uint32_t i = 0; i < 60; i++) drawn += lv_chart_get_series_y_array(chart, s0)[i * 2] != LV_CHART_POINT_NONE;
+    {   // temp rises 0..99 and falls back: within a slice the points are in the order the value moved
+        const int32_t* ya = lv_chart_get_series_y_array(chart, s0);
+        int up = 0, down = 0;
+        for(uint32_t i = 0; i < 58; i++) { up += ya[i * 2] < ya[i * 2 + 1]; down += ya[i * 2] > ya[i * 2 + 1]; }
+        CHECK(up >= 20);                                   // (the slices without the fall in them)
+        CHECK(down > 0);
+    }
     CHECK(drawn >= 58);                                        // (the newest slice may still be empty)
     lv_obj_t* axis = lv_obj_get_child(lv_obj_get_child(w, 2), 0);
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(axis, 0))) == "103.95");   // auto range 0..99 with 5 %
@@ -324,7 +332,7 @@ TEST_CASE("trend widget: draws, moves, zooms, shows values at a touch")
     rt.advance(150); trend_wait_idle(); rt.advance(150);
     CHECK(std::string(lv_label_get_text(range)).find("(live)") == std::string::npos);
     int drawn2 = 0;
-    for(uint32_t i = 0; i < 60; i++) drawn2 += lv_chart_get_series_y_array(chart, s0)[i] != LV_CHART_POINT_NONE;
+    for(uint32_t i = 0; i < 60; i++) drawn2 += lv_chart_get_series_y_array(chart, s0)[i * 2] != LV_CHART_POINT_NONE;
     CHECK(drawn2 >= 29);
     CHECK(drawn2 <= 31);                                       // half of the window is before the data starts
     // zoom out, forward past now: live again

@@ -8,8 +8,9 @@
 //     "refresh_ms": 2000,             // while following "now"
 //     "labels": { "now": "Now" } }
 //
-// Each point is a time slice: the line of its largest value and the line of its smallest value
-// are drawn, so that a short peak is never lost however long the window is. ◀ ▶ move half a
+// Each time slice gives two points of one line, its smallest and its largest value (in the
+// order the value moved: the one nearer to the last value of the slice comes second), so that
+// a short peak is never lost however long the window is. ◀ ▶ move half a
 // window, "Now" follows the newest data again. A touch on the chart shows the time and the
 // values there. The data is fetched by a background thread (SQLite does the slicing), so a
 // long window does not stop the screen.
@@ -118,7 +119,7 @@ struct TrendCtx {
     lv_obj_t*   ymin_label = nullptr;
     lv_obj_t*   now_btn = nullptr;
     lv_chart_cursor_t* cursor = nullptr;
-    std::vector<lv_chart_series_t*> s_max, s_min;
+    std::vector<lv_chart_series_t*> lines;                     // two points per slice
     lv_timer_t* timer = nullptr;
     std::shared_ptr<Shared> shared = std::make_shared<Shared>();
     int64_t     range_ms = 3600000;
@@ -203,8 +204,9 @@ struct TrendCtx {
         for(size_t i = 0; i < tags.size() && i < shown.size(); i++) {
             for(int k = 0; k < buckets && k < static_cast<int>(shown[i].size()); k++) {
                 const TrendBucket& t = shown[i][static_cast<size_t>(k)];
-                lv_chart_set_series_value_by_id(chart, s_max[i], static_cast<uint32_t>(k), t.has ? y(t.max) : LV_CHART_POINT_NONE);
-                lv_chart_set_series_value_by_id(chart, s_min[i], static_cast<uint32_t>(k), t.has ? y(t.min) : LV_CHART_POINT_NONE);
+                const bool rising = t.max - t.last <= t.last - t.min;      // ended near its top: min first
+                lv_chart_set_series_value_by_id(chart, lines[i], static_cast<uint32_t>(k) * 2, !t.has ? LV_CHART_POINT_NONE : y(rising ? t.min : t.max));
+                lv_chart_set_series_value_by_id(chart, lines[i], static_cast<uint32_t>(k) * 2 + 1, !t.has ? LV_CHART_POINT_NONE : y(rising ? t.max : t.min));
             }
         }
         lv_chart_refresh(chart);
@@ -266,7 +268,7 @@ struct TrendCtx {
     {
         k = std::clamp(k, 0, buckets - 1);
         lv_label_set_text(read_label, readout(k).c_str());
-        if(cursor && !s_max.empty()) lv_chart_set_cursor_point(chart, cursor, s_max[0], static_cast<uint32_t>(k));
+        if(cursor && !lines.empty()) lv_chart_set_cursor_point(chart, cursor, lines[0], static_cast<uint32_t>(k) * 2);
     }
     static void on_delete(lv_event_t* e)
     {
@@ -352,17 +354,15 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     lv_obj_set_height(c->chart, lv_pct(100));
     lv_obj_set_flex_grow(c->chart, 1);
     lv_chart_set_type(c->chart, LV_CHART_TYPE_LINE);
-    lv_chart_set_point_count(c->chart, static_cast<uint32_t>(c->buckets));
+    lv_chart_set_point_count(c->chart, static_cast<uint32_t>(c->buckets) * 2);
     lv_chart_set_axis_range(c->chart, LV_CHART_AXIS_PRIMARY_Y, 0, kScale);
     lv_chart_set_update_mode(c->chart, LV_CHART_UPDATE_MODE_CIRCULAR);
     lv_chart_set_div_line_count(c->chart, 5, 7);
     lv_obj_set_style_width(c->chart, 0, LV_PART_INDICATOR);       // no dots on the points
     lv_obj_set_style_height(c->chart, 0, LV_PART_INDICATOR);
     for(size_t i = 0; i < c->tags.size(); i++) {
-        c->s_max.push_back(lv_chart_add_series(c->chart, c->colors[i], LV_CHART_AXIS_PRIMARY_Y));
-        c->s_min.push_back(lv_chart_add_series(c->chart, lv_color_mix(c->colors[i], lv_color_white(), 200), LV_CHART_AXIS_PRIMARY_Y));
-        lv_chart_set_all_values(c->chart, c->s_max.back(), LV_CHART_POINT_NONE);
-        lv_chart_set_all_values(c->chart, c->s_min.back(), LV_CHART_POINT_NONE);
+        c->lines.push_back(lv_chart_add_series(c->chart, c->colors[i], LV_CHART_AXIS_PRIMARY_Y));
+        lv_chart_set_all_values(c->chart, c->lines.back(), LV_CHART_POINT_NONE);
     }
     c->cursor = lv_chart_add_cursor(c->chart, lv_palette_main(LV_PALETTE_GREY), LV_DIR_VER);
     lv_obj_add_event_cb(c->chart, &TrendCtx::on_press, LV_EVENT_PRESSED, c);

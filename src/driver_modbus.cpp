@@ -41,6 +41,7 @@
 #include "modbus_link.hpp"
 #include "tag.hpp"
 #include "util.hpp"
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -114,6 +115,7 @@ private:
 
     std::mutex        qlock_;
     std::deque<Write> queue_;
+    bool              queue_full_said_ = false;    // guarded by qlock_: the warning is given once until the queue is empty again
     std::thread       thread_;
     std::atomic<bool> running_{ false };
     uint16_t          tid_ = 0;
@@ -474,6 +476,7 @@ void ModbusDriver::thread_main()
             Write w;
             {
                 std::lock_guard<std::mutex> lock(qlock_);
+                if(queue_.empty()) queue_full_said_ = false;
                 if(queue_.empty() || !link_ok) break;
                 w = queue_.front();
                 queue_.pop_front();
@@ -538,8 +541,20 @@ void ModbusDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
         if(queue_.size() < kWriteQueueLen) {
             queue_.push_back({ i, v.as_number() });
             it.pending_writes++;
+            continue;
         }
-        else HML_WARN("%s: write queue full, dropping write to '%s'", type(), tag.name().c_str());
+        // Full: nothing has been sent for a while (no connection). The newest value of a tag is
+        // the one that counts: it replaces the one waiting, or the oldest write gives its place.
+        if(!queue_full_said_) {
+            queue_full_said_ = true;
+            HML_WARN("%s: %zu writes are waiting (no connection?): from now on only the newest value of each tag is kept", type(), queue_.size());
+        }
+        auto old = std::find_if(queue_.rbegin(), queue_.rend(), [i](const Write& w) { return w.item == i; });
+        if(old != queue_.rend()) { old->value = v.as_number(); continue; }
+        items_[queue_.front().item].pending_writes--;
+        queue_.pop_front();
+        queue_.push_back({ i, v.as_number() });
+        it.pending_writes++;
     }
 }
 
