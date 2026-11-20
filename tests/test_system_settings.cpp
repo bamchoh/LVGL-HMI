@@ -255,7 +255,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
         ]
     })json")));
     SystemSettings& sys = system_settings();
-    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "display", "driver_sim", "driver_plc", "driver_sim_2" });
+    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "display", "driver_sim", "driver_plc", "driver_sim_2", "monitor" });
     json arr = json::parse(R"([{"type":"sim"},{"type":"modbus_tcp","name":"PLC"},{"type":"sim"}])");
     CHECK(driver_keys(&arr) == std::vector<std::string>{ "sim", "PLC", "sim#2" });
     CHECK(driver_keys(nullptr).empty());
@@ -274,7 +274,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
 
     // screens are generated alongside the project's own
     REQUIRE(p.build_screens() == 0);                           // no project screens -> fallback label, but...
-    CHECK(ui().screen_count() == 7);                           // ...menu + 6 pages exist
+    CHECK(ui().screen_count() == 8);                           // ...menu + 7 pages exist
     CHECK(ui().show_screen("__system_driver_plc", "none"));
 
     SUBCASE("applying a driver page writes project.local.json and restarts the drivers") {
@@ -449,4 +449,106 @@ TEST_CASE("driver page: the MQTT user name and password are entered on the devic
     CHECK(overlay["drivers"]["mqtt"]["password"] == "pw-123");
     CHECK(jstr(*p.driver_config("mqtt"), "password", "") == "pw-123");
     drivers().stop_all();
+}
+
+TEST_CASE("System > Tags: lists the tags, filters, pages, writes a value")
+{
+    Runtime rt;
+    for(int i = 1; i <= 10; i++) rt.tag(vformat("t%02d", i), TagType::Int, i);
+    rt.tag("flag", TagType::Bool);
+    rt.tag("limited", TagType::Int, 5, 0, 100);
+    rt.tag("text", std::string("abc"));
+    rt.tag("sys.test.value", TagType::Int, 3);            // (one of the runtime's own)
+    SystemSettings& sys = system_settings();
+    sys.add_page(make_monitor_page());
+    sys.create_tags();
+    auto text = [](const char* key) { return tags().find(std::string("sys.monitor.") + key)->get().format(); };
+    auto type = [](const char* key, const char* value) { tags().find(std::string("sys.monitor.") + key)->set_string(value, nullptr); };
+
+    // the tags of the project, eight at a time, not the runtime's own
+    CHECK(text("range") == "1 - 8 / 13");
+    CHECK(text("r1") == "t01");
+    CHECK(text("v1") == "1");
+    CHECK(text("r8") == "t08");
+    CHECK(tags().find("sys.monitor.selected")->get_number() == 0);
+    sys.command("monitor", "next");
+    CHECK(text("range") == "9 - 13 / 13");
+    CHECK(text("r1") == "t09");
+    CHECK(text("r5") == "text");
+    CHECK(text("v5") == "abc");
+    CHECK(tags().find("sys.monitor.r6_used")->get_number() == 0);
+    sys.command("monitor", "next");                       // no further page
+    CHECK(text("r1") == "t09");
+    sys.command("monitor", "prev");
+    CHECK(text("r1") == "t01");
+
+    // a filter (any case); "sys." shows the runtime's tags
+    type("filter", "LIM");
+    sys.command("monitor", "find");
+    CHECK(text("range") == "1 - 1 / 1");
+    CHECK(text("r1") == "limited");
+    type("filter", "sys.");
+    sys.command("monitor", "find");
+    CHECK(text("r1").rfind("sys.", 0) == 0);
+    CHECK(text("r1").rfind("sys.monitor.", 0) != 0);      // (not the page's own tags)
+
+    // pick a tag, write a value: the limits of the tag hold
+    type("filter", "lim");
+    sys.command("monitor", "find");
+    sys.command("monitor", "select", "1");
+    CHECK(tags().find("sys.monitor.selected")->get_number() == 1);
+    CHECK(text("sel_name") == "limited  (int)");
+    CHECK(text("sel_value") == "5");
+    CHECK(text("value") == "5");
+    type("value", "42");
+    sys.command("monitor", "write");
+    CHECK(tags().find("limited")->get_number() == 42);
+    CHECK(text("status") == "limited = 42");
+    CHECK(text("sel_value") == "42");
+    type("value", "500");
+    sys.command("monitor", "write");
+    CHECK(tags().find("limited")->get_number() == 100);
+    CHECK(text("status").find("inside the limits") != std::string::npos);
+    type("value", "abc");                                 // not a number: nothing is written
+    sys.command("monitor", "write");
+    CHECK(tags().find("limited")->get_number() == 100);
+    CHECK(text("status").find("not a value") != std::string::npos);
+    CHECK(text("value") == "abc");                        // what was typed stays
+
+    // a bool and a text
+    type("filter", "flag");
+    sys.command("monitor", "find");
+    sys.command("monitor", "select", "1");
+    type("value", "true");
+    sys.command("monitor", "write");
+    CHECK(tags().find("flag")->get_number() == 1);
+    type("filter", "text");
+    sys.command("monitor", "find");
+    sys.command("monitor", "select", "1");
+    type("value", "hello world");
+    sys.command("monitor", "write");
+    CHECK(tags().find("text")->get().str == "hello world");
+
+    // the runtime's own tags are shown but not written here
+    type("filter", "sys.test");
+    sys.command("monitor", "find");
+    sys.command("monitor", "select", "1");
+    CHECK(text("sel_value") == "3");
+    type("value", "9");
+    sys.command("monitor", "write");
+    CHECK(text("status").find("not written here") != std::string::npos);
+    CHECK(tags().find("sys.test.value")->get_number() == 3);
+    sys.command("monitor", "close");
+    CHECK(tags().find("sys.monitor.selected")->get_number() == 0);
+
+    // the page builds as a screen and follows the tags while it is shown
+    for(const json& scr : sys.screens(800, 480)) REQUIRE(ui().build_screen(scr, ""));
+    type("filter", "t01");
+    sys.command("monitor", "find");
+    REQUIRE(ui().show_screen("__system_monitor", "none"));
+    rt.advance(100);
+    tags().find("t01")->set_number(77, nullptr);
+    for(int i = 0; i < 6; i++) sys.poll();
+    CHECK(text("v1") == "77");
+    ui().unload_all();
 }
