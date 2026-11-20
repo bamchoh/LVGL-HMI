@@ -1,16 +1,97 @@
 {
   "name": "temp_detail",
   "popup": true,
-  "w": 420, "h": 260,
-  "style": { "bg_color": "#1f2a38", "radius": 10 },
+  "w": 420,
+  "h": 264,
+  "dim": true,
+  "style": {
+    "bg_color": "#1f2a38",
+    "radius": 10,
+    "pad": 16
+  },
   "children": [
-    { "type": "label", "text": "@temperature", "x": 4, "y": 0, "style": { "font": 20, "text_color": "#ffffff" } },
-    { "type": "label", "align": "top_right", "x": -4, "y": 2, "style": { "font": 20, "text_color": "#4fc3f7" },
-      "bind": { "text": { "tag": "temp", "format": "%.1f C" } } },
-    { "type": "label", "text": "@low_limit", "x": 4, "y": 64, "style": { "text_color": "#9fb3c8" } },
-    { "type": "numeric_display", "input": true, "x": 140, "y": 54, "w": 120, "decimals": 1, "unit": " C", "bind": "temp_lo" },
-    { "type": "label", "text": "@high_limit", "x": 4, "y": 116, "style": { "text_color": "#9fb3c8" } },
-    { "type": "numeric_display", "input": true, "x": 140, "y": 106, "w": 120, "decimals": 1, "unit": " C", "bind": "temp_hi" },
-    { "type": "button", "align": "bottom_right", "w": 110, "h": 44, "text": "@close", "on_click": { "action": "close" } }
+    {
+      "type": "label",
+      "text": "@temperature",
+      "style": {
+        "font": 20,
+        "text_color": "#ffffff"
+      }
+    },
+    {
+      "type": "label",
+      "align": "top_right",
+      "style": {
+        "font": 28,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "temp",
+          "format": "%.1f C"
+        }
+      }
+    },
+    {
+      "type": "label",
+      "text": "@low_limit",
+      "x": 0,
+      "y": 68,
+      "style": {
+        "text_color": "#9fb3c8"
+      }
+    },
+    {
+      "type": "numeric_display",
+      "input": true,
+      "x": 136,
+      "y": 56,
+      "w": 128,
+      "min": 0,
+      "max": 50,
+      "decimals": 1,
+      "unit": " C",
+      "bind": "temp_lo"
+    },
+    {
+      "type": "label",
+      "text": "@high_limit",
+      "x": 0,
+      "y": 124,
+      "style": {
+        "text_color": "#9fb3c8"
+      }
+    },
+    {
+      "type": "numeric_display",
+      "input": true,
+      "x": 136,
+      "y": 112,
+      "w": 128,
+      "min": 0,
+      "max": 50,
+      "decimals": 1,
+      "unit": " C",
+      "bind": "temp_hi"
+    },
+    {
+      "type": "button",
+      "text": "@close",
+      "w": 128,
+      "h": 48,
+      "on_click": {
+        "action": "close"
+      },
+      "align": "bottom_right"
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 200,
+      "style_items": {
+        "font": 18
+      }
+    }
   ]
 }

@@ -1,18 +1,232 @@
 {
   "name": "trend",
   "scrollable": false,
-  "style": { "bg_color": "#141a22", "pad": 0 },
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
   "children": [
     {
-      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 56, "scrollable": false,
-      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 16, "pad_right": 16 },
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 48,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 16,
+        "pad_right": 16
+      },
       "children": [
-        { "type": "label", "text": "@trend", "align": "left_mid", "style": { "font": 24, "text_color": "#ffffff" } },
-        { "type": "button", "align": "right_mid", "w": 80, "h": 36, "text": "@back", "style_label": { "font": 14 },
-          "on_click": { "action": "back" } }
+        {
+          "type": "image",
+          "src": "assets/logo.png",
+          "align": "left_mid",
+          "x": -8,
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "@title",
+          "align": "left_mid",
+          "x": 32,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "w": 304,
+          "h": 36,
+          "labels": {
+            "idle": "@no_alarms",
+            "more": "@alarm_more"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -176,
+          "w": 14,
+          "h": 14,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -140,
+          "style": {
+            "font": 14
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 14
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "User: %s"
+            }
+          }
+        }
       ]
     },
-    { "type": "trend", "group": "process", "x": 16, "y": 68, "w": 768, "h": 400, "range_s": 300,
-      "tags": ["temp", "pressure", { "tag": "speed_pv", "color": "#66bb6a" }] }
+    {
+      "type": "trend",
+      "group": "process",
+      "x": 16,
+      "y": 56,
+      "w": 768,
+      "h": 360,
+      "range_s": 300,
+      "tags": [
+        {
+          "tag": "temp",
+          "color": "#42a5f5"
+        },
+        {
+          "tag": "level",
+          "color": "#26a69a"
+        },
+        {
+          "tag": "speed_pv",
+          "color": "#ffa726"
+        }
+      ],
+      "labels": {
+        "now": "@now"
+      }
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 424,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 8
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "@main",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@trend",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@alarms",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@recipes",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@widgets",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@settings",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "fade"
+          }
+        }
+      ]
+    }
   ]
 }

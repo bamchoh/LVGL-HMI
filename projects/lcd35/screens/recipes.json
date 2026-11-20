@@ -1,0 +1,245 @@
+{
+  "name": "recipes",
+  "scrollable": false,
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
+  "children": [
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 36,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 8,
+        "pad_right": 8
+      },
+      "children": [
+        {
+          "type": "label",
+          "text": "Pump Station",
+          "align": "left_mid",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "x": 2,
+          "w": 240,
+          "h": 28,
+          "style": {
+            "font": 12
+          },
+          "labels": {
+            "idle": "No alarms",
+            "more": "+%d"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -84,
+          "w": 12,
+          "h": 12,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -58,
+          "style": {
+            "font": 12
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "w": 54,
+          "long_mode": "dots",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 12,
+            "text_align": "right"
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "%s"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "recipe_table",
+      "book": "process",
+      "x": 8,
+      "y": 40,
+      "w": 464,
+      "h": 232,
+      "row_height": 26,
+      "labels": {
+        "write": "Write",
+        "read": "Read",
+        "save_as": "Save as",
+        "delete": "Del"
+      }
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 276,
+      "w": "100%",
+      "h": 44,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 6
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "Main",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Trend",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Alarms",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Recipes",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Widgets",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Setup",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "none"
+          }
+        }
+      ]
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 190,
+      "style": {
+        "pad": 4,
+        "pad_gap": 4
+      },
+      "style_items": {
+        "font": 18
+      }
+    }
+  ]
+}

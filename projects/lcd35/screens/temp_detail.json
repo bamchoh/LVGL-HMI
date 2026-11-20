@@ -1,0 +1,119 @@
+{
+  "name": "temp_detail",
+  "popup": true,
+  "w": 300,
+  "h": 190,
+  "dim": true,
+  "style": {
+    "bg_color": "#1f2a38",
+    "radius": 8,
+    "pad": 12
+  },
+  "children": [
+    {
+      "type": "label",
+      "text": "Temperature",
+      "style": {
+        "font": 16,
+        "text_color": "#ffffff"
+      }
+    },
+    {
+      "type": "label",
+      "align": "top_right",
+      "style": {
+        "font": 20,
+        "text_color": "#ffffff"
+      },
+      "bind": {
+        "text": {
+          "tag": "temp",
+          "format": "%.1f C"
+        }
+      }
+    },
+    {
+      "type": "label",
+      "text": "Low limit",
+      "style": {
+        "text_color": "#9fb3c8"
+      },
+      "x": 0,
+      "y": 44
+    },
+    {
+      "type": "numeric_display",
+      "w": 100,
+      "h": 30,
+      "bind": "temp_lo",
+      "style": {
+        "pad_top": 5,
+        "pad_bottom": 5,
+        "pad_left": 6,
+        "pad_right": 6
+      },
+      "x": 110,
+      "y": 38,
+      "input": true,
+      "min": 0,
+      "max": 50,
+      "decimals": 1,
+      "unit": " C"
+    },
+    {
+      "type": "label",
+      "text": "High limit",
+      "style": {
+        "text_color": "#9fb3c8"
+      },
+      "x": 0,
+      "y": 84
+    },
+    {
+      "type": "numeric_display",
+      "w": 100,
+      "h": 30,
+      "bind": "temp_hi",
+      "style": {
+        "pad_top": 5,
+        "pad_bottom": 5,
+        "pad_left": 6,
+        "pad_right": 6
+      },
+      "x": 110,
+      "y": 78,
+      "input": true,
+      "min": 0,
+      "max": 50,
+      "decimals": 1,
+      "unit": " C"
+    },
+    {
+      "type": "button",
+      "text": "Close",
+      "w": 96,
+      "h": 36,
+      "style": {
+        "radius": 6,
+        "pad": 0
+      },
+      "on_click": {
+        "action": "close"
+      },
+      "align": "bottom_right"
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 166,
+      "style": {
+        "pad": 4,
+        "pad_gap": 4
+      },
+      "style_items": {
+        "font": 18
+      }
+    }
+  ]
+}

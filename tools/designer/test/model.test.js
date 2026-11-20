@@ -892,6 +892,18 @@ test('M renameTag: everything that uses the tag follows, in one undo step', () =
   assert.equal(M.st.undo.length, 0);
 });
 
+test('M renameTag: the conditions of "animate" and script code written as lines follow too', () => {
+  const { M, p } = tagProject();
+  const s = M.screen().children;
+  s[3].animate = [{ preset: 'blink', when: 'temp' }, { preset: 'pulse', when: { tag: 'run', gt: { tag: 'temp' } } }];
+  p.scripts.push({ name: 'lines', trigger: 'interval', code: ['local t = tag.temp', 'tag.temp = t + 1'] });
+  assert.equal(M.tagUses().get('temp').length, 14);
+  M.renameTag(0, 'temp_pv');
+  deq(M.screen().children[3].animate, [{ preset: 'blink', when: 'temp_pv' }, { preset: 'pulse', when: { tag: 'run', gt: { tag: 'temp_pv' } } }]);
+  deq(M.st.project.scripts[1].code, ['local t = tag.temp_pv', 'tag.temp_pv = t + 1']);
+  assert.equal(M.problems().length, 0);
+});
+
 test('M moveWidgets: reorder, into a panel and out again; never into itself', () => {
   const { M } = tagProject();
   const types = () => M.screen().children.map(w => w.type);

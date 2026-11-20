@@ -107,6 +107,30 @@
       "name": "blink",
       "type": "bool",
       "init": false
+    },
+    {
+      "name": "pump_state",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 3
+    },
+    {
+      "name": "noise",
+      "type": "float",
+      "init": 0
+    },
+    {
+      "name": "counter",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 999
+    },
+    {
+      "name": "jog",
+      "type": "bool",
+      "init": false
     }
   ],
   "drivers": [
@@ -135,20 +159,16 @@
           "period_ms": 20000
         },
         {
-          "tag": "state_text",
-          "mode": "cycle",
-          "values": [
-            "Idle",
-            "Starting",
-            "Running",
-            "Stopping"
-          ],
-          "period_ms": 3000
-        },
-        {
           "tag": "blink",
           "mode": "square",
           "period_ms": 1000
+        },
+        {
+          "tag": "noise",
+          "mode": "random",
+          "min": 0,
+          "max": 10,
+          "period_ms": 500
         }
       ]
     },
@@ -212,22 +232,81 @@
   ],
   "data_log": {
     "groups": [
-      { "name": "process", "trigger": "interval", "interval_ms": 1000, "tags": ["temp", "pressure", "level", "speed_sp", "speed_pv"] },
-      { "name": "state", "trigger": "change", "tags": ["run", "auto_mode", "mode"] }
+      {
+        "name": "process",
+        "trigger": "interval",
+        "interval_ms": 1000,
+        "tags": [
+          "temp",
+          "pressure",
+          "level",
+          "speed_sp",
+          "speed_pv"
+        ]
+      },
+      {
+        "name": "state",
+        "trigger": "change",
+        "tags": [
+          "run",
+          "auto_mode",
+          "mode",
+          "pump_state"
+        ]
+      }
     ]
   },
   "alarms": {
     "items": [
-      { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi", "severity": "warning", "message": "@alarm_temp_high" },
-      { "name": "temp_low", "tag": "temp", "condition": "lt", "value_tag": "temp_lo", "severity": "warning", "message": "@alarm_temp_low" }
+      {
+        "name": "temp_high",
+        "tag": "temp",
+        "condition": "gt",
+        "value_tag": "temp_hi",
+        "severity": "warning",
+        "message": "@alarm_temp_high"
+      },
+      {
+        "name": "temp_low",
+        "tag": "temp",
+        "condition": "lt",
+        "value_tag": "temp_lo",
+        "severity": "warning",
+        "message": "@alarm_temp_low"
+      },
+      {
+        "name": "level_high",
+        "tag": "level",
+        "condition": "ge",
+        "value": 95,
+        "severity": "info",
+        "ack": false,
+        "message": "@alarm_level_high"
+      }
     ]
   },
   "users": {
-    "levels": ["Operator", "Maintenance", "Admin"],
+    "levels": [
+      "Operator",
+      "Maintenance",
+      "Admin"
+    ],
     "list": [
-      { "name": "operator", "level": 1, "pin": "1111" },
-      { "name": "maint", "level": 2, "pin": "2222" },
-      { "name": "admin", "level": 3, "pin": "0000" }
+      {
+        "name": "operator",
+        "level": 1,
+        "pin": "1111"
+      },
+      {
+        "name": "maint",
+        "level": 2,
+        "pin": "2222"
+      },
+      {
+        "name": "admin",
+        "level": 3,
+        "pin": "0000"
+      }
     ],
     "auto_logout_s": 300
   },
@@ -244,63 +323,416 @@
       "trigger": "interval",
       "code": "-- Auto mode: while the pump runs, the speed setpoint follows the temperature\n-- (18 C -> 0 %, 32 C -> 100 %). Switch \"Auto mode\" off to use the slider.\nif tag.auto_mode and tag.run then\n  local pct = (tag.temp - 18) / (32 - 18) * 100\n  tag.speed_sp = math.floor(math.max(0, math.min(100, pct)) + 0.5)\nend\n",
       "interval_ms": 500
+    },
+    {
+      "name": "pump",
+      "trigger": "interval",
+      "interval_ms": 200,
+      "code": [
+        "-- The pump of the demo. Without a PLC (the Modbus driver is not connected) the HMI plays it",
+        "-- itself: the speed follows the setpoint while Run is on and falls to 0 when it is off.",
+        "if not tag.plc_online then",
+        "  local target = tag.run and tag.speed_sp or 0",
+        "  local pv = tag.speed_pv",
+        "  if pv < target then pv = math.min(target, pv + 4) elseif pv > target then pv = math.max(target, pv - 4) end",
+        "  tag.speed_pv = pv",
+        "end",
+        "-- What the pump is doing: 0 idle, 1 starting, 2 running, 3 stopping (the main screen shows it).",
+        "local pv, state = tag.speed_pv, 0",
+        "if tag.run then state = (pv < tag.speed_sp - 8) and 1 or 2 elseif pv > 0 then state = 3 end",
+        "tag.pump_state = state",
+        "tag.state_text = ({ 'Idle', 'Starting', 'Running', 'Stopping' })[state + 1]"
+      ]
     }
   ],
   "recipes": {
     "level": 2,
     "books": [
-      { "name": "process", "items": ["speed_sp", "setpoint", "temp_lo", "temp_hi", "auto_mode"],
+      {
+        "name": "process",
+        "items": [
+          "speed_sp",
+          "setpoint",
+          "temp_lo",
+          "temp_hi",
+          "auto_mode"
+        ],
         "recipes": [
-          { "name": "Standard", "values": { "speed_sp": 60, "setpoint": 50, "temp_lo": 20, "temp_hi": 30, "auto_mode": true } },
-          { "name": "Gentle",   "values": { "speed_sp": 35, "setpoint": 40, "temp_lo": 22, "temp_hi": 28, "auto_mode": true } },
-          { "name": "Cleaning", "values": { "speed_sp": 90, "setpoint": 10, "temp_lo": 10, "temp_hi": 45, "auto_mode": false } }
-        ] }
+          {
+            "name": "Standard",
+            "values": {
+              "speed_sp": 60,
+              "setpoint": 50,
+              "temp_lo": 20,
+              "temp_hi": 30,
+              "auto_mode": true
+            }
+          },
+          {
+            "name": "Gentle",
+            "values": {
+              "speed_sp": 35,
+              "setpoint": 40,
+              "temp_lo": 22,
+              "temp_hi": 28,
+              "auto_mode": true
+            }
+          },
+          {
+            "name": "Cleaning",
+            "values": {
+              "speed_sp": 90,
+              "setpoint": 10,
+              "temp_lo": 10,
+              "temp_hi": 45,
+              "auto_mode": false
+            }
+          }
+        ]
+      }
     ]
   },
-  "screen_saver": { "after_s": 600, "wake_on_alarm": true },
-  "languages": ["ja", "en"],
+  "screen_saver": {
+    "after_s": 600,
+    "wake_on_alarm": true
+  },
+  "languages": [
+    "ja",
+    "en"
+  ],
   "language": "ja",
-  "font": { "file": "assets/fonts/NotoSansJP-subset.otf" },
+  "font": {
+    "file": "assets/fonts/NotoSansJP-subset.otf"
+  },
   "texts": {
-    "title": { "ja": "ポンプ場 1号", "en": "Pump Station #1" },
-    "alarms": { "ja": "アラーム", "en": "Alarms" },
-    "setup": { "ja": "設定", "en": "Setup" },
-    "temperature": { "ja": "温度", "en": "Temperature" },
-    "pressure": { "ja": "圧力", "en": "Pressure" },
-    "alarm": { "ja": "警報", "en": "Alarm" },
-    "trend_panel": { "ja": "トレンド（温度 / 液位）", "en": "Trend (temperature / level)" },
-    "pump_control": { "ja": "ポンプ操作", "en": "Pump control" },
-    "run": { "ja": "運転", "en": "Run" },
-    "stop": { "ja": "停止", "en": "Stop" },
-    "auto_mode": { "ja": "自動（スライダーをロック）", "en": "Auto mode (locks slider)" },
-    "back": { "ja": "戻る", "en": "Back" },
-    "back_arrow": { "ja": "< 戻る", "en": "< Back" },
-    "settings": { "ja": "設定", "en": "Settings" },
-    "main": { "ja": "メイン", "en": "Main" },
-    "recipes": { "ja": "レシピ", "en": "Recipes" },
-    "trend": { "ja": "トレンド", "en": "Trend" },
-    "system": { "ja": "システム", "en": "System" },
-    "restart": { "ja": "再起動", "en": "Restart" },
-    "reload": { "ja": "再読み込み", "en": "Reload" },
-    "exit": { "ja": "終了", "en": "Exit" },
-    "ack_all": { "ja": "すべて確認", "en": "ACK all" },
-    "close": { "ja": "閉じる", "en": "Close" },
-    "current_alarms": { "ja": "発生中（行をタップで確認）", "en": "Current (tap a row to acknowledge)" },
-    "history": { "ja": "履歴", "en": "History" },
-    "low_limit": { "ja": "下限", "en": "Low limit" },
-    "high_limit": { "ja": "上限", "en": "High limit" },
-    "operation_mode": { "ja": "運転モード", "en": "Operation mode" },
-    "operator_name": { "ja": "オペレーター名", "en": "Operator name" },
-    "language": { "ja": "English", "en": "日本語" },
-    "alarm_temp_high": { "ja": "温度が高い", "en": "Temperature high" },
-    "alarm_temp_low": { "ja": "温度が低い", "en": "Temperature low" }
+    "alarm_temp_high": {
+      "ja": "温度が高い",
+      "en": "Temperature high"
+    },
+    "alarm_temp_low": {
+      "ja": "温度が低い",
+      "en": "Temperature low"
+    },
+    "alarm_more": {
+      "ja": "ほか %d 件",
+      "en": "+%d more"
+    },
+    "alarm_level_high": {
+      "ja": "液位が高い",
+      "en": "Level high"
+    },
+    "main": {
+      "ja": "メイン",
+      "en": "Main"
+    },
+    "trend": {
+      "ja": "トレンド",
+      "en": "Trend"
+    },
+    "alarms": {
+      "ja": "アラーム",
+      "en": "Alarms"
+    },
+    "recipes": {
+      "ja": "レシピ",
+      "en": "Recipes"
+    },
+    "widgets": {
+      "ja": "部品",
+      "en": "Widgets"
+    },
+    "settings": {
+      "ja": "設定",
+      "en": "Settings"
+    },
+    "temperature": {
+      "ja": "温度",
+      "en": "Temperature"
+    },
+    "st_normal": {
+      "ja": "正常",
+      "en": "NORMAL"
+    },
+    "st_low": {
+      "ja": "低い",
+      "en": "LOW"
+    },
+    "st_high": {
+      "ja": "高い",
+      "en": "HIGH"
+    },
+    "pressure": {
+      "ja": "圧力",
+      "en": "Pressure"
+    },
+    "level": {
+      "ja": "液位",
+      "en": "Level"
+    },
+    "level_high": {
+      "ja": "満水に近い",
+      "en": "Nearly full"
+    },
+    "live_chart": {
+      "ja": "直近の動き（温度 ×2 / 液位 / 速度）",
+      "en": "Last minute (temperature x2 / level / speed)"
+    },
+    "pump": {
+      "ja": "ポンプ",
+      "en": "Pump"
+    },
+    "ps_idle": {
+      "ja": "停止中",
+      "en": "Idle"
+    },
+    "ps_starting": {
+      "ja": "起動中",
+      "en": "Starting"
+    },
+    "ps_running": {
+      "ja": "運転中",
+      "en": "Running"
+    },
+    "ps_stopping": {
+      "ja": "停止処理中",
+      "en": "Stopping"
+    },
+    "stop": {
+      "ja": "停止",
+      "en": "Stop"
+    },
+    "auto_mode": {
+      "ja": "自動（温度に合わせる）",
+      "en": "Auto (by temperature)"
+    },
+    "title": {
+      "ja": "ポンプ場 1号",
+      "en": "Pump Station #1"
+    },
+    "no_alarms": {
+      "ja": "アラームなし",
+      "en": "No alarms"
+    },
+    "now": {
+      "ja": "現在",
+      "en": "Now"
+    },
+    "al_unacked": {
+      "ja": "未確認",
+      "en": "UNACK"
+    },
+    "al_active": {
+      "ja": "発生中",
+      "en": "ACTIVE"
+    },
+    "al_cleared": {
+      "ja": "復帰",
+      "en": "CLEARED"
+    },
+    "al_raised": {
+      "ja": "発生",
+      "en": "RAISED"
+    },
+    "al_acked": {
+      "ja": "確認",
+      "en": "ACKED"
+    },
+    "current_alarms": {
+      "ja": "発生中（行をタップで確認）",
+      "en": "Current (tap a row to acknowledge)"
+    },
+    "unacked_count": {
+      "ja": "未確認の数:",
+      "en": "Not acknowledged:"
+    },
+    "ack_all": {
+      "ja": "すべて確認",
+      "en": "ACK all"
+    },
+    "history": {
+      "ja": "履歴",
+      "en": "History"
+    },
+    "rc_write": {
+      "ja": "書き込む",
+      "en": "Write"
+    },
+    "rc_read": {
+      "ja": "今の値を読む",
+      "en": "Read"
+    },
+    "rc_save_as": {
+      "ja": "別名で保存",
+      "en": "Save as"
+    },
+    "rc_delete": {
+      "ja": "削除",
+      "en": "Delete"
+    },
+    "rc_item": {
+      "ja": "項目",
+      "en": "Item"
+    },
+    "rc_recipe": {
+      "ja": "レシピ",
+      "en": "Recipe"
+    },
+    "rc_current": {
+      "ja": "今の値",
+      "en": "Current"
+    },
+    "cancel": {
+      "ja": "やめる",
+      "en": "Cancel"
+    },
+    "rc_name": {
+      "ja": "名前",
+      "en": "Name"
+    },
+    "mode_manual_s": {
+      "ja": "手動",
+      "en": "Manual"
+    },
+    "mode_auto_s": {
+      "ja": "自動",
+      "en": "Auto"
+    },
+    "mode_maint_s": {
+      "ja": "保守",
+      "en": "Maint."
+    },
+    "mode_manual": {
+      "ja": "手動",
+      "en": "Manual"
+    },
+    "mode_auto": {
+      "ja": "自動",
+      "en": "Automatic"
+    },
+    "mode_maint": {
+      "ja": "保守",
+      "en": "Maintenance"
+    },
+    "g_select": {
+      "ja": "選ぶ（3 つとも同じタグ）",
+      "en": "Choose (all three: one tag)"
+    },
+    "maint_active": {
+      "ja": "保守モード中",
+      "en": "Maintenance mode"
+    },
+    "g_input": {
+      "ja": "入力する",
+      "en": "Enter"
+    },
+    "operator_name": {
+      "ja": "オペレーター名",
+      "en": "Operator name"
+    },
+    "unlocked": {
+      "ja": "解除",
+      "en": "unlocked"
+    },
+    "locked": {
+      "ja": "ロック中",
+      "en": "locked"
+    },
+    "g_counter": {
+      "ja": "数える（+1 は長押しで連続）",
+      "en": "Count (hold +1 to repeat)"
+    },
+    "g_jog": {
+      "ja": "押している間だけ ON",
+      "en": "ON while pressed"
+    },
+    "jog": {
+      "ja": "寸動",
+      "en": "Jog"
+    },
+    "g_show": {
+      "ja": "見せる・動かす",
+      "en": "Show and move"
+    },
+    "g_run_hint": {
+      "ja": "運転で回る",
+      "en": "on Run"
+    },
+    "g_scroll": {
+      "ja": "長い文字は流せます: 枠に入らない文字を横に送って読ませる表示です。",
+      "en": "A long text can scroll: what does not fit moves sideways so that it can be read."
+    },
+    "g_color": {
+      "ja": "温度が高いと色が変わる",
+      "en": "Colour changes when hot"
+    },
+    "operation_mode": {
+      "ja": "運転モード",
+      "en": "Operation mode"
+    },
+    "temp_limits": {
+      "ja": "温度の警報（下限 / 上限）",
+      "en": "Alarm limits (low / high)"
+    },
+    "setpoint": {
+      "ja": "設定値",
+      "en": "Setpoint"
+    },
+    "user_and_system": {
+      "ja": "ユーザーとシステム",
+      "en": "User and system"
+    },
+    "login": {
+      "ja": "ログイン",
+      "en": "Log in"
+    },
+    "logout": {
+      "ja": "ログアウト",
+      "en": "Log out"
+    },
+    "language": {
+      "ja": "English",
+      "en": "日本語"
+    },
+    "system": {
+      "ja": "システム",
+      "en": "System"
+    },
+    "maintenance": {
+      "ja": "保守（レベル 2 以上）",
+      "en": "Maintenance (level 2 and up)"
+    },
+    "reload": {
+      "ja": "再読み込み",
+      "en": "Reload"
+    },
+    "restart": {
+      "ja": "再起動",
+      "en": "Restart"
+    },
+    "exit": {
+      "ja": "終了",
+      "en": "Exit"
+    },
+    "low_limit": {
+      "ja": "下限",
+      "en": "Low limit"
+    },
+    "high_limit": {
+      "ja": "上限",
+      "en": "High limit"
+    },
+    "close": {
+      "ja": "閉じる",
+      "en": "Close"
+    }
   },
   "screens": [
     "screens/main.json",
-    "screens/settings.json",
-    "screens/recipes.json",
-    "screens/alarms.json",
     "screens/trend.json",
+    "screens/alarms.json",
+    "screens/recipes.json",
+    "screens/widgets.json",
+    "screens/settings.json",
     "screens/temp_detail.json"
   ]
 }

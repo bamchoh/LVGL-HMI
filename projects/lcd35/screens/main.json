@@ -1,125 +1,835 @@
 {
   "name": "main",
   "scrollable": false,
-  "style": { "bg_color": "#141a22", "pad": 0 },
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
   "children": [
     {
-      "type": "panel", "x": 0, "y": 0, "w": "100%", "h": 40, "scrollable": false,
-      "style": { "bg_color": "#1f2a38", "radius": 0, "border_width": 0, "pad_left": 8, "pad_right": 8, "pad_top": 0, "pad_bottom": 0 },
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 36,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 8,
+        "pad_right": 8
+      },
       "children": [
-        { "type": "label", "text": "Pump Station #1", "align": "left_mid", "style": { "font": 18, "text_color": "#ffffff" } },
-        { "type": "label", "align": "center", "x": 20, "bind": { "text": { "tag": "state_text", "format": "%s" } },
-          "style": { "font": 14, "text_color": "#9fb3c8" } },
-        { "type": "led", "align": "right_mid", "x": -100, "w": 12, "h": 12, "color": "#4caf50", "bind": { "on": "plc_online" } },
-        { "type": "label", "align": "right_mid", "x": -68, "style": { "font": 12 },
-          "bind": { "text": { "tag": "plc_online", "format": "PLC" }, "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } } } },
-        { "type": "button", "align": "right_mid", "text": "Setup", "w": 60, "h": 30, "style_label": { "font": 12 },
-          "on_click": { "action": "goto", "screen": "settings", "anim": "slide_left" } }
+        {
+          "type": "label",
+          "text": "Pump Station",
+          "align": "left_mid",
+          "style": {
+            "font": 14,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "x": 2,
+          "w": 240,
+          "h": 28,
+          "style": {
+            "font": 12
+          },
+          "labels": {
+            "idle": "No alarms",
+            "more": "+%d"
+          }
+        },
+        {
+          "type": "led",
+          "align": "right_mid",
+          "x": -84,
+          "w": 12,
+          "h": 12,
+          "color": "#4caf50",
+          "bind": {
+            "on": "plc_online"
+          }
+        },
+        {
+          "type": "label",
+          "text": "PLC",
+          "align": "right_mid",
+          "x": -58,
+          "style": {
+            "font": 12
+          },
+          "bind": {
+            "text_color": {
+              "tag": "plc_online",
+              "map": {
+                "true": "#4caf50",
+                "false": "#78909c"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "w": 54,
+          "long_mode": "dots",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 12,
+            "text_align": "right"
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "%s"
+            }
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 8, "y": 48, "w": 148, "h": 108, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8 },
+      "type": "panel",
+      "x": 8,
+      "y": 44,
+      "w": 149,
+      "h": 80,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8
+      },
+      "on_click": {
+        "action": "popup",
+        "screen": "temp_detail"
+      },
       "children": [
-        { "type": "label", "text": "Temperature", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "label", "align": "center", "y": 2, "style": { "font": 28, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "temp", "format": "%.1f C" } } },
-        { "type": "bar", "align": "bottom_mid", "w": "100%", "h": 6, "min": 0, "max": 50,
-          "style_indicator": { "bg_color": "#2196f3" }, "bind": { "value": "temp" } }
-      ]
-    },
-
-    {
-      "type": "panel", "x": 166, "y": 48, "w": 148, "h": 108, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8 },
-      "children": [
-        { "type": "label", "text": "Pressure", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "arc", "align": "center", "y": 6, "w": 80, "h": 80, "min": 0, "max": 40, "adjustable": false,
-          "style": { "arc_width": 8 }, "style_indicator": { "arc_color": "#ff9800", "arc_width": 8 },
-          "bind": { "value": { "tag": "pressure", "scale": 10 } } },
-        { "type": "label", "align": "center", "y": 6, "style": { "font": 14, "text_color": "#ffffff" },
-          "bind": { "text": { "tag": "pressure", "format": "%.2f bar" } } }
-      ]
-    },
-
-    {
-      "type": "panel", "x": 324, "y": 48, "w": 148, "h": 108, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8 },
-      "children": [
-        { "type": "label", "text": "Alarm (lo / hi)", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
-          "style": { "radius": 6, "border_width": 0, "bg_color": "#2e7d32" },
-          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#ffffff" }, "text": "NORMAL" } ] },
-        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
-          "style": { "radius": 6, "border_width": 0, "bg_color": "#f9a825" },
-          "bind": { "visible": { "tag": "temp", "lt": { "tag": "temp_lo" } } },
-          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#000000" }, "text": "LOW" } ] },
-        { "type": "panel", "align": "top_mid", "y": 18, "w": "100%", "h": 34, "scrollable": false,
-          "style": { "radius": 6, "border_width": 0, "bg_color": "#c62828" },
-          "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } },
-          "children": [ { "type": "label", "align": "center", "style": { "font": 16, "text_color": "#ffffff" }, "text": "HIGH" } ] },
-        { "type": "panel", "align": "bottom_mid", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+        {
+          "type": "label",
+          "text": "Temp.",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "panel",
+          "align": "top_right",
+          "w": 56,
+          "h": 20,
+          "scrollable": false,
+          "style": {
+            "bg_color": "#2e7d32",
+            "radius": 4,
+            "border_width": 0,
+            "pad": 0
+          },
           "children": [
-            { "type": "numeric_display", "w": 62, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_lo",
-              "style": { "font": 12, "pad": 4 } },
-            { "type": "numeric_display", "w": 62, "input": true, "min": 0, "max": 50, "decimals": 1, "unit": " C", "bind": "temp_hi",
-              "style": { "font": 12, "pad": 4 } }
-          ] }
+            {
+              "type": "label",
+              "text": "NORMAL",
+              "align": "center",
+              "style": {
+                "text_color": "#ffffff",
+                "font": 12
+              }
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "align": "top_right",
+          "w": 56,
+          "h": 20,
+          "scrollable": false,
+          "style": {
+            "bg_color": "#f9a825",
+            "radius": 4,
+            "border_width": 0,
+            "pad": 0
+          },
+          "children": [
+            {
+              "type": "label",
+              "text": "LOW",
+              "align": "center",
+              "style": {
+                "text_color": "#ffffff",
+                "font": 12
+              }
+            }
+          ],
+          "bind": {
+            "visible": {
+              "tag": "temp",
+              "lt": {
+                "tag": "temp_lo"
+              }
+            }
+          }
+        },
+        {
+          "type": "panel",
+          "align": "top_right",
+          "w": 56,
+          "h": 20,
+          "scrollable": false,
+          "style": {
+            "bg_color": "#c62828",
+            "radius": 4,
+            "border_width": 0,
+            "pad": 0
+          },
+          "children": [
+            {
+              "type": "label",
+              "text": "HIGH",
+              "align": "center",
+              "style": {
+                "text_color": "#ffffff",
+                "font": 12
+              }
+            }
+          ],
+          "bind": {
+            "visible": {
+              "tag": "temp",
+              "gt": {
+                "tag": "temp_hi"
+              }
+            }
+          }
+        },
+        {
+          "type": "label",
+          "align": "center",
+          "y": 6,
+          "style": {
+            "font": 24,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "temp",
+              "format": "%.1f C"
+            }
+          }
+        },
+        {
+          "type": "bar",
+          "align": "bottom_mid",
+          "w": "100%",
+          "h": 6,
+          "min": 0,
+          "max": 50,
+          "bind": {
+            "value": "temp"
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 8, "y": 164, "w": 228, "h": 148, "scrollable": false,
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8 },
+      "type": "panel",
+      "x": 165,
+      "y": 44,
+      "w": 150,
+      "h": 80,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8
+      },
       "children": [
-        { "type": "label", "text": "Trend (temp / level)", "style": { "font": 12, "text_color": "#9fb3c8" } },
-        { "type": "chart", "align": "bottom_mid", "w": "100%", "h": 108, "chart_type": "line",
-          "points": 100, "min": 0, "max": 100, "sample_ms": 250, "hdiv": 3, "vdiv": 5,
-          "style": { "bg_color": "#141a22", "border_width": 0, "line_color": "#2b3645", "pad": 2 },
+        {
+          "type": "label",
+          "text": "Pressure",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "arc",
+          "align": "right_mid",
+          "w": 60,
+          "h": 60,
+          "min": 0,
+          "max": 40,
+          "adjustable": false,
+          "bind": {
+            "value": {
+              "tag": "pressure",
+              "scale": 10
+            }
+          },
+          "style": {
+            "arc_width": 7
+          },
+          "style_indicator": {
+            "arc_color": "#ff9800",
+            "arc_width": 7
+          }
+        },
+        {
+          "type": "label",
+          "align": "left_mid",
+          "y": 4,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "pressure",
+              "format": "%.2f"
+            }
+          }
+        },
+        {
+          "type": "label",
+          "text": "bar",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          },
+          "align": "bottom_left"
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 323,
+      "y": 44,
+      "w": 149,
+      "h": 80,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8
+      },
+      "children": [
+        {
+          "type": "label",
+          "text": "Level",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "bar",
+          "align": "right_mid",
+          "w": 28,
+          "h": 62,
+          "min": 0,
+          "max": 100,
+          "bind": {
+            "value": "level"
+          },
+          "style": {
+            "radius": 3
+          },
+          "style_indicator": {
+            "bg_color": "#26a69a",
+            "radius": 3
+          }
+        },
+        {
+          "type": "label",
+          "align": "left_mid",
+          "y": 4,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          },
+          "bind": {
+            "text": {
+              "tag": "level",
+              "format": "%d %%"
+            }
+          }
+        },
+        {
+          "type": "label",
+          "text": "Nearly full",
+          "align": "bottom_left",
+          "style": {
+            "text_color": "#f9a825",
+            "font": 12
+          },
+          "bind": {
+            "visible": {
+              "tag": "level",
+              "ge": 95
+            }
+          },
+          "animate": {
+            "preset": "blink",
+            "when": {
+              "tag": "level",
+              "ge": 95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 8,
+      "y": 132,
+      "w": 228,
+      "h": 136,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8
+      },
+      "children": [
+        {
+          "type": "label",
+          "text": "Temp x2 / level / speed",
+          "style": {
+            "font": 12,
+            "text_color": "#9fb3c8"
+          }
+        },
+        {
+          "type": "chart",
+          "align": "bottom_mid",
+          "w": "100%",
+          "h": 100,
+          "chart_type": "line",
+          "points": 80,
+          "min": 0,
+          "max": 100,
+          "sample_ms": 500,
+          "hdiv": 3,
+          "vdiv": 4,
           "series": [
-            { "tag": "temp",  "color": "#2196f3", "scale": 2 },
-            { "tag": "level", "color": "#4caf50" }
-          ] }
+            {
+              "tag": "temp",
+              "color": "#42a5f5",
+              "scale": 2
+            },
+            {
+              "tag": "level",
+              "color": "#26a69a"
+            },
+            {
+              "tag": "speed_pv",
+              "color": "#ffa726"
+            }
+          ],
+          "style": {
+            "bg_color": "#10151c",
+            "border_width": 0,
+            "radius": 4,
+            "pad": 4
+          }
+        }
       ]
     },
-
     {
-      "type": "panel", "x": 244, "y": 164, "w": 228, "h": 148, "scrollable": false,
-      "flex": "column", "flex_cross": "center",
-      "style": { "bg_color": "#1b2430", "radius": 8, "border_width": 0, "pad": 8, "pad_row": 4 },
+      "type": "panel",
+      "x": 244,
+      "y": 132,
+      "w": 228,
+      "h": 136,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1b2430",
+        "radius": 8,
+        "border_width": 0,
+        "pad": 8,
+        "pad_row": 4
+      },
+      "flex": "column",
       "children": [
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 6
+          },
           "children": [
-            { "type": "label", "text": "Pump run", "style": { "font": 14, "text_color": "#ffffff" } },
-            { "type": "led", "w": 12, "h": 12, "color": "#4caf50", "bind": { "on": "run" } },
-            { "type": "switch", "w": 44, "h": 22, "bind": "run" }
-          ] },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_between", "flex_cross": "center", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+            {
+              "type": "label",
+              "text": "Pump",
+              "style": {
+                "text_color": "#ffffff"
+              }
+            },
+            {
+              "type": "panel",
+              "w": 60,
+              "h": 18,
+              "flex_grow": 1,
+              "scrollable": false,
+              "style": {
+                "bg_opa": 0,
+                "border_width": 0,
+                "pad": 0
+              },
+              "children": [
+                {
+                  "type": "label",
+                  "text": "Idle",
+                  "style": {
+                    "text_color": "#78909c"
+                  },
+                  "bind": {
+                    "visible": {
+                      "tag": "pump_state",
+                      "eq": 0
+                    }
+                  }
+                },
+                {
+                  "type": "label",
+                  "text": "Starting",
+                  "style": {
+                    "text_color": "#f9a825"
+                  },
+                  "bind": {
+                    "visible": {
+                      "tag": "pump_state",
+                      "eq": 1
+                    }
+                  }
+                },
+                {
+                  "type": "label",
+                  "text": "Running",
+                  "style": {
+                    "text_color": "#66bb6a"
+                  },
+                  "bind": {
+                    "visible": {
+                      "tag": "pump_state",
+                      "eq": 2
+                    }
+                  }
+                },
+                {
+                  "type": "label",
+                  "text": "Stopping",
+                  "style": {
+                    "text_color": "#f9a825"
+                  },
+                  "bind": {
+                    "visible": {
+                      "tag": "pump_state",
+                      "eq": 3
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "switch",
+              "w": 50,
+              "h": 26,
+              "bind": "run"
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
           "children": [
-            { "type": "label", "text": "SP", "style": { "font": 12, "text_color": "#9fb3c8" } },
-            { "type": "numeric_display", "w": 64, "input": true, "min": 0, "max": 100, "unit": " %", "bind": "speed_sp", "style": { "font": 12, "pad": 4 } },
-            { "type": "label", "text": "PV", "style": { "font": 12, "text_color": "#9fb3c8" } },
-            { "type": "numeric_display", "w": 64, "unit": " %", "bind": "speed_pv", "style": { "font": 12, "pad": 4 } }
-          ] },
-        { "type": "slider", "w": "90%", "h": 8, "min": 0, "max": 100,
-          "bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } } },
-        { "type": "panel", "w": "100%", "h": "content", "flex": "row", "flex_main": "space_evenly", "scrollable": false,
-          "style": { "bg_opa": 0, "border_width": 0, "pad": 0 },
+            {
+              "type": "label",
+              "text": "SP",
+              "style": {
+                "text_color": "#9fb3c8"
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 66,
+              "h": 30,
+              "bind": "speed_sp",
+              "style": {
+                "pad_top": 5,
+                "pad_bottom": 5,
+                "pad_left": 6,
+                "pad_right": 6
+              },
+              "input": true,
+              "min": 0,
+              "max": 100,
+              "unit": " %"
+            },
+            {
+              "type": "label",
+              "text": "PV",
+              "style": {
+                "text_color": "#9fb3c8"
+              }
+            },
+            {
+              "type": "numeric_display",
+              "w": 66,
+              "h": 30,
+              "bind": "speed_pv",
+              "style": {
+                "pad_top": 5,
+                "pad_bottom": 5,
+                "pad_left": 6,
+                "pad_right": 6
+              },
+              "unit": " %"
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "w": "100%",
+          "h": "content",
+          "flex": "row",
+          "flex_cross": "center",
+          "scrollable": false,
+          "style": {
+            "bg_opa": 0,
+            "border_width": 0,
+            "pad": 0,
+            "pad_column": 0
+          },
+          "flex_main": "space_between",
           "children": [
-            { "type": "button", "text": "-10", "w": 60, "h": 32, "on_click": { "action": "dec", "tag": "speed_sp", "by": 10 } },
-            { "type": "button", "text": "+10", "w": 60, "h": 32, "on_click": { "action": "inc", "tag": "speed_sp", "by": 10 } },
-            { "type": "button", "text": "Stop", "w": 60, "h": 32, "style": { "bg_color": "#c62828" },
-              "on_click": [ { "action": "set", "tag": "run", "value": false }, { "action": "set", "tag": "speed_sp", "value": 0 } ] }
-          ] },
-        { "type": "checkbox", "text": "Auto mode", "bind": "auto_mode", "style": { "text_color": "#9fb3c8", "font": 12 } }
+            {
+              "type": "button",
+              "text": "-10",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "dec",
+                "tag": "speed_sp",
+                "by": 10
+              },
+              "bind": {
+                "enabled": {
+                  "tag": "auto_mode",
+                  "invert": true
+                }
+              }
+            },
+            {
+              "type": "button",
+              "text": "+10",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0
+              },
+              "on_click": {
+                "action": "inc",
+                "tag": "speed_sp",
+                "by": 10
+              },
+              "bind": {
+                "enabled": {
+                  "tag": "auto_mode",
+                  "invert": true
+                }
+              }
+            },
+            {
+              "type": "button",
+              "text": "Stop",
+              "w": 64,
+              "h": 32,
+              "style": {
+                "radius": 6,
+                "pad": 0,
+                "bg_color": "#c62828"
+              },
+              "on_click": {
+                "action": "set",
+                "tag": "run",
+                "value": false
+              }
+            }
+          ]
+        },
+        {
+          "type": "checkbox",
+          "text": "Auto (by temperature)",
+          "bind": "auto_mode",
+          "style": {
+            "font": 12
+          }
+        }
       ]
     },
-
-    { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": 190,
-      "style": { "pad": 4, "pad_gap": 4 }, "style_items": { "font": 18 } }
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 276,
+      "w": "100%",
+      "h": 44,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 6
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "Main",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#1565c0"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Trend",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "trend",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Alarms",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "alarms",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Recipes",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "recipes",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Widgets",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "widgets",
+            "anim": "none"
+          }
+        },
+        {
+          "type": "button",
+          "text": "Setup",
+          "w": 72,
+          "h": 36,
+          "style": {
+            "radius": 6,
+            "pad": 0,
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "settings",
+            "anim": "none"
+          }
+        }
+      ]
+    },
+    {
+      "type": "keyboard",
+      "align": "bottom_mid",
+      "w": "100%",
+      "h": 190,
+      "style": {
+        "pad": 4,
+        "pad_gap": 4
+      },
+      "style_items": {
+        "font": 18
+      }
+    }
   ]
 }
