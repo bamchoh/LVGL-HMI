@@ -126,7 +126,7 @@
         {
           "type": "panel",
           "align": "top_right",
-          "w": 56,
+          "w": 68,
           "h": 20,
           "scrollable": false,
           "style": {
@@ -150,7 +150,7 @@
         {
           "type": "panel",
           "align": "top_right",
-          "w": 56,
+          "w": 68,
           "h": 20,
           "scrollable": false,
           "style": {
@@ -182,7 +182,7 @@
         {
           "type": "panel",
           "align": "top_right",
-          "w": 56,
+          "w": 68,
           "h": 20,
           "scrollable": false,
           "style": {
