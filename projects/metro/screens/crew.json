@@ -1,0 +1,174 @@
+{
+  "name": "crew",
+  "popup": true,
+  "w": 520,
+  "h": 372,
+  "dim": true,
+  "style": {
+    "bg_color": "#1f2a38",
+    "radius": 10,
+    "pad": 16,
+    "border_width": 0
+  },
+  "children": [
+    {
+      "type": "label",
+      "text": "設定（デモ用）",
+      "x": 0,
+      "y": 0,
+      "style": {
+        "font": 24,
+        "text_color": "#ffffff"
+      }
+    },
+    {
+      "type": "label",
+      "text": "走行を止める",
+      "x": 0,
+      "y": 60,
+      "style": {
+        "font": 18,
+        "text_color": "#cfd8dc"
+      }
+    },
+    {
+      "type": "switch",
+      "x": 140,
+      "y": 48,
+      "w": 88,
+      "h": 48,
+      "bind": "paused"
+    },
+    {
+      "type": "button",
+      "text": "次の駅へ",
+      "x": 256,
+      "y": 44,
+      "w": 232,
+      "h": 56,
+      "on_click": {
+        "action": "set",
+        "tag": "cmd",
+        "value": 1
+      }
+    },
+    {
+      "type": "button",
+      "text": "行先を反対に",
+      "x": 0,
+      "y": 116,
+      "w": 232,
+      "h": 56,
+      "on_click": {
+        "action": "set",
+        "tag": "cmd",
+        "value": 2
+      },
+      "style": {
+        "bg_color": "#37474f"
+      }
+    },
+    {
+      "type": "button",
+      "text": "始発駅に戻す",
+      "x": 256,
+      "y": 116,
+      "w": 232,
+      "h": 56,
+      "on_click": {
+        "action": "set",
+        "tag": "cmd",
+        "value": 3
+      },
+      "style": {
+        "bg_color": "#37474f"
+      }
+    },
+    {
+      "type": "label",
+      "text": "表示の言語",
+      "x": 0,
+      "y": 188,
+      "style": {
+        "font": 16,
+        "text_color": "#90a4ae"
+      }
+    },
+    {
+      "type": "button",
+      "text": "自動で切替",
+      "x": 0,
+      "y": 216,
+      "w": 152,
+      "h": 56,
+      "checkable": true,
+      "style": {
+        "bg_color": "#37474f"
+      },
+      "style_checked": {
+        "bg_color": "#1565c0"
+      },
+      "bind": {
+        "checked": {
+          "tag": "lang_mode",
+          "eq": 0
+        }
+      }
+    },
+    {
+      "type": "button",
+      "text": "日本語",
+      "x": 168,
+      "y": 216,
+      "w": 152,
+      "h": 56,
+      "checkable": true,
+      "style": {
+        "bg_color": "#37474f"
+      },
+      "style_checked": {
+        "bg_color": "#1565c0"
+      },
+      "bind": {
+        "checked": {
+          "tag": "lang_mode",
+          "eq": 1
+        }
+      }
+    },
+    {
+      "type": "button",
+      "text": "English",
+      "x": 336,
+      "y": 216,
+      "w": 152,
+      "h": 56,
+      "checkable": true,
+      "style": {
+        "bg_color": "#37474f"
+      },
+      "style_checked": {
+        "bg_color": "#1565c0"
+      },
+      "bind": {
+        "checked": {
+          "tag": "lang_mode",
+          "eq": 2
+        }
+      }
+    },
+    {
+      "type": "button",
+      "text": "閉じる",
+      "align": "bottom_right",
+      "w": 152,
+      "h": 48,
+      "style": {
+        "bg_color": "#455a64"
+      },
+      "on_click": {
+        "action": "close"
+      }
+    }
+  ]
+}

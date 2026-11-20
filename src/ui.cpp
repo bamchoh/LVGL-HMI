@@ -1739,7 +1739,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         obj = lv_label_create(parent);
         lv_label_set_text(obj, texts().resolve(jstr(w, "text", "")).c_str());
         if(auto lm = jstr_opt(w, "long_mode")) {
-            lv_label_set_long_mode(obj, iequals(*lm, "dots") ? LV_LABEL_LONG_MODE_DOTS : iequals(*lm, "scroll") ? LV_LABEL_LONG_MODE_SCROLL_CIRCULAR : iequals(*lm, "clip") ? LV_LABEL_LONG_MODE_CLIP : LV_LABEL_LONG_MODE_WRAP);
+            lv_label_set_long_mode(obj, iequals(*lm, "dots") ? LV_LABEL_LONG_MODE_DOTS : (iequals(*lm, "scroll") || iequals(*lm, "circular")) ? LV_LABEL_LONG_MODE_SCROLL_CIRCULAR : iequals(*lm, "clip") ? LV_LABEL_LONG_MODE_CLIP : LV_LABEL_LONG_MODE_WRAP);
         }
         text_obj = obj;
     }

@@ -239,6 +239,15 @@ python tools\modbus_server.py --port 5020
 サーバーのコイル / 保持レジスタと同期します。サーバーが無い場合も画面は動作します（オフライン表示）。
 そのあいだは `pump` スクリプトがポンプを模擬し、運転を入れると速度（PV）が設定値（SP）まで上がります。
 
+もう 1 つのデモ `projects/metro` は、電車の車内案内表示です（大阪メトロ御堂筋線の駅名・駅番号・乗り換えを使った
+イメージで、所要時間とドアの向きは架空）。機器にはつながず、Lua スクリプト（`scripts/guide.lua`）が走行を模擬して
+文字列のタグを書き、画面はそれを表示するだけです。漢字・ひらがな・英語が数秒ごとに切り替わり、画面の上部か
+「設定」を押すと、走行の停止・次の駅へ・行先の反転・言語の固定ができます。
+
+```bash
+./build/bin/hml_runtime projects/metro/project.json
+```
+
 デモ（`projects/demo`）は、下のナビゲーションで切り替える 6 画面で、できることを一通り動かせます。
 
 | 画面     | 見られるもの                                                                                                   |
@@ -1112,7 +1121,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | type                  | 固有プロパティ                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `panel` (`container`) | `children`, `flex`                                                                                                        |
-| `label`               | `text`, `long_mode` (`wrap`/`dots`/`scroll`/`clip`)                                                                       |
+| `label`               | `text`, `long_mode` (`wrap`/`dots`/`scroll`（`circular` も同じ）/`clip`)                                                                       |
 | `button`              | `text`, `checkable`, `style_label`                                                                                        |
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
