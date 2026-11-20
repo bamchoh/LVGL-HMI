@@ -67,9 +67,16 @@ UA_LogLevel ua_log_level()
     }();
     return lvl;
 }
+// While this thread closes a session on purpose, what the server still answers to the requests
+// that were waiting (a ServiceFault for each Publish: "Session no longer valid", "Request with
+// unknown RequestId") is no news: a server that answers them, as the specification asks, filled
+// the log with warnings at every shutdown. Errors are still shown.
+thread_local bool t_closing = false;
+
 void ua_log(void*, UA_LogLevel level, UA_LogCategory, const char* msg, va_list args)
 {
     if(level < ua_log_level()) return;
+    if(t_closing && level == UA_LOGLEVEL_WARNING && ua_log_level() == UA_LOGLEVEL_WARNING) return;
     char buf[512];
     std::vsnprintf(buf, sizeof(buf), msg, args);
     if(level >= UA_LOGLEVEL_ERROR) HML_ERROR("opcua client: %s", buf);
@@ -523,8 +530,10 @@ void OpcUaClientDriver::thread_main()
         bool clean = false;
         if(c) {
             clean = session(c);
+            t_closing = clean || !running_;                  // (not when the connection was lost: that is news)
             UA_Client_disconnect(c);
             UA_Client_delete(c);
+            t_closing = false;
         }
         const bool was_online = online_ == 1;
         set_online(false);

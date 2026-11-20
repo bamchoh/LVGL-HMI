@@ -305,6 +305,21 @@ I18N.PATTERNS_JA.push(
   [/^recipe book "(.*)": a recipe name is 1 to 32 characters$/, 'レシピブック「$1」: レシピ名は 1〜32 文字です'],
   [/^recipe book "(.*)" is defined twice$/, 'レシピブック「$1」が 2 回定義されています'],
 );
+// ---- FINS driver
+Object.assign(I18N.KEYS_JA, { dest_network: '相手先ネットワークアドレス', dest_node: '相手先ノードアドレス', dest_unit: '相手先号機アドレス', node: '自分のノードアドレス' });
+Object.assign(I18N.TEXT_JA, {
+  'OMRON FINS (FINS/TCP)': 'オムロン FINS (FINS/TCP)',
+  'OMRON FINS (FINS/TCP) (fins)': 'オムロン FINS (FINS/TCP) (fins)',
+  'the FINS/TCP port of the CPU or of the Ethernet unit (default 9600)': 'CPU または Ethernet ユニットの FINS/TCP のポート番号（既定 9600）',
+  'route: destination network address (default 0 = the local network)': '経路: 相手先ネットワークアドレス（既定 0 = 自分のネットワーク）',
+  'route: destination node address (default 0 = the PLC the connection goes to)': '経路: 相手先ノードアドレス（既定 0 = 接続した PLC）',
+  'route: destination unit address (default 0 = the CPU)': '経路: 相手先号機アドレス（既定 0 = CPU ユニット）',
+  'our own node address (default 0 = the PLC gives us one)': '自分のノードアドレス（既定 0 = PLC が割り当てる）',
+  'only these may be written, e.g. D0-D999, W0-W99 (empty = everything except the Auxiliary Area)': 'ここに書いた範囲だけ書き込める。例: D0-D999, W0-W99（空欄 = 特殊補助リレー以外すべて）',
+  "also write the Auxiliary Area (A: the CPU's own flags and settings)": '特殊補助リレー（A: CPU 自身のフラグと設定）にも書き込む',
+  'D100 / CIO10 / W0.00 / H5 / E0_100 / T1': 'D100 / CIO10 / W0.00 / H5 / E0_100 / T1',
+});
+
 // ---- SLMP driver
 Object.assign(I18N.KEYS_JA, { frame: 'フレーム', network: 'ネットワーク番号', pc: 'PC 番号', io: '要求先ユニット I/O 番号', station: '要求先局番',
   write_ranges: '書き込みを許す範囲', allow_system_write: 'SM / SD にも書き込む', length: '文字数' });
