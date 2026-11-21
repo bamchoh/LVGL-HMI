@@ -697,6 +697,75 @@
     Panels.show('widgets');
   });
 
+  await test('library: widgets are kept as a part and used again with the mouse; a name with markup is text; import and export', async () => {
+    const $ = id => document.getElementById(id);
+    const later = () => new Promise(r => setTimeout(r, 60));
+    const btn = label => document.querySelector('#modal-buttons [data-label="' + label + '"]');
+    const kept = App.library.slice(), saved = (await host.settings()).library;
+    try {
+      App.library = []; await App.saveLibrary();
+      Panels.show('widgets'); App.doRefresh();
+      ok($('library'), 'the library under the palette');
+      eq(document.querySelectorAll('#library [data-lib]').length, 0);
+      // nothing selected: said, nothing kept
+      $('lib-add').click(); await later();
+      eq(App.library.length, 0);
+      ok($('modal').hidden, 'no question without a selection');
+      // two widgets -> a part
+      clickAt('1'); clickAt('2', { ctrlKey: true });
+      const two = [M.get([1]), M.get([2])].map(w => w.type);
+      $('lib-add').click(); await later();
+      ok(!$('modal').hidden, 'asks for the name');
+      const inp = document.querySelector('#modal-body input');
+      inp.value = '<img src=x onerror="window.__xss=2"> head';
+      window.__xss = 0;
+      btn('OK').click(); await later(); await frame();
+      eq(App.library.length, 1);
+      eq(App.library[0].widgets.map(w => w.type), two);
+      eq((await host.settings()).library.length, 1, 'kept in the settings of the designer');
+      const item = document.querySelector('#library [data-lib="0"]');
+      ok(item, 'listed');
+      eq(item.querySelector('.lib-name').textContent, '<img src=x onerror="window.__xss=2"> head', 'the name as it was typed');
+      eq(document.querySelectorAll('#library img').length, 0, 'no markup from the name');
+      await later();
+      eq(window.__xss, 0);
+      // used on another screen with one click
+      M.selectScreen(M.st.screens.length - 1); App.doRefresh();
+      const n = M.screen().children.length;
+      document.querySelector('#library [data-lib="0"]').click(); await frame();
+      eq(M.screen().children.length, n + 2, 'the two widgets are there');
+      eq(M.screen().children.slice(n).map(w => w.type), two);
+      eq(M.selection().length, 2, 'and selected');
+      key('z', { ctrlKey: true });
+      eq(M.screen().children.length, n, 'one undo');
+      eq(App.library.length, 1, 'undo does not touch the library');
+      // export, and import of a library from somebody else
+      $('lib-io').click(); await later();
+      ok(JSON.parse($('lib-text').value).parts.length === 1, 'the library as text');
+      $('lib-text').value = 'this is no library';
+      btn('Import').click(); await later();
+      ok(!$('modal').hidden && /library/.test($('lib-out').textContent), 'said: ' + $('lib-out').textContent);
+      eq(App.library.length, 1);
+      $('lib-text').value = JSON.stringify({ hml_library: 1, parts: [{ name: 'lamp', widgets: [{ type: 'led', x: 5, y: 5 }] }, { name: 'bad image', widgets: [{ type: 'image', src: '../../x.png' }] }] });
+      btn('Import').click(); await later();
+      eq(App.library.map(p => p.name), ['<img src=x onerror="window.__xss=2"> head', 'lamp', 'bad image']);
+      eq(App.library[2].widgets[0].src, undefined, 'a path out of the project is not taken');
+      ok(!$('modal').hidden && /x\.png/.test($('lib-out').textContent), 'what was left out is said');
+      closeModal();
+      eq(document.querySelectorAll('#library [data-lib]').length, 3);
+      // removed (the question is answered with yes)
+      const ask = App.ask; App.ask = () => true;
+      try { document.querySelector('#library [data-lib-del="1"]').click(); await later(); } finally { App.ask = ask; }
+      eq(App.library.map(p => p.name).includes('lamp'), false);
+      eq((await host.settings()).library.length, 2);
+    } finally {
+      closeModal();
+      App.library = kept;
+      await host.settings({ library: saved === undefined ? [] : saved });
+      App.doRefresh();
+    }
+  });
+
   await test('replace: what will change is listed before anything changes; new problems come with the way back; one undo', async () => {
     const $ = id => document.getElementById(id);
     const set = (id, v) => { $(id).value = v; $(id).dispatchEvent(new Event('input', { bubbles: true })); $(id).dispatchEvent(new Event('change', { bubbles: true })); };

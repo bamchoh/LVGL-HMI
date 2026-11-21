@@ -1161,6 +1161,128 @@ test('M replace: 100 screens with 5000 widgets - the plan and the replacement ta
   assert.ok(tPlan < 2000 && tApply < 10000 && tText < 10000 && tSize < 5000);
 });
 
+// ---------------------------------------------------------------- the library of parts (issue #71)
+
+test('M library: the selection becomes a part that begins at 0,0; a part is pasted like a copy', () => {
+  const { M } = lineProject();
+  M.st.sel = [0]; M.st.more = [[1]];
+  const part = M.libraryPartFromSelection('  Line head  ');
+  assert.equal(part.name, 'Line head');
+  assert.equal(part.widgets.length, 2);
+  assert.deepEqual([part.widgets[0].x, part.widgets[0].y, part.widgets[1].x, part.widgets[1].y], [0, 0, 0, 40]);
+  assert.equal(M.screen().children[0].x, 10, 'the screen is not touched');
+  assert.equal(part.widgets[1].on_click[1].code, 'tag.total = tag.line1_speed + tag.line2_speed', 'actions and code come along');
+  // a panel with its children is one widget of the part
+  M.st.sel = [3]; M.st.more = [];
+  const panel = M.libraryPartFromSelection('box');
+  assert.equal(panel.widgets.length, 1);
+  assert.equal(panel.widgets[0].children.length, 2);
+  assert.deepEqual([panel.widgets[0].x, panel.widgets[0].y], [0, 0]);
+  // nothing selected, no name
+  M.st.sel = []; M.st.more = [];
+  assert.equal(M.libraryPartFromSelection('x'), null);
+  M.st.sel = [0];
+  assert.equal(M.libraryPartFromSelection('   '), null);
+  // used on another screen: added, selected, one undo step
+  M.st.cur = 1; M.st.sel = [];
+  const n = M.screen().children.length, undos = M.st.undo.length;
+  assert.equal(M.pastePart(part), 2);
+  assert.equal(M.screen().children.length, n + 2);
+  assert.equal(M.st.undo.length, undos + 1);
+  assert.equal(M.screen().children[n].text, 'Line 1 speed');
+  M.screen().children[n].text = 'changed on the screen';
+  assert.equal(part.widgets[0].text, 'Line 1 speed', 'the part is not what is on the screen');
+  M.pastePart(part);
+  assert.notDeepEqual([M.screen().children[n + 2].x, M.screen().children[n + 2].y], [M.screen().children[n].x, M.screen().children[n].y], 'not exactly on top of the first');
+  assert.equal(M.pastePart(null), 0);
+  assert.equal(M.pastePart({ name: 'x', widgets: [] }), 0);
+});
+
+test('M library: export and import; a part with a name that is there is replaced; what is no library is refused', () => {
+  const { M } = lineProject();
+  M.st.sel = [0];
+  const a = M.libraryPartFromSelection('a');
+  M.st.sel = [1];
+  const b = M.libraryPartFromSelection('b');
+  const text = M.libraryExport([a, b]);
+  assert.equal(JSON.parse(text).hml_library, 1);
+  let r = M.libraryImport(text, []);
+  assert.deepEqual(plain(r.parts), plain([a, b]));
+  assert.deepEqual([r.added, r.replaced, r.errors.length], [2, 0, 0]);
+  // into a library that has "b" and "c": "b" is replaced in its place, "a" comes last
+  const c = { name: 'c', widgets: [{ type: 'label', text: 'c' }] }, oldB = { name: 'b', widgets: [{ type: 'led' }] };
+  r = M.libraryImport(text, [oldB, c]);
+  assert.deepEqual(plain(r.parts.map(p => p.name)), ['b', 'c', 'a']);
+  assert.equal(r.parts[0].widgets[0].type, 'button');
+  assert.deepEqual([r.added, r.replaced], [1, 1]);
+  // a bare list of parts, a BOM in front
+  assert.equal(M.libraryImport('\uFEFF' + JSON.stringify([c]), []).added, 1);
+  for (const bad of ['', 'hello', '{', '{}', '5', 'null', '{"parts": 5}', '{"parts": {}}', 'alert(1)', '({parts: []})', '// a comment\n{"parts": []}x']) {
+    const x = M.libraryImport(bad, [c]);
+    assert.equal(x.added + x.replaced, 0, bad);
+    assert.ok(x.errors.length >= 1 || bad === '[]', bad);
+    assert.equal(x.parts.length, 1, 'what was there stays');
+  }
+  // parts that are none are left out one by one; the others come in
+  r = M.libraryImport(JSON.stringify({ parts: [5, null, {}, { name: 'no widgets' }, { name: 'empty', widgets: [] }, { name: '', widgets: [{ type: 'label' }] }, { name: 'only junk', widgets: [5, 'x', {}] }, c] }), []);
+  assert.equal(r.added, 1);
+  assert.equal(r.errors.length, 7, r.errors.join(' | '));
+  // the library has room for 200
+  const many = Array.from({ length: 205 }, (_, i) => ({ name: 'p' + i, widgets: [{ type: 'label' }] }));
+  r = M.libraryImport(JSON.stringify(many), []);
+  assert.equal(r.parts.length, 200);
+  assert.equal(r.errors.length, 5);
+});
+
+test('M library: from outside nothing but data gets in - no prototypes, no paths out of the project, no bottomless nesting', () => {
+  const { M } = lineProject();
+  // (written as text: this is what a file somebody sends looks like)
+  const hostile = '{ "hml_library": 1, "parts": [ { "name": "<img src=x onerror=alert(1)>", "__proto__": { "polluted": true }, "widgets": [' +
+    '{ "type": "image", "src": "../../secret.png", "__proto__": { "polluted": 1 }, "constructor": { "prototype": { "polluted": 2 } }, "text": "<script>alert(1)</script>" },' +
+    '{ "type": "image", "src": "C:\\\\Windows\\\\win.ini" }, { "type": "image", "src": "/etc/passwd" }, { "type": "image", "src": "file:///c:/x.png" }, { "type": "image", "src": "\\\\\\\\server\\\\share\\\\a.png" },' +
+    '{ "type": "image", "src": "assets/..\\\\..\\\\x.png" }, { "type": "image", "src": "assets/logo.png" },' +
+    '{ "type": "panel", "children": [ { "type": "image", "src": "../up.png" }, { "type": "label", "text": "ok" }, "junk", null ] },' +
+    '{ "type": "button", "on_click": { "action": "script", "code": "os.execute(\\"rm -rf /\\")" } } ] } ] }';
+  const r = M.libraryImport(hostile, []);
+  assert.equal(r.added, 1);
+  const p = r.parts[0];
+  assert.equal(p.name, '<img src=x onerror=alert(1)>', 'a name is text; it is shown as text (the UI test looks at that)');
+  assert.equal({}.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(p.polluted, undefined);
+  assert.equal(p.widgets[0].polluted, undefined);
+  assert.ok(!Object.prototype.hasOwnProperty.call(p.widgets[0], 'constructor'));
+  assert.deepEqual(plain(p.widgets.slice(0, 7).map(w => w.src)), [null, null, null, null, null, null, 'assets/logo.png']);
+  assert.equal(p.widgets[0].text, '<script>alert(1)</script>', 'a text stays a text');
+  assert.deepEqual(plain(p.widgets[7].children), [{ type: 'image' }, { type: 'label', text: 'ok' }]);
+  assert.ok(r.dropped.filter(d => /image/.test(d)).length === 7, r.dropped.join(' | '));
+  // Lua code in a part is data like in any screen: it comes in as it is (and runs on the device like any script of the project)
+  assert.equal(p.widgets[8].on_click.code, 'os.execute("rm -rf /")');
+  // what cannot be in a JSON file cannot be in a part either
+  const c = M.libraryClean({ name: 'x', widgets: [{ type: 'label', f: () => 1, n: NaN, inf: Infinity, u: undefined, big: 'x'.repeat(30000), sym: Symbol('s') }] });
+  assert.deepEqual(Object.keys(c.part.widgets[0]).sort(), ['big', 'type']);
+  assert.equal(c.part.widgets[0].big.length, 20000);
+  // nested without end, more widgets than any screen has
+  let deep = { type: 'panel' };
+  const top = deep;
+  for (let i = 0; i < 500; i++) { deep.children = [{ type: 'panel' }]; deep = deep.children[0]; }
+  const d = M.libraryClean({ name: 'deep', widgets: [top] });
+  let depth = 0;
+  for (let w = d.part.widgets[0]; w; w = (w.children || [])[0]) depth++;
+  assert.ok(depth <= 22, 'cut at ' + depth);
+  let val = 1;
+  for (let i = 0; i < 200; i++) val = { v: val };
+  assert.ok(JSON.stringify(M.libraryClean({ name: 'v', widgets: [{ type: 'label', data: val }] }).part).length < 2000);
+  const wide = M.libraryClean({ name: 'wide', widgets: Array.from({ length: 2500 }, () => ({ type: 'label' })) });
+  assert.equal(wide.part, null);
+  assert.match(wide.error, /more than 2000/);
+  // a name: one line, 64 characters
+  assert.equal(M.libraryClean({ name: 'a\nb\tc\u0000d', widgets: [{ type: 'label' }] }).part.name, 'a b c d');
+  assert.equal(M.libraryClean({ name: 'n'.repeat(300), widgets: [{ type: 'label' }] }).part.name.length, 64);
+  assert.equal(M.libraryClean({ name: 5, widgets: [{ type: 'label' }] }).part.name, '5');
+  for (const bad of [null, 5, 'x', [], { widgets: [{ type: 'label' }] }]) assert.equal(M.libraryClean(bad).part, null);
+});
+
 test('M transfers: the tags follow a rename; a ring, a wrong trigger and a destination of the runtime are problems', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;
