@@ -416,6 +416,14 @@ Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
 Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター', 'Date and time input': '日付・時刻の入力', 'Table': '表' });
 Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ' });
+Object.assign(I18N.KEYS_JA, { zones: '色を付ける区間', widths: '列の幅', cells: 'セル', from: '開始', to: '終了' });
+Object.assign(I18N.TEXT_JA, { 'Edit cells…': 'セルを編集…', '+ row': '+ 行', '+ column': '+ 列', '− column': '− 列', 'Table cells': '表のセル', 'Move up': '上へ', 'Remove': '削除', 'Remove this row': 'この行を削除',
+  'This cell is kept as it is (edit it as JSON in the project file)': 'このセルはそのまま残します（プロジェクトのファイルで JSON として編集してください）',
+  'A cell is a text, or a tag in braces: {count}  ·  with a format: {temp|%.1f C}  ·  with a text per value: {state|0=Stop,1=Run,*=?} (* = any other value). The titles and widths of the columns are set under "columns".':
+    'セルには文字か、波かっこで囲んだタグを書きます: {count}  ·  書式つき: {temp|%.1f C}  ·  値ごとの文字: {state|0=停止,1=運転,*=?}（* はそれ以外の値）。列の見出しと幅は「表示する列」で設定します。',
+  'more curves on the same axes (4 in all)': '同じ軸に重ねる曲線（全部で 4 本まで）', 'a title per column; width in pixels (empty: the columns share what is left)': '列ごとの見出し。幅はピクセル（空なら残りを分け合う）',
+  'the cells: texts and tags': 'セルの中身（文字とタグ）', 'parts of the scale in a colour (a warning range, an alarm range)': '目盛りに色を付ける区間（警告の範囲、異常の範囲）',
+  'the title of each column, and the text shown when there is no row (empty)': '列ごとの見出しと、行がないときの文字（empty）', 'the width of a column in pixels (empty: the columns share what is left)': '列の幅（ピクセル。空なら残りを分け合う）' });
 Object.assign(I18N.KEYS_JA, { jitter: 'ブレの許容 (px)', smooth: '平均する回数', settle: '押し始めに捨てる回数', scroll_limit: 'スクロール開始の距離 (px)', log: 'タッチをログに残す' });
 Object.assign(I18N.KEYS_JA, { x_tag: '横軸のタグ', x_min: '横軸の最小', x_max: '横軸の最大', y_tag: '縦軸のタグ', y_min: '縦軸の最小', y_max: '縦軸の最大', clear_tag: '消去のタグ' });
 Object.assign(I18N.KEYS_JA, { seconds: '秒も入力する', year_min: '年の下限', year_max: '年の上限' });

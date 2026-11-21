@@ -21,6 +21,9 @@ function loadSchema() {
 const code = s => '`' + s + '`';
 function fieldType(f, S) {
   if (f.t === 'select') return (f.o || S.aligns).filter(o => o !== '').map(code).join(' / ');
+  if (f.t === 'list') return 'list of `{ ' + f.fields.map(x => '"' + x.k + '"').join(', ') + ' }`' + (f.wrap ? ' (or just the ' + f.wrap + ')' : '') + (f.max ? ', up to ' + f.max : '');
+  if (f.t === 'cells') return 'list of rows; a row is a list of cells; a cell is a text, a number or `{ "tag", "format", "map" }`';
+  if (f.t === 'map') return 'object: ' + (f.vt === 'number' ? 'a number' : 'a text') + ' per key (' + f.hint + ')';
   return { text: 'text', number: 'number', bool: 'true / false', color: 'color', size: 'size', lines: 'array of texts', points: '[[x, y], ...]',
            image: 'image path', tag: 'tag name', csv: 'array of texts', loggroup: 'data log group name', recipebook: 'recipe book name',
            screen: 'screen name', anim: 'animation', script: 'script name', code: 'Lua code' }[f.t] || f.t;
@@ -29,10 +32,6 @@ const jsonValue = v => code(JSON.stringify(v));
 // keys the runtime takes that the designer edits elsewhere (or only as JSON)
 const EXTRA = {
   trend: '`tags` items may be `{ "tag", "color" }`; `labels` (`{ "now" }`)',
-  xy_chart: '`series` (more curves: `[ { "x_tag", "y_tag", "color" } ]`, up to 4 curves in all)',
-  table: '`columns` (titles, or `{ "title", "width", "align" }`), `rows` (lists of cells: a text or `{ "tag", "format", "map" }`)',
-  meter: '`zones` (`[ { "from": 80, "to": 100, "color": "#e53935" } ]`: parts of the scale in a colour)',
-  log_view: '`labels` (object of texts: `empty` and the titles of the columns), `widths` (`{ "time": 150 }`, pixels)',
   alarm_list: '`labels` (object of texts)', alarm_banner: '`labels` (object of texts)', recipe_table: '`labels` (object of texts)',
 };
 

@@ -904,6 +904,55 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+test('M table cells: a cell as a line of text and back', () => {
+  const { M } = load();
+  const pairs = [
+    ['Loader', 'Loader'], ['', ''], [5, '5'], [2.5, '2.5'], [-1, '-1'],
+    [{ tag: 'count' }, '{count}'],
+    [{ tag: 'temp', format: '%.1f C' }, '{temp|%.1f C}'],
+    [{ tag: 'state', map: { 0: 'Stop', 1: 'Run', default: '?' } }, '{state|0=Stop,1=Run,*=?}'],
+    [{ tag: 'state', format: '%d', map: { 1: 'on' } }, '{state|%d|1=on}'],
+    [{ tag: 'pct', format: '%d %%' }, '{pct|%d %%}'],
+    ['{literal}', '\\{literal}'], ['\\{x', '\\\\{x'],
+    ['a {b} c', 'a {b} c'], ['50%', '50%'], ['a=b', 'a=b'], ['@title', '@title'],
+  ];
+  for (const [cell, text] of pairs) {
+    assert.equal(M.cellToText(cell), text, 'to text: ' + JSON.stringify(cell));
+    deq(M.textToCell(text), cell, 'back: ' + text);
+    assert.equal(M.cellEditable(cell), true, JSON.stringify(cell));
+  }
+  assert.equal(M.cellToText(null), '');
+  assert.equal(M.cellToText(undefined), '');
+  assert.equal(M.cellToText(true), 'true');
+  deq(M.textToCell(' {count} '), { tag: 'count' });                  // spaces around a tag do not matter
+  deq(M.textToCell('{ count |%d}'), { tag: 'count', format: '%d' });
+  deq(M.textToCell('{count'), '{count');                             // not closed: a text
+  deq(M.textToCell('{a}{b}'), '{a}{b}');
+  deq(M.textToCell('007'), '007');                                   // not a number as the runtime would print it
+  deq(M.textToCell('1e3'), '1e3');
+  deq(M.textToCell(' 5 '), 5);                                       // (spaces around a number do not matter)
+  // what the grid cannot write as a text is left alone
+  assert.equal(M.cellEditable('5'), true);                           // ("5" and 5 show the same)
+  assert.equal(M.cellEditable(null), true);
+  assert.equal(M.cellEditable({ tag: 't', map: { 0: 'a,b' } }), false);
+  assert.equal(M.cellEditable({ tag: 't', map: { 0: 'a|b' } }), false);
+  assert.equal(M.cellEditable({ tag: 't', format: 'x=%d' }), false);
+  assert.equal(M.cellEditable({ tag: 't', colour: 'red' }), false);
+  assert.equal(M.cellEditable({ text: 'x' }), false);
+  assert.equal(M.cellEditable(['a']), false);
+  assert.equal(M.cellEditable({ tag: 'a|b' }), false);
+  assert.equal(M.cellEditable({ tag: 't', map: { '': 'x' } }), false);
+});
+
+test('SCHEMA.logColumns: the columns a log view shows', () => {
+  const { SCHEMA } = load();
+  deq(SCHEMA.logColumns({}), ['time', 'level', 'source', 'message']);
+  deq(SCHEMA.logColumns({ source: 'operation' }), ['time', 'user', 'kind', 'target', 'old', 'new']);
+  deq(SCHEMA.logColumns({ source: 'system', columns: ['time', 'message'] }), ['time', 'message']);
+  deq(SCHEMA.logColumns({ columns: 'time, count' }), ['time', 'count']);
+  deq(SCHEMA.logColumns({ source: 'data', group: 'none' }), ['time']);
+});
+
 test('M renameTag: the cells of a table and the filter tag of a log view follow; unknown ones are problems', () => {
   const { M } = tagProject();
   const s = M.screen().children;

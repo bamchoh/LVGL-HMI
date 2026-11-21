@@ -298,3 +298,18 @@ button.arr { width: 34px; height: 28px; padding: 0; font-size: 16px; line-height
 #status-run { cursor: pointer; white-space: nowrap; }
 #status-run[hidden] { display: none; }
 #status-run.on { color: #81c784; }
+
+/* properties that are lists (zones of a meter, columns of a table), maps (titles of a log view) and the cells of a table */
+.list-editor { margin: 2px 0 6px; }
+.list-editor .list-head { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item { gap: 3px; }
+.list-item > input, .list-item > select, .list-item > span { flex: 1; min-width: 0; }
+.list-item > button { flex: none; }
+.map-editor { margin: 2px 0 6px; }
+.map-item > label { flex: 0 0 38%; overflow: hidden; text-overflow: ellipsis; }
+.cells-dialog { max-height: 60vh; overflow: auto; min-width: 520px; }
+table.cells { border-collapse: collapse; width: 100%; }
+table.cells th { font-weight: normal; font-size: 12px; color: var(--dim); text-align: left; padding: 2px 4px; }
+table.cells td { padding: 1px 2px; }
+table.cells td input { width: 100%; min-width: 90px; box-sizing: border-box; }
+.cells-tools { display: flex; gap: 6px; margin: 8px 0; }

@@ -116,7 +116,97 @@ const Props = {
     const tip = I18N.named(label) ? label + (hint ? '\n' + I18N.t(hint) : '') : I18N.t(hint || '');
     return U.el('div', { class: 'row', title: tip }, U.el('label', null, I18N.label(label)), input);
   },
-  fields(obj, defs, fk) { return defs.map(f => this.row(f.label || f.k, this.editor(obj, f.k, f, fk), f.hint)); },
+  fields(obj, defs, fk) {
+    return defs.map(f => f.t === 'list' ? this.listEditor(obj, f, fk) : f.t === 'map' ? this.mapEditor(obj, f, fk) : f.t === 'cells' ? this.cellsEditor(obj, f, fk)
+      : this.row(f.label || f.k, this.editor(obj, f.k, f, fk), f.hint));
+  },
+
+  // ---- properties that are lists and tables ------------------------------
+  // { k, t: 'list', fields: [...], item: {...} | () => ({...}), wrap: 'title', max }: a list of objects, one line of
+  // small editors per item. "wrap": an item may also be written as a bare value (a column of a table as
+  // its title); it becomes an object when one of its other fields is filled in.
+  listEditor(obj, f, fk) {
+    const list = Array.isArray(obj[f.k]) ? obj[f.k] : [];
+    const holder = i => new Proxy({}, {
+      get: (t, k) => { const it = list[i]; return it && typeof it === 'object' ? it[k] : (f.wrap && k === f.wrap ? it : undefined); },
+      set: (t, k, v) => { const it = list[i]; if (it && typeof it === 'object') it[k] = v; else list[i] = f.wrap && k !== f.wrap && it !== undefined && it !== null ? { [f.wrap]: it, [k]: v } : { [k]: v }; return true; },
+      deleteProperty: (t, k) => { const it = list[i]; if (it && typeof it === 'object') delete it[k]; else if (f.wrap && k === f.wrap) list[i] = ''; return true; },
+    });
+    const rows = list.map((it, i) => U.el('div', { class: 'row sub list-item' },
+      ...f.fields.map(sf => { const e = this.editor(holder(i), sf.k, sf, fk + '.' + f.k + '.' + i); e.title = I18N.label(sf.k) + (sf.hint ? '\n' + I18N.t(sf.hint) : '');
+        if (e.placeholder !== undefined && !e.placeholder) e.placeholder = I18N.label(sf.k); return e; }),
+      U.el('button', { class: 'mini', title: 'Move up', disabled: i === 0, dataset: { fk: fk + '.' + f.k + '.' + i + '.up' }, onclick: () => M.mutate(() => { list.splice(i - 1, 0, list.splice(i, 1)[0]); }) }, '↑'),
+      U.el('button', { class: 'mini danger', title: 'Remove', dataset: { fk: fk + '.' + f.k + '.' + i + '.del' }, onclick: () => M.mutate(() => { list.splice(i, 1); if (!list.length) delete obj[f.k]; }) }, '×')));
+    const full = f.max !== undefined && list.length >= f.max;
+    const add = U.el('button', { class: 'mini', disabled: full, dataset: { fk: fk + '.' + f.k + '.add' }, onclick: () => M.mutate(() => {
+      if (!Array.isArray(obj[f.k])) obj[f.k] = [];
+      obj[f.k].push(typeof f.item === 'function' ? f.item(obj) : U.clone(f.item || {}));
+    }) }, '+');
+    const head = U.el('div', { class: 'row', title: f.k + (f.hint ? '\n' + I18N.t(f.hint) : '') }, U.el('label', null, I18N.label(f.label || f.k)),
+      U.el('span', { class: 'dim list-head' }, f.fields.map(sf => I18N.label(sf.k)).join(' / ')), add);
+    return U.el('div', { class: 'list-editor', dataset: { list: f.k } }, head, ...rows);
+  },
+
+  // { k, t: 'map', keys: obj => [...], vt: 'text' | 'number' }: an object with a value for each of a few known
+  // keys (the title of each column of a log view). The object exists only while it holds something.
+  mapEditor(obj, f, fk) {
+    const holder = new Proxy({}, {
+      get: (t, k) => (obj[f.k] && typeof obj[f.k] === 'object' ? obj[f.k] : {})[k],
+      set: (t, k, v) => { if (!obj[f.k] || typeof obj[f.k] !== 'object') obj[f.k] = {}; obj[f.k][k] = v; return true; },
+      deleteProperty: (t, k) => { if (obj[f.k] && typeof obj[f.k] === 'object') { delete obj[f.k][k]; if (!Object.keys(obj[f.k]).length) delete obj[f.k]; } return true; },
+    });
+    const have = obj[f.k] && typeof obj[f.k] === 'object' ? Object.keys(obj[f.k]) : [];
+    const keys = [...new Set((f.keys ? f.keys(obj) : []).concat(have))];        // (also what the file holds beyond them)
+    const rows = keys.map(k => U.el('div', { class: 'row sub map-item' }, U.el('label', { class: 'dim' }, document.createTextNode(k)), this.editor(holder, k, { t: f.vt || 'text' }, fk + '.' + f.k)));
+    return U.el('details', { class: 'sec map-editor', open: have.length > 0, dataset: { map: f.k }, title: f.k + (f.hint ? '\n' + I18N.t(f.hint) : '') },
+      U.el('summary', null, I18N.label(f.label || f.k) + (have.length ? ' ●' : '')), U.el('div', { class: 'sec-body' }, ...rows));
+  },
+
+  // { k: 'rows', t: 'cells' }: the cells of a table, edited as a grid in a dialog (one line of text per cell:
+  // M.cellToText). The columns come from "columns" and from the longest row.
+  cellsEditor(obj, f, fk) {
+    const rows = Array.isArray(obj[f.k]) ? obj[f.k] : [];
+    const count = rows.length + ' × ' + Math.max(Array.isArray(obj.columns) ? obj.columns.length : 0, ...rows.map(r => Array.isArray(r) ? r.length : 0), 0);
+    const btn = U.el('button', { class: 'mini', dataset: { fk: fk + '.' + f.k + '.edit' }, onclick: () => this.openCells(obj, f) }, 'Edit cells…');
+    return this.row(f.label || f.k, U.el('span', { class: 'with-btn' }, U.el('span', { class: 'dim' }, document.createTextNode(count)), btn), f.hint);
+  },
+  openCells(obj, f) {
+    const title = c => c && typeof c === 'object' ? (c.title === undefined ? '' : String(c.title)) : (c === undefined || c === null ? '' : String(c));
+    const src = Array.isArray(obj[f.k]) ? obj[f.k] : [];
+    let ncol = Math.max(Array.isArray(obj.columns) ? obj.columns.length : 0, ...src.map(r => Array.isArray(r) ? r.length : 0), 1);
+    // the grid being edited: a text per cell, or the cell itself when the grid cannot write it as a text
+    let grid = src.map(r => Array.from({ length: ncol }, (_, i) => { const c = Array.isArray(r) ? r[i] : undefined; return M.cellEditable(c) ? { text: M.cellToText(c) } : { keep: c }; }));
+    const body = U.el('div', { class: 'cells-dialog' });
+    const draw = () => {
+      body.innerHTML = '';
+      const table = U.el('table', { class: 'cells' });
+      table.append(U.el('tr', null, U.el('th', null, ''), ...Array.from({ length: ncol }, (_, i) => U.el('th', null, document.createTextNode(title((obj.columns || [])[i]) || String(i + 1)))), U.el('th', null, '')));
+      grid.forEach((row, r) => table.append(U.el('tr', null, U.el('td', { class: 'dim' }, document.createTextNode(String(r + 1))),
+        ...row.map((cell, c) => U.el('td', null, 'keep' in cell
+          ? U.el('input', { type: 'text', disabled: true, value: JSON.stringify(cell.keep), title: 'This cell is kept as it is (edit it as JSON in the project file)' })
+          : U.el('input', { type: 'text', value: cell.text, dataset: { rc: r + ',' + c }, list: 'dl-tag-cells', oninput: e => { cell.text = e.target.value; } }))),
+        U.el('td', null, U.el('button', { class: 'mini danger', title: 'Remove this row', dataset: { delrow: r }, onclick: () => { grid.splice(r, 1); draw(); } }, '×')))));
+      const tools = U.el('div', { class: 'cells-tools' },
+        U.el('button', { class: 'mini', dataset: { act: 'addrow' }, onclick: () => { grid.push(Array.from({ length: ncol }, () => ({ text: '' }))); draw(); } }, '+ row'),
+        U.el('button', { class: 'mini', dataset: { act: 'addcol' }, disabled: ncol >= 32, onclick: () => { ncol++; grid.forEach(row => row.push({ text: '' })); draw(); } }, '+ column'),
+        U.el('button', { class: 'mini', dataset: { act: 'delcol' }, disabled: ncol <= 1, onclick: () => { ncol--; grid.forEach(row => row.pop()); draw(); } }, '− column'));
+      // the tags of the project, ready to pick as "{tag}"
+      const dl = U.el('datalist', { id: 'dl-tag-cells' }, ...M.tagNames().map(n => U.el('option', { value: '{' + n + '}' })));
+      body.append(table, tools, dl, U.el('div', { class: 'hint' },
+        'A cell is a text, or a tag in braces: {count}  ·  with a format: {temp|%.1f C}  ·  with a text per value: {state|0=Stop,1=Run,*=?} (* = any other value). The titles and widths of the columns are set under "columns".'));
+    };
+    draw();
+    App.modal({ title: 'Table cells', body, buttons: [{ label: 'Cancel' }, { label: 'OK', primary: true, onclick: () => {
+      M.mutate(() => {
+        const out = grid.map(row => { const cells = row.map(cell => 'keep' in cell ? cell.keep : M.textToCell(cell.text));
+          while (cells.length && (cells[cells.length - 1] === '' || cells[cells.length - 1] === undefined || cells[cells.length - 1] === null)) cells.pop();      // (a short row is a short row)
+          return cells; });
+        if (out.length) obj[f.k] = out; else delete obj[f.k];
+        // a column that was taken away takes its title with it
+        if (Array.isArray(obj.columns) && obj.columns.length > ncol) obj.columns.length = ncol;
+      });
+    } }] });
+  },
   section(title, open, ...body) { return U.el('details', { open: open !== false, class: 'sec' }, U.el('summary', null, I18N.t(title)), U.el('div', { class: 'sec-body' }, ...body)); },
 
   // ---- panel -------------------------------------------------------------
