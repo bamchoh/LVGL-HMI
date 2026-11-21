@@ -280,6 +280,9 @@ const M = {
           if (typeof x === 'string') { if (x) cb(x, n => { w.tags[i] = n; }, loc, 'trend', false); }
           else prop(x, 'tag', loc, 'trend');
         });
+        // the cells of a table that follow a tag; the tag a log view filters by
+        if (w.type === 'table' && Array.isArray(w.rows)) for (const row of w.rows) if (Array.isArray(row)) for (const cell of row) if (cell && typeof cell === 'object' && !Array.isArray(cell)) prop(cell, 'tag', loc, 'table');
+        if (w.type === 'log_view') prop(w, 'filter_tag', loc, 'filter');
         (w.children || []).forEach((c, i) => visit(c, path.concat(i)));
       };
       visit(s.data, []);

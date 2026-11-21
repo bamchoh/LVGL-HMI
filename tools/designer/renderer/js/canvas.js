@@ -137,6 +137,7 @@ const Canvas = {
       case 'log_view': return ['100%', 300];
       case 'meter': return [200, 200];
       case 'datetime_input': return [null, null];
+      case 'table': return ['100%', 200];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
@@ -470,6 +471,30 @@ const Canvas = {
   alarmSamples() {
     const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
     return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  // the rows and columns of the screen file; a cell that follows a tag shows the tag's first value (or its name)
+  w_table(el, w) {
+    const cols = Array.isArray(w.columns) ? w.columns : [], rows = Array.isArray(w.rows) ? w.rows.slice(0, 30) : [];
+    const n = Math.min(32, Math.max(cols.length, ...rows.map(r => Array.isArray(r) ? r.length : 0)));
+    const txt = v => typeof v === 'string' ? String(M.resolveText(v)) : (v === undefined || v === null ? '' : String(v));
+    const cellText = c => {
+      if (c === null || typeof c !== 'object') return txt(c);
+      const tag = (M.st.project.tags || []).find(t => t.name === c.tag);
+      if (!tag) return '{' + (c.tag || '?') + '}';
+      const v = tag.init === undefined ? (tag.type === 'string' ? '' : tag.type === 'bool' ? false : 0) : tag.init;
+      if (c.map && typeof c.map === 'object') { const k = v === true ? 'true' : v === false ? 'false' : String(v); const hit = c.map[k] !== undefined ? c.map[k] : (v === true ? c.map['1'] : v === false ? c.map['0'] : undefined);
+        if (hit !== undefined) return txt(hit); if (c.map.default !== undefined) return txt(c.map.default); }
+      // (a format with one conversion, as far as a preview needs it: %d %.1f %s and a text around it)
+      return c.format ? String(c.format).replace(/%[-+ 0#]*\d*(?:\.(\d+))?[dioxXufFeEgGs]/, (m, d) => /[fFeEgG]$/.test(m) && d !== undefined ? Number(v).toFixed(+d) : String(v)) : String(v);
+    };
+    const table = U.el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 'inherit', tableLayout: 'fixed' } });
+    const cell = (tag, text, i) => { const col = cols[i], o = col && typeof col === 'object' ? col : {};
+      return U.el(tag, { style: { textAlign: ['right', 'center'].includes(o.align) ? o.align : 'left', padding: '5px 6px', border: '1px solid rgba(128,128,128,.35)', overflow: 'hidden',
+        fontWeight: 'normal', width: o.width ? o.width + 'px' : null, background: tag === 'th' ? 'rgba(33,150,243,.3)' : 'transparent' } }, document.createTextNode(String(text))); };
+    if (w.header !== false) table.append(U.el('tr', null, ...Array.from({ length: n }, (_, i) => cell('th', txt(cols[i] && typeof cols[i] === 'object' ? cols[i].title : cols[i]), i))));
+    for (const r of rows) table.append(U.el('tr', null, ...Array.from({ length: n }, (_, i) => cell('td', Array.isArray(r) ? cellText(r[i]) : '', i))));
+    el.style.overflow = 'hidden';
+    el.append(table);
   },
   // the rollers the mode has, three rows each, a sample date in the middle row
   w_datetime_input(el, w) {

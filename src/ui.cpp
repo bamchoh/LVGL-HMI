@@ -8,6 +8,7 @@
 #include "log_view.hpp"
 #include "meter_view.hpp"
 #include "datetime_view.hpp"
+#include "table_view.hpp"
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
@@ -1966,6 +1967,9 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     }
     else if(iequals(type, "log_view")) {
         obj = build_log_view(parent, w);
+    }
+    else if(iequals(type, "table")) {
+        obj = build_table_view(parent, w);
     }
     else if(iequals(type, "datetime_input")) {
         wk = Widget::DateTime;

@@ -77,6 +77,8 @@ const SCHEMA = {
                      { k: 'max', t: 'number' }, { k: 'buckets', t: 'number' }, { k: 'refresh_ms', t: 'number' }] },
     recipe_table: { label: 'Recipe table', def: { w: '100%', h: 300 }, props: [{ k: 'book', t: 'recipebook' }, { k: 'row_height', t: 'number' }] },
     line:     { label: 'Line', def: { points: [[0, 0], [120, 60]] }, props: [{ k: 'points', t: 'points' }] },
+    table: { label: 'Table', def: { w: '100%', h: 200, columns: ['Name', { title: 'Value', align: 'right' }], rows: [['A', '1'], ['B', '2']] },
+             props: [{ k: 'header', t: 'bool' }] },
     datetime_input: { label: 'Date and time input', def: { mode: 'datetime' },
                       props: [{ k: 'mode', t: 'select', o: ['datetime', 'date', 'time'] }, { k: 'seconds', t: 'bool' }, { k: 'year_min', t: 'number' }, { k: 'year_max', t: 'number' }] },
     meter: { label: 'Meter', def: { w: 200, h: 200, min: 0, max: 100 },
