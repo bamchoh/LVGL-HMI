@@ -134,6 +134,7 @@ const Canvas = {
       case 'recipe_table': return ['100%', 300];
       case 'trend': return ['100%', 300];
       case 'alarm_list': return ['100%', 240];
+      case 'log_view': return ['100%', 300];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
@@ -467,6 +468,44 @@ const Canvas = {
   alarmSamples() {
     const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
     return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  // a few sample rows: what the columns will look like (the real rows come from the log on the device)
+  LOG_COLUMNS: { system: ['time', 'level', 'source', 'message'], operation: ['time', 'user', 'kind', 'target', 'old', 'new'] },
+  LOG_SAMPLES: {
+    system: [['INFO', 'system', 'project loaded'], ['WARN', 'driver', 'modbus: communication error, reconnecting'], ['ERROR', 'script', "script 'calc': attempt to index a nil value"],
+             ['INFO', 'driver', 'modbus 192.168.0.10:502 connected']],
+    operation: [['op', 'write', 'setpoint', '40', '45'], ['op', 'screen', 'trend', '', ''], ['admin', 'system', 'backup', '', ''], ['op', 'write', 'run', 'false', 'true']],
+  },
+  w_log_view(el, w) {
+    const src = ['system', 'operation', 'data'].includes(w.source) ? w.source : 'system', lab = w.labels || {};
+    const p = M.st.project, grp = ((p && p.data_log && p.data_log.groups) || []).find(g => g.name === w.group);
+    const all = src === 'data' ? ['time'].concat(((grp && grp.tags) || []).map(t => typeof t === 'string' ? t : (t && t.tag)).filter(Boolean)) : this.LOG_COLUMNS[src];
+    const asked = Array.isArray(w.columns) ? w.columns : typeof w.columns === 'string' ? w.columns.split(',').map(x => x.trim()).filter(Boolean) : [];
+    const cols = asked.length ? asked : all;
+    const title = c => lab[c] || (src === 'data' && c !== 'time' ? c : c.charAt(0).toUpperCase() + c.slice(1));
+    const bar = U.el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '0 0 6px 0' } });
+    if (src === 'system' && w.filter !== false) bar.append(U.el('span', { class: 'lv-al-dd' }, String(w.min_level || 'info').toUpperCase() + ' ▾'));
+    const n = Math.max(1, Math.min(U.num(w.rows, 10), 6));
+    bar.append(U.el('span', { style: { flex: '1', textAlign: 'right' } }, '1 - ' + n + ' / 128'), U.el('span', { class: 'lv-al-btn' }, '◀'), U.el('span', { class: 'lv-al-btn' }, '▶'));
+    const table = U.el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 'inherit' } });
+    const cell = (tag, text, color) => U.el(tag, { style: { textAlign: 'left', padding: '5px 6px', border: '1px solid rgba(128,128,128,.35)', whiteSpace: 'nowrap', overflow: 'hidden',
+      textOverflow: 'ellipsis', maxWidth: '0', fontWeight: 'normal', color: color || 'inherit', background: tag === 'th' ? 'rgba(33,150,243,.3)' : 'transparent' } }, document.createTextNode(String(text)));   // (as the device shows it: never translated)
+    table.append(U.el('tr', null, ...cols.map(c => cell('th', title(c)))));
+    for (let i = 0; i < n; i++) {
+      const time = '11-21 10:' + String(59 - i * 3).padStart(2, '0') + ':07';
+      let row, color = null;
+      if (src === 'data') row = cols.map((c, k) => c === 'time' ? time : (20 + ((i * 7 + k * 3) % 50) / 10).toFixed(1));
+      else {
+        const s = this.LOG_SAMPLES[src][i % 4];
+        const byName = src === 'system' ? { time, level: s[0], source: s[1], message: s[2], count: i % 4 === 1 ? 'x3' : '' }
+                                        : { time, user: s[0], screen: 'main', kind: s[1], target: s[2], old: s[3], new: s[4] };
+        if (src === 'system') color = s[0] === 'ERROR' ? '#ef9a9a' : s[0] === 'WARN' ? '#ffd54f' : null;
+        row = cols.map(c => byName[c] === undefined ? '' : byName[c]);
+      }
+      table.append(U.el('tr', null, ...row.map(t => cell('td', t, color))));
+    }
+    el.style.display = 'flex'; el.style.flexDirection = 'column'; el.style.padding = '6px'; el.style.overflow = 'hidden';
+    el.append(bar, table);
   },
   w_alarm_list(el, w) {
     const history = w.mode === 'history', lab = w.labels || {};
