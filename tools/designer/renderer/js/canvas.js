@@ -138,6 +138,7 @@ const Canvas = {
       case 'meter': return [200, 200];
       case 'datetime_input': return [null, null];
       case 'table': return ['100%', 200];
+      case 'xy_chart': return [300, 240];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
@@ -471,6 +472,30 @@ const Canvas = {
   alarmSamples() {
     const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
     return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  // the frame, the grid, the numbers at the ends of the axes and a sample curve per series
+  w_xy_chart(el, w) {
+    const NS = 'http://www.w3.org/2000/svg', mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    const dec = Math.min(3, Math.max(0, Math.round(U.num(w.decimals, 0))));
+    const ok = (lo, hi) => hi > lo ? [lo, hi] : [0, 100];
+    const [x0, x1] = ok(U.num(w.x_min, 0), U.num(w.x_max, 100)), [y0, y1] = ok(U.num(w.y_min, 0), U.num(w.y_max, 100));
+    const lab = (text, style) => U.el('span', { class: 'lv-xy-end', style: Object.assign({ position: 'absolute', opacity: '.7', whiteSpace: 'nowrap' }, style) }, document.createTextNode(text));
+    const left = Math.max(y0.toFixed(dec).length, y1.toFixed(dec).length) * 9 + 6, bottom = 22;
+    const svg = mk('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' });
+    Object.assign(svg.style, { position: 'absolute', left: left + 'px', top: '0', width: 'calc(100% - ' + left + 'px)', height: 'calc(100% - ' + bottom + 'px)', border: '1px solid rgba(128,128,128,.6)', boxSizing: 'border-box', borderRadius: '4px' });
+    const hd = Math.min(20, Math.max(0, Math.round(U.num(w.hdiv, 5)))), vd = Math.min(20, Math.max(0, Math.round(U.num(w.vdiv, 5))));
+    for (let i = 1; i < hd + 1; i++) svg.append(mk('line', { x1: 0, x2: 100, y1: 100 * i / (hd + 1), y2: 100 * i / (hd + 1), stroke: 'rgba(128,128,128,.35)', 'stroke-width': .5, 'vector-effect': 'non-scaling-stroke' }));
+    for (let i = 1; i < vd + 1; i++) svg.append(mk('line', { y1: 0, y2: 100, x1: 100 * i / (vd + 1), x2: 100 * i / (vd + 1), stroke: 'rgba(128,128,128,.35)', 'stroke-width': .5, 'vector-effect': 'non-scaling-stroke' }));
+    const colors = ['#2196f3', '#f44336', '#4caf50', '#ff9800'], all = [w].concat(Array.isArray(w.series) ? w.series.filter(s => s && typeof s === 'object') : []).slice(0, 4);
+    all.forEach((s, k) => {
+      const pts = Array.from({ length: 40 }, (_, i) => { const t = i / 39 * Math.PI * 2; return [50 + (38 - k * 8) * Math.cos(t) * (1 - .25 * Math.sin(t)), 50 - (34 - k * 7) * Math.sin(t)]; });
+      const col = s.color || colors[k];
+      if (w.mode === 'dots') pts.forEach(p => svg.append(mk('circle', { cx: p[0], cy: p[1], r: 1.2, fill: col })));
+      else svg.append(mk('polyline', { points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: col, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' }));
+    });
+    el.style.position = el.style.position || 'relative';
+    el.append(svg, lab(y1.toFixed(dec), { left: '0', top: '0' }), lab(y0.toFixed(dec), { left: '0', bottom: bottom + 'px' }),
+              lab(x0.toFixed(dec), { left: left + 'px', bottom: '0' }), lab(x1.toFixed(dec), { right: '0', bottom: '0' }));
   },
   // the rows and columns of the screen file; a cell that follows a tag shows the tag's first value (or its name)
   w_table(el, w) {

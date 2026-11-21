@@ -217,6 +217,7 @@ struct Checker {
             if(type == "log_view") own.insert("widths");                         // (an object: edited as JSON)
             if(type == "meter") own.insert("zones");
             if(type == "table") { own.insert("columns"); own.insert("rows"); }
+            if(type == "xy_chart") own.insert("series");
         }
         for(auto it = w.begin(); it != w.end(); ++it) {
             const std::string& k = it.key();
@@ -274,6 +275,28 @@ struct Checker {
             if(!books.count(b) && !(b.empty() && books.size() == 1)) add(where, b.empty() ? "no \"book\" (a recipe book)" : "unknown recipe book \"" + b + "\"");
         }
         if((type == "alarm_list" || type == "alarm_banner") && !has_alarms) add(where, "the project has no \"alarms\"");
+        if(type == "xy_chart") {
+            for(const char* k : { "x_tag", "y_tag" }) { if(w.contains(k)) need_tag(where, k, w[k]); else add(where, std::string("no \"") + k + "\""); }
+            if(w.contains("clear_tag")) need_tag(where, "clear_tag", w["clear_tag"]);
+            if(const json* ser = jget(w, "series")) {
+                if(!ser->is_array()) add(where, "series: a list is needed");
+                else for(size_t i = 0; i < ser->size(); i++) {
+                    const json& s = (*ser)[i];
+                    const std::string at = "series[" + std::to_string(i) + "]";
+                    if(!s.is_object()) { add(where, at + ": { \"x_tag\", \"y_tag\" } is needed"); continue; }
+                    for(auto k = s.begin(); k != s.end(); ++k) {
+                        if(k.key() == "x_tag" || k.key() == "y_tag") need_tag(where, at + "." + k.key(), k.value());
+                        else if(k.key() != "color") add(where, at + ": unknown key \"" + k.key() + "\"");
+                    }
+                    if(!s.contains("x_tag") || !s.contains("y_tag")) add(where, at + ": x_tag and y_tag are needed");
+                }
+            }
+            for(const char* a : { "x", "y" }) {
+                const std::string lo = std::string(a) + "_min", hi = std::string(a) + "_max";
+                if(w.contains(lo) && w.contains(hi) && w[lo].is_number() && w[hi].is_number() && !(w[hi].get<double>() > w[lo].get<double>()))
+                    add(where, hi + " has to be above " + lo);
+            }
+        }
         if(type == "table") {
             if(const json* cl = jget(w, "columns"); cl && !cl->is_array()) add(where, "columns: a list is needed");
             if(const json* rw = jget(w, "rows")) {

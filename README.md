@@ -43,6 +43,7 @@ build.cmd Debug
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
+| `test_xy_chart.cpp`                                  | XY グラフ（点の追加と破棄、変化時、複数の曲線、消去、数値でない値、極端な設定、描き直しの回数、`--check`）                   |
 | `test_table.cpp`                                     | 表（タグへの追従、`format` と `map`、極端な行数・列数と壊れた設定、1000 行の時間、`--check`）                               |
 | `test_datetime.cpp`                                  | 日付・時刻の入力（うるう年と月末、書式、数値との変換、ローラーとタグ、レベル、操作ログ、`--check`）                        |
 | `test_meter.cpp`                                     | メーター（針と数字、範囲外・数値でない値、極端な設定、描画時間、`--check`）                                                 |
@@ -1305,6 +1306,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
 | `arc`                 | `min`, `max`, `value`, `start_angle`, `end_angle`, `rotation`, `adjustable`                                               |
+| `xy_chart`            | XY グラフ: `x_tag`, `y_tag`, `x_min`, `x_max`, `y_min`, `y_max`, `points`, `sample_ms`, `refresh_ms`, `mode`, `clear_tag`, `series`（下記「XY グラフ」） |
 | `table`               | 表: `columns`, `rows`, `header`（下記「表」）                                                                             |
 | `datetime_input`      | 日付・時刻の入力: `mode`, `seconds`, `year_min`, `year_max`（下記「日付と時刻の入力」）                                    |
 | `meter`               | 針のメーター: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones`（下記「メーター」） |
@@ -1805,6 +1807,43 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 ```
 
 画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+
+## XY グラフ: `xy_chart`
+
+横軸と縦軸にそれぞれタグを取るグラフです（プレスの位置と荷重、バルブの開度と流量など）。一定の間隔か、値が変わった
+ときに点を足し、古い点から捨てます。時間を横軸にするグラフは `chart` / `trend` を使います。
+
+```json
+{ "type": "xy_chart", "w": 300, "h": 240,
+  "x_tag": "position", "x_min": 0, "x_max": 100,
+  "y_tag": "force",    "y_min": 0, "y_max": 50,
+  "points": 200, "sample_ms": 100, "clear_tag": "cycle_start" }
+```
+
+| キー                              | 内容                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `x_tag` / `y_tag`                 | 横軸・縦軸のタグ（`x` `y` は部品の位置なので、軸のキーは `x_tag` `x_min` … と書く）        |
+| `x_min` `x_max` `y_min` `y_max`   | 軸の範囲（既定 0 〜 100）。軸の両端に数字が出る                                            |
+| `points`                          | 残す点の数（2 〜 2000、既定 200）                                                          |
+| `sample_ms`                       | 点を取る間隔（20 以上、既定 100）。`0` は「x か y が変わったとき」                         |
+| `refresh_ms`                      | グラフを描き直す間隔の下限（50 以上、既定 250）                                            |
+| `mode`                            | `line`（来た順に線でつなぐ。既定）/ `dots`（点だけ）                                       |
+| `color`、`hdiv` / `vdiv`、`decimals` | 線の色、格子の線の数、軸の数字の小数の桁                                                |
+| `clear_tag`                       | このタグが真（0 以外）になった瞬間に、曲線を消して描き直す（1 サイクルごとの波形に使う）   |
+| `series`                          | 2 本目以降の曲線: `[ { "x_tag", "y_tag", "color" } ]`（全部で 4 本まで。軸は共通）         |
+
+- 数値でない値（通信前の NaN など）は点になりません。範囲の外の点は、グラフの端に描かれます（値そのものは保持します）。
+- 点は、別の画面を表示している間も取り続けます（戻ったときに曲線が出ています）。描画は画面を表示している間だけです。
+- **負荷に注意してください。** このグラフは、点が増えるたびに全部の線を描き直します。Raspberry Pi 4（480x320、グラフ 300x264、
+  曲線 2 本、1 秒に 20 点）での計測:
+
+  | 点の数（1 本あたり） | ランタイムの CPU 使用率 |
+  | -------------------- | ----------------------- |
+  | 300                  | 5 〜 8 %                |
+  | 2000                 | 25 〜 32 %              |
+
+  描き直しを 1 秒に 4 回（`refresh_ms` 250）にまとめた結果です（点ごとに描き直していた最初の実装では、300 点で約 30 %、
+  5000 点でほぼ 100 % でした）。小さな装置では `points` を数百にするか、`refresh_ms` を大きくしてください。
 
 ## 表: `table`
 

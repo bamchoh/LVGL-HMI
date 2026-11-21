@@ -372,6 +372,27 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('XY chart: in the palette, the numbers at the ends of the axes, a curve per series', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /XY グラフ/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('xy_chart'); await frame();
+    const p = M.st.sel, find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    ok(find() && find().classList.contains('lv-xy_chart') && find().querySelector('svg'), 'drawn');
+    const ends = () => [...find().querySelectorAll('.lv-xy-end')].map(e => e.textContent).sort().join(',');
+    eq(ends(), '0,0,100,100');
+    eq(find().querySelectorAll('svg polyline').length, 1);
+    const tag = M.st.project.tags[0].name;
+    M.mutate(() => { Object.assign(M.get(p), { x_tag: tag, y_tag: tag, x_min: -1, x_max: 1, y_min: 0, y_max: 0.5, decimals: 1, series: [{ x_tag: tag, y_tag: 'no_such_tag' }] }); });
+    App.doRefresh(); await frame();
+    eq(ends(), '-1.0,0.0,0.5,1.0');
+    eq(find().querySelectorAll('svg polyline').length, 2, 'a curve per series');
+    ok(M.problems().some(x => /no_such_tag/.test(x.text)), 'an unknown tag of a series is a problem');
+    M.mutate(() => { M.get(p).mode = 'dots'; }); App.doRefresh(); await frame();
+    ok(find().querySelectorAll('svg circle').length > 10 && !find().querySelector('svg polyline'), 'dots instead of lines');
+    ok([...document.querySelectorAll('#props input, #props select')].some(i => i.value === tag), 'the tag of an axis is shown in the properties');
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('table: in the palette, its rows and columns, tag cells show the first value of the tag', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /^表$|表/.test(t.trim())), 'palette: ' + pal.join(','));
