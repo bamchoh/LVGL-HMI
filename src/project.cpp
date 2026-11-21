@@ -8,6 +8,7 @@
 #include "system_settings.hpp"
 #include "texts.hpp"
 #include "screen_saver.hpp"
+#include "sound.hpp"
 #include <algorithm>
 #include "recipe.hpp"
 #include "alarm_summary_view.hpp"
@@ -60,6 +61,7 @@ void Project::apply_local_overlay()
     local_users_ = json();
     local_screen_saver_ = json();
     local_schedules_ = json();
+    local_sound_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
@@ -69,6 +71,7 @@ void Project::apply_local_overlay()
     if(const json* lu = jget(overlay, "users")) local_users_ = *lu;
     if(const json* ls = jget(overlay, "screen_saver")) local_screen_saver_ = *ls;
     if(const json* lc = jget(overlay, "schedules")) local_schedules_ = *lc;
+    if(const json* lo = jget(overlay, "sound")) local_sound_ = *lo;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
     if(!od || !od->is_object() || !drivers) return;
@@ -213,6 +216,7 @@ bool Project::load(const std::string& path)
     // the screen goes dark after a while without input ("screen_saver")
     screen_saver().configure(jget(root_, "screen_saver"), local_screen_saver_.is_null() ? nullptr : &local_screen_saver_, local_overlay_path());
     scheduler().load(jget(root_, "schedules"), local_schedules_.is_null() ? nullptr : &local_schedules_, local_overlay_path());
+    sound().configure(jget(root_, "sound"), local_sound_.is_null() ? nullptr : &local_sound_, info_.dir, local_overlay_path());
 
     // languages and texts ("@id"), and the font they are drawn with
     texts().load(root_);
@@ -275,6 +279,7 @@ void Project::start_logs(bool read_only, const std::string& log_dir)
     ui().register_action("data_log.sample", [](const std::string& arg) { data_log().sample(arg); });
     register_alarm_actions();
     register_alarm_summary_actions();
+    register_sound_actions();
     ui().register_action("alarm_log.export", [](const std::string& arg) {
         int64_t n = alarms().export_csv(arg);
         if(n >= 0) HML_INFO("alarm log: %lld rows exported", static_cast<long long>(n));
@@ -390,6 +395,7 @@ void Project::unload()
 {
     screen_saver().clear();
     scheduler().clear();
+    sound().clear();
     root_ = nullptr;
 }
 

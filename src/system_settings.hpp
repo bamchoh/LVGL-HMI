@@ -106,6 +106,7 @@ std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
 std::unique_ptr<SettingsPage> make_users_page();
 std::unique_ptr<SettingsPage> make_storage_page(Project& proj);  // System > Storage: backup, a project from a USB memory
 std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags: values of all tags, write one
+std::unique_ptr<SettingsPage> make_sound_page();               // System > Sound: mute, volume, a test (projects with "sound")
 std::unique_ptr<SettingsPage> make_schedule_page();            // System > Schedule: time, days, on / off of the schedules (projects that have some)
 // System > Device: an address of a PLC without a tag (system_device.cpp); for projects with a
 // driver that can do it.

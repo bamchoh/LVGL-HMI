@@ -39,7 +39,7 @@ struct Value {
 
 // Subscription groups let the UI drop all of its subscriptions on hot reload
 // without touching the drivers'.
-enum class SubGroup { Driver, UI, Script, DataLog, Alarm, Texts, Screen };
+enum class SubGroup { Driver, UI, Script, DataLog, Alarm, Texts, Screen, Sound };
 
 class TagStore;
 

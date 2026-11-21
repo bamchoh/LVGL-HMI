@@ -343,6 +343,17 @@
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
 
+## 音（`project.json` の `sound`）
+
+`"sound": {}` があると、タッチ音とアラーム音が鳴る（`"touch"` / `"alarm"`: `"click"` `"beep"` `"alarm"`、プロジェクトの中の
+`.wav`、または `false`）。頼まれずに `sound` を足したり消したりしない。画面から使えるもの:
+
+- 「ブザー停止」ボタン: `{ "type": "button", "text": "ブザー停止", "bind": { "visible": "sys.sound.alarm" }, "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }`
+  （アラーム音が鳴っている間だけ出て、押すと次の新しいアラームまで止まる）。
+- 消音のスイッチ: `{ "type": "switch", "bind": "sys.sound.mute" }`。音量: `{ "type": "slider", "min": 0, "max": 100, "bind": "sys.sound.volume" }`。
+- 音を鳴らす: `{ "action": "call", "fn": "sound.play", "arg": "beep" }`。
+- `sys.sound.*` のタグは `sound` があるプロジェクトにだけある。音は画像では確かめられないので、報告に書く。
+
 ## 時刻で実行する（`project.json` の `schedules`）
 
 「毎朝 8 時に〜する」は画面ではなくプロジェクトに書く。`do` は上の「動作」と同じ書き方。
