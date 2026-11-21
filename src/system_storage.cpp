@@ -54,7 +54,10 @@ public:
             f.value = std::find(f.options.begin(), f.options.end(), value) != f.options.end() ? value : f.options[0];
             out.push_back(f);
         };
+        const std::string problem = transfer_mount_usb();          // (a device without a desktop mounts nothing by itself)
+        if(!problem.empty()) mount_problem_ = problem;
         locations_ = transfer_locations();
+        if(!locations_.empty()) mount_problem_.clear();
         if(std::find(locations_.begin(), locations_.end(), location_) == locations_.end()) location_ = locations_.empty() ? "" : locations_[0];
         files_ = transfer_project_files(location_);
         std::vector<std::string> names;
@@ -69,6 +72,8 @@ public:
         flag("confirm", !confirm_.empty());
         info("confirm_text", confirm_ == "install" ? "Replace the project with '" + file_ + "'? The runtime restarts."
                              : confirm_ == "rollback" ? "Go back to the project that was replaced last? The runtime restarts." : "");
+        info("hint", locations_.empty() ? (mount_problem_.empty() ? "No USB memory is found. Plug one in." : mount_problem_) : "");
+        flag("no_location", locations_.empty());
         info("project", target().name + vformat("  (%d x %d)", proj_.info().width, proj_.info().height));
         return out;
     }
@@ -107,6 +112,12 @@ public:
             msg = transfer_backup(t, location_, &where);
             if(msg.empty()) { msg = "Backup written to " + where; operation_log().record("system", "backup", "", where); }
             else msg = "Backup failed: " + msg;
+        }
+        else if(cmd == "eject") {
+            const std::string where = location_;
+            msg = transfer_eject(where);
+            if(msg.empty()) { msg = "You can take the USB memory out now."; operation_log().record("system", "eject", "", where); }
+            else msg = "Not removed: " + msg;
         }
         else if(cmd == "install") {
             // (the location may have changed the list: look again before asking)
@@ -147,6 +158,7 @@ public:
         auto cur = ui().current_screen();
         if(!cur || *cur != SystemSettings::page_screen(id())) return false;
         if(++ticks_ % 4) return false;
+        if(const std::string pr = transfer_mount_usb(); !pr.empty()) { mount_problem_ = pr; take_form(); return true; }
         std::vector<std::string> loc = transfer_locations();
         if(loc == locations_ && transfer_project_files(location_) == files_) return false;
         take_form();
@@ -181,7 +193,10 @@ public:
         rows.push_back(row(json::array({ label("Project", lw),
             json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dots" }, { "bind", { { "text", tag("project") } } }, { "style", { { "font", font + 2 }, { "text_color", "#ffffff" } } } } })));
         rows.push_back(row(json::array({ label("Location", lw), dropdown("location"), button("Refresh", "#2c3e50", "refresh", compact ? 70 : 100) })));
-        rows.push_back(row(json::array({ button("Backup to this location", "#1565c0", "backup", bw, "has_location") })));
+        rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("hint") }, { "visible", tag("no_location") } } },
+                             { "style", { { "font", font }, { "text_color", "#ffcc80" } } } });
+        rows.push_back(row(json::array({ button("Backup to this location", "#1565c0", "backup", bw, "has_location"),
+                                         button("Remove safely", "#455a64", "eject", compact ? 130 : 180, "has_location") })));
         rows.push_back(row(json::array({ label("Project file", lw), dropdown("file") })));
         rows.push_back(row(json::array({ button("Install this project", "#c62828", "install", bw, "has_file"),
                                          button("Previous project", "#455a64", "rollback", compact ? 130 : 180, "has_previous") })));
@@ -200,6 +215,7 @@ private:
     Project&    proj_;
     std::vector<std::string> locations_, files_;
     std::string location_, file_;       // what is picked (a location, the name of a file in it)
+    std::string mount_problem_;         // why a USB memory that is plugged in does not show
     std::string confirm_;               // "install" / "rollback" while the question is shown
     bool        restart_ = false;
     int         restart_ticks_ = 0, ticks_ = 0;

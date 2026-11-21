@@ -19,6 +19,24 @@ namespace hml {
 // the removable drives (Windows), what is mounted below /media, /run/media and /mnt (Linux).
 std::vector<std::string> transfer_locations();
 
+// A file system on a removable drive, as "lsblk" tells (Linux).
+struct UsbVolume {
+    std::string device;       // /dev/sda1
+    std::string fstype;       // vfat, exfat, ext4 ...
+    std::string label;
+    std::string mountpoint;   // "" = not mounted
+};
+// The removable file systems in the output of "lsblk -J -o PATH,RM,HOTPLUG,TYPE,FSTYPE,LABEL,MOUNTPOINT".
+std::vector<UsbVolume> transfer_parse_lsblk(const std::string& json_text);
+// A device without a desktop mounts nothing by itself: mount the removable file systems that
+// are not mounted yet (udisks, as the user the runtime runs as). Returns "" or what stands in
+// the way (told once per device). Volumes taken out with transfer_eject stay out until they
+// are unplugged. Nothing happens on Windows.
+std::string transfer_mount_usb();
+// Write everything out and unmount what is mounted at this location, so that it can be pulled.
+// Returns "" or what went wrong.
+std::string transfer_eject(const std::string& location);
+
 // The project files of a location (full paths, sorted by name).
 std::vector<std::string> transfer_project_files(const std::string& location);
 
