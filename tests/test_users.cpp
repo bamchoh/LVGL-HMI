@@ -505,3 +505,67 @@ TEST_CASE("users: the system settings need system_level; users can be edited on 
     CHECK(users().login("boss", "7777") == Users::LoginResult::Ok);
     CHECK(users().login("admin", "0000") == Users::LoginResult::UnknownUser);
 }
+
+// ================================================================ security: the system settings' actions
+
+TEST_CASE("users: the pages Tags and Storage and their actions ask for system_level")
+{
+    Runtime rt;
+    TempDir tmp;
+    Project p;
+    REQUIRE(p.load(tmp.write("project.json", kProject)));
+    REQUIRE(p.build_screens() == 3);
+    SystemSettings& sys = system_settings();
+    REQUIRE(sys.page("monitor") != nullptr);
+    REQUIRE(sys.page("storage") != nullptr);
+    auto num = [](const char* tag) { return tags().find(tag)->get_number(); };
+    auto pick_x = [&] {
+        tags().find("sys.monitor.filter")->set_string("x", nullptr);
+        ui().call_action("system.do", "monitor:select:1");
+    };
+
+    // nobody logged in: the screens send to the login, the actions do nothing
+    for(const char* scr : { "__system_monitor", "__system_storage" }) {
+        CHECK(ui().screen_level(scr) == 3);
+        CHECK_FALSE(ui().show_screen(scr, "none"));
+        CHECK(ui().current_screen().value_or("") == "__login");
+    }
+    pick_x();
+    CHECK(num("sys.monitor.selected") == 0);
+    ui().call_action("system.do", "storage:backup");
+    CHECK(tagstr("sys.storage.status") == "");
+    CHECK(sys.apply("monitor") == "not allowed");
+
+    // Maintenance (level 2) is not enough either
+    ui().call_action("user.select", "2");
+    keypad("2222");
+    CHECK(users().level() < 3);
+    pick_x();
+    CHECK(num("sys.monitor.selected") == 0);
+    tags().find("sys.monitor.value")->set_string("5", nullptr);
+    ui().call_action("system.do", "monitor:write");
+    ui().call_action("system.do", "monitor:set:5");
+    CHECK(num("x") == 0);
+
+    // the administrator may
+    ui().call_action("user.select", "3");
+    keypad("0000");
+    REQUIRE(users().level() == 3);
+    pick_x();
+    CHECK(num("sys.monitor.selected") == 1);
+    tags().find("sys.monitor.value")->set_string("7", nullptr);
+    ui().call_action("system.do", "monitor:write");
+    CHECK(num("x") == 7);
+
+    // ... until the logout: the page is left, the action is refused again
+    REQUIRE(ui().show_screen("__system_monitor", "none"));
+    users().logout();
+    CHECK(ui().current_screen().value_or("") != "__system_monitor");
+    tags().find("sys.monitor.value")->set_string("9", nullptr);
+    ui().call_action("system.do", "monitor:write");
+    CHECK(num("x") == 7);
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}

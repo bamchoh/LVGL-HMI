@@ -733,3 +733,66 @@ TEST_CASE("fins: without a connection a question about an address is answered at
     CHECK_FALSE(r.ok);
     CHECK(r.error == "not connected");
 }
+
+TEST_CASE("fins: nonsense in the address and the value of System > Device sends nothing")
+{
+    Runtime rt;
+    FakeFinsServer srv;
+    rt.tag("online", TagType::Bool);
+    REQUIRE(start(rt, fins_cfg(srv, json::array())) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 1; }));
+    Driver* d = rt.drivers.all().at(0);
+    const int reads = srv.reads, writes = srv.writes;
+    const std::vector<std::string> nonsense = {
+        "", " ", std::string(5000, 'D'), "\xff\xfe\xfd", "D-1", "D99999999999999999999999",
+        "%s%s%n", "../../etc/passwd", "D100; reboot", "D100.99", "@", ":", "holding:", "holding:-1", "holding:1@", "coil:1@999", "\t\r" };
+    for(const std::string& a : nonsense) {
+        CAPTURE(a);
+        DeviceResult r = ask(d, a.c_str());
+        CHECK_FALSE(r.ok);
+        CHECK(r.error != "");
+        CHECK(r.error.size() < 300);
+        r = put(d, a.c_str(), "1");
+        CHECK_FALSE(r.ok);
+    }
+    for(const char* v : { "", " ", "1e400", "0x", "--5", "1 2", "\xff", "9999999999999999999999" }) {
+        const DeviceResult r = put(d, "D100", v);
+        CHECK_FALSE(r.ok);
+        CHECK(r.error != "");
+    }
+    CHECK(put(d, "D100", std::string(5000, '7').c_str()).ok == false);
+    CHECK(ask(d, "D100", "int16", -5).values.size() == 1);            // the number of values is kept in bounds
+    CHECK(ask(d, "D100", "int16", 100000).values.size() == 16);
+    CHECK(srv.writes == writes);
+    CHECK(srv.reads == reads + 2);                                        // (the two good questions above)
+    CHECK(tagv("online") == 1);
+}
+
+TEST_CASE("fins: System > Device and the tags at the same time, hundreds of times")
+{
+    Runtime rt;
+    FakeFinsServer srv;
+    rt.tag("online", TagType::Bool);
+    rt.tag("sp", TagType::Int);
+    rt.tag("pv", TagType::Int);
+    json cfg = fins_cfg(srv, json::parse(R"([ { "tag": "sp", "addr": "D300" }, { "tag": "pv", "addr": "D301", "access": "ro" } ])"));
+    cfg["poll_ms"] = 5;
+    REQUIRE(start(rt, cfg) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 1; }));
+    Driver* d = rt.drivers.all().at(0);
+    Tag* sp = tags().find("sp");
+    int wrong = 0;
+    for(int i = 1; i <= 300; i++) {
+        sp->set_number(i, nullptr);                                        // the operator writes a tag ...
+        { std::lock_guard<std::mutex> g(srv.mutex); srv.word(kD, 301) = static_cast<uint16_t>(i); }   // ... the PLC changes another ...
+        const std::string v = std::to_string(i * 7 % 30000);
+        if(!put(d, "D400", v.c_str()).ok) wrong++;                         // ... and the page writes and reads an address
+        if(ask(d, "D400").values != Strings{ v }) wrong++;
+        if(ask(d, "D300", "int16", 2).values.size() != 2) wrong++;
+    }
+    CHECK(wrong == 0);
+    REQUIRE(wait_for([&] { std::lock_guard<std::mutex> g(srv.mutex); return srv.word(kD, 300) == 300; }));
+    REQUIRE(wait_for([] { return tagv("pv") == 300 && tagv("sp") == 300; }));
+    CHECK(tagv("online") == 1);
+    CHECK(srv.connections == 1);                                           // never a reconnect
+}

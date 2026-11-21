@@ -97,6 +97,8 @@ bool Driver::device_next(uint64_t& id, DeviceRequest& r)
 
 void Driver::device_done(uint64_t id, DeviceResult r)
 {
+    // (an error may quote what was typed: never more than a screen can show)
+    if(r.error.size() > 200) r.error = r.error.substr(0, 200) + " ...";
     std::lock_guard<std::mutex> lock(device_lock_);
     device_out_.emplace_back(id, std::move(r));
     while(device_out_.size() > 32) device_out_.pop_front();       // (answers nobody came for)

@@ -158,7 +158,11 @@ void lsblk_walk(const json& list, std::vector<UsbVolume>& out)
             v.fstype = fs_type;
             v.label = text(d, "label");
             v.mountpoint = text(d, "mountpoint");
-            if(!v.device.empty()) out.push_back(std::move(v));
+            // the device goes into a command line: nothing but what a device node is made of
+            const bool plain = v.device.rfind("/dev/", 0) == 0 && v.device.size() <= 64 &&
+                               v.device.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-") == std::string::npos &&
+                               v.device.find("..") == std::string::npos;
+            if(plain) out.push_back(std::move(v));
         }
         if(const json* c = jget(d, "children")) lsblk_walk(*c, out);
     }
@@ -195,6 +199,21 @@ std::vector<UsbVolume> transfer_parse_lsblk(const std::string& json_text)
     return out;
 }
 
+std::string transfer_mount_problem(const UsbVolume& v, const std::string& output)
+{
+    // (the label is what somebody wrote onto the memory: shown, but only its harmless characters)
+    std::string label;
+    for(char c : v.label) if(label.size() < 24 && (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == ' ' || (c & 0x80))) label += c;
+    const std::string name = label.empty() ? v.device : "'" + label + "'";
+    if(output.find("NotAuthorized") != std::string::npos)
+        return "The USB memory " + name + " is there, but the runtime may not mount it (install tools/rpi/hml-usb.rules, see the README).";
+    if(output.find("not found") != std::string::npos && output.find("udisksctl") != std::string::npos)
+        return "The USB memory " + name + " is there but not mounted, and udisks2 is not installed to mount it.";
+    std::string why;
+    for(char c : output) if(why.size() < 160 && static_cast<unsigned char>(c) >= 0x20) why += c;
+    return "The USB memory " + name + " cannot be mounted: " + why;
+}
+
 std::string transfer_mount_usb()
 {
 #ifdef _WIN32
@@ -213,17 +232,11 @@ std::string transfer_mount_usb()
     forget(usb_ejected());
     for(const UsbVolume& v : vols) {
         if(!v.mountpoint.empty() || usb_refused().count(v.device) || usb_ejected().count(v.device)) continue;
-        if(v.device.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-") != std::string::npos) continue;
         int rc = 0;
         const std::string out = run("udisksctl mount -b " + v.device + " --no-user-interaction", &rc);
         if(rc == 0) { HML_INFO("storage: mounted %s (%s)", v.device.c_str(), v.label.empty() ? v.fstype.c_str() : v.label.c_str()); continue; }
         usb_refused().insert(v.device);
-        const std::string name = v.label.empty() ? v.device : "'" + v.label + "'";
-        if(out.find("NotAuthorized") != std::string::npos)
-            problem = "The USB memory " + name + " is there, but the runtime may not mount it (install tools/rpi/hml-usb.rules, see the README).";
-        else if(out.find("not found") != std::string::npos && out.find("udisksctl") != std::string::npos)
-            problem = "The USB memory " + name + " is there but not mounted, and udisks2 is not installed to mount it.";
-        else problem = "The USB memory " + name + " cannot be mounted: " + out.substr(0, 160);
+        problem = transfer_mount_problem(v, out);
         HML_WARN("storage: %s", problem.c_str());
     }
     return problem;

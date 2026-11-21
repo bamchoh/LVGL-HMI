@@ -232,10 +232,21 @@ void SystemSettings::refresh(const std::string& page_id)
     }
 }
 
+// The screens of the system settings ask for "users.system_level". Their actions ask again: a
+// button of a project screen (or a script) that calls "system.do" must not get around it.
+static bool system_allowed(const char* what, const std::string& page_id)
+{
+    const int need = users().system_level();
+    if(need <= 0 || users().level() >= need) return true;
+    HML_WARN("system: %s '%s' refused: level %d is needed, the user has %d", what, page_id.c_str(), need, users().level());
+    return false;
+}
+
 std::string SystemSettings::apply(const std::string& page_id)
 {
     SettingsPage* p = page(page_id);
     if(!p) { HML_WARN("system: unknown page '%s'", page_id.c_str()); return "unknown page"; }
+    if(!system_allowed("apply", page_id)) return "not allowed";
     if(!fields_.count(page_id)) refresh(page_id);
 
     std::map<std::string, std::string> values;
@@ -277,6 +288,7 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
 {
     SettingsPage* p = page(page_id);
     if(!p) { HML_WARN("system: unknown page '%s'", page_id.c_str()); return; }
+    if(!system_allowed("command for", page_id)) return;
     p->command(cmd, arg);
     refresh(page_id);
 }

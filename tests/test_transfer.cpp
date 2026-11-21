@@ -1,6 +1,7 @@
 // Backup, install and "previous project" on a USB memory (transfer.hpp) and the page
 // System > Storage. A folder stands in for the USB memory.
 #include <doctest.h>
+#include "miniz.h"
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
 #include "project_archive.hpp"
@@ -303,4 +304,87 @@ TEST_CASE("System > Storage: backup, install after a question, the restart is as
 #else
     unsetenv("HML_TRANSFER_DIR");
 #endif
+}
+
+// ================================================================ security: a hostile USB memory
+
+TEST_CASE("transfer: a project file cannot bring keys, local settings or logs, nor leave the folder")
+{
+    Temp tmp;
+    const fs::path proj = tmp.dir / "device" / "projects" / "pump", usb = tmp.dir / "usb", src = tmp.dir / "pc" / "new";
+    make_project(proj, "Old");
+    write(proj / "logs" / "data.db", "recorded");
+    write(proj / "project.local.json", "{ \"drivers\": {} }");
+    write(proj / "pki" / "own" / "key.der", "secret");
+    make_project(src, "New");
+    fs::create_directories(usb);
+
+    // a project file made by hand: a good project, and with it files the device owns
+    auto zip = [&](const char* name, const std::vector<std::pair<std::string, std::string>>& entries) {
+        mz_zip_archive z;
+        std::memset(&z, 0, sizeof(z));
+        REQUIRE(mz_zip_writer_init_file(&z, (usb / name).u8string().c_str(), 0));
+        for(const auto& e : entries) REQUIRE(mz_zip_writer_add_mem(&z, e.first.c_str(), e.second.data(), e.second.size(), MZ_DEFAULT_LEVEL));
+        REQUIRE(mz_zip_writer_finalize_archive(&z));
+        mz_zip_writer_end(&z);
+    };
+    zip("greedy.hmlproj", { { "project.json", read(src / "project.json") }, { "screens/s.json", read(src / "screens" / "s.json") },
+                            { "pki/own/key.der", "planted" }, { "pki/trusted/evil.der", "planted" },
+                            { "project.local.json", "{ \"users\": [] }" }, { "logs/data.db", "wiped" } });
+    const TransferTarget t = target_of(proj);
+    const std::string why = transfer_install(t, (usb / "greedy.hmlproj").generic_u8string());
+    // (installed without them, or refused: either way what the device owns is as it was)
+    CHECK(read(proj / "pki" / "own" / "key.der") == "secret");
+    CHECK_FALSE(fs::exists(proj / "pki" / "trusted" / "evil.der"));
+    CHECK(read(proj / "project.local.json") == "{ \"drivers\": {} }");
+    CHECK(read(proj / "logs" / "data.db") == "recorded");
+    if(why.empty()) CHECK(title_of(proj) == "New");
+    else CHECK(title_of(proj) == "Old");
+
+    // a file that is not a zip, an empty one, a huge name
+    write(usb / "empty.hmlproj", "");
+    write(usb / "noise.hmlproj", std::string(4096, '\xA5'));
+    CHECK(transfer_install(t, (usb / "empty.hmlproj").generic_u8string()) != "");
+    CHECK(transfer_install(t, (usb / "noise.hmlproj").generic_u8string()) != "");
+    CHECK(transfer_install(t, (usb / (std::string(300, 'a') + ".hmlproj")).generic_u8string()) != "");
+    CHECK(transfer_install(t, "") != "");
+    CHECK_FALSE(fs::exists(tmp.dir / "device" / "projects" / "pump.incoming"));
+}
+
+TEST_CASE("transfer: what lsblk and udisks say never becomes a command, and is told plainly")
+{
+    // a device name that is not a device node is not a volume (it would go into a command line)
+    const char* hostile = R"J({ "blockdevices": [
+        { "path": "/dev/sdb1; reboot", "rm": true, "type": "part", "fstype": "vfat", "label": "a", "mountpoint": null },
+        { "path": "/dev/sdb1$(reboot)", "rm": true, "type": "part", "fstype": "vfat", "label": "b", "mountpoint": null },
+        { "path": "/dev/../etc/passwd", "rm": true, "type": "part", "fstype": "vfat", "label": "c", "mountpoint": null },
+        { "path": "sdb1", "rm": true, "type": "part", "fstype": "vfat", "label": "d", "mountpoint": null },
+        { "path": "/dev/sdb1 -o exec", "rm": true, "type": "part", "fstype": "vfat", "label": "e", "mountpoint": null },
+        { "path": 5, "rm": true, "type": "part", "fstype": "vfat", "label": "f", "mountpoint": null },
+        { "path": "/dev/sdc1", "rm": true, "type": "part", "fstype": "vfat", "label": "$(reboot)`id`;'\"", "mountpoint": null },
+        "not an object", null ] })J";
+    const std::vector<UsbVolume> v = transfer_parse_lsblk(hostile);
+    REQUIRE(v.size() == 1);
+    CHECK(v[0].device == "/dev/sdc1");
+    CHECK(transfer_parse_lsblk(R"({ "blockdevices": 5 })").empty());
+    CHECK(transfer_parse_lsblk(std::string(100000, '[')).empty());
+
+    // the message for the operator: the reason in words, the label without what a shell or a screen could trip over
+    UsbVolume vol;
+    vol.device = "/dev/sdc1";
+    vol.label = v[0].label;
+    std::string m = transfer_mount_problem(vol, "Error mounting /dev/sdc1: GDBus.Error:org.freedesktop.UDisks2.Error.NotAuthorizedCanObtain: Not authorized");
+    CHECK(m.find("may not mount it") != std::string::npos);
+    CHECK(m.find("hml-usb.rules") != std::string::npos);
+    CHECK(m.find_first_of("$`;\"()") == m.find("(install"));          // (only our own bracket)
+    vol.label = "DATA 1";
+    m = transfer_mount_problem(vol, "sh: 1: udisksctl: not found\n");
+    CHECK(m.find("'DATA 1'") != std::string::npos);
+    CHECK(m.find("udisks2 is not installed") != std::string::npos);
+    vol.label = "";
+    m = transfer_mount_problem(vol, std::string("Error mounting: wrong fs type\n\x1b[31m") + std::string(500, 'x'));
+    CHECK(m.find("/dev/sdc1 cannot be mounted: Error mounting: wrong fs type") != std::string::npos);
+    CHECK(m.find('\n') == std::string::npos);
+    CHECK(m.find('\x1b') == std::string::npos);
+    CHECK(m.size() < 260);
 }
