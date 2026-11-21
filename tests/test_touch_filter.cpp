@@ -165,3 +165,59 @@ TEST_CASE("touch filter: the settings from a project are kept in bounds")
     f.feed(0, 0, false, 0);
     CHECK(f.finished());
 }
+
+TEST_CASE("touch filter: the finger lifting is left out too; the log tells the steady part from the ends")
+{
+    // a press as the ADS7846 gives it: two wild readings as the finger lands, steady ones, two wild ones as it lifts
+    TouchFilterConfig c = cfg(2, 1, 0);
+    c.release = 2;
+    TouchFilter f(c);
+    const int xs[] = { 260, 230, 200, 201, 199, 200, 202, 200, 170, 140 };
+    const int ys[] = { 90, 120, 150, 150, 151, 149, 150, 150, 180, 220 };
+    int min_x = 9999, max_x = -9999, min_y = 9999, max_y = -9999, pressed = 0;
+    for(int i = 0; i < 10; i++) {
+        const auto p = f.feed(xs[i], ys[i], true, static_cast<uint32_t>(i * 16));
+        if(!p.pressed) continue;
+        pressed++;
+        min_x = std::min(min_x, p.x); max_x = std::max(max_x, p.x);
+        min_y = std::min(min_y, p.y); max_y = std::max(max_y, p.y);
+    }
+    const auto up = f.feed(0, 0, false, 160);
+    CHECK_FALSE(up.pressed);
+    CHECK(pressed == 6);                                         // 10 readings, 2 at the start and 2 at the end left out
+    CHECK(min_x == 199);
+    CHECK(max_x == 202);                                         // none of the wild ones was passed on
+    CHECK(min_y == 149);
+    CHECK(max_y == 151);
+    CHECK(up.x >= 199);
+    CHECK(up.x <= 202);                                          // released where the finger rested
+    REQUIRE(f.finished());
+    CHECK(f.last().samples == 10);
+    CHECK(f.last().raw_dx == 120);                               // all readings
+    CHECK(f.last().raw_dy == 130);
+    CHECK(f.last().core_dx == 3);                                // without the first and last two
+    CHECK(f.last().core_dy == 2);
+    CHECK(f.last().out_dx == 3);
+    CHECK(f.describe().find("(3 x 2 without the first and last two)") != std::string::npos);
+
+    // a tap too short to have a steady part is still a tap (one press, one release)
+    TouchFilterConfig d = cfg(1, 1, 0);
+    d.release = 1;
+    TouchFilter g(d);
+    int n = 0;
+    for(int i = 0; i < 3; i++) if(g.feed(100 + i, 100, true, 0).pressed) n++;
+    CHECK(n == 1);
+    CHECK_FALSE(g.feed(0, 0, false, 0).pressed);
+    CHECK(g.last().core_dx == 0);
+    // ... and one shorter than what is left out is none
+    TouchFilter h(d);
+    CHECK_FALSE(h.feed(1, 1, true, 0).pressed);
+    CHECK_FALSE(h.feed(2, 2, true, 0).pressed);
+    CHECK_FALSE(h.feed(0, 0, false, 0).pressed);
+    // "release" alone switches the filter on, and is kept in bounds
+    json j = json::parse(R"({ "release": 2 })");
+    CHECK(parse_touch_filter(&j).active());
+    CHECK(parse_touch_filter(&j).release == 2);
+    j = json::parse(R"({ "release": 99 })");
+    CHECK(parse_touch_filter(&j).release == 3);
+}
