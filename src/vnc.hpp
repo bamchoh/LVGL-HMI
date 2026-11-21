@@ -50,6 +50,12 @@ struct VncRect { int x, y, w, h; };
 // row are one rectangle). Empty = the same picture.
 std::vector<VncRect> vnc_diff(const uint8_t* a, const uint8_t* b, int width, int height, int tile = 32);
 
+// The pointer a viewer draws by itself (the "Cursor" pseudo encoding, -239): one rectangle of a
+// FramebufferUpdate (header, pixels in the format of the viewer, mask), appended to out. Without
+// it some viewers (TigerVNC) show no pointer at all over the picture.
+constexpr int kVncCursorW = 12, kVncCursorH = 18;
+void vnc_cursor(const VncPixelFormat& f, std::vector<uint8_t>& out);
+
 class VncServer {
 public:
     VncServer();
