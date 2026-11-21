@@ -12,9 +12,10 @@
         3850,
         220
       ],
-      "jitter": 8,
+      "jitter": 12,
       "smooth": 3,
       "settle": 1,
+      "release": 1,
       "scroll_limit": 16
     }
   },

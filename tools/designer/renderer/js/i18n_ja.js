@@ -424,7 +424,7 @@ Object.assign(I18N.TEXT_JA, { 'Edit cells…': 'セルを編集…', '+ row': '+
   'more curves on the same axes (4 in all)': '同じ軸に重ねる曲線（全部で 4 本まで）', 'a title per column; width in pixels (empty: the columns share what is left)': '列ごとの見出し。幅はピクセル（空なら残りを分け合う）',
   'the cells: texts and tags': 'セルの中身（文字とタグ）', 'parts of the scale in a colour (a warning range, an alarm range)': '目盛りに色を付ける区間（警告の範囲、異常の範囲）',
   'the title of each column, and the text shown when there is no row (empty)': '列ごとの見出しと、行がないときの文字（empty）', 'the width of a column in pixels (empty: the columns share what is left)': '列の幅（ピクセル。空なら残りを分け合う）' });
-Object.assign(I18N.KEYS_JA, { jitter: 'ブレの許容 (px)', smooth: '平均する回数', settle: '押し始めに捨てる回数', scroll_limit: 'スクロール開始の距離 (px)', log: 'タッチをログに残す' });
+Object.assign(I18N.KEYS_JA, { jitter: 'ブレの許容 (px)', smooth: '平均する回数', settle: '押し始めに捨てる回数', release: '離す直前に捨てる回数', scroll_limit: 'スクロール開始の距離 (px)', log: 'タッチをログに残す' });
 Object.assign(I18N.KEYS_JA, { x_tag: '横軸のタグ', x_min: '横軸の最小', x_max: '横軸の最大', y_tag: '縦軸のタグ', y_min: '縦軸の最小', y_max: '縦軸の最大', clear_tag: '消去のタグ' });
 Object.assign(I18N.KEYS_JA, { seconds: '秒も入力する', year_min: '年の下限', year_max: '年の上限' });
 Object.assign(I18N.KEYS_JA, { ticks: '目盛りの数', major_every: '数字を付ける間隔', show_value: '値を数字で出す', needle_color: '針の色' });
