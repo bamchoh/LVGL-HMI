@@ -15,3 +15,6 @@ __pycache__/
 .vscode/
 .idea/
 *.swp
+
+# what a device keeps for itself (written by a run of the runtime)
+projects/*/project.local.json

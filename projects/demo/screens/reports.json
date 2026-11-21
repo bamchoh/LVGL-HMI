@@ -1,0 +1,38 @@
+{
+  "name": "reports",
+  "template": "frame",
+  "template_args": {
+    "title": "@reports"
+  },
+  "children": [
+    { "type": "panel", "x": 404, "y": 476, "w": 120, "h": 4, "scrollable": false, "style": { "bg_color": "#2196f3", "radius": 2, "border_width": 0 } },
+    {
+      "type": "button", "x": 16, "y": 56, "w": 216, "h": 48, "text": "@operation_log", "checkable": true,
+      "style": { "bg_color": "#37474f" }, "style_checked": { "bg_color": "#1565c0" },
+      "bind": { "checked": { "tag": "report_tab", "eq": 0 } }
+    },
+    {
+      "type": "button", "x": 240, "y": 56, "w": 216, "h": 48, "text": "@system_log", "checkable": true,
+      "style": { "bg_color": "#37474f" }, "style_checked": { "bg_color": "#1565c0" },
+      "bind": { "checked": { "tag": "report_tab", "eq": 1 } }
+    },
+    {
+      "type": "log_view", "x": 16, "y": 112, "w": 440, "h": 304, "source": "operation", "rows": 6, "widths": { "time": 136, "user": 96 },
+      "labels": { "time": "@lg_time", "user": "@lg_user", "target": "@lg_target", "new": "@lg_new", "empty": "@lg_empty" },
+      "bind": { "visible": { "tag": "report_tab", "eq": 0 } }
+    },
+    {
+      "type": "log_view", "x": 16, "y": 112, "w": 440, "h": 304, "source": "system", "rows": 6,
+      "labels": { "time": "@lg_time", "level": "@lg_level", "message": "@lg_message", "empty": "@lg_empty" },
+      "bind": { "visible": { "tag": "report_tab", "eq": 1 } }
+    },
+    {
+      "type": "label", "x": 464, "y": 68, "text": "@alarm_summary", "style": { "text_color": "#9fb3c8" }
+    },
+    {
+      "type": "alarm_summary", "x": 464, "y": 112, "w": 320, "h": 304, "days": 7, "rows": 5, "bars": false,
+      "labels": { "alarm": "@as_alarm", "count": "@as_count", "time": "@as_time", "day": "@as_day", "week": "@as_week",
+                  "month": "@as_month", "all": "@as_all", "by_count": "@as_by_count", "by_time": "@as_by_time", "empty": "@no_alarms" }
+    }
+  ]
+}

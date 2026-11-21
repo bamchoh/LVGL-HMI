@@ -4,7 +4,7 @@ what the server has (received/<port>/) and at what the runtime kept (logs/upload
 
   python -I tools/upload_check/check.py <the servers' folder in WSL> <ca.crt on this machine>
 
-From Git Bash: MSYS_NO_PATHCONV=1 in front (else the WSL path is rewritten). See the README ("ログを外に出す")."""
+From Git Bash: MSYS_NO_PATHCONV=1 in front (else the WSL path is rewritten). See the README ("Uploading the logs (`uploads`)")."""
 import json, os, shutil, subprocess, sys, time
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SERVER_DIR = sys.argv[1] if len(sys.argv) > 1 else '/home/user/hml-mailtest'

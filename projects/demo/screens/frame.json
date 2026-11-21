@@ -1,0 +1,149 @@
+{
+  "name": "frame",
+  "scrollable": false,
+  "style": {
+    "bg_color": "#141a22",
+    "pad": 0
+  },
+  "children": [
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 0,
+      "w": "100%",
+      "h": 48,
+      "scrollable": false,
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_left": 16,
+        "pad_right": 16
+      },
+      "children": [
+        {
+          "type": "image",
+          "src": "assets/logo.png",
+          "align": "left_mid",
+          "x": -8,
+          "zoom": 0.6
+        },
+        {
+          "type": "label",
+          "text": "${title}",
+          "align": "left_mid",
+          "x": 32,
+          "style": {
+            "font": 20,
+            "text_color": "#ffffff"
+          }
+        },
+        {
+          "type": "alarm_banner",
+          "align": "center",
+          "w": 304,
+          "h": 36,
+          "labels": {
+            "idle": "@no_alarms",
+            "more": "@alarm_more"
+          }
+        },
+        {
+          "type": "label",
+          "align": "right_mid",
+          "clickable": true,
+          "on_click": {
+            "action": "login"
+          },
+          "style": {
+            "text_color": "#9fb3c8",
+            "font": 14
+          },
+          "bind": {
+            "text": {
+              "tag": "sys.user.name",
+              "format": "User: %s"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "panel",
+      "x": 0,
+      "y": 424,
+      "w": "100%",
+      "h": 56,
+      "scrollable": false,
+      "flex": "row",
+      "flex_main": "center",
+      "flex_cross": "center",
+      "style": {
+        "bg_color": "#1f2a38",
+        "radius": 0,
+        "border_width": 0,
+        "pad": 0,
+        "pad_column": 8
+      },
+      "children": [
+        {
+          "type": "button",
+          "text": "@main",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "main",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@production",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "production",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@reports",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "reports",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@planner",
+          "w": 120,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "planner",
+            "anim": "fade"
+          }
+        }
+      ]
+    }
+  ]
+}

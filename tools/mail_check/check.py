@@ -3,7 +3,7 @@ case writes a project, runs the runtime for a few seconds and reads what the ser
 
   python -I tools/mail_check/check.py <the server's folder in WSL> <ca.crt on this machine>
 
-See the README ("メールで知らせる")."""
+See the README ("Mail (`mail`)")."""
 import json, os, shutil, subprocess, sys, time
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SERVER_DIR = sys.argv[1] if len(sys.argv) > 1 else '/home/user/hml-mailtest'

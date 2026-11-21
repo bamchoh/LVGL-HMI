@@ -1,5 +1,5 @@
 """A mail server for the check of HML's mail (check.py): aiosmtpd - not our code - on three ports.
-   Run it in a folder that has pkgs/ (get.py), server.crt and server.key (see the README, "メールで知らせる").
+   Run it in a folder that has pkgs/ (get.py), server.crt and server.key (see the README, "Mail (`mail`)").
    It listens on this machine only (127.0.0.1); another address as the first argument.
    2525  plain, no login                      ("security": "none")
    2587  STARTTLS, login required             ("security": "starttls")

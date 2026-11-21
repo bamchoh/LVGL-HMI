@@ -222,7 +222,7 @@
         {
           "type": "button",
           "text": "@main",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#37474f"
@@ -236,7 +236,7 @@
         {
           "type": "button",
           "text": "@trend",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#37474f"
@@ -250,7 +250,7 @@
         {
           "type": "button",
           "text": "@alarms",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#1565c0"
@@ -264,7 +264,7 @@
         {
           "type": "button",
           "text": "@recipes",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#37474f"
@@ -278,7 +278,7 @@
         {
           "type": "button",
           "text": "@widgets",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#37474f"
@@ -292,7 +292,7 @@
         {
           "type": "button",
           "text": "@settings",
-          "w": 120,
+          "w": 104,
           "h": 48,
           "style": {
             "bg_color": "#37474f"
@@ -300,6 +300,20 @@
           "on_click": {
             "action": "goto",
             "screen": "settings",
+            "anim": "fade"
+          }
+        },
+        {
+          "type": "button",
+          "text": "@production",
+          "w": 104,
+          "h": 48,
+          "style": {
+            "bg_color": "#37474f"
+          },
+          "on_click": {
+            "action": "goto",
+            "screen": "production",
             "anim": "fade"
           }
         }

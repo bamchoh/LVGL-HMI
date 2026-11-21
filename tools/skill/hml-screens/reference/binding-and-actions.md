@@ -181,8 +181,11 @@
 - イベントはどの部品にも書ける（`panel` や `label` も、イベントを書けば押せるようになる）。
 - `call` の `fn`（ランタイムに登録された動作）: `alarm.ack_all`（すべてのアラームを確認）、`data_log.sample`（`arg` に
   グループ名。今の値を記録）、`recipe.write` などレシピの操作（ふつうは `recipe_table` が行う）、
-  `system_log.export` / `data_log.export` / `alarm_log.export` / `operation_log.export`（CSV に書き出す）。
-  ほかの名前は書かない。
+  `system_log.export` / `data_log.export` / `alarm_log.export` / `operation_log.export`（CSV に書き出す）、
+  `alarm.export_summary`（アラーム集計を CSV に。`arg` は日数）、
+  `sound.play`（`arg` は音の名前）/ `sound.stop` / `sound.silence`、`mail.send`（`arg` は `"件名\n本文"`）/ `mail.test`、
+  `upload.run`（`arg` は `uploads` の名前。省くとすべて）。後ろの 3 組は、プロジェクトにその機能（`sound` / `mail` / `uploads`）が
+  あるときだけ働く（下の「画面の外の機能を画面から使う」）。ほかの名前は書かない。
 - `system` は組み込みのシステム設定画面を開く。`reload` `exit` `restart` は保守用。ふつうの画面には置かない。
 - `script` は Lua。`code` に短く書くか、`name` で `project.json` の `scripts` のものを呼ぶ。タグは `tag.名前`。
 
@@ -243,12 +246,15 @@
 
 - アラームごとの発生回数と発生時間の合計を、期間を選んで出す部品（保全向け: 「何が多いか」「何で長く止まったか」）。`alarms` が要る。
 - 中に、上の帯（期間と並べ方のドロップダウン、合計。高さ約 46px）と行を持つ。1 行 36px、見出し 28px。
-  **高さは「90 + 39 × 行数」を目安**にし、`rows` をそれに合わせる（480x320 の画面なら `rows` 5〜6）。幅は 320 以上。
+  **高さは「90 + 39 × 行数」を目安**にし、`rows` をそれに合わせる（480x320 の画面なら `rows` 5〜6）。
+  **幅は 360 以上**が安心（320 では、英語の並べ方の文字や長いアラーム名が切れる）。狭い所に置くなら `"bars": false`（回数の棒を出さない）にする。
+  アラームの名前が長いと 1 行に入らず切れる。名前の列が十分に取れる幅にする。
 - `days` で最初の期間（1 / 7 / 30 / 0 = すべて）、`sort` で `count`（回数）か `time`（時間）。どちらも操作者が部品の上で変えられる。
 - 部品の中の文字は英語（`Alarm` `Count` `Time` `24 h` …）。日本語にするには `labels` に書く:
   `"labels": { "alarm": "アラーム", "count": "回数", "time": "時間", "day": "24 時間", "week": "7 日", "month": "30 日", "all": "すべて", "by_count": "回数順", "by_time": "時間順", "empty": "アラームなし" }`
 - CSV に書き出すボタンを付けるなら `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }`（引数は日数）。
-- `--check --render` の画像では、行は出ない（ログを数えないため）。行の見え方は、コピーを動かす手順で確かめる。
+- `--check --render` の画像では、`--set` でアラームが出る値にすると、その分の行が出る（過去の記録は数えない）。
+  行の見え方は、こうして 1〜2 行出して確かめる。
 
 ### `alarm_list` / `alarm_banner`
 
@@ -293,7 +299,9 @@
 - `columns` は見出し（文字か `{ "title", "width", "align" }`）、`rows` は行の配列で、セルは文字・数値か `{ "tag": "<タグ>", "format": "%.1f", "map": { "0": "停止", "1": "運転" } }`。
   数値の列は `"align": "right"` にし、単位は `format` に入れる（`"%d 個"`）か見出しに書く。
 - 状態を `map` で文字にするときは、既存の画面の言い方に合わせる（「運転 / 停止」など）。色は付けられないので、状態は文字で区別する。
-- 1 行は約 32px（`font` 16 のとき）。高さは「(行数 + 1) × 32 + 8」を目安にし、入りきらない行は表の中でスクロールする。
+- 1 行は約 36px（`font` 16 のとき。見出しも同じくらい）。高さは「(行数 + 1) × 36 + 8」を目安にし、入りきらない行は表の中でスクロールする
+  （画像で最後の行が切れていないか、スクロールバーが出ていないかを見る）。
+- `map` の値にも `"@ID"` を書ける（言語に合わせて訳される）。
   幅を書かない列は残りを等分するので、長い文字の列以外には `width` を書くとそろう。
 - `languages` のあるプロジェクトでは、見出しとセルの文字を `"@ID"` で書く。
 
@@ -314,6 +322,7 @@
 - 注意・異常の範囲は `zones` で色を付ける: `"zones": [ { "from": 80, "to": 100, "color": "#e53935" } ]`（赤は異常、橙は警告。飾りには使わない）。
 - 目盛りの数字が込むときは `ticks` と `major_every` を減らす（例: 0〜100 なら `"ticks": 11, "major_every": 2`）。
   `(ticks - 1)` を `major_every` で割り切れるようにすると、最後の数字が `max` になる。
+- `decimals` は目盛りの数字にも効く（`2` にすると `0.00 1.00` になる）。目盛りが込んだら `decimals` を減らす。
 - 大きな数値をまとめて見せるなら `label` や `numeric_display` のほうが読みやすい。メーターは「どのあたりか」を一目で見せたいときに使う。
 
 ### `log_view`
@@ -327,8 +336,13 @@
 - 列の見出しは英語（`Time` `Message` …）。日本語などにするには `labels` に書く: `"labels": { "time": "時刻", "level": "種類", "message": "内容", "empty": "記録なし" }`
   （`languages` のあるプロジェクトでは `"@ID"`）。`data` の列の見出しはタグ名のまま。
 - 文字で絞り込ませたいときは、文字列タグを作り、`text_display`（`"input": true`）をそのタグに結び付け、`"filter_tag": "<タグ>"` を書く（画面に `keyboard` が要る）。
+- 列の幅を決めるには `widths` に列の名前ごとの幅を書く: `"widths": { "time": 150, "user": 90 }`（書かない列は残りを分ける）。
+  見出しが折り返したら（日本語の「ユーザー」など）、その列を広げる。
+- 2 つ並べるには幅が要る（440 + 440）。800 px の画面で操作ログとシステムログの両方を見せるなら、同じ場所に重ねて置き、
+  タグ（ボタンで 0 / 1 を書く）で `bind` の `visible` を切り替える。
 - 操作ログは「誰が何をしたか」の記録。見せる相手を限るなら、その画面か部品に `level` を付ける（既存の画面の `level` に合わせる）。
-- `--check --render` の画像では、表は見出しだけで行は出ない（ログを読まないため）。行の見え方は、コピーを動かす手順で確かめる。
+- `--check --render` の画像では、表は見出しだけで行は出ない（ログを読まないため）。`system` は、設定があっても
+  「The system log is not recorded …」と出ることがある（検査中は記録しないため。間違いではない）。行の見え方は、コピーを動かす手順で確かめる。
 
 ### `recipe_table`
 
@@ -343,60 +357,22 @@
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
 
-## ログを外に出す（`project.json` の `uploads`）
+## 画面の外の機能を画面から使う
 
-ログ（CSV）をサーバーへ送る設定はプロジェクトにある（`uploads`）。送り先に関わるので、頼まれずに足したり変えたりしない。
-**パスワードを project.json に書かない**（装置の System > Upload で設定する）。画面から使えるもの:
+スケジュール、音、機器間のデータ転送、メール、ログの送信、テンプレート画面は `project.json`（と画面ファイルの `template`）に書く。
+**設定キーの一覧と書き方は `project-features.md`**。頼まれたときだけ足す・変える。画面の側で使えるのは次のもの
+（タグは、その機能がプロジェクトにあるときだけある。`"enabled": false` でもタグはある）:
 
-- 今すぐ送るボタン: `{ "action": "call", "fn": "upload.run", "arg": "<uploads の name>" }`（`arg` を省くとすべて）。
-- 送信の状態: `sys.upload.waiting`（送信待ちのファイル数）、`sys.upload.error`（最後のファイルが失敗している間 1）。
-- 定期的に送るのは `schedules` に同じアクションを書く（画面ではない）。
+| 機能 | 画面から |
+| --- | --- |
+| 音（`sound`） | 消音のスイッチ `{ "type": "switch", "bind": "sys.sound.mute" }`、音量 `{ "type": "slider", "min": 0, "max": 100, "bind": "sys.sound.volume" }`、音を鳴らす `{ "action": "call", "fn": "sound.play", "arg": "beep" }` |
+| 音: ブザー停止 | `{ "type": "button", "text": "ブザー停止", "bind": { "visible": "sys.sound.alarm" }, "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }`（アラーム音が鳴っている間だけ出る。押すと次の新しいアラームまで止まる） |
+| メール（`mail`） | 送る `{ "action": "call", "fn": "mail.send", "arg": "件名\n本文 {タグ名}" }`（文字そのまま。`"@ID"` は使えない）、テスト `"mail.test"`、`sys.mail.waiting`（送信待ちの数）、`sys.mail.error`（失敗中 1） |
+| ログの送信（`uploads`） | 今すぐ送る `{ "action": "call", "fn": "upload.run", "arg": "<name>" }`、`sys.upload.waiting`、`sys.upload.error` |
+| スケジュール（`schedules`） | 画面に出す部品はない（装置の System > Schedule で見る・変える）。`{ "action": "system" }` のボタンで System を開ける |
+| データ転送（`transfers`） | 画面に出す部品はない。転送元と転送先のタグをふつうに表示すればよい（装置の System > Transfers に状態が出る） |
 
-## メール（`project.json` の `mail`）
-
-アラームをメールで送る設定はプロジェクトにある（`mail`）。サーバーや宛先に関わるので、頼まれずに足したり変えたりしない。
-**パスワードを project.json に書かない**（装置の System > Mail で設定する）。画面から使えるもの:
-
-- メールを送るボタン: `{ "action": "call", "fn": "mail.send", "arg": "件名\n本文 {タグ名}" }`（1 行目が件名。`{タグ名}` はその値）。
-- 送信の状態: `sys.mail.waiting`（送信待ちの数）、`sys.mail.error`（最後のメールが失敗している間 1。ランプなどに）。
-- `sys.mail.*` のタグは `mail` があるプロジェクトにだけある。
-
-## 機器間のデータ転送（`project.json` の `transfers`）
-
-「PLC1 の値を PLC2 に写す」は、スクリプトではなく `transfers` に書く（切断中は書かない、範囲外は書かない、を任せられる）。
-
-```json
-"transfers": [ { "name": "speed", "from": "plc1_speed", "to": "plc2_speed" },
-               { "name": "temp", "from": "plc1_temp", "to": "plc2_temp", "trigger": "cyclic", "every_ms": 1000, "when": "run" } ]
-```
-
-- `from` / `to` はタグ名。`trigger`: `"change"`（既定）/ `"cyclic"`。`scale` / `offset`、`out_of_range`（`"skip"` / `"clamp"`）、`when`、`enabled`。
-- 輪（A → B → A）は実行されない。`to` に `sys.*` は書けない。`--check` が見つける。
-- 機器との接続（`drivers`）に関わるので、頼まれずに足したり変えたりしない。
-
-## 音（`project.json` の `sound`）
-
-`"sound": {}` があると、タッチ音とアラーム音が鳴る（`"touch"` / `"alarm"`: `"click"` `"beep"` `"alarm"`、プロジェクトの中の
-`.wav`、または `false`）。頼まれずに `sound` を足したり消したりしない。画面から使えるもの:
-
-- 「ブザー停止」ボタン: `{ "type": "button", "text": "ブザー停止", "bind": { "visible": "sys.sound.alarm" }, "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }`
-  （アラーム音が鳴っている間だけ出て、押すと次の新しいアラームまで止まる）。
-- 消音のスイッチ: `{ "type": "switch", "bind": "sys.sound.mute" }`。音量: `{ "type": "slider", "min": 0, "max": 100, "bind": "sys.sound.volume" }`。
-- 音を鳴らす: `{ "action": "call", "fn": "sound.play", "arg": "beep" }`。
-- `sys.sound.*` のタグは `sound` があるプロジェクトにだけある。音は画像では確かめられないので、報告に書く。
-
-## 時刻で実行する（`project.json` の `schedules`）
-
-「毎朝 8 時に〜する」は画面ではなくプロジェクトに書く。`do` は上の「動作」と同じ書き方。
-
-```json
-"schedules": [
-  { "name": "start", "at": "08:00", "days": "weekdays", "do": { "action": "set", "tag": "run_enable", "value": true } },
-  { "name": "service", "at": "2026-12-01 09:00", "do": { "action": "popup", "screen": "service_due" } }
-]
-```
-
-- `at`: `"HH:MM"`、または 1 回だけの `"YYYY-MM-DD HH:MM"`。`days`: `"daily"`（既定） / `"weekdays"` / `"weekend"` / `["mon", "wed"]`。
-- `enabled: false` で止める。`catch_up: true` で、装置が止まっていた間に過ぎた時刻を次の起動時に 1 回実行する。
-- 時刻・曜日・オン / オフは、装置の System > Schedule でも変えられる。頼まれずに既存の予定を変えない。
-- `--check` が、時刻や曜日の書き間違い、ないタグ・画面を見つける。予定は画像には出ないので、報告に書く。
+- `mail` / `uploads` が `"enabled": false` のとき、`mail.send` や `upload.run` は何も送らない（ログに警告が出るだけ）。
+- `--check --render` の画像では、音・スケジュール・転送・メール・送信は動かない（転送先のタグは `init` の値のまま）。
+  `sys.sound.alarm` は `--set` で 1 にできないので、「ブザー停止」ボタンは画像では確かめられない。位置と色は、ほかのボタンに合わせて決め、報告に書く。
+- 「毎朝 8 時に〜する」「夜にログを送る」は、画面ではなく `schedules` に書く（`project-features.md`）。

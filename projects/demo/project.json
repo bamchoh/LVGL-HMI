@@ -131,6 +131,32 @@
       "name": "jog",
       "type": "bool",
       "init": false
+    },
+    {
+      "name": "next_maint",
+      "type": "string",
+      "init": "2026-12-01 09:00"
+    },
+    {
+      "name": "pressure_kpa",
+      "type": "float",
+      "init": 150,
+      "min": 0,
+      "max": 500
+    },
+    {
+      "name": "level_remote",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "report_tab",
+      "type": "int",
+      "init": 0,
+      "min": 0,
+      "max": 1
     }
   ],
   "drivers": [
@@ -392,6 +418,70 @@
       }
     ]
   },
+  "schedules": [
+    {
+      "name": "auto_on_shift_start",
+      "at": "08:00",
+      "days": "weekdays",
+      "do": { "action": "set", "tag": "auto_mode", "value": true }
+    },
+    {
+      "name": "shift_end_sample",
+      "at": "17:00",
+      "days": "weekdays",
+      "do": { "action": "call", "fn": "data_log.sample", "arg": "process" }
+    },
+    {
+      "name": "nightly_upload",
+      "at": "23:55",
+      "catch_up": true,
+      "do": { "action": "call", "fn": "upload.run", "arg": "nightly" }
+    }
+  ],
+  "sound": {
+    "volume": 60,
+    "touch": "click",
+    "alarm": "alarm",
+    "alarm_every_s": 5
+  },
+  "transfers": [
+    {
+      "name": "level_copy",
+      "from": "level",
+      "to": "level_remote"
+    },
+    {
+      "name": "pressure_kpa",
+      "from": "pressure",
+      "to": "pressure_kpa",
+      "trigger": "cyclic",
+      "every_ms": 1000,
+      "scale": 100,
+      "out_of_range": "clamp"
+    }
+  ],
+  "mail": {
+    "enabled": false,
+    "host": "smtp.example.com",
+    "security": "starttls",
+    "username": "hmi",
+    "from": "pump-station@example.com",
+    "to": ["shift@example.com"],
+    "alarms": {
+      "severities": ["warning"],
+      "subject": "[{project}] {alarm.message}",
+      "body": "{alarm.time}\nTemperature {temp} C, level {level} %"
+    }
+  },
+  "uploads": [
+    {
+      "name": "nightly",
+      "enabled": false,
+      "url": "https://files.example.com/pump-station/",
+      "username": "hmi",
+      "logs": ["data:process", "alarms", "operation", "system"]
+    }
+  ],
   "screen_saver": {
     "after_s": 600,
     "wake_on_alarm": true
@@ -724,7 +814,51 @@
     "close": {
       "ja": "閉じる",
       "en": "Close"
-    }
+    },
+    "production": { "ja": "生産", "en": "Production" },
+    "reports": { "ja": "記録", "en": "Reports" },
+    "planner": { "ja": "予定", "en": "Planner" },
+    "pump_speed": { "ja": "ポンプ速度", "en": "Pump speed" },
+    "xy_title": { "ja": "速度 % → 圧力 bar", "en": "Speed % → pressure bar" },
+    "col_item": { "ja": "項目", "en": "Item" },
+    "col_value": { "ja": "値", "en": "Value" },
+    "col_state": { "ja": "状態", "en": "State" },
+    "st_online": { "ja": "接続中", "en": "Online" },
+    "st_offline": { "ja": "未接続", "en": "Offline" },
+    "operation_log": { "ja": "操作ログ", "en": "Operation log" },
+    "system_log": { "ja": "システムログ", "en": "System log" },
+    "alarm_summary": { "ja": "アラーム集計", "en": "Alarm summary" },
+    "lg_time": { "ja": "時刻", "en": "Time" },
+    "lg_user": { "ja": "ユーザー", "en": "User" },
+    "lg_target": { "ja": "対象", "en": "Target" },
+    "lg_new": { "ja": "新しい値", "en": "New" },
+    "lg_level": { "ja": "種類", "en": "Level" },
+    "lg_message": { "ja": "内容", "en": "Message" },
+    "lg_empty": { "ja": "記録なし", "en": "No records" },
+    "as_alarm": { "ja": "アラーム", "en": "Alarm" },
+    "as_count": { "ja": "回数", "en": "Count" },
+    "as_time": { "ja": "時間", "en": "Time" },
+    "as_day": { "ja": "24 時間", "en": "24 h" },
+    "as_week": { "ja": "7 日", "en": "7 days" },
+    "as_month": { "ja": "30 日", "en": "30 days" },
+    "as_all": { "ja": "すべて", "en": "All" },
+    "as_by_count": { "ja": "回数順", "en": "Count" },
+    "as_by_time": { "ja": "時間順", "en": "Time" },
+    "next_maint": { "ja": "次回の保守", "en": "Next maintenance" },
+    "transfer_title": { "ja": "データ転送（圧力 → kPa）", "en": "Data transfer (pressure → kPa)" },
+    "transfer_from": { "ja": "転送元", "en": "Source" },
+    "transfer_to": { "ja": "転送先", "en": "Copied to" },
+    "sound": { "ja": "音", "en": "Sound" },
+    "sound_mute": { "ja": "消音", "en": "Mute" },
+    "sound_volume": { "ja": "音量", "en": "Volume" },
+    "sound_test": { "ja": "音を鳴らす", "en": "Play beep" },
+    "buzzer_stop": { "ja": "ブザー停止", "en": "Buzzer stop" },
+    "comm_title": { "ja": "メールとログ送信", "en": "Mail and log upload" },
+    "mail_waiting": { "ja": "メール 送信待ち", "en": "Mail waiting" },
+    "upload_waiting": { "ja": "ログ 送信待ち", "en": "Uploads waiting" },
+    "send_error": { "ja": "送信失敗", "en": "Failed" },
+    "send_logs_now": { "ja": "ログを今すぐ送る", "en": "Send logs now" },
+    "send_test_mail": { "ja": "テストメール", "en": "Send test mail" }
   },
   "screens": [
     "screens/main.json",
@@ -733,6 +867,10 @@
     "screens/recipes.json",
     "screens/widgets.json",
     "screens/settings.json",
-    "screens/temp_detail.json"
+    "screens/temp_detail.json",
+    "screens/frame.json",
+    "screens/production.json",
+    "screens/reports.json",
+    "screens/planner.json"
   ]
 }

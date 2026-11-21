@@ -1,0 +1,140 @@
+# project.json の機能（画面の外）
+
+画面（`screens/*.json`）ではなく `project.json` に書く機能の一覧です。**頼まれたときだけ**足す・変える（機器や外のサーバーに関わる）。
+書いたら `--check` を通す（キーの書き間違い、ないタグ・画面・ログ、暗号化なしなどを見つける）。
+**パスワードは `project.json` に書かない**（装置の System 画面で設定する。`--check` が指摘する）。
+
+目次: [テンプレート画面](#テンプレート画面) / [スケジュール](#スケジュール-schedules) / [音](#音-sound) /
+[機器間のデータ転送](#機器間のデータ転送-transfers) / [メール](#メール-mail) / [ログの送信](#ログの送信-uploads)
+
+## テンプレート画面
+
+ヘッダーやナビゲーションを 1 つの画面（テンプレート）に置き、ほかの画面の土台にする。**これは画面ファイルのキー**。
+
+```json
+// screens/frame.json: 土台（ふつうの画面と同じ書き方。"${名前}" が各画面の値に置き換わる）
+{ "name": "frame", "scrollable": false, "style": { "bg_color": "#141a22", "pad": 0 }, "children": [
+  { "type": "label", "x": 16, "y": 12, "text": "${title}", "style": { "font": 24 } },
+  { "type": "button", "x": 16, "y": 424, "w": 120, "h": 48, "text": "@main", "on_click": { "action": "goto", "screen": "main" } } ] }
+
+// screens/report.json: 土台の上に作る画面
+{ "name": "report", "template": "frame", "template_args": { "title": "@report" }, "children": [ ... ] }
+```
+
+- 画面のキー: `template`（土台の画面の名前）、`template_args`（`{ "名前": 文字・数値・true/false }`）。
+- 土台の部品が先に置かれ、画面自身の部品がその上に載る。土台の `style` `scrollable` `flex` も引き継ぎ、画面側に書けばそちらが優先。
+- 置き換わるのは土台の部品の `${名前}`（`${screen}` は画面の名前。渡さなかったものは空）。画面自身の部品では置き換わらない。
+  **`${名前}` は `text` などの表示する文字に使う。** 色（`bg_color`）やタグ名に書くと、土台の画面そのものには `${…}` のまま残るので、
+  `--check` が土台を問題にする（`runtime: unknown color '${…}'`）。
+- 「今いる画面のボタンだけ色を変える」は、土台ではなく各画面でする: 各画面が、自分のボタンの位置に小さな部品（下線や枠）を重ねて置く。
+- 土台もふつうの画面なので、`project.json` の `"screens"` に入れる。土台にポップアップは使えない。8 段まで重ねられる。
+- 画面自身の部品は、土台の部品（ヘッダー、ナビゲーション）に重ならない位置に置く。`--render` の画像には土台も描かれる。
+- 既存の画面がテンプレートを使っているプロジェクトでは、新しい画面も同じ `template` を付ける（共通部分を書き写さない）。
+
+## スケジュール (`schedules`)
+
+決まった時刻にアクション（ボタンと同じ動作）を実行する。
+
+```json
+"schedules": [
+  { "name": "start", "at": "08:00", "days": "weekdays", "do": { "action": "set", "tag": "run_enable", "value": true } },
+  { "name": "report", "at": "23:55", "catch_up": true, "do": [ { "action": "call", "fn": "upload.run", "arg": "nightly" } ] },
+  { "name": "service", "at": "2026-12-01 09:00", "do": { "action": "popup", "screen": "service_due" } }
+]
+```
+
+| キー | 内容 |
+| --- | --- |
+| `name` | 名前（必須、重複不可、64 文字まで） |
+| `at` | `"HH:MM"`（毎日 / `days` の曜日）、または `"YYYY-MM-DD HH:MM"`（1 回だけ） |
+| `days` | `"daily"`（既定）、`"weekdays"`、`"weekend"`、または `["mon", "wed"]`（`sun mon tue wed thu fri sat`）。日付つきの `at` には書かない |
+| `do` | アクション 1 つ、またはその配列（必須） |
+| `enabled` | `false` で実行しない |
+| `catch_up` | `true`: 装置が止まっていた間に過ぎた時刻を、次の起動時に 1 回実行する |
+
+装置では System > Schedule で時刻・曜日・オン / オフを変えられる（`do` は変えられない）。200 件まで。
+
+## 音 (`sound`)
+
+`"sound": {}` があるだけで、タッチ音（`click`）とアラーム音（`alarm`、確認されるまで 3 秒ごと）が鳴る。
+
+| キー | 内容 |
+| --- | --- |
+| `volume` | 0〜100（既定 80） |
+| `mute` | `true` で消音 |
+| `touch`、`alarm` | 音: `"click"` `"beep"` `"alarm"`、プロジェクトの中の `.wav`（`"assets/tap.wav"`）、または `false` |
+| `alarm_every_s` | アラーム音を鳴らし直す間隔の秒（既定 3、0 = 1 回だけ） |
+| `output` | `"auto"`（既定）/ `"audio"` / `"gpio"` / `"none"` |
+| `device` | Linux の ALSA デバイス（Raspberry Pi のイヤホン端子: `"plughw:CARD=Headphones,DEV=0"`） |
+| `gpio`、`gpio_active_low`、`gpio_chip` | ブザーをつないだ GPIO（Linux） |
+
+画面からの使い方（消音、音量、ブザー停止、音を鳴らす）は `binding-and-actions.md` の「画面の外の機能を画面から使う」。
+
+## 機器間のデータ転送 (`transfers`)
+
+タグの値を別のタグに写す（PLC → 別の PLC など）。切断中は書かない。
+
+```json
+"transfers": [
+  { "name": "speed", "from": "plc1_speed", "to": "plc2_speed" },
+  { "name": "temp", "from": "plc1_temp", "to": "plc2_temp", "trigger": "cyclic", "every_ms": 1000, "scale": 0.1, "when": "run" }
+]
+```
+
+| キー | 内容 |
+| --- | --- |
+| `name` | 名前（必須、重複不可） |
+| `from`、`to` | タグ名（必須。同じタグは不可、`to` に `sys.*` は不可） |
+| `trigger` | `"change"`（既定）/ `"cyclic"`（+ `every_ms`、100 以上、既定 1000） |
+| `scale`、`offset` | 書く値 = 元の値 × `scale` + `offset` |
+| `out_of_range` | 転送先のタグの `min` / `max` を外れた値: `"skip"`（既定）/ `"clamp"` |
+| `when` | 条件: タグ名、または `{ "tag": "mode", "eq": 2 }`（`eq ne gt lt ge le`） |
+| `enabled` | `false` で実行しない |
+
+輪（A → B → A）は実行されない（`--check` が指摘）。500 件まで。
+
+## メール (`mail`)
+
+アラームをメールで送る（SMTP）。
+
+```json
+"mail": { "host": "smtp.example.com", "security": "starttls", "username": "hmi",
+          "from": "hmi@example.com", "to": ["shift@example.com"],
+          "alarms": { "severities": ["critical"], "subject": "[{project}] {alarm.message}", "body": "{alarm.time}\n液位 {level} %" } }
+```
+
+| キー | 内容 |
+| --- | --- |
+| `host`、`port` | メールサーバー（必須）。`port` を省くと 587 / 465 / 25 |
+| `security` | `"starttls"`（既定）/ `"tls"` / `"none"`（暗号化なし: `--check` が知らせる） |
+| `username` | ログイン名（省くとログインしない）。**`password` は書かない**（装置の System > Mail） |
+| `from`、`to` | 差出人のアドレス（必須）、宛先（1 つ、または配列。必須、20 件まで） |
+| `verify`、`ca_file` | 証明書を検証する（既定 true）。`ca_file` はプロジェクトの中のファイル |
+| `timeout_ms`、`retry_s`、`retries`、`queue` | 待ち時間、再送の間隔と回数、送信待ちの上限 |
+| `alarms` | `events`（`"raised"` 既定、`"cleared"`、`"acked"`）、`severities`、`min_interval_s`、`subject`、`body`。`false` でアラームは送らない |
+| `enabled` | `false` で送らない |
+
+件名・本文の `{名前}`: タグの値、`{project}`、`{time}`、`{alarm.name}` `{alarm.message}` `{alarm.severity}` `{alarm.value}` `{alarm.event}` `{alarm.time}`。
+`"enabled": false` でも設定は検査され、`sys.mail.*` のタグもある（送らないだけ）。画面からの使い方は `binding-and-actions.md`。
+
+## ログの送信 (`uploads`)
+
+ログを CSV ファイルにしてサーバーへ送る。**自動では送らない**: `upload.run` アクションをスケジュールやボタンに置く。
+
+```json
+"uploads": [ { "name": "nightly", "url": "https://files.example.com/hml/", "username": "hmi",
+               "logs": ["data:line1", "alarms", "operation", "system"] } ]
+```
+
+| キー | 内容 |
+| --- | --- |
+| `name` | 名前（必須。英数字、`_`、`-`） |
+| `url` | `https://サーバー/フォルダー/`、`http://…`、`ftp://サーバー/フォルダー/`（http と ftp は暗号化なし: `--check` が知らせる）。URL にユーザー名・`?`・`..` は書けない |
+| `method` | HTTP: `"put"`（既定）/ `"post"` |
+| `username` | ログイン名。**`password` は書かない**（装置の System > Upload） |
+| `logs` | 送るもの（必須）: `"data:<data_log のグループ名>"`、`"alarms"`、`"operation"`、`"system"`。そのログがプロジェクトにあること |
+| `verify`、`ca_file`、`timeout_ms`、`retry_s`、`retries`、`keep` | 証明書の検証、待ち時間、再送、送信待ちのファイルの上限 |
+| `enabled` | `false` で送らない |
+
+スケジュールから送るなら `"do": { "action": "call", "fn": "upload.run", "arg": "nightly" }`。画面からの使い方は `binding-and-actions.md`。
+`"enabled": false` でも設定は検査され、`sys.upload.*` のタグもある。10 件まで。

@@ -2,7 +2,7 @@
 // connects / disconnects, project load messages, Lua log() ...) is recorded in a SQLite database
 // and can be exported as CSV.
 //
-//  - Enabled by "system_log" in project.json (see README.md, "システムログ").
+//  - Enabled by "system_log" in project.json (see README.md, "System log").
 //  - add() may be called from any thread. Rows are queued in memory and written by a background
 //    thread about once a second in one transaction, so the UI thread never waits for the disk.
 //  - A message that repeats back to back (a script failing on every interval tick) is stored once
