@@ -3,7 +3,7 @@
    8443  HTTPS  the same behind TLS (server.crt / server.key of this folder), login hmi / s3cret-pw required
    2121  FTP    pyftpdlib (get.py fetches it into pkgs/), login hmi / s3cret-pw, passive ports 60000-60010
 What arrives is kept in ./received/<port>/. They listen on this machine only (127.0.0.1).
-Run it in a folder that has server.crt and server.key (see the README, "ログを外に出す")."""
+Run it in a folder that has server.crt and server.key (see the README, "Uploading the logs (`uploads`)")."""
 import base64, http.server, os, re, ssl, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, 'pkgs'))

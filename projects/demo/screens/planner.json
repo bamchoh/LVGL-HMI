@@ -1,0 +1,75 @@
+{
+  "name": "planner",
+  "template": "frame",
+  "template_args": {
+    "title": "@planner"
+  },
+  "children": [
+    { "type": "panel", "x": 532, "y": 476, "w": 120, "h": 4, "scrollable": false, "style": { "bg_color": "#2196f3", "radius": 2, "border_width": 0 } },
+    {
+      "type": "panel", "x": 16, "y": 56, "w": 384, "h": 208, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "@next_maint", "style": { "text_color": "#9fb3c8" } },
+        { "type": "label", "align": "top_right", "bind": { "text": { "tag": "next_maint", "format": "%s" } },
+          "style": { "text_color": "#ffffff" } },
+        { "type": "datetime_input", "align": "bottom_mid", "mode": "datetime", "bind": "next_maint",
+          "year_min": 2026, "year_max": 2035, "level": 2, "level_deny": "login" }
+      ]
+    },
+    {
+      "type": "panel", "x": 16, "y": 272, "w": 384, "h": 144, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "@transfer_title", "style": { "text_color": "#9fb3c8" } },
+        { "type": "label", "x": 0, "y": 32, "text": "@transfer_from", "style": { "font": 14, "text_color": "#9fb3c8" } },
+        { "type": "label", "x": 200, "y": 32, "text": "@transfer_to", "style": { "font": 14, "text_color": "#9fb3c8" } },
+        { "type": "numeric_display", "x": 0, "y": 64, "w": 144, "decimals": 2, "unit": " bar", "bind": "pressure" },
+        { "type": "label", "x": 160, "y": 72, "text": "x100", "style": { "text_color": "#9fb3c8" } },
+        { "type": "numeric_display", "x": 200, "y": 64, "w": 144, "decimals": 0, "unit": " kPa", "bind": "pressure_kpa" }
+      ]
+    },
+    {
+      "type": "panel", "x": 408, "y": 56, "w": 376, "h": 176, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "@sound", "style": { "text_color": "#9fb3c8" } },
+        { "type": "label", "align": "top_right", "x": -72, "y": 4, "text": "@sound_mute" },
+        { "type": "switch", "align": "top_right", "w": 56, "h": 32, "bind": "sys.sound.mute" },
+        { "type": "label", "x": 0, "y": 52, "text": "@sound_volume" },
+        { "type": "slider", "x": 96, "y": 56, "w": 184, "min": 0, "max": 100, "bind": "sys.sound.volume" },
+        { "type": "label", "align": "top_right", "y": 52, "bind": { "text": { "tag": "sys.sound.volume", "format": "%d %%" } } },
+        { "type": "button", "align": "bottom_left", "w": 168, "h": 48, "text": "@sound_test",
+          "style": { "bg_color": "#37474f" },
+          "on_click": { "action": "call", "fn": "sound.play", "arg": "beep" } },
+        { "type": "button", "align": "bottom_right", "w": 168, "h": 48, "text": "@buzzer_stop",
+          "style": { "bg_color": "#ef6c00" },
+          "bind": { "visible": "sys.sound.alarm" },
+          "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }
+      ]
+    },
+    {
+      "type": "panel", "x": 408, "y": 240, "w": 376, "h": 176, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "@comm_title", "style": { "text_color": "#9fb3c8" } },
+        { "type": "label", "x": 0, "y": 32, "text": "@mail_waiting" },
+        { "type": "label", "align": "top_right", "y": 32, "bind": { "text": { "tag": "sys.mail.waiting", "format": "%d" } },
+          "style": { "text_color": "#ffffff" } },
+        { "type": "label", "align": "top_right", "x": -48, "y": 32, "text": "@send_error", "style": { "text_color": "#ef5350" },
+          "bind": { "visible": "sys.mail.error" } },
+        { "type": "label", "x": 0, "y": 60, "text": "@upload_waiting" },
+        { "type": "label", "align": "top_right", "y": 60, "bind": { "text": { "tag": "sys.upload.waiting", "format": "%d" } },
+          "style": { "text_color": "#ffffff" } },
+        { "type": "label", "align": "top_right", "x": -48, "y": 60, "text": "@send_error", "style": { "text_color": "#ef5350" },
+          "bind": { "visible": "sys.upload.error" } },
+        { "type": "button", "align": "bottom_left", "w": 168, "h": 48, "text": "@send_logs_now",
+          "style": { "bg_color": "#37474f" },
+          "on_click": { "action": "call", "fn": "upload.run", "arg": "nightly" } },
+        { "type": "button", "align": "bottom_right", "w": 168, "h": 48, "text": "@send_test_mail",
+          "style": { "bg_color": "#37474f" },
+          "on_click": { "action": "call", "fn": "mail.send", "arg": "HML demo: test mail\nPressure {pressure} bar, level {level} %" } }
+      ]
+    }
+  ]
+}

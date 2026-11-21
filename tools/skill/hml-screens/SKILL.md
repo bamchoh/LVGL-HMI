@@ -64,6 +64,8 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
   **そこにないキーは書かない**（ランタイムは黙って無視する。`--check` が見つける）。
 - `bind`（タグとの接続）、動作、ポップアップ、多言語、アラーム・トレンドなどの部品の使い方は
   **`reference/binding-and-actions.md`**。
+- 画面の外の機能（テンプレート画面、スケジュール、音、機器間のデータ転送、メール、ログの送信）の設定キーは
+  **`reference/project-features.md`**。これらは `project.json` に書く。頼まれたときだけ足す・変える。
 - そのまま動く見本は `examples/`（`project.json`、`screens/overview.json`、ポップアップの `screens/confirm_stop.json`）。
 
 ## 作るときの決まり

@@ -1,273 +1,275 @@
-# HML Runtime — LVGL 宣言型 HMI ランタイム
+# HML Runtime — a declarative HMI runtime on LVGL
+
+**English** | [日本語](README.ja.md)
 
 [![CI](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml)
 
-JSON で書いた画面定義を LVGL (v9.6) で描画し、タグ（プロセス変数）とウィジェットを
-双方向にバインドする HMI ランタイムです。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
-Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作します。
-データソースはドライバ方式で、シミュレーション、Modbus TCP クライアント、OPC UA サーバー
-（タグを OPC UA 変数として公開）を同梱しています。
-ランタイム本体は C++17 で書かれています（LVGL 本体は C ライブラリのまま利用）。
+HML is an HMI runtime that draws screen definitions written in JSON with LVGL (v9.6) and binds tags
+(process variables) and widgets in both directions. On a PC it runs in an SDL2 window; on Linux boards
+such as the Raspberry Pi it runs on the framebuffer / DRM + evdev (touch panel).
+Data sources are drivers. Simulation, a Modbus TCP client and an OPC UA server
+(which publishes the tags as OPC UA variables) are included.
+The runtime itself is written in C++17 (LVGL itself is used as the C library it is).
 
 ```
-project.json ──┬── tags      : 名前付き変数（bool/int/float/string）
-               ├── drivers   : sim / modbus_tcp / modbus_rtu / modbus_ascii がタグを読み書き
-               ├── screens   : screens/*.json → LVGL ウィジェットに展開
-               │                 bind でタグ⇔ウィジェットを接続、on_click 等でアクション
-               └── scripts   : Lua スクリプト（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / イベント）
+project.json ──┬── tags      : named variables (bool/int/float/string)
+               ├── drivers   : sim / modbus_tcp / modbus_rtu / modbus_ascii read and write the tags
+               ├── screens   : screens/*.json → expanded into LVGL widgets
+               │                 bind connects tag ⇔ widget, on_click etc. run actions
+               └── scripts   : Lua scripts (at startup / periodic / on a tag change / when a screen is shown or hidden / on an event)
 ```
 
-## ビルド（Windows / MSVC）
+## Building (Windows / MSVC)
 
-必要なもの: Visual Studio 2022 以降 (C++ ツール), CMake 3.24+, Ninja, ネットワーク接続
-（初回に LVGL / SDL2 / nlohmann-json / Lua / SQLite / open62541 / webview / WebView2 SDK をダウンロードします）。OPC UA サーバーを組み込むには
-Python 3 も必要です（open62541 のコード生成に使用。不要なら `-DHML_OPCUA=OFF`）。
+Required: Visual Studio 2022 or later (C++ tools), CMake 3.24+, Ninja, a network connection
+(the first build downloads LVGL / SDL2 / nlohmann-json / Lua / SQLite / open62541 / webview / the WebView2 SDK). To include the OPC UA server,
+Python 3 is also required (open62541 uses it to generate code; if you do not need it, `-DHML_OPCUA=OFF`).
 
 ```
-build.cmd            # Release ビルド → build\bin\hml_runtime.exe
+build.cmd            # Release build → build\bin\hml_runtime.exe
 build.cmd Debug
 ```
 
-### 単体テスト
+### Unit tests
 
-`tests/` に [doctest](https://github.com/doctest/doctest) の単体テストがあります。LVGL はメモリ上のディスプレイで
-ヘッドレスに動かし（`tests/lvgl_fixture.hpp`）、ティックを手動で進めるのでタイマーや画面遷移も決定的にテストできます。
+`tests/` has unit tests written with [doctest](https://github.com/doctest/doctest). LVGL runs headless on an in-memory display
+(`tests/lvgl_fixture.hpp`) and the tick is advanced by hand, so timers and screen changes are tested deterministically too.
 
-| テスト                                               | 対象                                                                                                                        |
+| Test | What it covers |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `test_util.cpp`, `test_jsonutil.cpp`, `test_tag.cpp` | ヘルパー、JSON アクセサ、タグストア（型変換・リミット・通知）                                                               |
-| `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
-| `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
-| `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
-| `test_animate.cpp`                                   | アニメーション（点滅がタグで始まり止まると元に戻る、移動・回転・拡大・色、コマ送り、回数、**表示していない画面と閉じたポップアップでは動かない**、**1 秒に 3 回より速く点滅しない**、書き間違いの警告、動作中に画面を消しても安全） |
-| `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
-| `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
-| `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
-| `test_alarm_stats.cpp`                               | アラームの集計（回数と時間、期間の端、記録の欠けと時計の変更、CSV の式の無害化、10 万件の時間、部品）                       |
-| `test_xy_chart.cpp`                                  | XY グラフ（点の追加と破棄、変化時、複数の曲線、消去、数値でない値、極端な設定、描き直しの回数、`--check`）                   |
-| `test_table.cpp`                                     | 表（タグへの追従、`format` と `map`、極端な行数・列数と壊れた設定、1000 行の時間、`--check`）                               |
-| `test_datetime.cpp`                                  | 日付・時刻の入力（うるう年と月末、書式、数値との変換、ローラーとタグ、レベル、操作ログ、`--check`）                        |
-| `test_meter.cpp`                                     | メーター（針と数字、範囲外・数値でない値、極端な設定、描画時間、`--check`）                                                 |
-| `test_log_view.cpp`                                  | ログの画面表示（ページ・絞り込み・期間、SQL 注入、壊れた文字、10 万行の時間、レベル、`--check`）                           |
-| `test_karakuri.cpp`                                  | Karakuri（PLC シミュレーター）を相手にしたデバイスモニターの読み書き。`tools/karakuri_check.py device` から動かすときだけ実行                           |
-| `test_vnc.cpp`, `test_transfer.cpp`                  | 遠隔表示（認証、ピクセル形式、差分、内蔵クライアントとの接続）、USB メモリでの更新とバックアップ                           |
-| `test_driver_slmp.cpp`                               | SLMP（デバイスの書き方、要求と応答のバイト列、壊れた・他のプロトコルの・長すぎる応答とランダムなバイト列の拒否、疑似サーバーに対する読み書き（全データ型・3E / 4E）、書き込みの制限、終了コード・無応答・切断からの復帰、1000 点のまとめ読み） |
-| `test_driver_mqtt.cpp`                               | MQTT（パケットのバイト列、残り長さの境界、壊れたパケットの拒否と 10 万個のランダムなパケット、疑似ブローカーに対する送信・状態トピックと遺言・指令の受信、**指令の検査**（範囲外・数値でない・長すぎる・UTF-8 でない・登録していないトピック・ワイルドカード）、**TLS**（正しい CA で接続、別の CA・別のホスト名の証明書を拒否、verify なしの警告、平文の拒否、パスワードがログに出ない）、拒否からの再試行、切断中は最新の値だけ送る、QoS 1 の再送、停止がすぐ終わる） |
-| `test_driver_opcua_client.cpp`                       | OPC UA クライアント（同じプロセスの open62541 サーバーを相手に: ノードの読み込みとサブスクリプション、`rw` の行だけ書き込み、**署名と暗号化**、**別の証明書のサーバーを拒否**、verify なしの警告、信頼する証明書がないと起動しない、平文で暗号化専用サーバーにつながらない、ユーザー名とパスワード（間違いの拒否、ログに出ない）、型に入らない値を書かない、サーバーの停止と復帰、停止がすぐ終わる、装置の証明書を 1 度だけ作る） |
-| `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
-| `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
-| `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
-| `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
-| `test_recipe.cpp`                                    | レシピ（読み込み・選択・書き込み・保存・値の変更・削除、範囲外なら何も書かない、書き込み後の確認、装置での保存と再起動後の読み戻し、壊れたファイル・書けないとき、CSV の数式エスケープと取り込みの検証・大きさの上限、名前とブック名（パスにならない）、ランダムなバイト列、レベル、レシピ表の部品と確認ダイアログ）、`write_file_atomic` |
-| `test_alarm_view.cpp`                                | アラームの確認（発生・復帰・確認の全順序）、再起動後の状態、履歴のページ送りと絞り込み、古い DB への列追加、確認のレベルと記録、一覧とバナー、1000 件の性能、SQL インジェクション・制御文字・不正な UTF-8 |
-| `test_trend.cpp`                                     | トレンド（区間ごとの最小・最大・最後、短いピークが消えない、bool・文字列・点を含むタグ名、1 分ごとの要約の書き込み、要約と記録の組み合わせが記録だけの結果と一致、名前の SQL インジェクション、100 万件の速さ、部品の移動・拡大縮小・凡例・存在しないグループ） |
-| `test_logs.cpp`                                      | 変数ロギング（各トリガー）、アラーム（発生 / 復帰）、操作ログ（ウィジェット・アクション、パスワードの伏せ字）、CSV エクスポート |
-| `test_key_service.cpp`                               | 鍵の管理（SHA-256 / フィンガープリント、公開鍵の検証、authorized_keys の編集、受付プロトコル、Keys ページ）       |
-| `test_popup.cpp`                                     | ポップアップ（開く・モーダル・重ねる・名前を指定して閉じる・戻るで閉じる、画面の切り替えで閉じる、goto でも開く、ポップアップでない画面は開かない、閉じている間は更新しない、レベル、1000 回の開閉で部品が増えない） |
-| `test_screen_saver.cpp`                              | 画面消灯（時間で消える・0 は消さない、**点けるタッチではボタンが押されない**（模擬タッチパネルで確認）、タグでの切り替え、ログアウト、アラームで点灯 / しない設定、ポップアップも覆う、装置での時間の変更と `project.local.json`） |
-| `test_schedule.cpp`                                  | スケジュール（時刻と曜日・日付指定の 1 回、月末・年末・うるう日、**時計を進めた / 戻したときに二重に実行しない・飛ばさない**、停止中に過ぎた予定と `catch_up`、再起動後も残る、装置での変更と保存、壊れた設定、200 件の負荷、操作ログ、System > Schedule ページ、`--check`） |
-| `test_data_transfer.cpp`                             | 機器間のデータ転送（型の変換、変化時 / 周期 / 条件、**範囲外・NaN・無限大を書かない**、**起動時と切断中は書かない・再接続後は読み直してから最新の値で再開**、輪の検出、壊れた設定、100 件の負荷、System > Transfers ページ、`--check`）。通信はせず、接続の状態だけを言う模擬ドライバーと時計の差し替えで確かめる |
-| `test_smtp.cpp`、`test_smtp_socket.cpp`              | SMTP（STARTTLS / TLS / 平文、AUTH PLAIN / LOGIN、件名の文字コード、**ヘッダーへの差し込みを防ぐ**、**暗号化されていない接続でパスワードを送らない**、STARTTLS への割り込み、応答しない・SMTP でないサーバー）。前者は 1 行ずつの模擬、後者はテスト内の TLS サーバーに実際のソケットでつなぐ（信頼できない証明書・名前の違う証明書の拒否） |
-| `test_net_upload.cpp`                                | ファイルの送信（HTTP の PUT / POST、FTP のパッシブ転送を 1 行ずつの模擬で、**ファイル名やログイン情報でヘッダー・コマンドを足せない**、リダイレクトに付いていかない、PASV のアドレスを使わない、URL の検査）と、テスト内の HTTP / FTP サーバーへの実ソケットでの送信 |
-| `test_upload.cpp`                                    | ログの送信の管理（ログごとのファイル、1 つずつ送る、再送とあきらめ、**送れなかったファイルが再起動後も残る**、あふれたら古いものから、パスワードが操作ログ・画面に出ない、遅いサーバーで画面が止まらない、System > Upload ページ、`--check`） |
-| `test_mail.cpp`                                      | メール通知（アラームからの送信、重要度とイベントの絞り込み、再送の間隔とあきらめ、**送信待ちが再起動後も残る**、あふれたら古いものから、パスワードが待ち行列・操作ログ・画面に出ない、遅いサーバーで画面が止まらない、System > Mail ページ、`--check`） |
-| `test_sound.cpp`                                     | 音（内蔵の音と音量、WAV の読み書き、**壊れた WAV・フォルダーの外のファイルを拒否**、タッチ音が鳴る部品 / 鳴らない部品・スクロール、アラーム音の繰り返し・確認で停止・消音、`mute` / `volume` の保存、**音の出口がない・壊れた出力でも落ちない**、アクション、System > Sound ページ、`--check`） |
-| `test_template.cpp`                                  | テンプレート画面（テンプレートの部品が先・画面の部品が上、`${名前}` の置き換え、画面ごとに動く接続と動作、重ねたテンプレート、**ないテンプレート・ポップアップ・自分自身・輪でも落ちない**、50 画面の構築時間、`--check`） |
-| `test_texts.cpp`                                     | 多言語（`@ID` の解決・既定の言語へのフォールバック・`@@`・存在しない ID、`sys.lang` での切り替えと不正な値の差し戻し、部品・選択肢・アラームの言語、切り替えで画面を作り直す）、フォント（どの大きさでも作れる・ない文字は組み込みフォント・`cmap` と `hmtx` の読み取り・壊れた / 切り詰めた / ランダムなフォントファイル、デモ全画面の描画） |
-| `test_users.cpp`                                     | ユーザー管理（ログイン・ロック・自動ログアウト、ウィジェットと画面のレベル、ログイン画面、装置上でのユーザー編集） |
-| `test_project_archive.cpp`                           | プロジェクトファイル（構成ファイルの一覧、作成と展開、プロジェクト外へ出るパスの拒否、PC ごとのファイルの保護）     |
-| `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、ホットリロード）                                  |
-| `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
-| `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
+| `test_util.cpp`, `test_jsonutil.cpp`, `test_tag.cpp` | Helpers, JSON accessors, the tag store (type conversion, limits, notification) |
+| `test_project.cpp`, `test_demo_projects.cpp` | Loading and validation of project.json; every screen of the bundled projects builds |
+| `test_ui.cpp`, `test_screenshot.cpp` | Every widget type, styles, bindings (two-way included), actions, screen changes, BMP output |
+| `test_driver_registry.cpp`, `test_driver_sim.cpp` | Registering / starting / stopping drivers, the simulation waveforms |
+| `test_animate.cpp` | Animations (a blink starts with a tag and the widget returns to its original state when it stops, move, rotate, scale, color, frame stepping, repeat count, **they do not run on a screen that is not shown or in a closed popup**, **nothing blinks faster than 3 times a second**, warnings for typing mistakes, deleting the screen while they run is safe) |
+| `test_images.cpp` | Images (PNG / JPEG / BMP / GIF, `fit`, JPEG / BMP only at their original size, background images, images that follow a tag, **a broken, missing or too large file or a file outside the project is not shown** (also when a tag names it)) |
+| `test_check.cpp` | Checking a project (`--check`: 0 findings for a correct project, 26 kinds of mistake that the runtime silently ignores are found with their location, characters missing from the font, broken files, 0 findings for the shipped projects and the examples of the skill), PNG screenshots |
+| `test_driver_fins.cpp` | FINS (how addresses are written, the bytes of FINS/TCP and of the commands, broken responses, reading and writing against a mock server, end codes, reconnection) |
+| `test_alarm_stats.cpp` | Alarm statistics (counts and durations, the edges of the period, gaps in the records and clock changes, neutralizing formulas in CSV, the time for 100,000 records, the widget) |
+| `test_xy_chart.cpp` | XY chart (adding and discarding points, on change, several curves, clearing, non-numeric values, extreme settings, the number of redraws, `--check`) |
+| `test_table.cpp` | Table (following the tags, `format` and `map`, extreme numbers of rows and columns and broken settings, the time for 1000 rows, `--check`) |
+| `test_datetime.cpp` | Date and time input (leap years and ends of months, formats, conversion to and from numbers, rollers and tags, levels, the operation log, `--check`) |
+| `test_meter.cpp` | Meter (needle and numbers, out-of-range and non-numeric values, extreme settings, drawing time, `--check`) |
+| `test_log_view.cpp` | Showing logs on a screen (pages, filters, periods, SQL injection, broken characters, the time for 100,000 rows, levels, `--check`) |
+| `test_karakuri.cpp` | Reading and writing with the device monitor against Karakuri (a PLC simulator). Runs only when started from `tools/karakuri_check.py device` |
+| `test_vnc.cpp`, `test_transfer.cpp` | Remote display (authentication, pixel formats, differences, a connection with the built-in client), updates and backups with a USB memory |
+| `test_driver_slmp.cpp` | SLMP (how devices are written, the bytes of requests and responses, rejection of responses that are broken, of another protocol or too long and of random bytes, reading and writing against a mock server (all data types, 3E / 4E), limits on writing, recovery from end codes, no response and disconnection, block reads of 1000 points) |
+| `test_driver_mqtt.cpp` | MQTT (the bytes of the packets, the boundaries of the remaining length, rejection of broken packets and 100,000 random packets, publishing to a mock broker, the status topic and the will, receiving commands, **checking of commands** (out of range, not a number, too long, not UTF-8, a topic that is not registered, wildcards), **TLS** (connects with the right CA, rejects a certificate of another CA or another host name, a warning without verify, plaintext is rejected, the password does not appear in the log), retry after a rejection, only the latest value is sent while disconnected, QoS 1 retransmission, stopping ends at once) |
+| `test_driver_opcua_client.cpp` | OPC UA client (against an open62541 server in the same process: reading nodes and subscriptions, writing only the `rw` rows, **signing and encryption**, **a server with another certificate is rejected**, a warning without verify, does not start without a trusted certificate, does not connect in plaintext to an encryption-only server, user name and password (a wrong one is rejected, they do not appear in the log), a value that does not fit the type is not written, the server stopping and coming back, stopping ends at once, the certificate of the device is made only once) |
+| `test_driver_modbus.cpp` | End to end against a mock Modbus TCP server inside the test (all areas, all data types, writing, reconnection) |
+| `test_driver_modbus_serial.cpp` | Modbus RTU / ASCII (frames and CRC / LRC, several units, broken responses, recovery from no response, a mock serial port) |
+| `test_driver_opcua.cpp` | Reading and writing the OPC UA server driver with the open62541 client API |
+| `test_system_log.cpp` | System log (recording to SQLite, collapsing of repeats, the number of records kept, CSV export, writing from threads) |
+| `test_recipe.cpp` | Recipes (load, select, write, save, changing values, delete, nothing is written if a value is out of range, verification after writing, saving on the device and reading back after a restart, broken files and when writing is not possible, escaping of formulas in CSV, validation of imports and the size limit, names and book names (they do not become paths), random bytes, levels, the recipe table widget and the confirmation dialog), `write_file_atomic` |
+| `test_alarm_view.cpp` | Acknowledging alarms (every order of raise, clear and acknowledge), the state after a restart, paging and filtering of the history, adding columns to an old DB, the level for acknowledging and its record, the list and the banner, performance with 1000 records, SQL injection, control characters, invalid UTF-8 |
+| `test_trend.cpp` | Trend (minimum, maximum and last of each interval, a short peak does not disappear, bool, string and tag names containing a dot, writing the summary of each minute, the combination of summaries and records agrees with the result from the records alone, SQL injection in names, the speed with 1,000,000 records, moving and zooming the widget, the legend, a group that does not exist) |
+| `test_logs.cpp` | Data log (every trigger), alarms (raise / clear), operation log (widgets, actions, masking of passwords), CSV export |
+| `test_key_service.cpp` | Key management (SHA-256 / fingerprints, validation of public keys, editing authorized_keys, the enrollment protocol, the Keys page) |
+| `test_popup.cpp` | Popups (open, modal, stacking, closing by name, closing with back, closing on a screen change, goto opens one too, a screen that is not a popup is not opened, no updates while closed, levels, 1000 opens and closes do not add widgets) |
+| `test_screen_saver.cpp` | Screen saver (the screen goes off after the time, 0 never turns it off, **the touch that turns it on does not press a button** (checked with a mock touch panel), switching by a tag, logout, turning on at an alarm / the setting not to, it covers popups too, changing the time on the device and `project.local.json`) |
+| `test_schedule.cpp` | Schedules (time of day and weekdays, one run on a given date, end of month, end of year, leap day, **nothing runs twice or is skipped when the clock is set forward / back**, schedules that passed while stopped and `catch_up`, they remain after a restart, changing and saving on the device, broken settings, a load of 200 entries, the operation log, the System > Schedule page, `--check`) |
+| `test_data_transfer.cpp` | Data transfer between devices (type conversion, on change / periodic / conditional, **out-of-range values, NaN and infinity are not written**, **nothing is written at startup or while disconnected; after reconnecting it reads again and resumes with the latest value**, detection of loops, broken settings, a load of 100 entries, the System > Transfers page, `--check`). It does not communicate; it is checked with mock drivers that only report the state of the connection and with a replaced clock |
+| `test_smtp.cpp`, `test_smtp_socket.cpp` | SMTP (STARTTLS / TLS / plaintext, AUTH PLAIN / LOGIN, the character encoding of the subject, **header injection is prevented**, **the password is not sent over a connection that is not encrypted**, interception of STARTTLS, a server that does not respond or is not SMTP). The former is a line-by-line mock; the latter connects with a real socket to a TLS server inside the test (rejection of an untrusted certificate and of a certificate with a different name) |
+| `test_net_upload.cpp` | Sending files (HTTP PUT / POST and FTP passive transfer with a line-by-line mock, **a file name or login data cannot add headers or commands**, redirects are not followed, the address in PASV is not used, checking of URLs) and sending over real sockets to HTTP / FTP servers inside the test |
+| `test_upload.cpp` | Managing the sending of logs (a file per log, sending one at a time, retries and giving up, **files that could not be sent remain after a restart**, the oldest go first on overflow, the password does not appear in the operation log or on the screen, a slow server does not stop the screen, the System > Upload page, `--check`) |
+| `test_mail.cpp` | Mail notification (sending from an alarm, filtering by severity and event, the retry interval and giving up, **mail waiting to be sent remains after a restart**, the oldest go first on overflow, the password does not appear in the queue, the operation log or on the screen, a slow server does not stop the screen, the System > Mail page, `--check`) |
+| `test_sound.cpp` | Sound (the built-in sounds and volume, reading and writing WAV, **a broken WAV and a file outside the folder are rejected**, widgets that make / do not make the touch sound and scrolling, repeating the alarm sound, stopping on acknowledge, muting, saving `mute` / `volume`, **no crash without a sound output or with a broken output**, actions, the System > Sound page, `--check`) |
+| `test_template.cpp` | Template screens (the widgets of the template come first and those of the screen are on top, replacing `${name}`, bindings and actions that work per screen, nested templates, **no crash with a missing template, a popup, itself or a loop**, the time to build 50 screens, `--check`) |
+| `test_texts.cpp` | Languages (resolving `@ID`, falling back to the default language, `@@`, an ID that does not exist, switching with `sys.lang` and reverting an invalid value, the language of widgets, options and alarms, the screens are rebuilt on switching), fonts (can be made at any size, missing characters come from the built-in font, reading `cmap` and `hmtx`, broken / truncated / random font files, drawing every screen of the demo) |
+| `test_users.cpp` | Users (login, lockout, automatic logout, levels of widgets and screens, the login screen, editing users on the device) |
+| `test_project_archive.cpp` | Project files (the list of member files, creating and extracting, rejection of paths that leave the project, protection of the per-PC files) |
+| `test_script.cpp` | Lua scripts (reading and writing tags, every trigger, the sandbox, timeouts, hot reload) |
+| `tools/designer/test/model.test.js` | util / schema / model of the designer (`node --test`, no dependency packages) |
+| `smoke_runtime.cmake` | Starts the executable `hml_runtime` headless with the demo project (the SDL dummy driver) and checks the screenshot and the exit code |
 
 ```
-test.cmd                         # ビルドして hml_tests を実行
-test.cmd -tc="*modbus*"          # doctest の引数をそのまま渡せる（テストケース名でフィルタ）
+test.cmd                         # build and run hml_tests
+test.cmd -tc="*modbus*"          # doctest arguments are passed through (filter by test case name)
 ctest --test-dir build --output-on-failure   # hml_tests + designer_js (node) + hml_runtime_smoke
 ```
 
-Linux では `./build.sh` のあとに `build-<backend>/bin/hml_tests` を実行してください。
-テストを組み込みたくない場合は `-DHML_TESTS=OFF` を付けます。
+On Linux, run `build-<backend>/bin/hml_tests` after `./build.sh`.
+To leave the tests out, add `-DHML_TESTS=OFF`.
 
-GitHub Actions（`.github/workflows/ci.yml`）が push / PR ごとに Windows (MSVC, sdl) と Linux (gcc, fbdev) で
-テストを実行し、続けてランタイムとデザイナーのフルビルドも行います。
+GitHub Actions (`.github/workflows/ci.yml`) runs the tests on Windows (MSVC, sdl) and Linux (gcc, fbdev) on every push / PR,
+and then also does a full build of the runtime and the designer.
 
-### PLC シミュレーターとの接続確認（Karakuri）
+### Checking the drivers against a PLC simulator (Karakuri)
 
-単体テストの通信相手は、このリポジトリで書いた模擬です。同じ思い違いが両方に入ると気づけないので、別の実装である
-PLC シミュレーター [Karakuri](https://github.com/bamchoh/karakuri) を相手にした確認も用意しています（CTest には入りません。
-Karakuri を起動しておく必要があります）。
+The communication partners of the unit tests are mocks written in this repository. If the same misunderstanding is in both, nobody notices it, so
+there is also a check against a different implementation, the PLC simulator [Karakuri](https://github.com/bamchoh/karakuri) (it is not part of CTest.
+Karakuri must be running).
 
 ```
-python -I tools/karakuri_check.py --api http://localhost:8765/api          # すべて
+python -I tools/karakuri_check.py --api http://localhost:8765/api          # everything
 python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slmp / fins / modbus / opcua / opcua-secure / device / opcua-server / transfer
 ```
 
-プロトコルごとに、Karakuri のサーバーを起動し、REST API でメモリに値を入れ、ランタイムを数秒動かしてタグの値を
-出力させ、続けてタグに書かせた値を Karakuri のメモリから読み戻して比べます。
+For each protocol it starts the server of Karakuri, puts values into its memory through the REST API, runs the runtime for a few seconds and has it
+print the tag values, then has it write values to tags, reads them back from the memory of Karakuri and compares them.
 
-| 確認          | 内容                                                                                              |
+| Check | What it covers |
 | ------------- | ------------------------------------------------------------------------------------------------- |
-| `fins`        | FINS/TCP。DM・CIO・WR・HR・EM・タイマ・カウンタ、int16 / uint16 / int32 / float / bcd16 / string、ビットの読み書き |
-| `slmp`        | 3E / 4E フレーム。D・W（16 進）・M・X・Y、int16 / uint16 / int32 / float / string、ワードのビット |
-| `modbus`      | Modbus TCP。保持・入力レジスタ、コイル、ディスクリート入力、u16 / s16 / u32 / s32 / float         |
-| `opcua`       | OPC UA クライアント（暗号なし）。INT / DINT / UINT / REAL / LREAL / BOOL / STRING の購読と書き込み |
-| `opcua-secure`| 同じ内容を Basic256Sha256 の Sign & Encrypt で（Karakuri の OPC UA サーバーにエンドポイントを足します） |
-| `device`      | デバイスモニター（タグのないアドレスの読み書き）を SLMP / FINS / Modbus TCP で |
-| `opcua-server`| 逆向き: ランタイムの OPC UA サーバー（暗号なし）に Karakuri の OPC UA クライアントをつなぎ、ノードの一覧と型、読み出し、書き込み、読み取り専用・型違い・存在しないノードの拒否を確かめる |
-| `transfer`    | 機器間のデータ転送: SLMP → FINS / Modbus、FINS → SLMP。起動時の値、変化、100 件同時、条件、周期での書き直し、**FINS / SLMP のサーバーを止めて再開**（止まっている間は書かない、再開後は最新の値だけが届く、古い値を書き戻さない） |
+| `fins` | FINS/TCP. DM, CIO, WR, HR, EM, timers, counters, int16 / uint16 / int32 / float / bcd16 / string, reading and writing bits |
+| `slmp` | 3E / 4E frames. D, W (hexadecimal), M, X, Y, int16 / uint16 / int32 / float / string, bits of a word |
+| `modbus` | Modbus TCP. Holding and input registers, coils, discrete inputs, u16 / s16 / u32 / s32 / float |
+| `opcua` | OPC UA client (no encryption). Subscribing to and writing INT / DINT / UINT / REAL / LREAL / BOOL / STRING |
+| `opcua-secure`| The same with Sign & Encrypt of Basic256Sha256 (an endpoint is added to the OPC UA server of Karakuri) |
+| `device` | The device monitor (reading and writing addresses that have no tag) over SLMP / FINS / Modbus TCP |
+| `opcua-server`| The other direction: the OPC UA client of Karakuri connects to the OPC UA server of the runtime (no encryption) and checks the list of nodes and their types, reading, writing, and the rejection of read-only nodes, wrong types and nodes that do not exist |
+| `transfer` | Data transfer between devices: SLMP → FINS / Modbus, FINS → SLMP. The values at startup, changes, 100 entries at once, conditions, periodic rewriting, **stopping and restarting the FINS / SLMP server** (nothing is written while it is stopped, only the latest value arrives after the restart, old values are not written back) |
 
-## ビルド（Raspberry Pi / Linux）
+## Building (Raspberry Pi / Linux)
 
-表示バックエンドは CMake の `-DHML_BACKEND=` で選びます（`build.sh` が引数で切り替えます）。
+The display backend is chosen with `-DHML_BACKEND=` of CMake (`build.sh` switches it by its argument).
 
-| バックエンド | 用途                                                                                       | 追加パッケージ |
+| Backend | Use | Additional packages |
 | ------------ | ------------------------------------------------------------------------------------------ | -------------- |
-| `fbdev`      | `/dev/fb0` + evdev。X11/Wayland 不要、コンソールから起動する Raspberry Pi 向け（**既定**） | なし           |
-| `drm`        | `/dev/dri/card0` (KMS) + evdev。vc4-kms-v3d 環境でティアリングを避けたい場合               | `libdrm-dev`   |
-| `sdl`        | デスクトップ Linux のウィンドウ表示（Windows と同じ）                                      | `libsdl2-dev`  |
+| `fbdev` | `/dev/fb0` + evdev. No X11/Wayland needed; for a Raspberry Pi that starts from the console (**default**) | none |
+| `drm` | `/dev/dri/card0` (KMS) + evdev. For avoiding tearing in a vc4-kms-v3d environment | `libdrm-dev` |
+| `sdl` | A window on desktop Linux (the same as Windows) | `libsdl2-dev` |
 
-### Raspberry Pi 上でビルドする（ネイティブ）
+### Building on the Raspberry Pi (native)
 
-Raspberry Pi OS (Bookworm, 32/64 bit どちらでも) で:
+On Raspberry Pi OS (Bookworm, either 32 or 64 bit):
 
 ```
 sudo apt install build-essential cmake ninja-build git
 ./build.sh fbdev                # → build-fbdev/bin/hml_runtime
-sudo apt install libdrm-dev && ./build.sh drm    # DRM 版を使う場合
+sudo apt install libdrm-dev && ./build.sh drm    # to use the DRM version
 ```
 
-Pi 4 で初回ビルドは数分です（LVGL / nlohmann-json / open62541 のダウンロードにネットワークが必要）。
-コンパイラは g++ 10 以降（C++17）、OPC UA を組み込む場合は python3 も必要です（Raspberry Pi OS には標準で入っています）。
+The first build takes a few minutes on a Pi 4 (the network is needed to download LVGL / nlohmann-json / open62541).
+The compiler must be g++ 10 or later (C++17); to include OPC UA, python3 is also required (Raspberry Pi OS has it by default).
 
-### PC (Linux / WSL) でクロスコンパイルする
+### Cross-compiling on a PC (Linux / WSL)
 
 ```
-sudo apt install gcc-aarch64-linux-gnu        # 64bit OS 用
-sudo apt install gcc-arm-linux-gnueabihf      # 32bit OS 用
+sudo apt install gcc-aarch64-linux-gnu        # for a 64bit OS
+sudo apt install gcc-arm-linux-gnueabihf      # for a 32bit OS
 ./build.sh fbdev --cross aarch64              # → build-fbdev-aarch64/bin/hml_runtime
 ./build.sh fbdev --cross armhf                # → build-fbdev-armhf/bin/hml_runtime
 ```
 
-`fbdev` バックエンドは libc 以外に依存しないため、sysroot 無しでクロスコンパイルできます。
-できたバイナリと `projects/` ディレクトリを Pi にコピーすれば動作します。
-（`drm` / `sdl` をクロスビルドするには対象ライブラリ入りの sysroot が必要です。）
+The `fbdev` backend depends on nothing but libc, so it cross-compiles without a sysroot.
+Copy the resulting binary and the `projects/` directory to the Pi and it runs.
+(Cross-building `drm` / `sdl` requires a sysroot that contains the target libraries.)
 
-### Raspberry Pi で実行する
+### Running on the Raspberry Pi
 
 ```
 sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
 ```
 
-- デスクトップ (X11/Wayland) が動いていると framebuffer を奪い合うので、`raspi-config` で
-  「Console」起動にするか、`sudo systemctl stop lightdm` 等でデスクトップを止めてから起動してください。
-- root 以外で動かすには `sudo usermod -aG video,input $USER` を実行して再ログインします。
-- カーネルメッセージやログインプロンプトが HMI の上に描かれるのを防ぐため、ランタイムは起動時にコンソール
-  （`display.console`、既定 `/dev/tty1`）をグラフィックスモード（`KD_GRAPHICS`）に切り替え、終了時に戻します。
-  `/dev/tty1` は root 専用なので、`tools/rpi/hml.service` のように `TTYPath=/dev/tty1` + `StandardInput=tty` で
-  systemd から tty を受け取るか、root で実行してください（開けない場合は警告を出して続行します）。
-  `"console": "none"` で無効化、環境変数 `HML_CONSOLE` で上書きできます。ユニットは `getty@tty1` と排他にして
-  あるので tty1 のログインプロンプトは出なくなります（SSH を使ってください）。
-- 起動・終了時のコンソールログ（カーネルや systemd の `[ OK ] ...`）を画面に出さないようにするには
-  `sudo tools/rpi/quiet_boot.sh` を実行して再起動します。`cmdline.txt` の `console=tty1` を `console=tty3`
-  （画面に出ない VT）に変えて `quiet loglevel=3` を足し、`getty@tty1` を無効にします（ログインは SSH で）。
-  シリアルコンソールはそのままです。`--revert` で元に戻ります。`apply_lcd.sh` も最後にこれを実行します。
-- 起動スプラッシュ: `hml_runtime --splash project.json` は `display.splash`（PNG、プロジェクトからの相対パス。
-  中央に表示し、画面より大きければ縮小）を背景色 `display.splash_bg`（既定は黒）の上に 1 枚描いて終了します。
-  画像がなければプロジェクトのタイトルを表示します。tty1 をグラフィックスモードのまま残すので、HMI が描画を
-  始めるまで画面に残ります。`tools/rpi/hml-splash.service` が起動のごく初期（ルートファイルシステムが
-  あれば動く）にこれを実行します。デザイナーでは Project タブの「Boot splash」で設定できます。
+- If a desktop (X11/Wayland) is running, it fights over the framebuffer, so set the boot to "Console" in `raspi-config`,
+  or stop the desktop with `sudo systemctl stop lightdm` or the like before starting.
+- To run as a user other than root, run `sudo usermod -aG video,input $USER` and log in again.
+- To keep kernel messages and the login prompt from being drawn over the HMI, the runtime switches the console
+  (`display.console`, default `/dev/tty1`) to graphics mode (`KD_GRAPHICS`) at startup and switches it back on exit.
+  `/dev/tty1` is for root only, so either receive the tty from systemd with `TTYPath=/dev/tty1` + `StandardInput=tty`, as `tools/rpi/hml.service` does,
+  or run as root (if it cannot be opened, the runtime prints a warning and continues).
+  `"console": "none"` disables this, and the environment variable `HML_CONSOLE` overrides it. The unit conflicts with `getty@tty1`,
+  so the login prompt on tty1 no longer appears (use SSH).
+- To keep the console log at boot and shutdown (`[ OK ] ...` of the kernel and systemd) off the screen,
+  run `sudo tools/rpi/quiet_boot.sh` and reboot. It changes `console=tty1` in `cmdline.txt` to `console=tty3`
+  (a VT that is not shown on the screen), adds `quiet loglevel=3` and disables `getty@tty1` (log in over SSH).
+  The serial console stays as it is. `--revert` undoes it. `apply_lcd.sh` also runs this at its end.
+- Boot splash: `hml_runtime --splash project.json` draws `display.splash` (a PNG, a path relative to the project;
+  shown in the center, and scaled down if it is larger than the screen) once on the background color `display.splash_bg` (default black) and exits.
+  If there is no image, it shows the title of the project. It leaves tty1 in graphics mode, so the splash stays on the screen until the HMI
+  starts drawing. `tools/rpi/hml-splash.service` runs this very early in the boot (it works as soon as
+  the root file system is there). In the designer it is set in "Boot splash" on the Project tab.
   ```
   sudo install -m 644 ~/hml/tools/rpi/hml.service ~/hml/tools/rpi/hml-splash.service /etc/systemd/system/
   sudo systemctl daemon-reload && sudo systemctl enable hml-splash
   ```
-  `hml.service` は `TTYReset` / `TTYVTDisallocate` を使いません（テキストモードに戻してスプラッシュが消えるため）。
-- コンソールのカーソル点滅が画面に残る場合は `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`。
-- 画面サイズは framebuffer の解像度が使われます。`project.json` の `display.width/height` は
-  画面 JSON の座標基準なので、Pi の解像度に合わせておくか `rotation` と合わせて調整してください。
-- fbdev/drm ドライバはカーネルが返す物理サイズから DPI を計算しますが、HDMI ではでたらめな値
-  （Pi 4 で 1280 px = 70 mm → 464 dpi）が返ることがあり、テーマの余白や角丸が数倍に膨らみます。
-  ランタイムは `display.dpi`（既定 130）で必ず上書きするので、通常は何もしなくて大丈夫です。
-- 入力は `/dev/input/event*` を自動検出します（タッチ / マウス / キーボード）。特定のデバイスだけ
-  使う場合は `display.input` か環境変数 `HML_INPUT` で指定します。
-- 終了は `Ctrl-C` (SIGINT/SIGTERM)、画面 JSON のホットリロードは `kill -HUP <pid>` または `kill -USR1 <pid>`。
+  `hml.service` does not use `TTYReset` / `TTYVTDisallocate` (they switch back to text mode and the splash disappears).
+- If the blinking cursor of the console stays on the screen: `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`.
+- The screen size is the resolution of the framebuffer. `display.width/height` in `project.json` is
+  the coordinate reference of the screen JSON, so set it to the resolution of the Pi or adjust it together with `rotation`.
+- The fbdev/drm drivers calculate the DPI from the physical size that the kernel returns, but over HDMI a nonsense value
+  (on a Pi 4, 1280 px = 70 mm → 464 dpi) is sometimes returned, and the padding and corner radii of the theme swell to several times their size.
+  The runtime always overrides it with `display.dpi` (default 130), so normally nothing needs to be done.
+- Input is detected automatically from `/dev/input/event*` (touch / mouse / keyboard). To use only one particular device,
+  specify it with `display.input` or the environment variable `HML_INPUT`.
+- Exit with `Ctrl-C` (SIGINT/SIGTERM); hot reload of the screen JSON is `kill -HUP <pid>` or `kill -USR1 <pid>`.
 
-### 3.5 インチ HDMI LCD (480x320) + ADS7846 タッチの例
+### Example: a 3.5 inch HDMI LCD (480x320) with an ADS7846 touch panel
 
-`tools/rpi/` に Raspberry Pi OS 用の設定一式があります。`projects/lcd35` は同じデモを 480x320 向けに
-組み直したものです（タッチは 180 度回転なので `calibration` が [max, max, min, min] の順になっています）。
+`tools/rpi/` has a full set of settings for Raspberry Pi OS. `projects/lcd35` is the same demo rebuilt
+for 480x320 (the touch panel is rotated 180 degrees, so `calibration` is in the order [max, max, min, min]).
 
 ```
 scp -r tools/rpi pi:~/hml/lcd          # config-lcd.txt / apply_lcd.sh / quiet_boot.sh / hml.service
-sudo ~/hml/lcd/apply_lcd.sh            # config.txt と cmdline.txt を書き換え、起動ログも非表示（--revert で元に戻る）
+sudo ~/hml/lcd/apply_lcd.sh            # rewrites config.txt and cmdline.txt and also hides the boot log (--revert undoes it)
 sudo reboot
-sudo cp ~/hml/lcd/hml.service /etc/systemd/system/ && sudo systemctl enable --now hml   # 自動起動
+sudo cp ~/hml/lcd/hml.service /etc/systemd/system/ && sudo systemctl enable --now hml   # start automatically
 ```
 
-- 既定は vc4 オーバーレイなし（firmware が `hdmi_cvt` で 480x320 を出し、`/dev/fb0` は simple-framebuffer）。
-  `vc4-fkms-v3d` はカーネル 6.18 では `Cannot find any crtc or sizes` で失敗し fb0 が消えるため使いません。
-- タッチの向きを調べるには `python3 tools/rpi/touch_raw.py /dev/input/event0 60` で生の座標を見ます。
-- 画面に触らずにタッチ操作を試すには `tools/rpi/tap.py` を使います。入力デバイスにタッチのイベントを書き込むので、
-  ランタイムには本物のタッチとして届きます（実行するユーザーが `input` グループに入っている必要があります）。
-  座標は画面上の位置で、表示サイズとタッチ補正は `--project` で指定した project.json から読みます。
+- The default is without a vc4 overlay (the firmware outputs 480x320 with `hdmi_cvt`, and `/dev/fb0` is a simple-framebuffer).
+  `vc4-fkms-v3d` is not used: on kernel 6.18 it fails with `Cannot find any crtc or sizes` and fb0 disappears.
+- To find the orientation of the touch panel, look at the raw coordinates with `python3 tools/rpi/touch_raw.py /dev/input/event0 60`.
+- To try touch operations without touching the screen, use `tools/rpi/tap.py`. It writes touch events to the input device,
+  so they reach the runtime as real touches (the user who runs it must be in the `input` group).
+  The coordinates are positions on the screen; the display size and the touch calibration are read from the project.json given with `--project`.
   `python3 tools/rpi/tap.py --project projects/lcd35/project.json 440,20,900 95,70`
-  （`X,Y,待ち時間ms` を並べる）。結果は `cat /dev/fb0 > shot.raw` で画面を取得して確認できます。
+  (a sequence of `X,Y,wait in ms`). The result can be checked by capturing the screen with `cat /dev/fb0 > shot.raw`.
 
-Linux 用の `display` 設定:
+The `display` settings for Linux:
 
 ```json
 "display": {
   "width": 800, "height": 480,
   "rotation": 0,                       // 0 / 90 / 180 / 270
-  "dpi": 130,                          // テーマの余白・角丸の基準（省略時 130 = Windows/SDL と同じ）
-  "fbdev": "/dev/fb0",                 // fbdev バックエンドのデバイス（省略可）
-  "drm":   "/dev/dri/card0",           // drm バックエンドのデバイス（省略可）
-  "input": "",                         // 空 = 自動検出、例 "/dev/input/event0"
-  "touch": { "swap_axes": false, "calibration": [0, 0, 4095, 4095],    // 抵抗膜式などの補正（省略可）
-             "jitter": 12, "smooth": 3, "settle": 1, "release": 1, "lift_ms": 60, "scroll_limit": 8 } // 抵抗膜式のブレ対策（省略可。下記）
+  "dpi": 130,                          // reference for the padding and corner radii of the theme (130 if omitted = the same as Windows/SDL)
+  "fbdev": "/dev/fb0",                 // device of the fbdev backend (optional)
+  "drm":   "/dev/dri/card0",           // device of the drm backend (optional)
+  "input": "",                         // empty = automatic detection, e.g. "/dev/input/event0"
+  "touch": { "swap_axes": false, "calibration": [0, 0, 4095, 4095],    // calibration for resistive panels etc. (optional)
+             "jitter": 12, "smooth": 3, "settle": 1, "release": 1, "lift_ms": 60, "scroll_limit": 8 } // against the jitter of resistive panels (optional; see below)
 }
 ```
 
-### タッチのブレ対策（抵抗膜式のパネル）
+### Touch jitter (resistive panels)
 
-抵抗膜式のパネル（ADS7846 など）は、指を置いたままでも読み取り値が数ピクセル動き、押し始めの 1 回目は大きく外れることが
-あります。そのままだと、ローラーが震える・押しただけのボタンがドラッグ扱いになる・スライダーが揺れる、といった動きになります。
-`display.touch` に次のキーを書くと、ランタイムが読み取り値を安定させます（どれも書かなければ何もしません。静電容量式には不要です）。
+On a resistive panel (ADS7846 and the like) the readings move by a few pixels even while the finger rests on it, and the first reading of a press can be
+far off. Left as it is, this makes a roller tremble, a button that was only pressed count as a drag, and a slider waver.
+With the following keys in `display.touch` the runtime stabilizes the readings (with none of them it does nothing. Capacitive panels do not need them).
 
-| キー           | 内容                                                                                                   | 抵抗膜式の目安 |
+| Key | Description | Guide value for resistive panels |
 | -------------- | ------------------------------------------------------------------------------------------------------ | -------------- |
-| `settle`       | 押し始めの N 回分の読み取りを捨てる（0 〜 5）。指が着く瞬間の外れ値を除く                              | 1              |
-| `release`      | 離す直前の N 回分の読み取りを捨てる（0 〜 3）。指が離れる瞬間の外れ値を除く。そのぶん、すべての読み取りを N 回分（ADS7846 で 1 回約 16 ms）遅らせて伝える | 1 |
-| `lift_ms`      | これより短い「離れた」は、離れたと見なさない（0 〜 300、0 = 無効）。抵抗膜式は、指を滑らせている途中で一瞬だけ接触が切れることがあり、そこでドラッグが 2 つのタッチに分かれて、前半が「その場所のボタンを押した」扱いになる。これを 1 つのタッチとしてつなぐ。本当に離したときの通知は、この時間だけ遅れる | 60 |
-| `smooth`       | 直近 N 回の平均を使う（1 〜 8。1 = そのまま）                                                          | 3              |
-| `jitter`       | 伝える点は、指がそこから N ピクセルより離れたときだけ動く（0 = 無効）。押している間は 1 点のまま、ドラッグは最大 N ピクセル遅れて追従 | 12 |
-| `scroll_limit` | 一覧がスクロールを始めるまでに指が動く距離（LVGL の既定は 10）。`jitter` がブレを除くので小さくてよい（指が実際に動く距離は `jitter` + この値） | 8 |
-| `log`          | タッチ 1 回ごとに、読み取りの回数・ブレた幅・伝えた点が動いた幅をシステムログに 1 行残す               | 調整のときだけ |
+| `settle` | Discards the first N readings of a press (0 to 5). Removes the outliers of the moment the finger lands | 1 |
+| `release` | Discards the last N readings before the release (0 to 3). Removes the outliers of the moment the finger leaves. In exchange, every reading is reported N readings late (about 16 ms per reading on the ADS7846) | 1 |
+| `lift_ms` | A "released" shorter than this is not taken as a release (0 to 300, 0 = disabled). On a resistive panel the contact sometimes breaks for an instant while the finger slides; the drag is then split into two touches, and the first half counts as "the button at that place was pressed". This joins them into one touch. The notification of a real release is delayed by this time | 60 |
+| `smooth` | Uses the average of the last N readings (1 to 8. 1 = as they are) | 3 |
+| `jitter` | The reported point moves only when the finger is more than N pixels away from it (0 = disabled). While pressing it stays one point; a drag follows up to N pixels behind | 12 |
+| `scroll_limit` | The distance the finger moves before a list starts to scroll (the LVGL default is 10). It can be small because `jitter` removes the jitter (the distance the finger really moves is `jitter` + this value) | 8 |
+| `log` | For every touch, leaves one line in the system log with the number of readings, the width of the jitter and the width the reported point moved | only while tuning |
 
-調整の手順: `"log": true` を足して配備し、ボタンを 1〜2 秒押し続ける操作を何度か行い、ログ（`hml.log`）の
+How to tune: add `"log": true` and deploy, hold a button down for 1 to 2 seconds several times, and look in the log (`hml.log`) at
 `touch: 37 samples in 720 ms, the readings wandered 23 x 31 px (9 x 14 without the first and last two), reported 0 x 0 px`
-を見ます。「wandered」が読み取り全体のブレの幅、かっこの中が押し始めと離す直前の 2 回ずつを除いた幅（指を置いている間のブレ）です。
-全体が大きくかっこの中が小さいなら `settle` / `release` が効きます。`jitter` は、かっこの中の幅より少し大きい値にします
-（大きすぎるとドラッグの追従が鈍くなります）。`1 samples in 0 ms` は、パネルが 1 回だけ誤って反応したもので、`settle` が 1 以上なら
-タッチとして扱われません。`2 short lift(s) bridged (longest 31 ms)` は、ドラッグの途中で接触が一瞬切れたのを `lift_ms` がつないだ回数、
-`48 ms after the touch before` は、前のタッチの直後に始まったタッチ（つながれなかった切れ目）です。`log` が有効な間は、続けて
-`touch: -> a scroll` / `-> no scroll` / `-> a click` も出ます（そのタッチを画面がどう扱ったか）。
+in it. "wandered" is the width of the jitter over all readings; the part in parentheses is the width without the first two and the last two readings (the jitter while the finger rests).
+If the whole is large and the part in parentheses is small, `settle` / `release` help. Set `jitter` a little larger than the width in the parentheses
+(if it is too large, a drag follows sluggishly). `1 samples in 0 ms` is the panel reacting falsely just once; with `settle` at 1 or more
+it is not treated as a touch. `2 short lift(s) bridged (longest 31 ms)` is the number of times `lift_ms` joined a momentary break of contact in the middle of a drag;
+`48 ms after the touch before` is a touch that began right after the previous one (a break that was not joined). While `log` is enabled,
+`touch: -> a scroll` / `-> no scroll` / `-> a click` follows too (how the screen treated that touch).
 
-3.5 インチ LCD（ADS7846）での実測（指での操作）:
+Measured on the 3.5 inch LCD (ADS7846), operated with a finger:
 
-| 設定 | 結果 |
+| Setting | Result |
 | ---- | ---- |
-| フィルターなし | 指を置いたままでも読み取りが中央値 10 px（最大 19 px）動く。ローラーを押すと震える。1 回だけの誤反応が 36 回中 4 回 |
-| `settle` 1、`release` 1、`smooth` 3、`jitter` 12、`scroll_limit` 16 | 置いたままのタッチ 26 回はすべて動きなし（震えは止まる）。押したまま動かすと、スクロールにならずボタンを押したことになる場合がある |
-| 上に加えて `lift_ms` 60、`scroll_limit` 8 | ドラッグ 53 回がすべてスクロールになり、クリックになったものは 0 回。動かさないタッチ 9 回はすべてクリック。途中で接触が切れてつないだのは 1 回（16 ms） |
+| No filter | The readings move by a median of 10 px (19 px at most) even while the finger rests. A pressed roller trembles. A single false reaction in 4 of 36 |
+| `settle` 1, `release` 1, `smooth` 3, `jitter` 12, `scroll_limit` 16 | All 26 resting touches without any movement (the trembling stops). Moving while pressing sometimes counts as pressing a button instead of a scroll |
+| The above plus `lift_ms` 60, `scroll_limit` 8 | All 53 drags became scrolls and 0 became clicks. All 9 touches without movement became clicks. The contact broke and was joined once (16 ms) |
 
-最後の行が目安の値です。`lift_ms` と `scroll_limit` は同時に変えたので、どちらがどれだけ効いたかは分けて確かめていません
-（接触が切れたのは 53 回中 1 回だけだったので、`scroll_limit` を縮めた効果のほうが大きい見込みです）。パネルごとに違うので、`log` で確かめてください。
-デザイナーでは、プロジェクトタブの「タッチパネル」で設定できます。3.5 インチ LCD のプリセットには目安の値が入っています。
+The last row holds the guide values. `lift_ms` and `scroll_limit` were changed at the same time, so how much each of them contributed has not been checked separately
+(the contact broke only once in 53 drags, so the effect of reducing `scroll_limit` is expected to be the larger one). It differs from panel to panel, so check with `log`.
+In the designer it is set in "Touch panel" on the Project tab. The preset for the 3.5 inch LCD contains the guide values.
 
-環境変数 `HML_FBDEV` / `HML_DRM` / `HML_INPUT` を設定すると `project.json` より優先されます。
+Setting the environment variables `HML_FBDEV` / `HML_DRM` / `HML_INPUT` takes precedence over `project.json`.
 
-systemd で自動起動する例 (`/etc/systemd/system/hml.service`):
+An example of starting automatically with systemd (`/etc/systemd/system/hml.service`):
 
 ```ini
 [Unit]
@@ -284,81 +286,88 @@ User=root
 WantedBy=multi-user.target
 ```
 
-`sudo systemctl enable --now hml` で起動し、`sudo systemctl reload hml` で画面 JSON を再読み込みできます。
+Start it with `sudo systemctl enable --now hml`; `sudo systemctl reload hml` reloads the screen JSON.
 
-## 実行
+## Running
 
 ```
 build\bin\hml_runtime.exe projects\demo\project.json
 ```
 
-| キー / オプション           | 動作                                                                                                              |
+| Key / option | What it does |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `F5`                        | 画面 JSON をホットリロード（タグ・ドライバは維持、表示中の画面を保つ）。Linux fbdev/drm では `SIGHUP` / `SIGUSR1` |
-| `Esc`                       | 終了。Linux fbdev/drm では `Ctrl-C` (`SIGINT` / `SIGTERM`)                                                        |
-| `SIGUSR2`（Linux fbdev/drm）| ランタイムを再起動（終了処理をしてから同じコマンドラインで起動し直す）。デザイナーの Deploy が使う                |
-| `--screen <name>`           | 起動時に表示する画面を指定                                                                                        |
-| `--screenshot <file>`       | 起動後にスクリーンショットを保存。名前が `.png` で終われば PNG、それ以外は BMP                                    |
-| `--check`                   | プロジェクトの間違いを一覧にして終了（下記「プロジェクトの検査」）。`--render` `--lang` `--set` と組み合わせられる |
-| `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
-| `--stats <seconds>`          | メインループの負荷を指定秒ごとにログに出す（1 秒あたりの周回数、占有率、最長の 1 周の時間）。負荷の確認用 →「負荷の確認」 |
-| `--list-serial-ports`        | その機械のシリアルポートを一覧表示して終了（project.json は不要）→「ドライバ: modbus_rtu / modbus_ascii」 |
-| `--reload-after <ms>`       | 指定時間後にホットリロードを実行（テスト用）                                                                      |
-| `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
-| `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
-| `--click <x>,<y>,<ms>`      | 起動から `ms` 後に座標 (x,y) をクリック（複数指定可、UI 自動テスト用）                                            |
-| `--shot-at <ms>,<file>`     | 指定時刻にスクリーンショットを保存（複数指定可。`.png` なら PNG）                                                 |
+| `F5` | Hot reload of the screen JSON (tags and drivers are kept, the screen on display stays). On Linux fbdev/drm: `SIGHUP` / `SIGUSR1` |
+| `Esc` | Quit. On Linux fbdev/drm: `Ctrl-C` (`SIGINT` / `SIGTERM`) |
+| `SIGUSR2` (Linux fbdev/drm) | Restart the runtime (it shuts down cleanly and starts again with the same command line). The designer's Deploy uses this |
+| `--screen <name>` | The screen to show at startup |
+| `--screenshot <file>` | Save a screenshot after startup. PNG if the name ends in `.png`, BMP otherwise |
+| `--check` | List the mistakes in the project and exit (see "Checking a project (`--check`)" below). Can be combined with `--render` `--lang` `--set` |
+| `--exit-after <ms>` | Exit automatically after the given time (for CI / automated tests) |
+| `--stats <seconds>` | Log the load of the main loop every given number of seconds (passes per second, busy ratio, time of the longest pass). For checking the load → "Checking the load" |
+| `--list-serial-ports` | List the serial ports of this machine and exit (no project.json needed) → "Driver: modbus_rtu / modbus_ascii (serial)" |
+| `--reload-after <ms>` | Do a hot reload after the given time (for tests) |
+| `--export-system-log <file.csv>` | Write the system log to a CSV file and exit (narrow it down with `--log-level warn` and the like) → "System log" |
+| `--export-data-log <file.csv>` | Write a group of the data log to a CSV file and exit (`--group <name>`). `--export-alarm-log` / `--export-operation-log` work the same way → "Logging" |
+| `--click <x>,<y>,<ms>` | Click at the coordinates (x,y) `ms` after startup (can be given more than once; for automated UI tests) |
+| `--shot-at <ms>,<file>` | Save a screenshot at the given time (can be given more than once; PNG if `.png`) |
 
-デモの Modbus 接続を試すには、同梱のテストサーバーを別ターミナルで起動してください。
+To try the Modbus connection of the demo, start the bundled test server in another terminal.
 
 ```
 python tools\modbus_server.py --port 5020
 ```
 
-接続すると画面右上の PLC ランプが点灯し、Run スイッチ・Speed スライダー・Setpoint アークが
-サーバーのコイル / 保持レジスタと同期します。サーバーが無い場合も画面は動作します（オフライン表示）。
-そのあいだは `pump` スクリプトがポンプを模擬し、運転を入れると速度（PV）が設定値（SP）まで上がります。
+Once connected, the PLC lamp at the top right of the screen lights up, and the Run switch, the Speed slider and the Setpoint arc
+stay in sync with the coils / holding registers of the server. The screens work without the server too (shown as offline).
+In the meantime the `pump` script simulates the pump: when you switch it to run, the speed (PV) rises to the setpoint (SP).
 
-もう 1 つのデモ `projects/metro` は、電車の車内案内表示です（大阪メトロ御堂筋線の駅名・駅番号・乗り換えを使った
-イメージで、所要時間とドアの向きは架空）。機器にはつながず、Lua スクリプト（`scripts/guide.lua`）が走行を模擬して
-文字列のタグを書き、画面はそれを表示するだけです。漢字・ひらがな・英語が数秒ごとに切り替わり、画面の上部か
-「設定」を押すと、走行の停止・次の駅へ・行先の反転・言語の固定ができます。
+Another demo, `projects/metro`, is a passenger information display inside a train (an illustration that uses the station names, station numbers and transfers of the Osaka Metro Midosuji Line;
+the travel times and door sides are fictitious). It connects to no device: a Lua script (`scripts/guide.lua`) simulates the run and
+writes string tags, and the screen only shows them. Kanji, hiragana and English alternate every few seconds, and pressing the top of the screen or
+"Settings" lets you stop the run, go to the next station, reverse the destination and fix the language.
 
 ```bash
 ./build/bin/hml_runtime projects/metro/project.json
 ```
 
-`projects/factory` は、生産ラインを斜め上から見た監視画面です（アイソメトリック。3D ではなく、斜め視点で描いた絵を
-奥から手前の順に重ねています）。コンベアの上を製品が流れ、プレスが上下し、検査の光が点滅し、搬送車がパレットを
-運びます。機械に触れると詳細が開き、故障を起こしたり復旧したりできます。絵は `tools/gen_factory_demo.py` が描いた
-単純な立体で（Pillow が要ります）、画面ファイルも同じスクリプトが書きます。走行の模擬は `scripts/line.lua` です。
-`projects/factory35` は同じ画面の 480x320 版（絵を 0.6 倍にしたもの。Raspberry Pi の 3.5 インチ LCD 用）です。
+`projects/factory` is a monitoring screen that looks at a production line from diagonally above (isometric. Not 3D: pictures drawn from a diagonal viewpoint
+are stacked from back to front). Products move along the conveyor, the press goes up and down, the inspection light blinks, and a transport vehicle carries
+pallets. Touching a machine opens its details, where you can cause a fault and recover from it. The pictures are simple solids drawn by `tools/gen_factory_demo.py`
+(it needs Pillow), and the same script writes the screen files. The simulation of the run is `scripts/line.lua`.
+`projects/factory35` is the 480x320 version of the same screen (the pictures scaled by 0.6; for the 3.5 inch LCD of the Raspberry Pi).
 
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json
 ```
 
-デモ（`projects/demo`）は、下のナビゲーションで切り替える 6 画面で、できることを一通り動かせます。
+The demo (`projects/demo`) has 9 screens, switched with the navigation at the bottom, that let you try everything the runtime can do.
 
-| 画面     | 見られるもの                                                                                                   |
+| Screen | What you can see |
 | -------- | -------------------------------------------------------------------------------------------------------------- |
-| メイン   | 値の表示（ラベル・バー・円弧）、状態で変わる色と文字、チャート、スイッチ・スライダー・ボタン・数値入力、条件付きの無効化、ポップアップ（温度をタップ）、Lua スクリプト（自動運転とポンプの模擬） |
-| トレンド | 変数ロギングの履歴（`trend`）                                                                                    |
-| アラーム | 発生中の一覧と確認、履歴（`alarm_list`）。上の帯（`alarm_banner`）は全画面に出ます                              |
-| レシピ   | レシピの書き込み・読み出し・保存（`recipe_table`。レベル 2 以上: `maint` / PIN `2222`）                          |
-| 部品     | ドロップダウン・ローラー・択一ボタン、文字とパスワードの入力、長押しの連続操作、押している間だけ ON、LED・スピナー・流れる文字・棒グラフ、アニメーション（回転・移動・色） |
-| 設定     | 運転モード、警報の上下限、設定値（つまみ・入力・ボタン）、ログイン / ログアウト、言語の切り替え、システム設定、保守の操作（レベル 2 以上） |
+| Main | Display of values (label, bar, arc), colors and text that change with the state, chart, switch, slider, button, numeric input, conditional disabling, popup (tap the temperature), Lua scripts (automatic operation and the pump simulation) |
+| Trend | History of the data log (`trend`) |
+| Alarms | List of active alarms and acknowledging them, history (`alarm_list`). The band at the top (`alarm_banner`) appears on every screen |
+| Recipes | Writing, reading and saving recipes (`recipe_table`. Level 2 or higher: `maint` / PIN `2222`) |
+| Widgets | Dropdown, roller, one-of-many buttons, text and password input, repeated operation on a long press, ON only while pressed, LED, spinner, scrolling text, bar chart, animations (rotation, movement, color) |
+| Settings | Operation mode, upper and lower alarm limits, setpoint (knob, input, buttons), login / logout, switching the language, system settings, maintenance operations (level 2 or higher) |
+| Production | Three meters (`meter`, with colored zones), an XY chart (`xy_chart`), a table (`table`: tag values and a state as text). This screen and the two below are built on a **template screen** (`frame`: the header and the navigation) |
+| Reports | The operation log and the system log (`log_view`, switched with two buttons), the alarm summary (`alarm_summary`) |
+| Planner | Date and time input (`datetime_input`), sound (mute, volume, play a sound, silence the buzzer), the source and the destination of a data transfer, the state of mail and uploads with their buttons |
 
-### プロジェクトの検査（`--check`）
+Besides, `project.json` has schedules (three, such as switching the automatic mode on at 8:00 on weekdays), sound, data transfers (a copy of the level, the pressure converted to kPa),
+and examples of mail and uploads (`"enabled": false`; the servers do not exist, so nothing is sent as it is). They show on the pages System > Schedule / Sound / Transfers / Mail / Upload.
+These three screens and the settings **were made by an AI that was given nothing but the skill** (→ "Having an AI make screens (the skill)").
+
+### Checking a project (`--check`)
 
 ```
 hml_runtime project.json --check
 hml_runtime project.json --check --render main,main.png --render main+temp_detail,popup.png --lang en --set temp=34.5
 ```
 
-プロジェクトを動かさずに、間違いを 1 行ずつ（`ファイル: 場所: 内容`）出します。**ウィンドウを出さず、ドライバを起動せず
-（機器につながない）、プロジェクトのフォルダーに何も書きません。** 間違いがなければ `no problems` で終了コード 0、
-あれば件数を出して 1 です。デザイナーなしで（スクリプトや AI から）プロジェクトを確かめるためのものです。
+Without running the project, it prints the mistakes one per line (`file: place: what is wrong`). **It opens no window, starts no driver
+(it does not connect to any device), and writes nothing to the project folder.** If there are no mistakes it prints `no problems` and exits with code 0;
+if there are, it prints their number and exits with 1. It is for checking a project without the designer (from a script or an AI).
 
 ```
 screens/main.json: children[3] (button): on_click (goto): unknown screen "setting"
@@ -367,254 +376,264 @@ project.json: drivers[0] (plc): map: unknown tag "pressur"
 3 problem(s)
 ```
 
-| 見つけるもの | 例 |
+| What it finds | Examples |
 | --- | --- |
-| ファイル | 読めない、JSON の文法エラー、画面がない、画面名の重複、`start_screen` がない |
-| 部品 | 知らない `type`、知らないキー（つづりの間違い。ランタイムは黙って無視する）、知らないスタイルのキー |
-| `bind` | 知らない種類、ないタグ、知らないキー |
-| 動作 | 知らない動作・キー、ないタグ・画面・スクリプト・言語・アニメーション、ポップアップでない画面への `popup` |
-| 参照 | `texts` にない `"@ID"`、ない画像・フォントのファイル、トレンドのグループとタグ、レシピのブック、アラームの設定がない |
-| ドライバ | 表（`map`、`items`、`publish` …）と `status_tag` のないタグ |
-| 文字 | フォント（と組み込みフォント）にない文字 |
-| `runtime:` の行 | 実際に読み込んで全画面を作ったときにランタイムが出した警告とエラー |
+| Files | Cannot be read, JSON syntax error, no screens, duplicate screen names, no `start_screen` |
+| Widgets | Unknown `type`, unknown key (a spelling mistake; the runtime silently ignores it), unknown style key |
+| `bind` | Unknown kind, missing tag, unknown key |
+| Actions | Unknown action or key, missing tag, screen, script, language or animation, `popup` to a screen that is not a popup |
+| References | An `"@ID"` that is not in `texts`, a missing image or font file, the group and tags of a trend, the book of a recipe, missing alarm settings |
+| Drivers | Missing tags in the tables (`map`, `items`, `publish` …) and in `status_tag` |
+| Characters | Characters that are not in the font (nor in the built-in fonts) |
+| `runtime:` lines | Warnings and errors the runtime gives when it actually loads the project and builds every screen |
 
-- `--at <ms>`: `--render` が、画面を表示してからおよそその時間がたった絵を描きます（アニメーションの途中。既定 200）。
-- `--render <画面>,<ファイル>`: その画面を描いて保存します（複数指定可）。`<画面>+<ポップアップ>` と書くと、その画面の上に
-  ポップアップを開いた状態です（ポップアップの名前だけなら `start_screen` の上）。
-  `--lang <言語>` でその言語、`--set <タグ>=<値>` でタグの値を変えた状態を描けます（この 2 つはふつうの起動でも使えます）。
-- スクリプトは動きます（周期のスクリプトがタグを書き換えるプロジェクトでは、`--set` した値と違う値が出ることがあります）。
-- フォントにない文字（画面では □ になる）も出します: `texts` はすべての言語、画面に直接書いた文字や単位はそのとき
-  描いた言語と状態のものです（`screen "main": text "21.5 ℃": no glyph for: ℃`）。
-- 描くときは、いちばん高いユーザーレベルでログインした状態です。アラーム・トレンド・レシピは装置と同じように動きますが、
-  記録は一時フォルダーに置いて終了時に消します。機器につながないので、値は `init` と `--set` のままです。
-- 部品やキーの一覧は、デザイナーの `schema.js` から生成した `src/check_schema.inc` です（`node tools/skill/gen_reference.js`。
-  ずれるとテストが落ちます）。訳の抜けや、収まらないかもしれない長い訳は、デザイナーの問題一覧で見ます。
+- `--at <ms>`: `--render` draws the picture as it is about that long after the screen is shown (in the middle of an animation. Default 200).
+- `--render <screen>,<file>`: draws that screen and saves it (can be given more than once). `<screen>+<popup>` means the state with the popup
+  open on top of that screen (with only the name of a popup, on top of `start_screen`).
+  `--lang <language>` draws it in that language, and `--set <tag>=<value>` with the tag changed to that value (these two also work in a normal start).
+- Scripts run (in a project where a periodic script rewrites tags, a value different from the one you `--set` may appear).
+- It also reports characters that are not in the font (they become □ on the screen): for `texts`, all languages; for text and units written directly on a screen, those of
+  the language and state that were drawn (`screen "main": text "21.5 ℃": no glyph for: ℃`).
+- When it draws, a user of the highest level is logged in. Alarms, trends and recipes work as on the device, but
+  the records are put in a temporary folder and deleted on exit. As it connects to no device, the values stay at `init` and `--set`.
+- The list of widgets and keys is `src/check_schema.inc`, generated from the designer's `schema.js` (`node tools/skill/gen_reference.js`.
+  A test fails if they drift apart). Missing translations, and long translations that may not fit, are shown in the designer's problem list.
 
-### 負荷の確認
+### Checking the load
 
-規模の大きいプロジェクトで装置がどのくらい忙しくなるかは、`--stats` で確認できます。
+How busy the device gets with a large project can be checked with `--stats`.
 
 ```
 hml_runtime project.json --stats 5
 [hml INFO ] stats: 5.0 s, 724 passes (145/s), busy 20%, longest pass 31.2 ms, 0 of 50 ms or more; tags avg 0.79 max 20.1 ms, lvgl avg 0.62 max 11.1 ms
 ```
 
-- メインループの 1 周は「タグ変化の通知（`tags`）」と「LVGL の処理（`lvgl`: タイマー、入力、描画）」です。
-  1 周のあいだは他の処理が待たされるので、`longest pass` がタッチやタグ変化に対する最悪の遅れの目安になります。
-- `busy` はメインループが処理に使っている時間の割合です。100% に近づくと、周回数（`passes`）が落ちて表示の更新が遅れます。
+- One pass of the main loop is "notification of tag changes (`tags`)" and "the work of LVGL (`lvgl`: timers, input, drawing)".
+  Everything else waits during a pass, so `longest pass` is a measure of the worst delay in responding to a touch or a tag change.
+- `busy` is the share of time the main loop spends working. As it approaches 100%, the number of passes (`passes`) drops and display updates fall behind.
 
-規模が大きくても重くなりにくいよう、次のようにしています。
+The following keeps the runtime from getting heavy even with a large project.
 
-- 表示していない画面のウィジェットは、タグが変化しても更新しません。その画面を表示するときにまとめて反映します。
-- 画面は、最初に表示するときに組み立てます。起動時は開始画面だけを組み立て、残りは動作中に 1 枚ずつ組み立てます
-  （画面 JSON の誤りによる警告は、起動後しばらくのあいだに出ます）。
+- Widgets of screens that are not on display are not updated when a tag changes. The changes are applied together when that screen is shown.
+- A screen is built when it is first shown. At startup only the start screen is built, and the rest are built one at a time while running
+  (warnings about mistakes in the screen JSON appear during a short while after startup).
 
-`tools/make_stress_project.py` は、タグ数・画面数・ウィジェット数・ロギング量などを指定して負荷確認用のプロジェクトを作ります
-（`--preset light | medium | heavy | extreme`、個別のオプションで上書き可）。外部とは通信しません。
+`tools/make_stress_project.py` makes a project for checking the load from the given number of tags, screens and widgets, amount of logging and so on
+(`--preset light | medium | heavy | extreme`, which individual options can override). It does not communicate with anything outside.
 
 ```
 python tools/make_stress_project.py stress --preset heavy
 hml_runtime stress/project.json --stats 5
 ```
 
-## デザイナー（GUI でプロジェクトを作る）
+## The designer (making projects in a GUI)
 
-`hml_designer.exe`（Windows ビルドでは既定で一緒にビルドされます）は、`project.json` と画面 JSON を
-GUI で編集するツールです。追加のランタイムは不要で、OS 標準の WebView（Windows: WebView2、
-Windows 10/11 に標準搭載）に HTML/JS の画面を表示し、C++ のホストがファイル入出力とランタイムの起動を担当します。
+`hml_designer.exe` (built together by default in the Windows build) is a tool that edits `project.json` and the screen JSON
+in a GUI. It needs no additional runtime: it shows HTML/JS pages in the WebView of the OS (Windows: WebView2,
+included in Windows 10/11), and a C++ host takes care of file I/O and of starting the runtime.
 
 ```
-build\bin\hml_designer.exe                       # 起動（New / Open で開始）
-build\bin\hml_designer.exe projects\demo\project.json   # プロジェクトを指定して起動
-build\bin\hml_designer.exe line1.hmlproj                  # プロジェクトファイル（1 ファイルの形式）を指定して起動
+build\bin\hml_designer.exe                       # start (begin with New / Open)
+build\bin\hml_designer.exe projects\demo\project.json   # start with a project
+build\bin\hml_designer.exe line1.hmlproj                  # start with a project file (the single-file format)
 ```
 
-| 場所                                   | 内容                                                                                                                                                               |
+| Place | Contents |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 左: Widgets                            | パレット。クリックすると選択中のパネル（または画面）に追加                                                                                                         |
-| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバ設定（sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正                          |
-| 中央: キャンバス                       | ドラッグで移動、右下のハンドルでサイズ変更、矢印キーで 1 px（Shift で 10 px）移動。flex レイアウトの子は親の設定に従うので移動不可                                 |
-| 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
-| Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
-| Run                                    | 保存して `hml_runtime` を通常起動。ランタイムのログはデザイナー下部のパネルに出ます（停止・コピー・非表示。ステータスバーの「ランタイム」で再表示）。もう一度 Run すると、前のランタイムを閉じてから起動します |
-| Deploy                                 | 保存して、プロジェクト（と任意でランタイム）を SSH でターゲット（Raspberry Pi など）へ送り、ランタイムを再起動 →「ターゲットへのデプロイ」                        |
-| 中央: Logs タブ                        | 変数ロギング（グループ）、アラーム、操作ログ、システムログの設定。チェックを入れたものだけ記録される     |
-| 中央: Users タブ                       | ユーザー管理: レベル名、ユーザー（名前・レベル・PIN）、自動ログアウトやロックの設定 →「ユーザー管理」   |
-| 中央: Scripts タブ                     | Lua スクリプトの追加・削除、トリガー（起動時 / 周期 / タグ変化 / 画面の表示・非表示 / manual）とコードの編集。ウィジェットのイベントには `script` アクションで割り当てる |
-| JSON                                   | 現在の画面 JSON を直接編集して適用                                                                                                                                 |
+| Left: Widgets | The palette. A click adds the widget to the selected panel (or the screen) |
+| Left: Screens / Tags / Drivers / Project | Adding and deleting screens and the start screen, the tag table, driver settings (forms for sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server + raw JSON), display size, theme, touch calibration |
+| Center: canvas | Drag to move, resize with the handle at the bottom right, move 1 px with the arrow keys (10 px with Shift). Children of a flex layout follow the settings of their parent and cannot be moved |
+| Right: tree + properties | Hierarchy and order (▲▼ for forward and back, ⇥⇤ to move into and out of a panel), position / size / flags / style (per selector) / bindings / events (lists of actions) |
+| Preview | Saves, then starts `hml_runtime` without a window (`SDL_VIDEODRIVER=dummy`) and shows a screenshot of that screen. The canvas is an approximation, so make the final check here |
+| Run | Saves and starts `hml_runtime` normally. The log of the runtime appears in the panel at the bottom of the designer (stop, copy, hide; show it again with "Runtime" in the status bar). Another Run closes the previous runtime and then starts |
+| Deploy | Saves, sends the project (and optionally the runtime) to the target (a Raspberry Pi and the like) over SSH, and restarts the runtime → "Deploying to a target" |
+| Center: Logs tab | Settings of the data log (groups), alarms, operation log and system log. Only those that are checked are recorded |
+| Center: Users tab | Users: level names, users (name, level, PIN), settings for automatic logout and lockout → "Users" |
+| Center: Scripts tab | Adding and deleting Lua scripts, editing the trigger (at startup / periodic / tag change / a screen shown or hidden / manual) and the code. Assign one to a widget event with the `script` action |
+| JSON | Edit the JSON of the current screen directly and apply it |
 
-### 置換、画面の複製、別の大きさへの変換
+### Find and replace, copies of screens, another display size
 
-- **Replace（置換）**: タグ名または文字を、この画面・すべての画面・プロジェクト全体で置き換えます。
-  検索する文字を入れると、**変わる所の一覧（どの画面のどの部品か、変わる前と後）が先に出ます**。「置換」を押すまで何も変わりません。
-  - タグ名は、部品の接続（`bind`）、動作、条件、Lua の `tag.名前`、アラーム、ログ、ドライバー、転送、スケジュールのすべてが対象です。
-    「全体が一致するものだけ」を外すと名前の一部を置き換えます（`line1_` → `line2_`）。
-  - 「新しい名前のタグがなければ作る」: 置換後の名前のタグを、元のタグの型と上下限をコピーして作ります。
-    「タグ一覧の名前も変える」（プロジェクト全体のとき）: タグの定義の名前も変えます。ほかのタグと同じ名前になるものは変えません。
-  - 文字は、部品の文字・選択肢・アラームのメッセージと、多言語の表（プロジェクト全体のとき）が対象です。`"@id"` は名前なので変えません。
-  - 置換は取り消し 1 回（Ctrl+Z）で戻せます。**置換で問題一覧が増えたときは、増えた問題をその場に出し**、「置換を取り消す」で戻せます。
-- **テンプレート画面**: 共通のヘッダーやナビゲーションを 1 つの画面に置いて、ほかの画面の土台にします →「テンプレート画面」。
-- **画面の複製**: 左の Screens タブの ⧉。同じ内容の画面を、元の画面のすぐ後ろに作ります（名前は `<元の名前>_copy`）。
-  「複製 → この画面で `line1_` を `line2_` に置換（タグも作る）」で、ライン 2 の画面ができます。
-- **別の大きさに変換**: Project タブ > 表示 の「別の大きさに変換…」。すべての画面の位置・大きさ・余白を新しい表示サイズに合わせて
-  拡大・縮小し、フォントはいちばん近い大きさにします（`%` と `content` の指定はそのまま）。変換のあと、文字が収まっているか画面を見てください。
-- 100 画面・5000 部品のプロジェクトで、置換の一覧 0.01 秒、置換 0.1 秒、大きさの変換 0.02 秒ほどです。
+- **Replace**: replaces a tag name or text in this screen, in all screens or in the whole project.
+  When you enter the text to find, **the list of the places that change (which widget of which screen, before and after) comes first**. Nothing changes until you press "Replace".
+  - For tag names, it covers all of: the connections of widgets (`bind`), actions, conditions, `tag.name` in Lua, alarms, logs, drivers, transfers and schedules.
+    Turn off "Only the whole name / text" to replace part of a name (`line1_` → `line2_`).
+  - "Make the tags the new names need": makes the tags with the names after the replacement, copying the type and limits of the original tags.
+    "Rename in the tag list too" (for the whole project): changes the names in the tag definitions too. A name that would become the same as another tag's is not changed.
+  - For text, it covers the text, options and alarm messages of widgets, and the table of languages (for the whole project). `"@id"` is a name, so it is not changed.
+  - A replacement is undone with a single undo (Ctrl+Z). **When a replacement adds to the problem list, the added problems are shown on the spot**, and "Undo the replacement" takes it back.
+- **Template screens**: put a common header or navigation on one screen and use it as the base of other screens → "Template screens (`template`)".
+- **Copies of screens**: ⧉ in the Screens tab on the left. It makes a screen with the same contents right after the original (its name is `<original name>_copy`).
+  "Copy → replace `line1_` with `line2_` in this screen (making the tags too)" gives you the screen for line 2.
+- **Converting to another size**: "Convert to another size…" in Project tab > Display. It scales the positions, sizes and paddings of all screens up or down to the new display
+  size, and takes the nearest size for fonts (`%` and `content` values stay as they are). After the conversion, look at the screens to see whether the text fits.
+- In a project of 100 screens and 5000 widgets, the list for a replacement takes about 0.01 s, the replacement 0.1 s, and the size conversion 0.02 s.
 
-### 部品ライブラリ
+### The library of parts
 
-よく使う部品の組（ポンプ 1 台分の表示、起動 / 停止ボタンの並び、など）を登録して、どのプロジェクトでも使い回せます。
+You can keep sets of widgets you use often (the display for one pump, a row of start / stop buttons, and so on) and reuse them in any project.
 
-- **登録**: 画面で部品を選び（Ctrl+クリックで複数。パネルは中身ごと）、左の Widgets タブの下の「+ 選択を登録」を押して名前を付けます。
-- **使う**: ライブラリの部品をクリックすると、選択中のパネル（または画面）に追加されます。貼り付けと同じで、取り消し 1 回で戻せます。
-  接続しているタグ・動作・スクリプトもそのまま入るので、別のラインに使うときは「置換」でタグ名を変えます。
-- **人に渡す / 受け取る**: 「取込 / 書出」で、ライブラリ全体が文字（JSON）で出ます。ファイルにコピーして渡し、受け取った側は貼って
-  「取り込み」を押します（同じ名前の部品は置き換え）。
-- ライブラリは**デザイナーの設定（この PC のユーザーごと）に保存**します。プロジェクトのファイルには何も足さないので、
-  ランタイムにも、古いデザイナーにも影響しません。上限は 200 個、1 個あたり部品 2000 個までです。
-- 受け取ったライブラリは**データとして読むだけ**です（JSON として解釈し、決まった形のものだけを取り込みます）。
-  プロジェクトのフォルダーの外を指す画像のパス（`../`、絶対パス、ドライブ名、共有名）は取り込まず、何を外したかを表示します。
-  部品の名前や文字に HTML が入っていても、文字として表示されるだけです。
-  **部品に入っているスクリプト（Lua）は、画面のほかのスクリプトと同じく装置で動きます。** 知らない人から受け取った部品は、使う前に動作を見てください。
-- 画像を使う部品は、画像のファイルまでは持ち運びません。使う先のプロジェクトに同じパスの画像がなければ、問題一覧に出ます。
+- **Keeping**: select widgets on a screen (Ctrl+click for several; a panel comes with its contents), press "+ Keep selection" at the bottom of the Widgets tab on the left, and give it a name.
+- **Using**: a click on a part of the library adds it to the selected panel (or the screen). It is the same as a paste, and a single undo takes it back.
+  The connected tags, actions and scripts come along as they are, so to use it for another line, change the tag names with "Replace".
+- **Giving to / receiving from others**: "Import / export" gives the whole library as text (JSON). Copy it into a file and hand it over; the receiver pastes it and
+  presses "Import" (parts with the same name are replaced).
+- The library is **saved in the designer's settings (per user of this PC)**. It adds nothing to the project files, so
+  it affects neither the runtime nor older designers. The limits are 200 parts, and 2000 widgets per part.
+- A received library is **only read as data** (it is parsed as JSON, and only what has the expected form is imported).
+  Image paths that point outside the project folder (`../`, absolute paths, drive names, share names) are not imported, and what was left out is shown.
+  If a widget's name or text contains HTML, it is only displayed as text.
+  **Scripts (Lua) inside a part run on the device, like the other scripts of the screen.** For a part received from someone you do not know, look at its actions before you use it.
+- A part that uses images does not carry the image files with it. If the project where you use it has no image at the same path, it appears in the problem list.
 
-### プロジェクトの保存形式
+### How a project is saved
 
-プロジェクトは 2 つの形で保存できます。Save As のダイアログで選びます（既定はプロジェクトファイル）。
+A project can be saved in two forms. You choose in the Save As dialog (the default is the project file).
 
-| 形式                 | 内容                                                                                           |
+| Form | Contents |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
-| プロジェクトファイル | `<名前>.hmlproj` の 1 ファイル。project.json・画面・スクリプト・画像をまとめた zip 形式        |
-| フォルダー           | `project.json` と、その隣の `screens/`、`assets/`（これまでの形）                              |
+| Project file | A single file, `<name>.hmlproj`. A zip archive that holds project.json, the screens, the scripts and the images |
+| Folder | `project.json` and, next to it, `screens/` and `assets/` (the form used so far) |
 
-- **プロジェクトファイルは 1 つで完結します。** USB メモリやメールで持ち運んだり、そのままバージョン管理に入れたりできます。
-  中身は通常の zip なので、拡張子を `.zip` にすれば一般のツールで開けます。
-- デザイナーの Open / Save / Run / Preview / Deploy は、どちらの形でも同じように使えます。
-  フォルダーのプロジェクトを開いて Save As でプロジェクトファイルにする（またはその逆）と、画像などのファイルも一緒に移ります。
-- ランタイムにも直接渡せます: `hml_runtime line1.hmlproj`
-- **入るのはプロジェクトを構成するファイルだけです**（project.json、そこや画面から名前で参照されているファイル、`assets/` の中身）。
-  記録されたログや、その PC だけの設定（`project.local.json`）は入りません。
-- プロジェクトファイルは、開くときに作業用フォルダーへ展開されます（Windows: `%LOCALAPPDATA%\hml\work\<名前>-<識別子>`、
-  Linux: `~/.cache/hml/work/...`）。Run したときのログや「device on this PC」などの PC ごとの設定はそこに置かれ、
-  プロジェクトファイルには書き戻されません。画像を追加したときも、Save するまでプロジェクトファイルには入りません。
-- デプロイしたときのターゲット上の名前は、ファイル名から拡張子を除いたものです（`Pump Station.hmlproj` → `projects/pump-station` の
-  ように、使えない文字は `-` になります）。ターゲット上は今までどおりフォルダーの形で置かれます。
+- **A project file is complete in itself.** You can carry it on a USB memory or by mail, or put it under version control as it is.
+  The contents are an ordinary zip, so with the extension changed to `.zip` it opens in common tools.
+- Open / Save / Run / Preview / Deploy of the designer work the same way with either form.
+  If you open a folder project and make it a project file with Save As (or the other way round), the images and other files move with it.
+- It can be given to the runtime directly too: `hml_runtime line1.hmlproj`
+- **Only the files that make up the project go in** (project.json, the files referenced by name from it or from the screens, the contents of `assets/`).
+  Recorded logs and the settings of that PC only (`project.local.json`) do not go in.
+- A project file is extracted into a working folder when it is opened (Windows: `%LOCALAPPDATA%\hml\work\<name>-<id>`,
+  Linux: `~/.cache/hml/work/...`). The logs of a Run and per-PC settings such as "device on this PC" are kept there and
+  are not written back to the project file. An image you add does not go into the project file either until you Save.
+- The name on the target after a deploy is the file name without the extension (`Pump Station.hmlproj` → `projects/pump-station`;
+  characters that cannot be used become `-`, as here). On the target it is placed in the folder form, as before.
 
-### ターゲットへのデプロイ
+### Deploying to a target
 
-ツールバーの **Deploy** で、開いているプロジェクトを Raspberry Pi などのターゲットへ送ります。
+**Deploy** in the toolbar sends the open project to a target such as a Raspberry Pi.
 
-| 項目            | 内容                                                                                                   |
+| Item | Contents |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
-| target (host)   | ターゲットの IP アドレスまたはホスト名                                                                 |
-| user / port     | ログインするユーザー名と SSH のポート（既定 22）                                                       |
-| private key     | SSH の秘密鍵ファイル。空なら既定の鍵（`~/.ssh/id_*`）                                                  |
-| remote folder   | ターゲット上の配置先（既定 `hml` = ホームの `hml/`）                                                   |
-| send runtime    | チェックすると、指定したターゲット用の `hml_runtime`（Linux 用のビルド）も送って入れ替える             |
-| run on target   | このプロジェクトを、ターゲットが表示するプロジェクトにする（既定でオン。再起動後もそのまま）           |
-| restart runtime | 配置後にターゲットのランタイムを再起動する（`SIGUSR2`）                                                |
-| local settings  | チェックすると、ターゲットの画面で変更された設定（`project.local.json`）を削除する。毎回オフで始まる   |
+| target (host) | IP address or host name of the target |
+| user / port | The user name to log in with and the SSH port (default 22) |
+| private key | The SSH private key file. If empty, the default keys (`~/.ssh/id_*`) |
+| remote folder | Where to put things on the target (default `hml` = `hml/` in the home directory) |
+| send runtime | If checked, the given `hml_runtime` for the target (a Linux build) is sent too and replaces the one there |
+| run on target | Makes this project the one the target shows (on by default. It stays so after a reboot) |
+| restart runtime | Restarts the runtime of the target after placing the files (`SIGUSR2`) |
+| local settings | If checked, deletes the settings changed on the screen of the target (`project.local.json`). Starts unchecked every time |
 
-ダイアログを開いたとき（接続先が入力済みの場合）と **Check** を押したときに、何も送らずにターゲットの状態を調べて表示します。
+When the dialog opens (if the connection is already filled in) and when you press **Check**, it examines the state of the target without sending anything and shows it.
 
-- **ターゲットで動いているプロジェクト**（このプロジェクトか、別のプロジェクトか、ランタイムが動いていないか）
-- **ターゲットのローカル設定**: ターゲットのシステム設定画面で変更されたドライバ設定は `project.local.json` に保存され、
-  デプロイしてもそちらが優先されます。該当する項目を「ターゲットでの値」と「このプロジェクトの値」を並べた表で表示します。
-  プロジェクトの値に戻したいときは「local settings」にチェックを入れてデプロイします。
-- **ファイルの差分**: 変更されたファイル、新しいファイル、ターゲットにだけ残っているファイルの一覧（ファイル単位）
+- **The project running on the target** (this project, another project, or the runtime is not running)
+- **The local settings of the target**: driver settings changed in the system settings screens of the target are saved in `project.local.json`,
+  and they take precedence even after a deploy. The items concerned are shown in a table with "the value on the target" and "the value in this project" side by side.
+  To go back to the values of the project, check "local settings" and deploy.
+- **File differences**: the list of changed files, new files, and files left only on the target (per file)
 
-デプロイが終わると、同じ内容を調べ直して表示します。
+When the deploy is done, it examines the same things again and shows them.
 
-ターゲット上の配置は次のとおりです。
+The layout on the target is as follows.
 
 ```
 <remote folder>/hml_runtime
-<remote folder>/projects/<プロジェクトのフォルダ名>/project.json, screens/, assets/ ...
-<remote folder>/active_project      表示するプロジェクト（例: projects/myhmi/project.json）
+<remote folder>/projects/<project folder name>/project.json, screens/, assets/ ...
+<remote folder>/active_project      the project to show (e.g. projects/myhmi/project.json)
 ```
 
-**送るもの**: プロジェクトを構成するファイルだけです。`project.json`、そこや画面ファイルに名前が書かれているファイル
-（画面、スクリプト、画像、スプラッシュ）、`assets/` フォルダーの中身。同じフォルダーにほかのファイルがあっても送りません。
-プロジェクトは専用のフォルダーに保存してください（フォルダー名がターゲットでのプロジェクト名になります）。
-ほかのファイルがあるフォルダーに保存しようとすると、デザイナーが新しいフォルダーを作るかどうか尋ねます。
+**What is sent**: only the files that make up the project. `project.json`, the files whose names are written in it or in the screen files
+(screens, scripts, images, the splash), and the contents of the `assets/` folder. Other files in the same folder are not sent.
+Save the project in a folder of its own (the folder name becomes the project name on the target).
+If you try to save into a folder that has other files, the designer asks whether to make a new folder.
 
-**表示するプロジェクトの切り替え**: 「run on target」がオンなら、デプロイしたプロジェクトがターゲットの表示になります。
-ターゲットの自動起動（systemd のユニットなど）はコマンドラインで 1 つのプロジェクトを指していますが、ランタイムは
-自分の隣に `active_project` があればそちらを読み込みます。ユニットを書き換える必要はありません（管理者権限も不要）。
-この動作は、実行ファイルの隣に `projects` フォルダーがある配置のときだけで、`--ignore-active` で無効にできます。
-切り替えには、この機能を持つランタイムがターゲットで動いている必要があります（古い場合は「send runtime」で入れ替えてください）。
+**Switching the project on display**: with "run on target" on, the deployed project becomes what the target shows.
+The autostart of the target (a systemd unit and the like) points to one project on its command line, but the runtime
+loads `active_project` instead if that file is next to it. The unit need not be rewritten (and no administrator rights are needed).
+This works only in a layout where a `projects` folder is next to the executable, and `--ignore-active` turns it off.
+For the switch, a runtime that has this feature must be running on the target (if it is an old one, replace it with "send runtime").
 
-- PC 側は OS 付属の OpenSSH（`ssh` / `scp`）を使います。**鍵認証のみ**で、パスワードは聞きません。
-  公開鍵は、ターゲットの画面（System > Keys）を鍵管理モードにして private key の右の **Register…** を押すと登録できます
-  （→「鍵の管理」）。手作業でターゲットの `~/.ssh/authorized_keys` に追加してもかまいません。
-- 初めて接続するターゲットのホスト鍵は、自動的に `known_hosts` に登録されます。
-- ターゲットにだけあるファイル（`logs/`、システム設定画面が書く `project.local.json`）は残ります
-  （`project.local.json` は「local settings」にチェックしたときだけ削除します）。
-  PC 側の `logs/` と `project.local.json` は送りません。プロジェクトから削除したファイルは、ターゲットからは消えません。
-- ランタイムが動いていなければ、ファイルの配置だけを行います（結果にその旨が表示されます）。
-  ターゲットが別のプロジェクトを実行している場合も、結果に表示されます。
-- 接続先の設定は、プロジェクトではなくデザイナーの設定ファイル（Windows: `%APPDATA%\hml_designer\settings.json`）に、
-  プロジェクトごとに保存されます。
+- The PC side uses the OpenSSH that comes with the OS (`ssh` / `scp`). **Key authentication only**: it does not ask for a password.
+  To register the public key, put the screen of the target (System > Keys) into key management mode and press **Register…** to the right of private key
+  (→ "Key management (the Keys page)"). You may also add it by hand to `~/.ssh/authorized_keys` on the target.
+- The host key of a target you connect to for the first time is registered in `known_hosts` automatically.
+- Files that exist only on the target (`logs/`, and `project.local.json` written by the system settings screens) stay
+  (`project.local.json` is deleted only when "local settings" is checked).
+  `logs/` and `project.local.json` of the PC side are not sent. Files deleted from the project are not removed from the target.
+- If the runtime is not running, only the files are placed (the result says so).
+  If the target is running another project, the result shows that too.
+- The connection settings are saved not in the project but in the settings file of the designer (Windows: `%APPDATA%\hml_designer\settings.json`),
+  per project.
 
-ウィンドウを開かずにコマンドラインからもデプロイできます。省略したオプションには、Deploy ダイアログで
-そのプロジェクトに最後に使った値が使われます。
+You can also deploy from the command line without opening a window. For options you leave out, the values last used
+for that project in the Deploy dialog are used.
 
 ```
 hml_designer --deploy projects\lcd35\project.json --host 192.168.0.8 --user pi ^
-    [--port 22] [--key <秘密鍵>] [--remote-dir hml] [--runtime <Linux 用 hml_runtime>] [--no-restart] [--no-activate] [--clear-local]
+    [--port 22] [--key <private key>] [--remote-dir hml] [--runtime <hml_runtime for Linux>] [--no-restart] [--no-activate] [--clear-local]
 ```
 
-`--check` を付けると何も送らず、ターゲットの状態（上の Check と同じ内容）を JSON で表示します。
+With `--check` it sends nothing and prints the state of the target (the same as Check above) as JSON.
 
-- **表示言語**: ツールバーの選択欄で日本語 / English を切り替えられます（初回は OS の言語）。日本語では、プロパティが
-  「背景色」「文字色」のような名前で表示され、マウスを乗せると JSON のキー名（`bg_color` など）が出ます。保存される JSON は変わりません。
-- **編集はすぐキャンバスに反映されます**: 色の選択中や数値・テキストの入力中も、確定を待たずにキャンバスが変わります（取り消しは 1 回分）。
-- **よく使うスタイルは最初から並んでいます**（背景色、文字色、文字サイズ、角の丸み、枠線、余白）。空欄はテーマの既定値です。
-- **画面のプリセット**: Project タブの「画面のプリセット」で、表示器を選ぶと画面サイズとタッチ補正がまとめて入ります
-  （3.5 インチ LCD + ADS7846 など）。タッチ補正は「タッチパネル」の欄で 4 つの値として個別に直せます。
-- キーボード: Ctrl+S 保存、Ctrl+Z / Ctrl+Y 取り消し / やり直し、Ctrl+D 複製、Delete 削除、Esc 選択解除。
-- 画面 JSON のコメントは読み込めますが、保存時には整形された JSON（コメントなし）になります。
-- `hml_runtime.exe` は `hml_designer.exe` と同じフォルダから探します。
-- ページ本体は `tools/designer/renderer/`（`index.html`, `js/*.js`）で、ビルド時に `bin/designer/` へコピーされます。
-  ランタイムが対応するウィジェット・プロパティ一覧は `js/schema.js` にまとまっているので、ランタイムに
-  機能を足したらここに 1 行追加すれば GUI に現れます。
-- Linux でもビルドできます（`-DHML_DESIGNER=ON`、`libwebkit2gtk-4.1-dev` が必要）。Raspberry Pi 上で使う想定ではありません。
+- **Display language**: the selector in the toolbar switches between Japanese and English (the language of the OS the first time). In Japanese, the properties are
+  shown with names such as "背景色" (background color) and "文字色" (text color), and hovering the mouse shows the JSON key name (`bg_color` and so on). The saved JSON does not change.
+- **Edits show on the canvas at once**: while you pick a color or type a number or text, the canvas changes without waiting for you to confirm (one undo step).
+- **The styles used most often are there from the start** (background color, text color, text size, corner radius, border, padding). An empty field means the default of the theme.
+- **Display presets**: with "display preset" in the Project tab, choosing a display fills in the screen size and the touch calibration together
+  (3.5 inch LCD + ADS7846 and so on). The touch calibration can be corrected as 4 separate values in the "Touch panel" section.
+- Keyboard: Ctrl+S save, Ctrl+Z / Ctrl+Y undo / redo, Ctrl+D duplicate, Delete delete, Esc deselect.
+- Comments in the screen JSON can be read, but on saving it becomes formatted JSON (without comments).
+- `hml_runtime.exe` is looked for in the same folder as `hml_designer.exe`.
+- The pages themselves are in `tools/designer/renderer/` (`index.html`, `js/*.js`) and are copied to `bin/designer/` at build time.
+  The list of the widgets and properties the runtime supports is gathered in `js/schema.js`, so when you add a feature to
+  the runtime, adding one line here makes it appear in the GUI.
+- It can be built on Linux too (`-DHML_DESIGNER=ON`, needs `libwebkit2gtk-4.1-dev`). It is not meant to be used on a Raspberry Pi.
 
-## AI に画面を作ってもらう（Skill）
+## Having an AI make screens (the skill)
 
-「こんな感じで画面を作って」と AI に頼めるように、HML の画面の書き方をまとめた **Skill**（AI 向けの手引き）が
-`tools/skill/hml-screens/` にあります。要るのはデザイナー一式（`hml_designer` と、同じフォルダーの `hml_runtime`）と、
-PC のファイルを読み書きできる AI（Claude Code、Claude のデスクトップアプリなど）だけです。ビルド環境は要りません。
+So that you can ask an AI to "make a screen like this", there is a **skill** (a guide for AIs) on how to write HML screens
+in `tools/skill/hml-screens/`. All you need is the designer package (`hml_designer` and, in the same folder, `hml_runtime`) and
+an AI that can read and write files on the PC (Claude Code, the Claude desktop app and the like). No build environment is needed.
 
-| ファイル                              | 内容                                                                                   |
+| File | Contents |
 | ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `SKILL.md`                            | 手順（プロジェクトを読む → 画面を書く → ランタイムで描いて確かめる → 報告）、レイアウト・タッチ・色・文字の決まり、してはいけないこと |
-| `reference/widgets.md`                | 部品・プロパティ・スタイル・動作の一覧。デザイナーの `schema.js` から生成（`node tools/skill/gen_reference.js`） |
-| `reference/binding-and-actions.md`    | `bind`、動作、ポップアップ、多言語、アラーム・トレンドなどの部品の使い方                |
-| `examples/`                           | そのまま動く見本のプロジェクト（概要画面と確認のポップアップ）                          |
+| `SKILL.md` | The procedure (read the project → write the screens → draw them with the runtime and check → report), the rules for layout, touch, colors and text, and what must not be done |
+| `reference/widgets.md` | The list of widgets, properties, styles and actions. Generated from the designer's `schema.js` (`node tools/skill/gen_reference.js`) |
+| `reference/binding-and-actions.md` | `bind`, actions, popups, languages, how to use widgets such as alarms, trends, meters, tables and log views, and how a screen uses the features outside the screens |
+| `reference/project-features.md` | The keys of the features outside the screens: template screens, schedules, sound, data transfers, mail, uploads |
+| `examples/` | A sample project that runs as it is (an overview screen and a confirmation popup) |
 
-使い方:
+How to use it:
 
-1. デザイナーでプロジェクトを開き、ツールバーの **AI** を押す。
-2. 出てきた文を「コピー」して AI に渡し、最後の行に作りたい画面を書く。文には、デザイナーに付いている Skill
-   （`<デザイナーのフォルダー>/skills/hml-screens/SKILL.md`）、プロジェクトのフォルダー、ランタイムの場所が入っています。
-3. AI がファイルを変えると、**開いているデザイナーが自動で読み直します**。見た目と問題一覧を確かめる。
+1. Open the project in the designer and press **AI** in the toolbar.
+2. "Copy" the text that appears, give it to the AI, and write the screen you want on the last line. The text contains the skill that comes with the designer
+   (`<designer folder>/skills/hml-screens/SKILL.md`), the project folder and the location of the runtime.
+3. When the AI changes files, **the open designer reloads them automatically**. Check the appearance and the problem list.
 
-- Skill はデザイナーと一緒に配られるので、デザイナーと同じ版です。Claude Code に常に入れておきたいときは、同じダイアログの
-  「Claude Code に Skill を入れる」（`~/.claude/skills/hml-screens` にコピー）を使います。Claude のアプリには、
-  「Skill のフォルダーを開く」で出るフォルダーを zip にして、設定の Skill の追加から入れられます。
-- プロジェクトファイル（`.hmlproj`）のときは、AI は作業用フォルダー（ダイアログに出る場所）で作業します。終わったら
-  デザイナーで「保存」を押すと、AI の変更がファイルに入ります。
-- デザイナーは、ウィンドウに戻ったときと数秒ごとに、project.json と画面のファイルが外で変わっていないかを見ます。
-  変わっていたら読み直し（表示中の画面はそのまま）、デザイナー側に保存していない変更があるときは、どちらを残すかを聞きます。
-  テキストエディターで直接書き換えたときも同じです。
+- The skill is distributed with the designer, so it is the same version as the designer. To have it in Claude Code all the time, use
+  "Install the skill for Claude Code" in the same dialog (it copies to `~/.claude/skills/hml-screens`). For the Claude app,
+  zip the folder that "Open the skill folder" shows and add it from the skills section of the settings.
+- With a project file (`.hmlproj`), the AI works in the working folder (the place shown in the dialog). When it is done,
+  press "Save" in the designer and the AI's changes go into the file.
+- When you come back to its window, and every few seconds, the designer looks whether project.json and the screen files have changed outside.
+  If they have, it reloads them (the screen on display stays), and if the designer has unsaved changes of its own, it asks which to keep.
+  The same holds when you rewrite the files directly in a text editor.
 
-- AI は `hml_runtime --check --render ...`（上記「プロジェクトの検査」）で、間違いの一覧と画面の画像を得て確かめます。
-  ウィンドウは出ず、機器にもつながらず、プロジェクトには何も書かれません。
-- AI が変えるのは画面と、必要なら `tags` と `texts` です。`drivers`、`users`、装置の設定には触れません。
-- 見た目（重なり、はみ出し）と意味（出すタグ、単位）は機械では確かめられません。AI は画像を見て直し、最後に人が
-  デザイナーで確かめます。
-- 見本と一覧が実装とずれないよう、テストが確かめています（見本のプロジェクトは `hml_tests` が読み込んで全画面を描き、
-  一覧は `node --test` が `schema.js` と突き合わせます）。
+- **The skill grows with every feature** (the list of a new widget is generated from `schema.js`; how to use it is written by hand).
+  Whether it is enough was tried for real: the three demo screens "Production", "Reports" and "Planner" and the settings for schedules, sound,
+  data transfers, mail and uploads were made by **an AI that was given the skill folder and the demo project and nothing else** (not this README, not the sources; 2026-11).
+  The result: `--check` found 3 problems (all of them `${name}` of a template used in a color); everything else was right on the first try from what the skill says.
+  The points that AI found unclear (the height of a table, the smallest width of an alarm summary, how to place two log views, `decimals` of a meter,
+  how to mark the button of the current screen in a template, and others) have gone into the skill.
+  **Not checked**: other AIs and other models, a 480x320 display, the settings of drivers (not covered by the skill).
+- A skill installed on the PC (`~/.claude/skills/hml-screens`) does not update itself. After updating the designer, press
+  "Install the skill for Claude Code" in the AI dialog again.
+- With `hml_runtime --check --render ...` (see "Checking a project (`--check`)" above) the AI gets the list of mistakes and images of the screens, and checks them.
+  No window opens, no device is connected, and nothing is written to the project.
+- What the AI changes is the screens and, if needed, `tags` and `texts`. It does not touch `drivers`, `users` or the settings of the device.
+- Appearance (overlaps, overflow) and meaning (which tags to show, units) cannot be checked by a machine. The AI looks at the images and fixes them, and finally a person
+  checks in the designer.
+- Tests make sure that the samples and the lists do not drift from the implementation (`hml_tests` loads the sample project and draws every screen,
+  and `node --test` compares the lists with `schema.js`).
 
 ## project.json
 
@@ -635,12 +654,12 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 }
 ```
 
-- `tags[].type`: `bool` / `int` / `float` / `string`。`min` / `max` を付けると、HMI 側からの書き込み（ウィジェット、アクション、スクリプト、OPC UA クライアント）が
-  その範囲に丸められます。機器（Modbus）から読んだ値は丸めず、機器が持っている値をそのまま表示します。
-  範囲外の値を読んだときは、タグごとに 1 回、警告をログに出します。
-- `screens` はファイルパス（project.json からの相対）か、画面オブジェクトを直接書けます。
+- `tags[].type`: `bool` / `int` / `float` / `string`. With `min` / `max`, a write from the HMI side (a widget, an action, a script, an OPC UA client)
+  is clamped to that range. A value read from a device (Modbus) is not clamped; the value the device holds is shown as it is.
+  When a value outside the range is read, a warning goes to the log once per tag.
+- `screens` takes file paths (relative to project.json), or screen objects written in place.
 
-### ドライバ: sim（シミュレーション）
+### Driver: sim (simulation)
 
 ```json
 {
@@ -675,7 +694,7 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 
 `mode`: `sine` / `triangle` / `ramp` / `square` / `random` / `counter` / `cycle`
 
-### ドライバ: modbus_tcp
+### Driver: modbus_tcp
 
 ```json
 {
@@ -709,22 +728,22 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 }
 ```
 
-| キー               | 値                                                                                             |
+| Key | Value |
 | ------------------ | ---------------------------------------------------------------------------------------------- |
-| `area`             | `coil` (FC1/5), `discrete` (FC2), `holding` (FC3/6/16), `input` (FC4)                          |
-| `dtype`            | `u16` (既定), `s16`, `u32`, `s32`, `float`。32bit 型は 2 レジスタ、`swap_words` でワード順反転 |
-| `scale` / `offset` | タグ値 = 生値 × scale + offset。書き込み時は逆変換                                             |
-| `access`           | `rw` (coil/holding の既定), `ro`, `wo`                                                         |
-| `status_tag`       | 接続状態を書き込む bool タグ（任意）                                                           |
+| `area` | `coil` (FC1/5), `discrete` (FC2), `holding` (FC3/6/16), `input` (FC4) |
+| `dtype` | `u16` (default), `s16`, `u32`, `s32`, `float`. The 32-bit types take 2 registers; `swap_words` reverses the word order |
+| `scale` / `offset` | Tag value = raw value × scale + offset. A write does the inverse conversion |
+| `access` | `rw` (default for coil/holding), `ro`, `wo` |
+| `status_tag` | A bool tag that receives the connection state (optional) |
 
-- 読み出しはワーカースレッドで周期実行。UI からの書き込みはキューに積まれ、同じスレッドが送信します。
-- 起動時にタグの初期値を PLC に書き込むことはありません（PLC 側の値が優先されます）。
-- 切断時は指数バックオフ（0.5s → 5s）で再接続します。
+- Reads run periodically on a worker thread. Writes from the UI are queued, and the same thread sends them.
+- The initial values of the tags are not written to the PLC at startup (the values in the PLC take precedence).
+- After a disconnect, the driver reconnects with exponential backoff (0.5s → 5s).
 
-### ドライバ: modbus_rtu / modbus_ascii（シリアル）
+### Driver: modbus_rtu / modbus_ascii (serial)
 
-シリアルポート（RS-232 / RS-485、USB シリアル変換を含む）で Modbus RTU または Modbus ASCII のクライアント（マスター）として
-通信します。`map` の書き方やデータ型は `modbus_tcp` と同じです。
+The driver communicates over a serial port (RS-232 / RS-485, including USB serial converters) as a Modbus RTU or Modbus ASCII client (master).
+`map` and the data types are written the same way as for `modbus_tcp`.
 
 ```json
 {
@@ -740,54 +759,54 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 }
 ```
 
-| キー                    | 既定値                                  | 内容                                                                    |
+| Key | Default | Description |
 | ----------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| `device`                |                                         | シリアルポート。Linux は `/dev/ttyUSB0` など、Windows は `COM4` など    |
-| `baud`                  | `9600`                                  | 1200 / 2400 / 4800 / 9600 / 19200 / 38400 / 57600 / 115200 / 230400     |
-| `data_bits`             | RTU `8`、ASCII `7`                      | RTU は 8 のみ                                                           |
-| `parity`                | RTU `none`、ASCII `even`                | `none` / `even` / `odd`                                                 |
-| `stop_bits`             | `1`                                     | `1` / `2`                                                               |
-| `unit_id`               | `1`                                     | 相手のユニット（スレーブ）番号。`map` の行ごとに `unit_id` で上書きできる |
-| `timeout_ms`            | `500`                                   | 応答を待つ時間                                                          |
-| `host` / `port`         |                                         | `device` を書かずにこちらを書くと、同じフレームを TCP で送る（シリアル–イーサネット変換器） |
+| `device` | | The serial port. `/dev/ttyUSB0` and the like on Linux, `COM4` and the like on Windows |
+| `baud` | `9600` | 1200 / 2400 / 4800 / 9600 / 19200 / 38400 / 57600 / 115200 / 230400 |
+| `data_bits` | RTU `8`, ASCII `7` | RTU allows only 8 |
+| `parity` | RTU `none`, ASCII `even` | `none` / `even` / `odd` |
+| `stop_bits` | `1` | `1` / `2` |
+| `unit_id` | `1` | The unit (slave) number of the other side. A `unit_id` in a row of `map` overrides it for that row |
+| `timeout_ms` | `500` | How long to wait for a response |
+| `host` / `port` | | Written instead of `device`, these send the same frames over TCP (a serial–Ethernet converter) |
 
-**シリアルポートの名前**
+**Names of serial ports**
 
-ポートの名前は OS によって、また機械によって違います。`device` には、**そのプロジェクトを動かす機械（ターゲット）での名前**を書きます。
+The name of a port differs from OS to OS and from machine to machine. In `device`, write **the name on the machine that runs the project (the target)**.
 
-| OS      | 名前の例                                                             | 備考                                                                 |
+| OS | Example names | Notes |
 | ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Linux   | `/dev/ttyUSB0`、`/dev/ttyACM0`、`/dev/ttyAMA0`                       | USB 変換器は挿した順に番号が付くので、2 本あると入れ替わることがある |
-| Linux   | `/dev/serial/by-id/usb-FTDI_USB_HS_SERIAL_CONVERTER_XXXX-if00-port0` | USB 変換器の「変わらない名前」。挿す順番や口を変えても同じ           |
-| Windows | `COM4`                                                               | 番号は PC ごとに決まる                                               |
+| Linux | `/dev/ttyUSB0`, `/dev/ttyACM0`, `/dev/ttyAMA0` | USB converters are numbered in the order they are plugged in, so with two of them the names can swap |
+| Linux | `/dev/serial/by-id/usb-FTDI_USB_HS_SERIAL_CONVERTER_XXXX-if00-port0` | The "stable name" of a USB converter. It stays the same when the plugging order or the socket changes |
+| Windows | `COM4` | The number is decided by each PC |
 
-名前を調べる方法:
+How to find the name:
 
-- **装置の画面**: システム設定の Driver ページでは、`device` をその装置で見つかったポートの一覧から選べます。
-  ページを開いたときに調べ直すので、あとから挿した変換器も出ます。「ports found」に説明つきの一覧も表示されます。
-- **デザイナー**: ドライバ設定の **Find serial ports …** で、ターゲットのポート（Deploy の接続設定を使って調べます）と
-  この PC のポートを、説明つきで一覧表示します。ターゲットのポートを選ぶと `device` に、PC のポートを選ぶと下記の
-  「device on this PC」に入ります。
-- **コマンド**: `hml_runtime --list-serial-ports` が、その機械のポートを 1 行に 1 つ表示します
-  （`デバイス名 <TAB> 変わらない名前 <TAB> 説明`）。
+- **The screen of the device**: on the Driver page of the system settings, `device` can be chosen from the list of ports found on that device.
+  The list is refreshed when the page opens, so a converter plugged in later appears too. "ports found" also shows the list with descriptions.
+- **The designer**: **Find serial ports …** in the driver settings lists the ports of the target (found through the connection settings of Deploy) and
+  the ports of this PC, with descriptions. Choosing a port of the target puts it into `device`; choosing a port of the PC puts it into
+  "device on this PC", described below.
+- **Command**: `hml_runtime --list-serial-ports` prints the ports of that machine, one per line
+  (`device name <TAB> stable name <TAB> description`).
 
-**同じプロジェクトを PC でも動かすとき**（デザイナーの Run / Preview など）は、プロジェクトを分ける必要はありません。
-PC でのポート名は、デザイナーのドライバ設定の **device on this PC** に書きます。これは PC 側の `project.local.json` に保存され、
-その PC で動かすときだけ `device` の代わりに使われます。デプロイでは送られないので、ターゲットには影響しません。
+**When the same project also runs on the PC** (Run / Preview of the designer and so on), there is no need for a separate project.
+Write the port name on the PC into **device on this PC** in the driver settings of the designer. It is saved in `project.local.json` on the PC, and
+it is used instead of `device` only when the project runs on that PC. A deploy does not send it, so the target is not affected.
 
-別の OS の名前のまま動かした場合（Windows で `/dev/ttyUSB0` など）は、その旨と、その機械にあるポートの一覧がログに出ます。
+When the project runs with a name of another OS (such as `/dev/ttyUSB0` on Windows), the log says so and lists the ports that the machine has.
 
-- 通信条件（ボーレート、データ長、パリティ、ストップビット）は相手の機器に合わせてください。
-- **1 本の回線に複数のユニットをつなげます**（RS-485）。`map` の行に `unit_id` を書くと、そのユニットに問い合わせます。
-  応答しないユニットがあっても、ほかのユニットとの通信は続きます（応答しないユニットは 1 周につき 1 回だけ待ちます）。
-- シリアル回線には「接続」がないので、`status_tag` は「どれか 1 つでもユニットが応答している」あいだオンになります。
-  どのユニットも応答しなくなるとオフになり、間隔を空けながら（最大 5 秒）問い合わせを続けます。
-- Linux では、ランタイムを動かすユーザーがシリアルポートに読み書きできる必要があります（通常は `dialout` グループ）。
-- 応答のチェックサム（RTU は CRC-16、ASCII は LRC）が合わないフレームは捨てます。
+- Set the communication parameters (baud rate, data bits, parity, stop bits) to match the other device.
+- **Several units can be connected to one line** (RS-485). A `unit_id` in a row of `map` sends the request to that unit.
+  When a unit does not respond, communication with the other units continues (the driver waits for a unit that does not respond only once per cycle).
+- A serial line has no "connection", so `status_tag` is on while "at least one unit is responding".
+  When no unit responds any more it turns off, and the driver keeps asking at growing intervals (5 seconds at most).
+- On Linux, the user that runs the runtime must be able to read and write the serial port (normally the `dialout` group).
+- A frame whose response checksum (CRC-16 for RTU, LRC for ASCII) does not match is discarded.
 
-### ドライバ: slmp（三菱電機 MELSEC: SLMP / MC プロトコル）
+### Driver: slmp (Mitsubishi Electric MELSEC: SLMP / MC protocol)
 
-SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP）で MELSEC の CPU または Ethernet ユニットと読み書きします。
+The driver reads and writes a MELSEC CPU or Ethernet module with SLMP (3E / 4E frames of the MC protocol, binary code, TCP).
 
 ```json
 {
@@ -807,32 +826,32 @@ SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP�
 }
 ```
 
-| キー                 | 内容                                                                                                   |
+| Key | Description |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| `host` / `port`      | CPU（または Ethernet ユニット）のアドレスと SLMP のポート。GX Works の「外部機器接続設定」で開けたポート |
-| `frame`              | `3e`（既定）/ `4e`（要求ごとにシリアル番号が付き、応答の取り違えを防げる）                              |
-| `network` `pc` `io` `station` | 経路（既定 0 / 255 / 0x3FF / 0 = 接続した局の CPU）                                          |
-| `write_ranges`       | 書き込みを許す範囲（`"D0-D999"` のように）。省略時は SM / SD 以外すべて書き込める                      |
-| `allow_system_write` | `true` のときだけ SM / SD に書き込む（既定 `false`）                                                    |
-| `addr`               | GX Works の書き方: `D100` `W1A` `R0` `ZR100` `M0` `X1F` `Y20` `B0` `L0` `F0` `V0` `S0` `TS0` `TC0` `TN0` `SS0` `SC0` `SN0` `CS0` `CC0` `CN0` `SM400` `SD0` `SB0` `SW0` `DX0` `DY0` `Z0`。X Y B W SB SW DX DY ZR は 16 進。`D10.3` はワードのビット（読み取りのみ） |
-| `dtype`              | ワードデバイス: `int16`（既定）`uint16` `int32` `uint32` `float` `string`（`length` 文字、下位バイトが先）。ビットデバイスは bool |
-| `scale` / `offset`   | 値 = 生の値 × scale + offset（書き込みは逆算）                                                          |
-| `access`             | `rw`（既定）/ `ro` / `wo`                                                                               |
-| `swap_words`         | 32 ビットの値の上位ワードが先（既定は MELSEC と同じく下位ワードが先）                                   |
+| `host` / `port` | The address of the CPU (or the Ethernet module) and the SLMP port: the port opened in "External Device Configuration" of GX Works |
+| `frame` | `3e` (default) / `4e` (every request carries a serial number, which prevents mixing up responses) |
+| `network` `pc` `io` `station` | The route (default 0 / 255 / 0x3FF / 0 = the CPU of the connected station) |
+| `write_ranges` | The ranges where writes are allowed (as in `"D0-D999"`). When omitted, everything except SM / SD can be written |
+| `allow_system_write` | Writes to SM / SD only when `true` (default `false`) |
+| `addr` | Written as in GX Works: `D100` `W1A` `R0` `ZR100` `M0` `X1F` `Y20` `B0` `L0` `F0` `V0` `S0` `TS0` `TC0` `TN0` `SS0` `SC0` `SN0` `CS0` `CC0` `CN0` `SM400` `SD0` `SB0` `SW0` `DX0` `DY0` `Z0`. X Y B W SB SW DX DY ZR are hexadecimal. `D10.3` is a bit of a word (read only) |
+| `dtype` | Word devices: `int16` (default) `uint16` `int32` `uint32` `float` `string` (`length` characters, low byte first). Bit devices are bool |
+| `scale` / `offset` | Value = raw value × scale + offset (a write calculates backwards) |
+| `access` | `rw` (default) / `ro` / `wo` |
+| `swap_words` | The high word of a 32-bit value comes first (the default is low word first, as in MELSEC) |
 
-- 読み出しは、同じデバイスでまとめて一括読み出し（ワード単位、1 回 960 ワードまで、32 ワードまでの隙間は続けて読む）
-  にするので、1000 点でも数回の要求で済みます。ビットデバイスは 16 点ずつワード単位で読みます。
-- 書き込みは、ワードデバイスはワード単位、ビットデバイスはビット単位の一括書き込みです。ワードのビット（`D10.3`）は
-  書き込みません（PLC が同時に同じワードを書くと消えてしまう読み書きになるため）。
-- 応答はヘッダー・長さ（最大 960 ワード分）・4E のシリアル番号を確かめ、合わないもの・途中で切れたもの・時間内に
-  来ないものは捨てて接続し直します。終了コード（`C056` など）が返ったときは、接続を保ったまま値を変えずに警告を
-  1 度出します。
-- SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
-  範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
+- Reads are grouped per device into batch reads (in words, up to 960 words at a time; a gap of up to 32 words is read through),
+  so even 1000 points take only a few requests. Bit devices are read in words, 16 points at a time.
+- Writes are batch writes: in words for word devices, in bits for bit devices. A bit of a word (`D10.3`) is
+  not written (it would be a read-modify-write that is lost when the PLC writes the same word at the same time).
+- For a response, the driver checks the header, the length (at most 960 words' worth) and the serial number of 4E; a response that does not match, is cut off midway or does not
+  arrive in time is discarded and the driver reconnects. When an end code (such as `C056`) comes back, it keeps the connection, leaves the value unchanged and gives a warning
+  once.
+- SLMP is a plain-text protocol with neither encryption nor authentication. Use it with the PLC on a closed network, and narrow the writable
+  ranges with `write_ranges`. UDP and the serial MC protocol (4C frame) are not supported yet.
 
-### ドライバ: fins（オムロン: FINS/TCP）
+### Driver: fins (OMRON: FINS/TCP)
 
-FINS/TCP でオムロンの PLC（CS / CJ / CP / NJ / NX）のメモリを読み書きします。
+The driver reads and writes the memory of an OMRON PLC (CS / CJ / CP / NJ / NX) with FINS/TCP.
 
 ```json
 {
@@ -852,35 +871,35 @@ FINS/TCP でオムロンの PLC（CS / CJ / CP / NJ / NX）のメモリを読み
 }
 ```
 
-| キー                 | 内容                                                                                                   |
+| Key | Description |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| `host` / `port`      | CPU（または Ethernet ユニット）のアドレスと FINS/TCP のポート（既定 9600）                              |
-| `dest_network` `dest_node` `dest_unit` | 経路（既定 0 / 0 / 0 = 接続した PLC の CPU。ノードアドレスは接続時に PLC から受け取る） |
-| `node`               | 自分のノードアドレス（既定 0 = PLC が割り当てる）                                                       |
-| `write_ranges`       | 書き込みを許す範囲（`"D0-D999"` のように）。省略時は特殊補助リレー（A）以外すべて書き込める            |
-| `allow_system_write` | `true` のときだけ特殊補助リレー（A）に書き込む（既定 `false`）                                          |
-| `addr`               | CX-Programmer の書き方: `D100`（`DM100` も可）`CIO10`（数字だけの `10` も CIO）`W5` `H7` `A440` `E0_100`（EM のバンク 0。バンクは 16 進で 0〜18）`T3` `C4`（タイマ・カウンタの現在値）。`D100.03` `W0.15` はビット（00〜15） |
-| `dtype`              | ワード: `int16`（既定）`uint16` `int32` `uint32` `float` `bcd16` `bcd32` `string`（`length` 文字、上位バイトが先）。ビットは bool |
-| `scale` / `offset`   | 値 = 生の値 × scale + offset（書き込みは逆算）                                                          |
-| `access`             | `rw`（既定）/ `ro` / `wo`                                                                               |
-| `swap_words`         | 32 ビットの値の上位ワードが先（既定は下位ワードが先）                                                   |
+| `host` / `port` | The address of the CPU (or the Ethernet unit) and the FINS/TCP port (default 9600) |
+| `dest_network` `dest_node` `dest_unit` | The route (default 0 / 0 / 0 = the CPU of the connected PLC. The node address is received from the PLC on connecting) |
+| `node` | The node address of this side (default 0 = the PLC assigns it) |
+| `write_ranges` | The ranges where writes are allowed (as in `"D0-D999"`). When omitted, everything except the Auxiliary Area (A) can be written |
+| `allow_system_write` | Writes to the Auxiliary Area (A) only when `true` (default `false`) |
+| `addr` | Written as in CX-Programmer: `D100` (`DM100` also works) `CIO10` (a bare number `10` is CIO too) `W5` `H7` `A440` `E0_100` (bank 0 of EM. The bank is hexadecimal, 0 to 18) `T3` `C4` (the present value of a timer / counter). `D100.03` `W0.15` are bits (00 to 15) |
+| `dtype` | Words: `int16` (default) `uint16` `int32` `uint32` `float` `bcd16` `bcd32` `string` (`length` characters, high byte first). Bits are bool |
+| `scale` / `offset` | Value = raw value × scale + offset (a write calculates backwards) |
+| `access` | `rw` (default) / `ro` / `wo` |
+| `swap_words` | The high word of a 32-bit value comes first (the default is low word first) |
 
-- 読み出しは、同じエリアでまとめて「メモリエリア読み出し」（1 回 990 ワードまで、32 ワードまでの隙間は続けて読む）に
-  します。ビットは、読んだワードから取り出します。
-- 書き込みは「メモリエリア書き込み」で、ワードはワード単位、ビットは 1 ビット単位です（PLC がそのビットだけを変えるので、
-  同じワードのほかのビットは消えません）。
-- `bcd16` / `bcd32` は、PLC の中の `0x1234` を 1234 として扱います。PLC の値が BCD でないとき（桁に A〜F がある）は
-  タグを変えずに警告を 1 度出し、入らない値（負の数、9999 を超える数）は書き込みません。
-- 応答は FINS/TCP のヘッダー・長さ・サービス ID・コマンドコードを確かめ、合わないもの・途中で切れたもの・時間内に
-  来ないものは捨てて接続し直します。終了コード（`1103` など）が返ったときは、接続を保ったまま値を変えずに警告を 1 度出します。
-- FINS は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
-  範囲を絞ってください。FINS/UDP とシリアル（Host Link）にはまだ対応していません。
-- 確認は、テスト内の模擬の相手と PLC シミュレーター Karakuri の FINS サーバーで行っています。**実機での確認はまだです。**
+- Reads are grouped per area into "Memory Area Read" commands (up to 990 words at a time; a gap of up to 32 words is read
+  through). Bits are taken out of the words that were read.
+- Writes use "Memory Area Write": in words for words, one bit at a time for bits (the PLC changes only that bit, so
+  the other bits of the same word are not lost).
+- `bcd16` / `bcd32` treat `0x1234` in the PLC as 1234. When the value in the PLC is not BCD (a digit is A to F), the driver
+  leaves the tag unchanged and gives a warning once; a value that does not fit (a negative number, a number above 9999) is not written.
+- For a response, the driver checks the FINS/TCP header, the length, the service ID and the command code; a response that does not match, is cut off midway or does not
+  arrive in time is discarded and the driver reconnects. When an end code (such as `1103`) comes back, it keeps the connection, leaves the value unchanged and gives a warning once.
+- FINS is a plain-text protocol with neither encryption nor authentication. Use it with the PLC on a closed network, and narrow the writable
+  ranges with `write_ranges`. FINS/UDP and serial (Host Link) are not supported yet.
+- It has been checked against the simulated peer in the tests and against the FINS server of the PLC simulator Karakuri. **It has not been checked on a real PLC yet.**
 
-### ドライバ: mqtt（MQTT クライアント）
+### Driver: mqtt (MQTT client)
 
-MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）、指令を受け取って（subscribe）タグに書き込みます。
-**既定で TLS（1.2 / 1.3）を使い、ブローカーの証明書とホスト名を確認します。** 実装は mbedTLS（Apache-2.0）です。
+The driver connects to a broker with MQTT 3.1.1, sends tag values (publish), and receives commands (subscribe) and writes them to tags.
+**By default it uses TLS (1.2 / 1.3) and verifies the certificate and the host name of the broker.** The implementation is mbedTLS (Apache-2.0).
 
 ```json
 {
@@ -900,37 +919,37 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
 }
 ```
 
-| キー                         | 内容                                                                                          |
+| Key | Description |
 | ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `host` / `port`              | ブローカー。ポートの既定は 8883（TLS）、`"tls": false` なら 1883                                |
-| `tls`                        | 既定 `true`。`false` は平文（ユーザー名・パスワード・値がネットワーク上で読める）。閉じたネットワークだけで |
-| `verify`                     | 既定 `true`: 証明書を `ca_file` の CA で確かめ、ホスト名も確認する。`false` は警告付き（なりすましを防げない） |
-| `ca_file`                    | ブローカーの CA 証明書（PEM、project.json からの相対パス）。Linux では空欄ならシステムの CA（`/etc/ssl/certs/ca-certificates.crt`） |
-| `cert_file` / `key_file`     | クライアント証明書と秘密鍵（PEM）。ブローカーが求める場合                                       |
-| `username` / `password`      | 装置のシステム設定（System > Driver）で入れると `project.local.json` に入り、project.json には残りません |
-| `client_id`                  | 装置ごとに別の値にする                                                                         |
-| `topic_prefix`               | すべてのトピックの前に付く                                                                     |
-| `status_topic`               | 接続すると `online`（retain）、切れるとブローカーが遺言（last will）で `offline` を出す          |
-| `status_tag`                 | 接続中は 1                                                                                    |
-| `payload`                    | `value`（既定。`21.5`、bool は `true` / `false`）/ `json`（`{"v": 21.5, "ts": ミリ秒}`）         |
-| `qos` / `retain`             | publish の既定（QoS は 0 か 1）                                                                |
-| `publish[]`                  | `tag`、`topic`（既定はタグ名）、`mode`: `change`（既定、変化したとき）/ `interval`（`interval_ms` ごと）、`qos`、`retain` |
-| `subscribe[]`                | `tag`、`topic`（既定はタグ名）。**ここに書いたタグだけが外から書き込まれます**。ワイルドカード（`+` `#`）は使えません |
-| `keepalive_s` / `timeout_ms` / `reconnect_ms` | 既定 30 秒 / 5000 ms（接続とハンドシェイク）/ 1000 ms（再接続の最初の待ち。30 秒まで倍に延びる） |
+| `host` / `port` | The broker. The default port is 8883 (TLS), or 1883 with `"tls": false` |
+| `tls` | Default `true`. `false` is plain text (the user name, the password and the values can be read on the network). Only on a closed network |
+| `verify` | Default `true`: the certificate is checked against the CA in `ca_file`, and the host name is verified too. `false` comes with a warning (it cannot prevent impersonation) |
+| `ca_file` | The CA certificate of the broker (PEM, a path relative to project.json). On Linux, when empty, the CAs of the system (`/etc/ssl/certs/ca-certificates.crt`) |
+| `cert_file` / `key_file` | The client certificate and the private key (PEM). For a broker that asks for them |
+| `username` / `password` | Entered in the system settings of the device (System > Driver), they go into `project.local.json` and do not stay in project.json |
+| `client_id` | Use a different value for each device |
+| `topic_prefix` | Put in front of every topic |
+| `status_topic` | On connecting, `online` (retain); when the connection is lost, the broker publishes `offline` as the last will |
+| `status_tag` | 1 while connected |
+| `payload` | `value` (default. `21.5`; a bool is `true` / `false`) / `json` (`{"v": 21.5, "ts": milliseconds}`) |
+| `qos` / `retain` | The defaults for publish (QoS is 0 or 1) |
+| `publish[]` | `tag`, `topic` (default: the tag name), `mode`: `change` (default, when the value changes) / `interval` (every `interval_ms`), `qos`, `retain` |
+| `subscribe[]` | `tag`, `topic` (default: the tag name). **Only the tags written here are written from outside.** Wildcards (`+` `#`) cannot be used |
+| `keepalive_s` / `timeout_ms` / `reconnect_ms` | Default 30 seconds / 5000 ms (connect and handshake) / 1000 ms (the first wait before a reconnect. It doubles up to 30 seconds) |
 
-- 受け取った値は、数値のタグなら数値か、bool なら `true` / `false` / `1` / `0` / `on` / `off` か、文字列なら UTF-8 で
-  256 バイト以下かを確かめ、タグの `min` / `max` の外なら書き込みません（ログに警告）。`{"v": ...}` の形も受け付けます。
-  受け取って書いた値は、同じタグを publish していても送り返しません。
-- ブローカーからのパケットは、長さ（64 KiB まで）・種類・フラグ・トピック（UTF-8、ワイルドカードなし）を確かめ、
-  壊れていれば接続を切ってつなぎ直します（QoS 2 には対応していません）。
-- ブローカーにつながらない間は、`change` のトピックごとに最新の値だけを覚えておき、つながったときに送ります。
-  確認（PUBACK）が来ていない QoS 1 のメッセージは、つなぎ直したあと DUP を付けて送り直します（100 件まで）。
-- パスワードはログに出しません。`project.local.json` には平文で入るので、装置のファイルを読める人は読めます。
+- A received value is checked: a number for a numeric tag; `true` / `false` / `1` / `0` / `on` / `off` for a bool; UTF-8 of
+  256 bytes or less for a string. A value outside the `min` / `max` of the tag is not written (a warning in the log). The form `{"v": ...}` is accepted too.
+  A value that was received and written is not sent back, even when the same tag is published.
+- For a packet from the broker, the driver checks the length (up to 64 KiB), the type, the flags and the topic (UTF-8, no wildcards);
+  when the packet is broken, it drops the connection and connects again (QoS 2 is not supported).
+- While the broker cannot be reached, the driver remembers only the latest value of each `change` topic and sends it on connecting.
+  A QoS 1 message that has not been acknowledged (PUBACK) is sent again with DUP after the reconnect (up to 100 messages).
+- The password is not written to the log. It is in `project.local.json` in plain text, so anybody who can read the files of the device can read it.
 
-### ドライバ: opcua_client（OPC UA クライアント）
+### Driver: opcua_client (OPC UA client)
 
-ほかの OPC UA サーバー（PLC、SCADA など）のノードをタグにします。**既定で署名と暗号化（Sign & Encrypt）を使い、
-サーバーの証明書を確認します。** 実装は open62541（MPL-2.0）で、暗号は mbedTLS です。
+The driver makes nodes of another OPC UA server (a PLC, a SCADA system and so on) into tags. **By default it uses signing and encryption (Sign & Encrypt) and
+verifies the certificate of the server.** The implementation is open62541 (MPL-2.0), and the cryptography is mbedTLS.
 
 ```json
 {
@@ -945,35 +964,35 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
 }
 ```
 
-| キー                         | 内容                                                                                          |
+| Key | Description |
 | ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `endpoint`                   | サーバーの `opc.tcp://ホスト:ポート`                                                            |
-| `security`                   | `sign_encrypt`（既定）/ `sign` / `none`（平文。値がネットワーク上で読めて、書き換えられる。警告付き） |
-| `policy`                     | 空欄なら両方が使える最も強いもの。`Basic256Sha256`、`Aes128_Sha256_RsaOaep`、`Aes256_Sha256_RsaPss` など |
-| `server_cert`                | 信頼するサーバーの証明書（DER / PEM、project.json からの相対パス。配列も可）。装置の `pki/trusted/` に置いたものも信頼する。**どちらもないと接続しません**（open62541 は信頼リストが空だと何でも受け入れるため） |
-| `verify`                     | 既定 `true`。`false` はサーバーの証明書を確認しない（警告付き。なりすましを防げない）              |
-| `cert_file` / `key_file`     | このクライアントの証明書と秘密鍵（DER）。空欄なら、装置が初回に `pki/own/opcua_client.der`（RSA 2048、20 年）を作り、以後それを使う。サーバー側でこの証明書を信頼させてください |
-| `application_uri`            | クライアントの URI（既定 `urn:hml:opcua_client`）。`cert_file` を使うときは証明書の URI と同じに |
-| `username` / `password`      | 装置のシステム設定（System > Driver）で入れると `project.local.json` に入り、project.json には残りません |
-| `publish_ms`                 | サーバーが変化を送る間隔（サブスクリプション。既定 500）                                         |
-| `timeout_ms` / `reconnect_ms`| 既定 5000 ms（接続）/ 1000 ms（再接続の最初の待ち。30 秒まで倍に延びる）                         |
-| `status_tag`                 | 接続中は 1                                                                                    |
-| `map[]`                      | `tag`、`node`（`ns=2;s=Temp`、`ns=3;i=1001`、名前空間 URI で書く `nsu=urn:...;s=...`）、`access`: `ro`（既定）/ `rw` |
+| `endpoint` | `opc.tcp://host:port` of the server |
+| `security` | `sign_encrypt` (default) / `sign` / `none` (plain text. The values can be read and altered on the network. Comes with a warning) |
+| `policy` | When empty, the strongest one that both sides can use. `Basic256Sha256`, `Aes128_Sha256_RsaOaep`, `Aes256_Sha256_RsaPss` and so on |
+| `server_cert` | The certificate of the server to trust (DER / PEM, a path relative to project.json. An array is allowed too). Certificates placed in `pki/trusted/` of the device are trusted too. **With neither, the driver does not connect** (because open62541 accepts anything when the trust list is empty) |
+| `verify` | Default `true`. `false` does not verify the certificate of the server (comes with a warning. It cannot prevent impersonation) |
+| `cert_file` / `key_file` | The certificate and the private key of this client (DER). When empty, the device creates `pki/own/opcua_client.der` (RSA 2048, 20 years) the first time and uses it from then on. Make the server trust this certificate |
+| `application_uri` | The URI of the client (default `urn:hml:opcua_client`). When `cert_file` is used, make it the same as the URI of the certificate |
+| `username` / `password` | Entered in the system settings of the device (System > Driver), they go into `project.local.json` and do not stay in project.json |
+| `publish_ms` | The interval at which the server sends changes (the subscription. Default 500) |
+| `timeout_ms` / `reconnect_ms`| Default 5000 ms (connect) / 1000 ms (the first wait before a reconnect. It doubles up to 30 seconds) |
+| `status_tag` | 1 while connected |
+| `map[]` | `tag`, `node` (`ns=2;s=Temp`, `ns=3;i=1001`, or `nsu=urn:...;s=...` written with the namespace URI), `access`: `ro` (default) / `rw` |
 
-- 値はサブスクリプションで受け取ります（Boolean、整数、Float、Double、String、LocalizedText。配列は未対応）。
-- **サーバーへの書き込みは `"access": "rw"` の行だけ**です。値はノードのデータ型に変換し、入らないもの
-  （Int16 のノードに 40000、数値のノードに文字列など）は書き込まずにログに残します。接続していない間の変更は、
-  あとからまとめて送りません。
-- 接続が切れたら、セッションとサブスクリプションを作り直します。
-- `pki/` は装置の持ち物で、`logs/` や `project.local.json` と同じくデプロイで消えず、プロジェクトファイルにも入りません
-  （プロジェクトファイルから信頼する証明書を仕込むこともできません）。
-- 接続できない理由を調べるときは、環境変数 `HML_OPCUA_LOG=info`（または `debug`）で open62541 のログを増やせます。
+- Values are received through a subscription (Boolean, integers, Float, Double, String, LocalizedText. Arrays are not supported).
+- **Only the rows with `"access": "rw"` write to the server.** The value is converted to the data type of the node; a value that does not fit
+  (40000 for an Int16 node, a string for a numeric node and so on) is not written and is recorded in the log. Changes made while not connected are
+  not sent together afterwards.
+- When the connection is lost, the driver creates the session and the subscription again.
+- `pki/` belongs to the device: like `logs/` and `project.local.json`, a deploy does not delete it and it does not go into the project file
+  (nor can a project file plant a certificate to trust).
+- To find out why a connection fails, the environment variable `HML_OPCUA_LOG=info` (or `debug`) makes open62541 log more.
 
-### ドライバ: opcua_server（OPC UA サーバー）
+### Driver: opcua_server (OPC UA server)
 
-タグを OPC UA の変数ノードとして公開します。SCADA や他の HMI、Python (asyncua) などの
-OPC UA クライアントから読み書きでき、クライアントからの書き込みはそのままタグに反映されて
-画面と他のドライバ（Modbus など）に伝わります。実装は open62541 (MPL-2.0) です。
+The driver exposes tags as OPC UA variable nodes. OPC UA clients such as SCADA, other HMIs and Python (asyncua)
+can read and write them; a write from a client goes straight into the tag and
+reaches the screens and the other drivers (Modbus and so on). The implementation is open62541 (MPL-2.0).
 
 ```json
 {
@@ -989,84 +1008,84 @@ OPC UA クライアントから読み書きでき、クライアントからの�
 }
 ```
 
-| キー        | 意味                                                                                              |
+| Key | Description |
 | ----------- | ------------------------------------------------------------------------------------------------- |
-| `port`      | 待ち受けポート（既定 4840）。エンドポイントは `opc.tcp://<host>:<port>`                           |
-| `namespace` | タグノードの名前空間 URI。インデックスは起動時に割り当てられます（通常 2）                        |
-| `folder`    | `Objects/` 直下に作るフォルダ名（既定 `HML`）                                                     |
-| `tags`      | 公開するタグ。省略時は全タグを読み書き可で公開。要素は文字列か `{ "tag", "access": "rw" / "ro" }` |
+| `port` | The listening port (default 4840). The endpoint is `opc.tcp://<host>:<port>` |
+| `namespace` | The namespace URI of the tag nodes. The index is assigned at startup (normally 2) |
+| `folder` | The name of the folder created directly under `Objects/` (default `HML`) |
+| `tags` | The tags to expose. When omitted, all tags are exposed as readable and writable. An element is a string or `{ "tag", "access": "rw" / "ro" }` |
 
-- ノード ID は `ns=<index>;s=<タグ名>`、型は bool → Boolean、int → Int64、float → Double、string → String です。
-  クライアントは、この型で書き込んでください。別の型（Int64 のノードに Int16 など）の書き込みは、サーバーが
-  `BadTypeMismatch` で断ります（一般のクライアントはノードの型を読んでから書くので、そのまま使えます）。
-- 読み出しはタグストアから都度取得するので、Subscription / MonitoredItem でも最新値が届きます。
-- セキュリティポリシーは `None`（暗号化・認証なし）のみです。閉じたネットワークでの利用を想定しています。
-- 動作確認用のクライアントを同梱しています（`pip install asyncua` が必要）。
+- The node ID is `ns=<index>;s=<tag name>`, and the types are bool → Boolean, int → Int64, float → Double, string → String.
+  A client must write with this type. A write with another type (Int16 to an Int64 node and so on) is refused by the server
+  with `BadTypeMismatch` (ordinary clients read the type of the node before they write, so they work as they are).
+- A read fetches the value from the tag store each time, so Subscription / MonitoredItem also get the latest value.
+- The only security policy is `None` (no encryption, no authentication). It is meant for use on a closed network.
+- A client for checking the operation is included (it needs `pip install asyncua`).
 
 ```
-python tools\opcua_client_test.py                       # Objects/HML 配下のタグを一覧
-python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型はノードから自動判定）
+python tools\opcua_client_test.py                       # list the tags under Objects/HML
+python tools\opcua_client_test.py --write speed_sp=77   # write (the type is determined from the node automatically)
 ```
 
-## 遠隔表示と遠隔操作（VNC）
+## Remote display and remote operation (VNC)
 
-装置の画面を、PC やスマートフォンの VNC ビューアー（RealVNC Viewer、TigerVNC、TightVNC など）で見て、操作できます。
-ランタイムが小さな VNC サーバー（RFB 3.3 / 3.7 / 3.8、Raw エンコーディング）を持っています。既定は無効です。
+You can see and operate the screen of the device with a VNC viewer (RealVNC Viewer, TigerVNC, TightVNC and others) on a PC or a smartphone.
+The runtime has a small VNC server (RFB 3.3 / 3.7 / 3.8, Raw encoding). It is off by default.
 
 ```json
 "remote": { "enabled": true, "port": 5900, "password": "abcd1234", "view_only": false }
 ```
 
-| キー        | 内容                                                                                             |
+| Key | Description |
 | ----------- | ------------------------------------------------------------------------------------------------ |
-| `enabled`   | `true` で待ち受ける（既定 `false`）                                                              |
-| `port`      | 既定 5900（ビューアーには `装置のアドレス:5900` または `装置のアドレス:0` と入れる）             |
-| `password`  | VNC 認証のパスワード（先頭の 8 文字だけが使われる）。**空のときは、装置自身（127.0.0.1）からしかつなげません** |
-| `view_only` | `true` で見るだけ（ビューアーのマウス・タッチは効かない）                                        |
+| `enabled`   | `true` listens for a viewer (default `false`) |
+| `port`      | Default 5900 (in the viewer, enter `device address:5900` or `device address:0`) |
+| `password`  | The password of the VNC authentication (only the first 8 characters are used). **When it is empty, only the device itself (127.0.0.1) can connect** |
+| `view_only` | `true` only shows the screen (the mouse and touch of the viewer do nothing) |
 
-- ビューアーに映るのは、スクリーンショットと同じ絵（画面と、その上のダイアログ・画面消灯）です。ビューアーがつないでいる
-  間だけ画面を取り込み、変わった所だけを送ります。
-- ビューアーのクリックは、装置の画面を指で押したのと同じに扱われます（ユーザーのレベル、操作ログもそのまま働きます）。
-  キーボードの入力は送られません（画面のキーボードを押してください）。
-- つなげるビューアーは一度に 1 つです。接続と切断はシステムログと操作ログ（`remote`）に残ります。
-- パスワードを 5 回間違えると、30 秒のあいだ誰もログインできません。
-- でたらめなデータを送るビューアーは、その接続が切られるだけです（ログインの前には画面の内容を一切送りません）。
-  ただし、つないだまま何も送らない相手は、ログインの前でも最大 10 秒その 1 つの枠をふさぎます。信頼できない機器が
-  いるネットワークには出さないでください。
-- 負荷の目安: Raspberry Pi 4、480x320、動きのある画面（`projects/factory35`）で、ランタイムの CPU 使用率は
-  ビューアーなしで約 7 %、TigerVNC をつないで約 13 % でした。800x480 の実機では測っていません。
-- **VNC は暗号化されず、パスワードの確認も弱い仕組み（DES、8 文字）です。** 閉じたネットワークで使うか、パスワードを
-  空にして SSH のトンネル越しに使ってください:
-  `ssh -L 5900:127.0.0.1:5900 <user>@<装置>` を実行したまま、ビューアーで `localhost:5900` につなぎます。
-- 確認は、テスト内の小さなクライアントで行っています（認証の値は OpenSSL の結果と比べています）。
-  TigerVNC Viewer 1.16.2（Windows）で、パスワード付きの接続と画面の表示を確かめました。ビューアーからのクリックと、ほかのビューアーは未確認です。
+- The viewer shows the same picture as a screenshot (the screen, and the dialogs and the screen saver above it). The runtime captures
+  the screen only while a viewer is connected, and sends only the parts that changed.
+- A click in the viewer is handled exactly like a finger on the screen of the device (the level of the user and the operation log work as they are).
+  Keyboard input is not sent (press the on-screen keyboard).
+- One viewer can connect at a time. Connections and disconnections are recorded in the system log and the operation log (`remote`).
+- After 5 wrong passwords, nobody can log in for 30 seconds.
+- A viewer that sends garbage only gets its connection closed (nothing of the screen content is sent before the login).
+  However, a peer that connects and then sends nothing occupies that one slot for up to 10 seconds, even before the login. Do not expose
+  the server to a network with untrusted devices.
+- A guide to the load: on a Raspberry Pi 4, 480x320, with a screen that moves (`projects/factory35`), the CPU usage of the runtime was
+  about 7 % without a viewer and about 13 % with TigerVNC connected. It was not measured on real 800x480 hardware.
+- **VNC is not encrypted, and its password check is a weak mechanism (DES, 8 characters).** Use it on a closed network, or leave the password
+  empty and use it through an SSH tunnel:
+  keep `ssh -L 5900:127.0.0.1:5900 <user>@<device>` running, and connect the viewer to `localhost:5900`.
+- It is checked with a small client inside the tests (the authentication values are compared with the results of OpenSSL).
+  With TigerVNC Viewer 1.16.2 (Windows), a connection with a password and the display of the screen were checked. Clicks from the viewer, and other viewers, are not checked.
 
-## 画面消灯（スクリーンセーバー）
+## Screen saver
 
-操作がないまま一定時間が経つと画面を消します。
+The screen turns off when a set time passes without any operation.
 
 ```json
 "screen_saver": { "after_s": 600, "wake_on_alarm": true, "logout": false }
 ```
 
-| キー            | 内容                                                                 |
+| Key | Description |
 | --------------- | -------------------------------------------------------------------- |
-| `after_s`       | 操作がないまま消すまでの秒数（既定 0 = 消さない）                     |
-| `wake_on_alarm` | 新しいアラーム（発生、未確認）で点ける（既定 `true`）                  |
-| `logout`        | 消えたらログアウトする（既定 `false`）                                |
+| `after_s`       | Seconds without operation before the screen turns off (default 0 = never) |
+| `wake_on_alarm` | A new alarm (raised, not acknowledged) turns the screen on (default `true`) |
+| `logout`        | Log out when the screen turns off (default `false`) |
 
-- 消灯中は、画面・ポップアップ・ダイアログの上に黒い層を出し、バックライトを消せる表示器では消します
-  （Linux: `/sys/class/backlight/*/bl_power`、なければフレームバッファのブランク。どちらも使えない表示器、
-  PC では黒い画面にするだけです）。
-- **点けるためのタッチでは何も押されません**（そのタッチは最後まで黒い層が受け取ります）。
-- タグ `sys.screen.off`: 消灯中は 1。1 を書くとすぐに消え、0 で点きます（「画面を消す」ボタンなど）。
-- 装置のシステム設定 **System > Display** で時間を変えられます。変えた値は `project.local.json`（`"screen_saver": { "after_s": N }`）
-  に残り、プロジェクトの値と同じに戻すと消えます。デプロイでは上書きされません。
+- While the screen is off, a black layer covers the screen, the popups and the dialogs, and on displays whose backlight can be turned off, the backlight is turned off
+  (Linux: `/sys/class/backlight/*/bl_power`, or else the blanking of the framebuffer. On a display where neither works, and
+  on a PC, the screen only goes black).
+- **The touch that turns the screen on presses nothing** (the black layer receives that touch to its end).
+- Tag `sys.screen.off`: 1 while the screen is off. Writing 1 turns the screen off at once, 0 turns it on (for a "Screen off" button, for example).
+- The time can be changed on the device in the system settings, **System > Display**. The changed value stays in `project.local.json` (`"screen_saver": { "after_s": N }`),
+  and disappears when it is set back to the value of the project. A deploy does not overwrite it.
 
-## スケジュール（時刻で動作を実行する）
+## Schedules (actions that run by the clock)
 
-決まった時刻に、画面のボタンと同じ動作（アクション）を実行します。始業時に運転の許可を入れる、夜に照明を切る、
-決まった日に点検の画面を出す、といった使い方です。
+At a set time, the runtime runs the same actions as a button on a screen. Typical uses: enable operation at the start of work, switch the lights off at night,
+show a maintenance screen on a set day.
 
 ```json
 "schedules": [
@@ -1078,33 +1097,33 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 ]
 ```
 
-| キー       | 内容                                                                                              |
+| Key | Description |
 | ---------- | ------------------------------------------------------------------------------------------------- |
-| `name`     | 名前（必須、64 文字まで、重複不可）。装置の画面と操作ログに出ます                                   |
-| `at`       | `"HH:MM"`（毎日、または `days` の曜日）か、`"YYYY-MM-DD HH:MM"`（その日時に 1 回だけ）。装置の時計（現地時刻） |
-| `days`     | 曜日: `"daily"`（既定）、`"weekdays"`、`"weekend"`、または `["mon", "wed"]`（`sun mon tue wed thu fri sat`） |
-| `do`       | 実行するアクション 1 つ、またはその配列（→「アクション」）。知らないアクションは飛ばします            |
-| `enabled`  | `false` で、残したまま実行しない（既定 `true`）                                                    |
-| `catch_up` | `true`: 装置が止まっている間に過ぎた時刻を、次の起動時に 1 回だけ実行する（既定 `false`）           |
+| `name`     | Name (required, up to 64 characters, no duplicates). It appears on the screen of the device and in the operation log |
+| `at`       | `"HH:MM"` (every day, or on the weekdays of `days`) or `"YYYY-MM-DD HH:MM"` (only once, at that date and time). The clock of the device (local time) |
+| `days`     | Weekdays: `"daily"` (default), `"weekdays"`, `"weekend"`, or `["mon", "wed"]` (`sun mon tue wed thu fri sat`) |
+| `do`       | One action to run, or an array of them (→ "Actions"). Unknown actions are skipped |
+| `enabled`  | `false` keeps the schedule but does not run it (default `true`) |
+| `catch_up` | `true`: a time that passed while the device was stopped runs once at the next start (default `false`) |
 
-- 判定は 1 秒ごとです。時刻になった最初の判定で 1 回だけ実行し、数秒の遅れ（重い処理、NTP の補正）で飛ばしません。
-- **時計を戻しても、同じ時刻を 2 回は実行しません。** 時計を 2 分より大きく進めたとき（手で合わせた、停止していた）は、
-  その間に過ぎた時刻は実行しません。`catch_up` を付けた予定だけ、過ぎたいちばん新しい時刻（1 日以内）を 1 回実行します。
-  電源を切っていた間の扱いも同じです（`catch_up` の予定は、最後に実行した時刻を `project.local.json` に覚えます）。
-- 夏時間のある地域では、切り替えで存在しない時刻・2 回ある時刻の扱いは OS の時刻変換に従います（未確認）。
-- 実行は操作ログに `schedule` として残ります（`operation_log` があるとき）。ユーザーのレベルには関係なく実行されます
-  （予定はプロジェクトを作った人が決めたものだからです）。画面を切り替えるアクションは、操作中でも切り替わるので注意してください。
-- 上限は 200 件です（200 件を 1 秒ごとに判定しても 0.1 ms 未満）。
-- **装置での変更**: システム設定 **System > Schedule**（`schedules` のあるプロジェクトに出ます）で、予定を押して
-  時刻・曜日・オン / オフを変えられます。**実行する内容（`do`）は装置では変えられません。** 変えた値は
-  `project.local.json`（`"schedules": { "<name>": { "at": ..., "days": ..., "enabled": ... } }`）に残り、プロジェクトの値と
-  同じに戻すと消えます。デプロイでは上書きされません。変更はシステム設定のレベル（`users.system_level`）で守られ、操作ログに残ります。
-- `--check` とデザイナーの問題一覧は、時刻・曜日の書き間違い、名前の重複、知らないアクション、ないタグ・画面を見つけます。
-  デザイナーでは プロジェクト > スケジュール で編集します。
+- The check is made every second. The schedule runs once at the first check after its time, and a delay of a few seconds (heavy work, an NTP correction) does not make it skip.
+- **When the clock is set back, the same time does not run twice.** When the clock is moved forward by more than 2 minutes (set by hand, or the device was stopped),
+  the times that passed in between do not run. Only schedules with `catch_up` run once, for the newest time that passed (within 1 day).
+  The time the power was off is handled the same way (schedules with `catch_up` remember the time of their last run in `project.local.json`).
+- In regions with daylight saving time, the handling of times that do not exist or exist twice at the changeover follows the time conversion of the OS (not checked).
+- A run is recorded in the operation log as `schedule` (when there is an `operation_log`). It runs regardless of the level of the user
+  (because the schedules were decided by the person who made the project). Note that an action that changes the screen changes it even while somebody is operating.
+- The limit is 200 schedules (checking 200 schedules every second takes less than 0.1 ms).
+- **Changes on the device**: in the system settings, **System > Schedule** (it appears in projects with `schedules`), press a schedule to
+  change its time, weekdays and on / off. **What it runs (`do`) cannot be changed on the device.** The changed values stay in
+  `project.local.json` (`"schedules": { "<name>": { "at": ..., "days": ..., "enabled": ... } }`), and disappear when they are
+  set back to the values of the project. A deploy does not overwrite them. Changes are protected by the level of the system settings (`users.system_level`) and are recorded in the operation log.
+- `--check` and the designer's list of problems find mistakes in times and weekdays, duplicate names, unknown actions, and tags and screens that do not exist.
+  In the designer, edit them in Project > Schedules.
 
-## メールで知らせる（`mail`）
+## Mail (`mail`)
 
-アラームが出たときに、メールで知らせます。メールサーバー（SMTP）に直接つなぎます。
+The runtime sends a mail when an alarm is raised. It connects directly to the mail server (SMTP).
 
 ```json
 "mail": {
@@ -1113,62 +1132,62 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
   "from": "hmi@example.com", "to": ["shift@example.com", "boss@example.com"],
   "alarms": { "severities": ["critical"], "events": ["raised"],
               "subject": "[{project}] {alarm.severity}: {alarm.message}",
-              "body": "{alarm.time}\n{alarm.message}\n値: {alarm.value}\nタンクの液位: {level} %" }
+              "body": "{alarm.time}\n{alarm.message}\nValue: {alarm.value}\nTank level: {level} %" }
 }
 ```
 
-| キー                  | 内容                                                                                              |
+| Key | Description |
 | --------------------- | ------------------------------------------------------------------------------------------------- |
-| `host`、`port`        | メールサーバー。`port` を省くと 587（starttls）/ 465（tls）/ 25（none）                              |
-| `security`            | `"starttls"`（既定: 何かを送る前に暗号化する）/ `"tls"`（最初から TLS）/ `"none"`（暗号化しない。自社内の中継サーバーだけ） |
-| `username`、`password`| ログイン（省くとログインしない）。**パスワードはプロジェクトに書かず、装置の System > Mail で設定します**（`project.local.json` に保存） |
-| `from`、`to`          | 差出人のアドレス、宛先（1 つ、または配列。20 件まで）                                               |
-| `verify`、`ca_file`   | サーバーの証明書を検証する（既定 `true`）。`ca_file` を省くと OS が信頼する証明書を使う             |
-| `timeout_ms`          | サーバーの応答を待つ時間（既定 10000）                                                              |
-| `retry_s`、`retries`  | 届かなかったときの再送: `retry_s` 秒後、その 2 倍後、3 倍後 …（既定 60 秒、5 回）                    |
-| `queue`               | 送信待ちの上限（既定 50）。あふれたら古いものから捨てて、ログに書きます                             |
-| `alarms`              | どのアラームを送るか（下）。`false` でアラームは送らない（アクションからは送れる）                  |
-| `enabled`             | `false` で送らない（装置の System > Mail で切り替えられる）                                         |
+| `host`, `port`        | The mail server. Without `port`: 587 (starttls) / 465 (tls) / 25 (none) |
+| `security`            | `"starttls"` (default: encrypts before anything is sent) / `"tls"` (TLS from the start) / `"none"` (no encryption. Only for a relay server inside your own company) |
+| `username`, `password`| Login (without them, no login). **The password is not written in the project; set it on the device in System > Mail** (saved in `project.local.json`) |
+| `from`, `to`          | The address of the sender, the recipients (one, or an array. Up to 20) |
+| `verify`, `ca_file`   | Verify the certificate of the server (default `true`). Without `ca_file`, the certificates trusted by the OS are used |
+| `timeout_ms`          | The time to wait for an answer of the server (default 10000) |
+| `retry_s`, `retries`  | Resending when a mail was not delivered: after `retry_s` seconds, then after 2 times that, 3 times that … (default 60 seconds, 5 times) |
+| `queue`               | The limit of mails waiting to be sent (default 50). When it overflows, the oldest are dropped and this is written to the log |
+| `alarms`              | Which alarms are sent (below). `false` sends no alarms (actions can still send) |
+| `enabled`             | `false` sends nothing (can be switched on the device in System > Mail) |
 
-`alarms`: `events`（`"raised"`（既定）、`"cleared"`、`"acked"`）、`severities`（省くとすべて）、`min_interval_s`（同じアラームを
-この秒数より短い間隔では送らない。既定 60）、`subject`、`body`。
+`alarms`: `events` (`"raised"` (default), `"cleared"`, `"acked"`), `severities` (all when omitted), `min_interval_s` (the same alarm is
+not sent at intervals shorter than this number of seconds. Default 60), `subject`, `body`.
 
-- **件名・本文の `{名前}`**: タグの値（`{level}`）、`{project}`（プロジェクトの題名）、`{time}`、アラームの
-  `{alarm.name}` `{alarm.message}` `{alarm.severity}` `{alarm.value}` `{alarm.event}` `{alarm.time}` `{alarm.user}`。
-  ない名前はそのまま出ます。
-- **送信は別スレッド**で、画面もドライバーもメールサーバーを待ちません。サーバーに届かないときは待ち行列に残して送り直し、
-  サーバーがはっきり断ったとき（パスワード違い、宛先なし）はすぐにあきらめてログに書きます。
-  送信待ちは `logs/mail_queue.json` に残るので、**再起動しても消えません**（送信中に電源が切れたメールは、次の起動でもう一度送ります）。
-- **装置の System > Mail**（`mail` のあるプロジェクトに出ます）: 送信のオン / オフ、宛先、ユーザー名、パスワードを変えられ、
-  「Send a test mail」で試せます。結果（送れた / 送れなかった理由）が「State」に出ます。パスワードの欄はいつも空で、
-  空のまま Apply するとパスワードは変わりません。変更は `project.local.json`（`"mail"`）に残り、操作ログに記録されます（パスワードの値は記録しません）。
-  サーバー・暗号化の方式・差出人は、装置からは変えられません。
-- アクション: `{ "action": "call", "fn": "mail.send", "arg": "件名\n本文 {level}" }`（1 行目が件名）、`"mail.test"`。
-  タグ: `sys.mail.waiting`（送信待ちの数）、`sys.mail.error`（最後のメールが失敗している間 1）。
-- **安全のために**:
-  - ユーザー名とパスワードは、**暗号化された接続でしか送りません**。`starttls` でサーバーが STARTTLS を出さないとき、証明書が信頼できないときは、
-    何も送らずにやめます（`"security": "none"` を明示したときだけ平文で送り、ログと `--check` で知らせます）。
-  - 件名や宛先に入る値（タグ、アラームの文字）に改行があっても、ヘッダーや宛先を足すことはできません（改行を取り除き、アドレスは形を検査します）。
-  - パスワードは、待ち行列のファイル・ログ・画面・操作ログのどこにも出しません。`--check` とデザイナーは、プロジェクトのファイルに
-    パスワードが書かれていると知らせます。
-- `--check` の間は、メールを送らず、ファイルも書きません。
-- 対応していないもの: 添付ファイル、HTML メール、OAuth2（Gmail / Microsoft 365 の「アプリ パスワード」でないログイン）、
-  差出人の表示名。ログ（CSV）を外に出す機能は別です。
-- 確かめた範囲:
-  - 自作でないメールサーバー（aiosmtpd 1.4.6、WSL で起動）を相手に、Windows のランタイムから: STARTTLS + ログイン、最初から TLS、平文の 3 通りで
-    **メールが届くこと**、日本語の件名と本文・タグの値・1 行だけの `.` がサーバー側で元どおり読めること、アラームからの送信、
-    パスワード違い・ログインなし・信頼できない証明書・STARTTLS のないポートでは何も届かず理由が出ること、宛先の一部だけ断られたとき、
-    サーバーがいないときに待ち行列に残ること（`tools/mail_check/check.py`）。
-  - Windows と Raspberry Pi 4 から、公開のメールサーバー（smtp.gmail.com:587）に対して、STARTTLS と OS の証明書での検証まで
-    （ログインなしなので、送信はサーバーに断られます）。
-  - **確かめていないこと**: 各社のメールサービスにログインしての送信（Gmail、Microsoft 365 など）、Raspberry Pi からの実際の送信。
-- 上の確認をもう一度するには: WSL のフォルダーに `tools/mail_check/get.py`（aiosmtpd を取得する）と `smtpd.py` を置き、`localhost` 用のサーバー証明書
-  （`server.crt` / `server.key` と、それを署名した `ca.crt`）を作って `python3 smtpd.py` を起動し、Windows で
-  `python -I tools/mail_check/check.py <WSL のフォルダー> <ca.crt>` を実行します。サーバーは受け取ったメールをファイルに書くだけで、外へは送りません。
+- **`{name}` in the subject and the body**: the value of a tag (`{level}`), `{project}` (the title of the project), `{time}`, and of the alarm
+  `{alarm.name}` `{alarm.message}` `{alarm.severity}` `{alarm.value}` `{alarm.event}` `{alarm.time}` `{alarm.user}`.
+  A name that does not exist is output as it is.
+- **Sending runs on another thread**; neither the screen nor the drivers wait for the mail server. When the server cannot be reached, the mail stays in the queue and is sent again;
+  when the server clearly refuses (wrong password, no such recipient), the runtime gives up at once and writes it to the log.
+  The waiting mails are kept in `logs/mail_queue.json`, so **they survive a restart** (a mail that was being sent when the power went off is sent once more at the next start).
+- **System > Mail on the device** (it appears in projects with `mail`): you can change sending on / off, the recipients, the user name and the password, and
+  try it with "Send a test mail". The result (sent / the reason it was not sent) appears in "State". The password field is always empty, and
+  Apply with the field left empty does not change the password. Changes stay in `project.local.json` (`"mail"`) and are recorded in the operation log (the value of the password is not recorded).
+  The server, the kind of encryption and the sender cannot be changed from the device.
+- Actions: `{ "action": "call", "fn": "mail.send", "arg": "Subject\nBody {level}" }` (the first line is the subject), `"mail.test"`.
+  Tags: `sys.mail.waiting` (the number of mails waiting), `sys.mail.error` (1 while the last mail has failed).
+- **For safety**:
+  - The user name and the password are **sent only over an encrypted connection**. With `starttls`, when the server does not offer STARTTLS or the certificate cannot be trusted,
+    the runtime stops without sending anything (it sends in plain text only when `"security": "none"` is written explicitly, and the log and `--check` report it).
+  - Even when a value that goes into the subject or the recipients (a tag, the text of an alarm) contains line breaks, it cannot add headers or recipients (line breaks are removed, and the form of addresses is checked).
+  - The password appears nowhere: not in the queue file, the log, the screen or the operation log. `--check` and the designer report it when
+    a password is written in a file of the project.
+- During `--check`, no mail is sent and no file is written.
+- Not supported: attachments, HTML mail, OAuth2 (logins to Gmail / Microsoft 365 other than an "app password"),
+  a display name of the sender. Sending the logs (CSV) out is a separate feature.
+- What was checked:
+  - Against a mail server that is not ours (aiosmtpd 1.4.6, started in WSL), from the runtime on Windows: in the 3 ways STARTTLS + login, TLS from the start, and plain text,
+    **that the mail arrives**, that a Japanese subject and body, tag values and a line with only a `.` can be read unchanged on the server side, sending from an alarm,
+    that with a wrong password, without a login, with an untrusted certificate and on a port without STARTTLS nothing arrives and the reason is reported, the case that only a part of the recipients is refused,
+    and that the mail stays in the queue when there is no server (`tools/mail_check/check.py`).
+  - From Windows and a Raspberry Pi 4, against a public mail server (smtp.gmail.com:587), as far as STARTTLS and the verification with the certificates of the OS
+    (there is no login, so the server refuses the sending).
+  - **Not checked**: sending with a login to the mail services of the vendors (Gmail, Microsoft 365 and others), actual sending from a Raspberry Pi.
+- To repeat the check above: put `tools/mail_check/get.py` (it fetches aiosmtpd) and `smtpd.py` in a folder in WSL, make a server certificate for `localhost`
+  (`server.crt` / `server.key`, and the `ca.crt` that signed it), start `python3 smtpd.py`, and on Windows run
+  `python -I tools/mail_check/check.py <WSL folder> <ca.crt>`. The server only writes the mails it receives to files and sends nothing out.
 
-## ログを外に出す（`uploads`）
+## Uploading the logs (`uploads`)
 
-ログ（変数ロギング、アラーム、操作ログ、システムログ）を CSV ファイルにして、サーバーへ送ります。
+The logs (data log, alarms, operation log, system log) are made into CSV files and sent to a server.
 
 ```json
 "uploads": [
@@ -1180,58 +1199,58 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 ]
 ```
 
-| キー                  | 内容                                                                                              |
+| Key | Description |
 | --------------------- | ------------------------------------------------------------------------------------------------- |
-| `name`                | 名前（英数字、`_`、`-`。必須、重複不可）                                                            |
-| `url`                 | 送り先。`https://サーバー/フォルダー/`、`http://…`（暗号化なし）、`ftp://サーバー/フォルダー/`（暗号化なし、パッシブ） |
-| `method`              | HTTP: `"put"`（既定: `URL + ファイル名` に PUT）/ `"post"`（URL にそのまま POST。ファイル名は `Content-Disposition`） |
-| `username`、`password`| ログイン（HTTP は Basic 認証）。**パスワードはプロジェクトに書かず、装置の System > Upload で設定します** |
-| `logs`                | 送るもの: `"data:<グループ名>"`、`"alarms"`、`"operation"`、`"system"`                              |
-| `verify`、`ca_file`   | HTTPS のサーバー証明書を検証する（既定 `true`）。`ca_file` を省くと OS が信頼する証明書を使う       |
-| `timeout_ms`          | サーバーの応答を待つ時間（既定 30000）                                                              |
-| `retry_s`、`retries`  | 届かなかったときの再送: `retry_s` 秒後、その 2 倍後 …（既定 300 秒、3 回）                           |
-| `keep`                | 送信待ちのファイルの上限（既定 20）。超えたら古いものから消して、ログに書きます                     |
-| `enabled`             | `false` で送らない（装置の System > Upload で切り替えられる）                                       |
+| `name`                | Name (letters, digits, `_`, `-`. Required, no duplicates) |
+| `url`                 | The destination. `https://server/folder/`, `http://…` (not encrypted), `ftp://server/folder/` (not encrypted, passive) |
+| `method`              | HTTP: `"put"` (default: PUT to `URL + file name`) / `"post"` (POST to the URL as it is. The file name is in `Content-Disposition`) |
+| `username`, `password`| Login (HTTP uses Basic authentication). **The password is not written in the project; set it on the device in System > Upload** |
+| `logs`                | What is sent: `"data:<group name>"`, `"alarms"`, `"operation"`, `"system"` |
+| `verify`, `ca_file`   | Verify the server certificate of HTTPS (default `true`). Without `ca_file`, the certificates trusted by the OS are used |
+| `timeout_ms`          | The time to wait for an answer of the server (default 30000) |
+| `retry_s`, `retries`  | Resending when a file was not delivered: after `retry_s` seconds, then after 2 times that … (default 300 seconds, 3 times) |
+| `keep`                | The limit of files waiting to be sent (default 20). Beyond it, the oldest are deleted and this is written to the log |
+| `enabled`             | `false` sends nothing (can be switched on the device in System > Upload) |
 
-- **自動では送りません。** アクション `{ "action": "call", "fn": "upload.run", "arg": "<名前>" }`（`arg` を省くとすべて）で送ります。
-  上の例のようにスケジュールに入れると毎晩送れます（`catch_up` を付けると、その時刻に電源が切れていても次の起動時に送ります）。ボタンにも置けます。
-- 1 回の実行で、ログごとに 1 ファイルを `logs/upload/<名前>/` に書き出し、1 つずつ別スレッドで送ります（画面はサーバーを待ちません）。
-  ファイル名は `<プロジェクトの題名>_<ログ>_<YYYYMMDD-HHMMSS>.csv` です。中身は、そのときログに残っている全体です
-  （ログの量は、各ログの `retention_days` / `max_rows` で決まります）。
-- **送れたファイルは消し、送れなかったファイルは残します。** サーバーに届かないときは間隔を伸ばして送り直し、回数を使い切っても
-  ファイルは消さずに、次の `upload.run`・装置の再起動・パスワードの変更のときにまた送ります。サーバーがはっきり断ったとき
-  （パスワード違い、フォルダーなし）も同じで、原因を直せば送れます。
-- 装置の **System > Upload**（`uploads` のあるプロジェクトに出ます）: 送り先ごとに、送信のオン / オフ、ユーザー名、パスワードを変えられ、
-  「Send the logs now」ですぐ送れます。結果と送信待ちの数が出ます。パスワードの欄はいつも空で、空のまま Apply するとパスワードは変わりません。
-  変更は `project.local.json`（`"uploads": { "<名前>": … }`）に残り、操作ログに記録されます（パスワードの値は記録しません）。送り先の URL は装置からは変えられません。
-- タグ: `sys.upload.waiting`（送信待ちのファイル数）、`sys.upload.error`（最後のファイルが失敗している間 1）。
-- **安全のために**:
-  - `http://` と `ftp://` は暗号化されません。ファイルも、ユーザー名とパスワードも、ネットワーク上で読めます。起動時のログと `--check`、
-    デザイナーの問題一覧で知らせます。**外のネットワークへ送るときは `https://` を使ってください。**
-  - HTTPS では証明書を検証します。サーバーが別の URL へ移れと答えても（リダイレクト）、付いていきません（ファイルとパスワードを別の所へ送らないため）。
-  - FTP では、サーバーの返事に書かれたアドレスではなく、つないでいるサーバーへデータを送ります。
-  - URL にユーザー名・パスワード・`?`・`..` は書けません。ファイル名は英数字と `._-` だけにします。
-  - パスワードは `project.local.json` だけに置き、ログ・画面・操作ログには出しません。
-- `--check` の間は、ファイルを書かず、何も送りません。
-- 対応していないもの: FTPS / SFTP、差分だけの送信（毎回そのログの全体を送ります）、圧縮、OAuth などのトークン認証、プロキシ。
-- 大きなログ: ファイルは 16 KB ずつ読んで送るので、送信でメモリーは増えません。ただし CSV の書き出しは今ある書き出し機能と同じで、
-  UI スレッドで全行を読みます（10 万行で数秒かかることがあります）。夜間など、操作のない時刻に実行してください。
-- 確かめた範囲:
-  - 自作でないサーバー（Python 標準の `http.server`、pyftpdlib 2.2.0。WSL で起動）を相手に、Windows のランタイムから:
-    HTTP の PUT、HTTPS の PUT と POST（ログインあり）、FTP（パッシブ、ログインあり）で**ファイルが届き、中身が CSV として読めること**、
-    パスワード違い（HTTPS / FTP）・信頼できない証明書・サーバーの容量不足（507）・リダイレクト（301）・ないフォルダー・書き込み権限のないフォルダーでは
-    届かず、理由がログに出て、ファイルが残ること、残ったファイルが正しいパスワードでの次の起動で送られること、サーバーがいないときに残ること
-    （`tools/upload_check/check.py`、23 項目）。
-  - **確かめていないこと**: Raspberry Pi からの送信、インターネット上のサーバー（nginx の WebDAV、S3 の署名付き URL など）、10 万行のログ。
-- 上の確認をもう一度するには: メールの確認（「メールで知らせる」）と同じ WSL のフォルダーに `tools/upload_check/servers.py` を置き、
-  `python3 get.py . pyftpdlib pyasyncore pyasynchat` で FTP サーバーを取得して `python3 servers.py` を起動し、Windows で
-  `python -I tools/upload_check/check.py <WSL のフォルダー> <ca.crt>` を実行します。サーバーは 127.0.0.1 だけで待ち受け、受け取ったファイルを `received/` に置くだけです。
-  （Windows では `localhost` が先に IPv6 に解決され、WSL のサーバーへの接続に 2 秒ほど余計にかかります。確認では `127.0.0.1` を使っています。）
+- **Nothing is sent automatically.** The action `{ "action": "call", "fn": "upload.run", "arg": "<name>" }` sends (without `arg`, all of them).
+  Put in a schedule as in the example above, it sends every night (with `catch_up`, it sends at the next start even if the power was off at that time). It can also be put on a button.
+- One run writes one file per log to `logs/upload/<name>/` and sends them one by one on another thread (the screen does not wait for the server).
+  The file name is `<project title>_<log>_<YYYYMMDD-HHMMSS>.csv`. The content is everything that is in the log at that moment
+  (the amount of log is decided by the `retention_days` / `max_rows` of each log).
+- **A file that was sent is deleted; a file that could not be sent is kept.** When the server cannot be reached, the runtime sends again at growing intervals, and even when the retries are used up
+  it does not delete the file but sends it again at the next `upload.run`, at a restart of the device, or when the password is changed. The same holds when the server clearly refuses
+  (wrong password, no such folder): once the cause is fixed, the file can be sent.
+- **System > Upload** on the device (it appears in projects with `uploads`): for each destination you can change sending on / off, the user name and the password, and
+  send at once with "Send the logs now". The result and the number of files waiting are shown. The password field is always empty, and Apply with the field left empty does not change the password.
+  Changes stay in `project.local.json` (`"uploads": { "<name>": … }`) and are recorded in the operation log (the value of the password is not recorded). The URL of a destination cannot be changed from the device.
+- Tags: `sys.upload.waiting` (the number of files waiting), `sys.upload.error` (1 while the last file has failed).
+- **For safety**:
+  - `http://` and `ftp://` are not encrypted. The files, and the user name and the password, can be read on the network. The log at startup, `--check` and
+    the designer's list of problems report it. **Use `https://` when you send to an outside network.**
+  - With HTTPS the certificate is verified. When the server answers that the client should go to another URL (a redirect), the runtime does not follow (so that the file and the password are not sent somewhere else).
+  - With FTP, the data is sent to the server the runtime is connected to, not to the address written in the reply of the server.
+  - A URL cannot contain a user name, a password, `?` or `..`. File names are made of letters, digits and `._-` only.
+  - The password is kept only in `project.local.json` and does not appear in the log, on the screen or in the operation log.
+- During `--check`, no file is written and nothing is sent.
+- Not supported: FTPS / SFTP, sending only the difference (the whole of the log is sent every time), compression, token authentication such as OAuth, proxies.
+- Large logs: a file is read and sent 16 KB at a time, so sending does not increase the memory. However, the CSV export is the same as the existing export feature and
+  reads all rows on the UI thread (100,000 rows can take a few seconds). Run it at a time without operation, such as at night.
+- What was checked:
+  - Against servers that are not ours (`http.server` of the Python standard library, pyftpdlib 2.2.0. Started in WSL), from the runtime on Windows:
+    with HTTP PUT, HTTPS PUT and POST (with login), and FTP (passive, with login), **that the file arrives and its content can be read as CSV**,
+    that with a wrong password (HTTPS / FTP), an untrusted certificate, a server out of space (507), a redirect (301), a folder that does not exist and a folder without write permission
+    nothing arrives, the reason appears in the log and the file is kept, that a kept file is sent at the next start with the right password, and that the file is kept when there is no server
+    (`tools/upload_check/check.py`, 23 items).
+  - **Not checked**: sending from a Raspberry Pi, servers on the Internet (WebDAV of nginx, signed URLs of S3 and others), a log of 100,000 rows.
+- To repeat the check above: put `tools/upload_check/servers.py` in the same WSL folder as for the check of the mail ("Mail (`mail`)"),
+  fetch the FTP server with `python3 get.py . pyftpdlib pyasyncore pyasynchat`, start `python3 servers.py`, and on Windows run
+  `python -I tools/upload_check/check.py <WSL folder> <ca.crt>`. The servers listen only on 127.0.0.1 and only put the files they receive in `received/`.
+  (On Windows, `localhost` resolves to IPv6 first, and the connection to the servers in WSL takes about 2 seconds longer. The check uses `127.0.0.1`.)
 
-## 機器間のデータ転送
+## Data transfer between devices
 
-あるタグの値を別のタグに写します。タグは PLC につながっているので、PLC から別の PLC へ、PLC から上位（OPC UA、MQTT）へ、
-表示器を中継にして値を渡せます。
+The value of one tag is copied to another tag. Tags are connected to PLCs, so values can be passed from one PLC to another PLC, or from a PLC to a higher system (OPC UA, MQTT),
+with the display unit as the relay.
 
 ```json
 "transfers": [
@@ -1241,81 +1260,81 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 ]
 ```
 
-| キー           | 内容                                                                                                   |
+| Key | Description |
 | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `name`         | 名前（必須、64 文字まで、重複不可）。装置の画面とログに出ます                                           |
-| `from`、`to`   | 値を取るタグ、書くタグ。`to` に `sys.*`（ランタイムのタグ）は書けません                                 |
-| `trigger`      | `"change"`（既定: 転送元が変わったとき）/ `"cyclic"`（変わったとき + `every_ms` ごと）                   |
-| `every_ms`     | `cyclic` の周期（既定 1000、100 以上）                                                                  |
-| `scale`、`offset` | 書く値 = 転送元の値 × `scale` + `offset`（既定 1 と 0）                                              |
-| `out_of_range` | 転送先のタグの `min` / `max` を外れた値: `"skip"`（既定: 書かない）/ `"clamp"`（近いほうの限界値を書く） |
-| `when`         | 条件（省略可）: タグ名（0 でない間）、または `{ "tag": "mode", "eq": 2 }`（`eq ne gt lt ge le`、相手は数値・文字・`{ "tag": ... }`） |
-| `enabled`      | `false` で、残したまま実行しない                                                                        |
+| `name`         | Name (required, up to 64 characters, no duplicates). It appears on the screen of the device and in the log |
+| `from`, `to`   | The tag the value is taken from, the tag it is written to. `sys.*` (tags of the runtime) cannot be written in `to` |
+| `trigger`      | `"change"` (default: when the source changes) / `"cyclic"` (when it changes + every `every_ms`) |
+| `every_ms`     | The period of `cyclic` (default 1000, at least 100) |
+| `scale`, `offset` | Written value = source value × `scale` + `offset` (default 1 and 0) |
+| `out_of_range` | A value outside the `min` / `max` of the destination tag: `"skip"` (default: not written) / `"clamp"` (the nearer limit is written) |
+| `when`         | Condition (optional): a tag name (while it is not 0), or `{ "tag": "mode", "eq": 2 }` (`eq ne gt lt ge le`; the other side is a number, a string or `{ "tag": ... }`) |
+| `enabled`      | `false` keeps the transfer but does not run it |
 
-- 値は転送先のタグの型に合わせます（整数へは四捨五入、bool へは 0 かどうか、文字へは表示どおり、文字からは全体が数値のときだけ）。
-  **数値でない値、NaN、無限大、転送先のタグの上下限を外れた値は書きません。**
-- `change` は転送元が変わったときだけ書きます（転送先がほかで書き換えられても、そのままです）。
-  `cyclic` は周期ごとに見て、転送先の値が違っていれば書き直します（同じ値を何度も送ることはしません）。
-- **切断中は書きません。** どちらかのタグのドライバー（Modbus、SLMP、FINS、MQTT、OPC UA クライアント）がつながっていない間は
-  何も書かず、**再接続のあとは値を読み直してから、最新の値で再開します**。切断前に読んだ古い値を、あとから書くことはありません
-  （周期で読むドライバーは 1 周読み終わるまで、MQTT / OPC UA クライアントは値が届くか 2 秒たつまで待ちます）。
-  起動時も同じで、PLC から読む前の初期値（0）を相手に書くことはありません。
-- 条件（`when`）が成り立たない間は書かず、成り立ったときに、そのときの値を書きます。
-- **輪になった転送（A → B → A）は実行しません**（起動時のログ、`--check`、デザイナーの問題一覧に出ます）。
-- 書き込みは各ドライバーの決まりに従います（読み取り専用の割り付けには書かれません）。上限は 500 件です。
-- 装置のシステム設定 **System > Transfers**（`transfers` のあるプロジェクトに出ます）に、転送ごとの状態と、動いていない理由
-  （`source offline (plc1)`、`out of range` など）、書いた回数が出ます。表示だけで、設定は変えられません。
-  状態が変わると、ログにまとめて 1 行出ます（`transfers: 3 of 100 do not run: 3 destination offline (plc2);`）。
-- 接続の単位はドライバーです。Modbus のシリアルで 1 台だけ応答しない、といった機器ごとの区別はしません。
-  MQTT へ送る値と、読み取りのない割り付けは、再接続のあとに同じ値をもう一度送ることはしません。
-- 速さの目安（PC、Karakuri が相手、各ドライバーの周期 100 ms）: 転送元の変化から転送先に届くまで 100〜200 ms。
-  転送が 100 件あっても変わりません。
+- The value is converted to the type of the destination tag (to an integer by rounding, to a bool by whether it is 0, to a string as displayed, from a string only when the whole of it is a number).
+  **Values that are not numbers, NaN, infinity, and values outside the limits of the destination tag are not written.**
+- `change` writes only when the source changes (when the destination is changed by something else, it stays that way).
+  `cyclic` looks every period and writes again when the value of the destination differs (it does not send the same value again and again).
+- **Nothing is written while disconnected.** While the driver of either tag (Modbus, SLMP, FINS, MQTT, OPC UA client) is not connected,
+  nothing is written, and **after a reconnection the values are read again first, and the transfer resumes with the latest value**. An old value read before the disconnection is never written later
+  (a driver that reads cyclically waits until one full round is read; the MQTT / OPC UA clients wait until a value arrives or 2 seconds pass).
+  It is the same at startup: the initial value (0) from before the PLC is read is never written to the other side.
+- While the condition (`when`) does not hold, nothing is written; when it becomes true, the value of that moment is written.
+- **Transfers that form a loop (A → B → A) are not run** (they appear in the log at startup, in `--check`, and in the designer's list of problems).
+- Writing follows the rules of each driver (a read-only mapping is not written). The limit is 500 transfers.
+- In the system settings of the device, **System > Transfers** (it appears in projects with `transfers`) shows the state of each transfer, the reason why it does not run
+  (`source offline (plc1)`, `out of range` and so on), and the number of writes. It only displays; the settings cannot be changed.
+  When the state changes, one summary line is written to the log (`transfers: 3 of 100 do not run: 3 destination offline (plc2);`).
+- The unit of connection is the driver. Individual devices are not told apart, such as one unit on a Modbus serial line that does not answer.
+  Values sent to MQTT, and mappings that are not read, are not sent again with the same value after a reconnection.
+- A guide to the speed (PC, against Karakuri, period of each driver 100 ms): 100 to 200 ms from the change of the source until it arrives at the destination.
+  This does not change with 100 transfers.
 
-## 音（タッチ音・アラーム音）
+## Sound (touch sound, alarm sound)
 
-`"sound"` を書くと、タッチしたときと新しいアラームのときに音を出します。書かなければ何も鳴りません。
+With `"sound"`, the device makes a sound on a touch and on a new alarm. Without it, nothing sounds.
 
 ```json
 "sound": { "volume": 80, "touch": "click", "alarm": "alarm", "alarm_every_s": 3 }
 ```
 
-| キー              | 内容                                                                                              |
+| Key | Description |
 | ----------------- | ------------------------------------------------------------------------------------------------- |
-| `output`          | `"auto"`（既定）/ `"audio"`（Windows: 既定の音声デバイス、Linux: ALSA）/ `"gpio"`（GPIO のブザー、Linux）/ `"none"`。`auto` は `gpio` があればブザー、なければ audio |
-| `volume`、`mute`  | 音量 0〜100（既定 80）と消音。ブザーに音量はありません                                             |
-| `touch`           | タッチ音: `"click"`（既定）、`"beep"`、`"alarm"`、プロジェクトの WAV ファイル、または `false`        |
-| `alarm`           | 新しいアラームの音: 同じ書き方（既定 `"alarm"`）                                                    |
-| `alarm_every_s`   | アラームが確認されるまで、この秒数ごとに鳴らし直す（既定 3、0 = 1 回だけ）                           |
-| `device`          | Linux: ALSA のデバイス名（既定 `"default"`。例 `"plughw:1,0"`）                                     |
-| `gpio`、`gpio_active_low`、`gpio_chip` | ブザーをつないだ GPIO の番号（Raspberry Pi: GPIO 番号）、Low で鳴るブザーか、チップ（既定 `/dev/gpiochip0`） |
+| `output`          | `"auto"` (default) / `"audio"` (Windows: the default audio device, Linux: ALSA) / `"gpio"` (a buzzer on a GPIO, Linux) / `"none"`. `auto` is the buzzer when `gpio` is given, otherwise audio |
+| `volume`, `mute`  | Volume 0 to 100 (default 80) and mute. A buzzer has no volume |
+| `touch`           | Touch sound: `"click"` (default), `"beep"`, `"alarm"`, a WAV file of the project, or `false` |
+| `alarm`           | The sound of a new alarm: written the same way (default `"alarm"`) |
+| `alarm_every_s`   | Sounds again every this many seconds until the alarm is acknowledged (default 3, 0 = only once) |
+| `device`          | Linux: the ALSA device name (default `"default"`. Example `"plughw:1,0"`) |
+| `gpio`, `gpio_active_low`, `gpio_chip` | The number of the GPIO the buzzer is connected to (Raspberry Pi: the GPIO number), whether the buzzer sounds on Low, the chip (default `/dev/gpiochip0`) |
 
-- **タッチ音**は、クリックとして受け付けられたときに鳴ります（ボタン、スイッチ、入力欄など。何もしないパネルや、
-  指でスクロールしたとき、無効な部品では鳴りません）。
-- **アラーム音**は、確認待ちのアラームが増えたときに鳴り始め、すべて確認されるまで繰り返します
-  （原因が消えても、確認するまで鳴ります）。起動時にすでにあったアラームでは鳴りません。
-- タグ: `sys.sound.mute`（消音）、`sys.sound.volume`（音量）、`sys.sound.alarm`（アラーム音が鳴っている間 1。
-  **0 を書くと、次の新しいアラームまで止まります**: 「ブザー停止」ボタン）。外から 1 にはできません。
-- アクション: `{ "action": "call", "fn": "sound.play", "arg": "beep" }`（`arg` は内蔵の音か WAV ファイル）、
-  `"sound.stop"`、`"sound.silence"`（アラーム音を止める）。アラーム音が鳴っている間、ほかの音は割り込みません。
-- **音のファイル**は、プロジェクトのフォルダーの中の `.wav`（PCM、8 / 16 ビット、モノラル / ステレオ、4 MB まで。
-  30 秒より長い分は切ります）。フォルダーの外、圧縮された WAV、MP3 などは鳴りません（`--check` が見つけます）。
-- 装置のシステム設定 **System > Sound** で、消音・音量を変え、試しに鳴らせます。変えた値は `project.local.json`
-  （`"sound": { "mute": ..., "volume": ... }`）に残り、プロジェクトの値と同じに戻すと消えます。
-- **音の出口がない装置でも、そのまま動きます**（音声デバイスや GPIO を開けなければ、ログに 1 回書いて、鳴らさないだけです。
-  `sys.sound.alarm` は変わらず動くので、画面のランプには使えます）。
-- Linux の audio は ALSA（`libasound.so.2`）を実行時に読み込みます（ビルドには要りません）。GPIO のブザーは、
-  電圧をかけると鳴るタイプ（アクティブブザー）を、GPIO の文字デバイス（`/dev/gpiochipN`）で On / Off します。
-  実行するユーザーが `audio` / `gpio` グループに入っている必要があります。
-- **Raspberry Pi のイヤホン端子**: ALSA の既定の出力先（`"default"`）は、ふつう HDMI です。イヤホン端子（3.5 mm）に出すには
-  `"device": "plughw:CARD=Headphones,DEV=0"` と書きます（カードの名前は `aplay -L` で見られます）。
-- 確認した範囲: Raspberry Pi 4 のイヤホン端子で、アラーム音が鳴る・確認すると止まる・新しいアラームでまた鳴る・
-  Silence で止まることを、耳で聞いて確かめました。GPIO のブザーは、線が音に合わせて切り替わることまで（実物のブザーは未確認）、
-  Windows は音声デバイスへの再生命令が通ることまでです（耳での確認はしていません）。
+- The **touch sound** plays when a touch is accepted as a click (buttons, switches, input fields and so on. It does not play on a panel that does nothing,
+  when scrolling with a finger, or on a disabled widget).
+- The **alarm sound** starts when the number of alarms waiting to be acknowledged grows, and repeats until all are acknowledged
+  (it sounds until the acknowledgement, even when the cause is gone). It does not sound for alarms that already exist at startup.
+- Tags: `sys.sound.mute` (mute), `sys.sound.volume` (volume), `sys.sound.alarm` (1 while the alarm sound is sounding.
+  **Writing 0 stops it until the next new alarm**: a "Silence buzzer" button). It cannot be set to 1 from outside.
+- Actions: `{ "action": "call", "fn": "sound.play", "arg": "beep" }` (`arg` is a built-in sound or a WAV file),
+  `"sound.stop"`, `"sound.silence"` (stops the alarm sound). While the alarm sound is sounding, other sounds do not interrupt it.
+- **Sound files** are `.wav` files inside the project folder (PCM, 8 / 16 bit, mono / stereo, up to 4 MB.
+  The part beyond 30 seconds is cut). Files outside the folder, compressed WAV, MP3 and so on do not play (`--check` finds them).
+- In the system settings of the device, **System > Sound** changes mute and volume and plays a test sound. The changed values stay in `project.local.json`
+  (`"sound": { "mute": ..., "volume": ... }`), and disappear when they are set back to the values of the project.
+- **A device without a sound output runs as it is** (when the audio device or the GPIO cannot be opened, the runtime writes it to the log once and just makes no sound.
+  `sys.sound.alarm` works unchanged, so it can be used for a lamp on a screen).
+- On Linux, audio loads ALSA (`libasound.so.2`) at run time (it is not needed for the build). The GPIO buzzer is
+  the type that sounds when a voltage is applied (an active buzzer), switched on / off through the GPIO character device (`/dev/gpiochipN`).
+  The user that runs the runtime must be in the `audio` / `gpio` groups.
+- **The headphone jack of the Raspberry Pi**: the default output of ALSA (`"default"`) is usually HDMI. To output to the headphone jack (3.5 mm),
+  write `"device": "plughw:CARD=Headphones,DEV=0"` (the names of the cards are shown by `aplay -L`).
+- What was checked: on the headphone jack of a Raspberry Pi 4, that the alarm sound sounds, stops on acknowledgement, sounds again on a new alarm, and
+  stops with Silence, was checked by ear. The GPIO buzzer is checked only as far as the line switching in time with the sound (a real buzzer is not checked),
+  and Windows only as far as the playback command to the audio device being accepted (it was not checked by ear).
 
-## 多言語表示とフォント
+## Languages and fonts
 
-画面の文字を複数の言語で持ち、装置で切り替えられます。日本語などラテン文字以外には、その文字があるフォントを
-プロジェクトに入れます。
+The texts on the screens can be held in several languages and switched on the device. For Japanese and other scripts that are not Latin, put a font
+that has those characters into the project.
 
 ```json
 "languages": ["ja", "en"],
@@ -1327,55 +1346,55 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 }
 ```
 
-| キー        | 内容                                                                                          |
+| Key | Description |
 | ----------- | --------------------------------------------------------------------------------------------- |
-| `languages` | 言語コード。最初のものが既定で、訳がないときもその言語を表示する                                |
-| `language`  | 起動時の言語（既定: 最初のもの）                                                              |
-| `texts`     | ID ごとの各言語のテキスト                                                                     |
-| `font.file` | すべての文字に使う TTF / OTF（どの大きさでも使える）。省略時は組み込みの Montserrat（ラテン文字のみ） |
+| `languages` | Language codes. The first one is the default, and its text is also shown when a translation is missing |
+| `language`  | The language at startup (default: the first one) |
+| `texts`     | The texts of each language, by ID |
+| `font.file` | A TTF / OTF used for all characters (usable at any size). When omitted, the built-in Montserrat (Latin characters only) |
 
-- 部品の `text` / `placeholder` / `options` の各項目、アラーム・レシピ・トレンド部品の `labels`、アラームの `message` に
-  `"@ID"` と書くと、その言語のテキストになります。`texts` にない ID はそのまま表示され（既存の `"@..."` を壊さない）、
-  `"@@"` は `"@"` 1 文字です。
-- 言語はタグ `sys.lang` です。動作 `{ "action": "language", "lang": "en" }`（`"next"` で次の言語）や、`sys.lang` に連動した
-  部品、Lua で書き換えると、画面を作り直してその言語で表示します（表示中の画面と「戻る」の履歴はそのまま。スクリプトの
-  状態も保たれます）。`sys.languages` に一覧（`ja,en`）があります。
-- アラームの記録には、その時点の言語のメッセージが残ります。
-- 組み込みのシステム設定画面とログイン画面は英語のままです。
-- フォントのファイルがあれば、各大きさの字形はそのファイルから作られ（TinyTTF）、ファイルにない文字（`LV_SYMBOL_*` の
-  アイコンなど）は組み込みのフォントで表示します。字形は最初に表示するときに作られ、キャッシュされます。
-- 日本語のフォントは大きいので、`tools/subset_font.py` で使う文字だけにした小さなファイルを作れます
-  （ASCII・かな・記号・JIS 第 1 水準漢字で約 1.2 MB。`--jis2` で第 2 水準、`--text` でプロジェクトの文字を追加）。
-  デモには Noto Sans JP のサブセット（SIL Open Font License。`projects/demo/assets/fonts/OFL.txt`）が入っています。
-  フォントを同梱するときは、ライセンスの条件（著作権表示とライセンス文を添える、フォント単体で販売しない）を守ってください。
+- Write `"@ID"` in the `text` / `placeholder` / each item of `options` of a widget, in the `labels` of the alarm, recipe and trend widgets, or in the `message` of an alarm,
+  and it becomes the text of the current language. An ID that is not in `texts` is displayed as it is (so that existing `"@..."` texts do not break), and
+  `"@@"` is the single character `"@"`.
+- The language is the tag `sys.lang`. When it is changed by the action `{ "action": "language", "lang": "en" }` (`"next"` for the next language), by a widget bound to `sys.lang`,
+  or by Lua, the screens are rebuilt and displayed in that language (the displayed screen and the "back" history stay as they are. The state of
+  the scripts is also kept). `sys.languages` has the list (`ja,en`).
+- The alarm record keeps the message in the language of that moment.
+- The built-in system settings screens and the login screen stay in English.
+- When there is a font file, the glyphs of each size are made from that file (TinyTTF), and characters that are not in the file (such as the `LV_SYMBOL_*`
+  icons) are displayed with the built-in font. Glyphs are made when they are first displayed, and cached.
+- Japanese fonts are large, so `tools/subset_font.py` can make a small file with only the characters in use
+  (about 1.2 MB with ASCII, kana, symbols and the JIS level 1 kanji. `--jis2` adds level 2, `--text` adds the characters of a project).
+  The demo contains a subset of Noto Sans JP (SIL Open Font License. `projects/demo/assets/fonts/OFL.txt`).
+  When you bundle a font, keep the conditions of its license (include the copyright notice and the license text, do not sell the font by itself).
 
 ```
 python -I tools/subset_font.py NotoSansJP-Regular.otf projects/myhmi/assets/fonts/NotoSansJP-subset.otf --text projects/myhmi/project.json projects/myhmi/screens/*.json
 ```
 
-**デザイナーには日本語フォント（Noto Sans JP のサブセット、SIL Open Font License）が付いています**（`<デザイナーのフォルダー>/fonts/`）。
-ランタイムの組み込みフォントは欧文だけなので、日本語を出すプロジェクトには次のどちらかで入れます。フォントとライセンス文が
-プロジェクトの `assets/fonts/` にコピーされ、`font.file` が設定されます（デプロイやプロジェクトファイルにも一緒に入ります）。
+**The designer comes with a Japanese font (a subset of Noto Sans JP, SIL Open Font License)** (`<designer folder>/fonts/`).
+The built-in font of the runtime is Latin only, so put the font into a project that shows Japanese in one of the following two ways. The font and the license text are
+copied to `assets/fonts/` of the project, and `font.file` is set (they also go into deploys and project files).
 
-- 新規作成のダイアログの「日本語フォント」（デザイナーを日本語で表示しているときは既定でオン）
-- プロジェクト タブ > フォント の「日本語フォントを入れる（Noto Sans JP）」
+- "Japanese font" in the dialog for a new project (on by default when the designer is displayed in Japanese)
+- "Add the Japanese font (Noto Sans JP)" in the Project tab > Font
 
-日本語の文字があるのにフォントが未設定のプロジェクトは、問題一覧に出ます。
+A project that has Japanese characters but no font set appears in the list of problems.
 
-デザイナーでは「多言語テキスト」タブ（Ctrl+8）で ID と各言語の訳を表で編集でき、表計算ソフトとの取り込み / 書き出し
-（翻訳者に渡す用）、キャンバスに表示する言語の切り替えもできます。訳がないテキスト、`texts` にない `"@ID"`、元の言語より
-かなり長い訳（収まらないかもしれない）は問題一覧に出ます。フォントはプロジェクト タブの「フォント」で指定します。
+In the designer, the "Texts" tab (Ctrl+8) edits the IDs and the translations of each language in a table, and can also import from / export to spreadsheet software
+(to hand to a translator) and switch the language shown on the canvas. Texts without a translation, `"@ID"` that is not in `texts`, and translations
+much longer than the original language (they may not fit) appear in the list of problems. The font is set under "Font" in the Project tab.
 
-LVGL 9.4 の TinyTTF には不具合が 2 つあり、ランタイムは回避しています: フォントにない文字を求めるとキャッシュの要素が
-二重に解放される（フォントの文字表 `cmap` を自分で読み、ある文字だけを TinyTTF に求める）、カーニングのキャッシュが
-解放済みの要素を使い、一部の文字の送り幅が別の字形のものになる（カーニングを使わず、送り幅は `hmtx` から求める）。
-どちらも AddressSanitizer と表示の確認で見つけたものです（`src/font_cmap.hpp`）。LVGL 9.6 ではどれも起きなくなりましたが、
-回避は残しています（負担が小さく、カーニングはこのフォントでは文字の配置がかなり遅くなるため）。
+TinyTTF of LVGL 9.4 has 2 defects, and the runtime works around them: asking for a character that is not in the font frees a cache entry
+twice (the runtime reads the character table `cmap` of the font itself and asks TinyTTF only for characters that exist), and the kerning cache
+uses a freed entry, so that the advance width of some characters becomes that of another glyph (the runtime does not use kerning and takes the advance width from `hmtx`).
+Both were found with AddressSanitizer and by checking the display (`src/font_cmap.hpp`). With LVGL 9.6 neither happens any more, but
+the workarounds stay (their cost is small, and with this font kerning makes the layout of text considerably slower).
 
-## ユーザー管理
+## Users
 
-ユーザーごとにレベルを決め、レベルが足りないユーザーには画面やウィジェットを操作させないようにできます。
-project.json に `users` を書いたときだけ有効で、書かなければ今までどおり何も制限されません。
+Each user has a level, and users whose level is too low can be kept from operating screens and widgets.
+This is active only when `users` is written in project.json; without it, nothing is restricted, as before.
 
 ```json
 "users": {
@@ -1392,19 +1411,19 @@ project.json に `users` を書いたときだけ有効で、書かなければ�
 }
 ```
 
-| キー            | 既定値                          | 内容                                                                              |
+| Key | Default | Description |
 | --------------- | ------------------------------- | --------------------------------------------------------------------------------- |
-| `levels`        | Operator / Maintenance / Admin  | レベル 1, 2, 3 … の名前（最大 9）。レベル 0 は「誰もログインしていない」          |
-| `list`          |                                 | ユーザー（最大 16）。`name`（16 文字まで）、`level`、`pin`（4〜8 桁の数字）       |
-| `auto_logout_s` | `300`                           | この秒数だけ操作がないと自動でログアウト（`0` = しない）                          |
-| `max_failures`  | `5`                             | PIN を続けてこの回数まちがえると、そのユーザーをロック                            |
-| `lock_s`        | `60`                            | ロックの時間（秒）                                                                |
-| `system_level`  | いちばん高いレベル              | システム設定画面を開くのに必要なレベル（`0` = 制限なし）                          |
-| `enabled`       | `true`                          | `false` で設定を残したまま無効にする                                              |
+| `levels`        | Operator / Maintenance / Admin  | The names of the levels 1, 2, 3 … (up to 9). Level 0 is "nobody is logged in" |
+| `list`          |                                 | The users (up to 16). `name` (up to 16 characters), `level`, `pin` (4 to 8 digits) |
+| `auto_logout_s` | `300`                           | Automatic logout after this many seconds without operation (`0` = never) |
+| `max_failures`  | `5`                             | This many wrong PINs in a row lock that user |
+| `lock_s`        | `60`                            | The time of the lock (seconds) |
+| `system_level`  | The highest level               | The level needed to open the system settings screens (`0` = no restriction) |
+| `enabled`       | `true`                          | `false` disables it while keeping the settings |
 
-**レベルの指定**
+**Setting the levels**
 
-画面とウィジェットに `level`（必要な最低レベル）を書きます。
+Write `level` (the lowest level needed) on screens and widgets.
 
 ```json
 { "name": "settings", "level": 2, "children": [ ... ] }
@@ -1414,188 +1433,188 @@ project.json に `users` を書いたときだけ有効で、書かなければ�
 { "type": "numeric_display", "input": true, "bind": "setpoint", "level": 2, "level_deny": "login" }
 ```
 
-- **画面の `level`**: レベルが足りないユーザーがその画面へ移動しようとすると、ログイン画面が出ます。
-  十分なレベルでログインすると、そのまま目的の画面へ進みます。ログアウトしたとき（自動ログアウトを含む）に
-  表示中の画面が見られなくなった場合は、開始画面へ戻ります。
-- **ウィジェットの `level`**: レベルが足りないあいだの扱いを `level_deny` で選びます。
+- **`level` of a screen**: when a user whose level is too low tries to go to that screen, the login screen appears.
+  After a login with a sufficient level, the runtime goes on to that screen. When, after a logout (including the automatic logout),
+  the displayed screen may no longer be seen, the runtime goes back to the start screen.
+- **`level` of a widget**: `level_deny` selects what happens while the level is too low.
 
-  | `level_deny`       | レベルが足りないとき                                               |
+  | `level_deny`       | When the level is too low |
   | ------------------ | ------------------------------------------------------------------ |
-  | `disable`（既定）  | 無効表示（薄くなる）になり、操作できない                           |
-  | `hide`             | 表示しない                                                         |
-  | `login`            | 見た目は通常どおり。触るとログイン画面が出る（操作は行われない）   |
+  | `disable` (default) | Shown as disabled (dimmed), and cannot be operated |
+  | `hide`             | Not displayed |
+  | `login`            | Looks as usual. Touching it brings up the login screen (the operation is not performed) |
 
-  `level` はそのウィジェット自身にかかります。パネルに付けた場合、`hide` は中身ごと隠れますが、
-  `disable` は中のウィジェットには及ばないので、操作させたくないウィジェットそれぞれに付けてください。
-- **システム設定画面**は `system_level` 以上でないと開けません（鍵の管理やドライバ設定を含む全ページ）。
+  `level` applies to that widget itself. On a panel, `hide` hides it together with its content, but
+  `disable` does not reach the widgets inside, so put it on each widget that must not be operated.
+- The **system settings screens** can be opened only with `system_level` or higher (all pages, including the key management and the driver settings).
 
-**ログイン**
+**Login**
 
-ログイン画面は組み込みです。左の一覧からユーザーを選び、テンキーで PIN を入れて OK を押します。
-`{ "action": "login" }` で開けるほか、レベルが必要な操作をしたときに自動で出ます。ログイン中は右上に
-Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトできます。
+The login screen is built in. Select a user in the list on the left, enter the PIN on the numeric keypad and press OK.
+It opens with `{ "action": "login" }`, and also appears by itself when an operation needs a level. While somebody is logged in, a
+Logout button appears at the top right. `{ "action": "logout" }` also logs out.
 
-画面からは次のタグを使えます（OPC UA には公開されません）。
+Screens can use the following tags (they are not published to OPC UA).
 
-| タグ                  | 内容                                          |
+| Tag | Meaning |
 | --------------------- | --------------------------------------------- |
-| `sys.user.name`       | ログイン中のユーザー名（いなければ空）        |
-| `sys.user.level`      | レベル（`0` = ログインしていない）            |
-| `sys.user.level_name` | レベルの名前                                  |
-| `sys.user.logged_in`  | ログイン中なら true                           |
+| `sys.user.name`       | The name of the logged-in user (empty when there is none) |
+| `sys.user.level`      | The level (`0` = not logged in) |
+| `sys.user.level_name` | The name of the level |
+| `sys.user.logged_in`  | true while somebody is logged in |
 
-たとえば `"bind": { "visible": { "tag": "sys.user.level", "ge": 2 } }` で、表示だけを切り替えることもできます。
+For example, `"bind": { "visible": { "tag": "sys.user.level", "ge": 2 } }` switches only the visibility.
 
-**装置の画面でユーザーを編集する**
+**Editing users on the screen of the device**
 
-システム設定の Users ページで、ユーザーの追加・変更（レベル、PIN）・削除ができます。
+The Users page of the system settings adds, changes (level, PIN) and deletes users.
 
-- 追加: Name・Level・PIN を入れて Save。変更: 一覧の Edit で Name と Level が入るので、直して Save
-  （PIN を空のままにすると、今の PIN のまま）。削除: Delete を押し、確認でもう一度 Delete。
-- システム設定を開けるユーザー（`system_level` 以上）の最後の 1 人は、削除もレベルを下げることもできません。
-- システム設定の操作（`system.do` / `system.apply`: タグへの書き込み、デバイスモニター、プロジェクトのインストールなど）は、
-  画面だけでなく操作そのものも `system_level` を確かめます。プロジェクトの画面のボタンやスクリプトから呼んでも、
-  レベルが足りなければ何もしません（システムログに警告が残ります）。
-- 装置で編集すると、その装置は自分のユーザー一覧（`project.local.json` の `users`）を使うようになり、
-  **project.json の `list` は使われなくなります**。デプロイしても装置の一覧は残ります。デザイナーの Deploy
-  ダイアログにその旨が表示され、「local settings」にチェックを入れてデプロイすると project.json の一覧に戻せます。
+- Add: enter Name, Level and PIN, then Save. Change: Edit in the list fills in Name and Level; correct them, then Save
+  (with the PIN left empty, the current PIN stays). Delete: press Delete, and Delete once more at the confirmation.
+- The last user who can open the system settings (`system_level` or higher) can neither be deleted nor have the level lowered.
+- For the operations of the system settings (`system.do` / `system.apply`: writing to a tag, the device monitor, installing a project and so on),
+  not only the screen but the operation itself checks `system_level`. Called from a button of a project screen or from a script,
+  they do nothing when the level is too low (a warning stays in the system log).
+- Once the users are edited on the device, that device uses its own list of users (`users` in `project.local.json`), and
+  **the `list` of project.json is no longer used**. The list of the device stays after a deploy. The Deploy dialog of the designer
+  says so, and a deploy with "local settings" checked goes back to the list of project.json.
 
-**PIN の保存について**
+**How the PIN is stored**
 
-- デザイナーと装置の画面で設定した PIN は、ソルト付きの SHA-256 ハッシュ（`pin_hash`）で保存され、
-  ファイルに数字は残りません。手で書くときは `"pin": "1234"` と平文で書くこともできます。
-- PIN は桁数が少ないので、ハッシュは「うっかり読めてしまう」ことを防ぐ程度のものです。プロジェクトの
-  ファイルを手に入れた人は総当たりで PIN を割り出せます。強い秘密を守る仕組みではありません。
-- ログイン画面で押したキーは操作ログに記録されません。
+- A PIN set in the designer or on the screen of the device is stored as a salted SHA-256 hash (`pin_hash`), and
+  no digits stay in the file. When you write it by hand, you can also write plain text, `"pin": "1234"`.
+- A PIN has few digits, so the hash only prevents it from being "read by accident". Somebody who gets hold of the
+  project file can find the PIN by brute force. It is not a mechanism that protects a strong secret.
+- The keys pressed on the login screen are not recorded in the operation log.
 
-レベルや `auto_logout_s` などの設定の変更は、ランタイムの再起動で反映されます。
+Changes to settings such as the levels and `auto_logout_s` take effect at a restart of the runtime.
 
-## システム設定画面
+## The system settings screens
 
-ランタイムは project.json とは別に、組み込みの「System」メニュー画面（`__system`）と設定ページ画面
-（`__system_<id>`）を自動生成します。画面のボタンから `{ "action": "system" }` で開けます。
+Apart from project.json, the runtime generates a built-in "System" menu screen (`__system`) and settings page screens
+(`__system_<id>`) by itself. A button on a screen opens them with `{ "action": "system" }`.
 
-| ページ | 内容 |
+| Page | Meaning |
 |---|---|
-| About | ホスト名、IP アドレス、プロジェクト、表示バックエンド、ビルド情報（表示のみ） |
-| Network | NetworkManager (`nmcli`) のある Linux で、インターフェース、DHCP / 固定 IP、アドレス (CIDR)、ゲートウェイ、DNS を設定。Apply で `nmcli connection modify` + `up` を実行（一般ユーザーでは polkit が認証を求めるので `sudo -n` で再試行。`tools/rpi/hml.sudoers` を入れておく）。接続中の IP を変えると SSH が切れます。Windows では表示のみ |
-| Keys | SSH の鍵の管理（Linux の fbdev / drm バックエンドで表示）。デプロイに使う鍵の登録・削除 →「鍵の管理」 |
-| Users | ユーザーの追加・変更・削除（project.json に `users` があるとき）→「ユーザー管理」 |
-| Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
-| Sound | 消音、音量、試しに鳴らす、出力先の表示（`sound` があるとき）→「音」 |
-| Transfers | 機器間のデータ転送の状態と、動いていない理由（`transfers` があるとき。表示のみ）→「機器間のデータ転送」 |
-| Upload | ログの送信: 送り先ごとのオン / オフ、ログイン、今すぐ送る、送信の状態（`uploads` があるとき）→「ログを外に出す」 |
-| Mail | メール通知のオン / オフ、宛先、ログイン、テスト送信、送信の状態（`mail` があるとき）→「メールで知らせる」 |
-| Schedule | スケジュールの一覧と次の実行時刻。予定を押して時刻・曜日・オン / オフを変える（`schedules` があるとき）→「スケジュール」 |
-| Tags | すべてのタグの今の値を一覧で見る（8 件ずつ、名前の一部で絞り込み。`sys.` と入れるとランタイム自身のタグ）。行を押すと、そのタグに値を書き込める（bool は TRUE / FALSE のボタン、数値は数字のキーパッド、文字列はキーボード。絞り込みは「x」で消す）。立ち上げと保守で、画面を作っていない値を確かめる・変えるためのもの。書き込みはタグの上下限に従い、ドライバを通って機器にも届き、操作ログに `monitor` として残る。`sys.` のタグには書き込めない |
-| Device | **タグを割り付けていない PLC のアドレス**を読み書きする（Modbus、SLMP、FINS のドライバーがあるプロジェクトに出る）→「デバイスモニター」 |
-| Storage | USB メモリ（ネットワークのない現場用）へのバックアップ、USB メモリのプロジェクトファイルのインストール、ひとつ前のプロジェクトに戻す →「USB メモリでの更新とバックアップ」 |
+| About | Host name, IP address, project, display backend, build information (display only) |
+| Network | On Linux with NetworkManager (`nmcli`): sets the interface, DHCP / static IP, address (CIDR), gateway and DNS. Apply runs `nmcli connection modify` + `up` (for an ordinary user polkit asks for authentication, so it retries with `sudo -n`. Install `tools/rpi/hml.sudoers` beforehand). Changing the IP of the connection in use cuts SSH. On Windows, display only |
+| Keys | Management of the SSH keys (shown with the fbdev / drm backends on Linux). Registers and deletes the keys used for deploys → "Key management (the Keys page)" |
+| Users | Adds, changes and deletes users (when project.json has `users`) → "Users" |
+| Driver: … | Each driver of project.json (one page per driver). Edits `enabled` and scalar settings such as `host` / `port` / `poll_ms`. Apply saves to `project.local.json` and restarts all drivers |
+| Sound | Mute, volume, a test sound, display of the output (when there is `sound`) → "Sound (touch sound, alarm sound)" |
+| Transfers | The state of the data transfers between devices and the reason why one does not run (when there is `transfers`. Display only) → "Data transfer between devices" |
+| Upload | Sending the logs: on / off per destination, login, send now, the state of sending (when there is `uploads`) → "Uploading the logs (`uploads`)" |
+| Mail | Mail notification on / off, recipients, login, test mail, the state of sending (when there is `mail`) → "Mail (`mail`)" |
+| Schedule | The list of schedules and the time of the next run. Press a schedule to change its time, weekdays and on / off (when there is `schedules`) → "Schedules (actions that run by the clock)" |
+| Tags | A list of the current values of all tags (8 at a time, filtered by a part of the name. Enter `sys.` for the tags of the runtime itself). Pressing a row lets you write a value to that tag (TRUE / FALSE buttons for a bool, a numeric keypad for a number, the keyboard for a string. "x" clears the filter). It is for checking and changing values that have no screen, during commissioning and maintenance. A write follows the limits of the tag, reaches the device through the driver, and is recorded in the operation log as `monitor`. Tags of `sys.` cannot be written |
+| Device | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Device page)" |
+| Storage | Backup to a USB memory (for sites without a network), installing a project file from a USB memory, going back to the previous project → "Updates and backups with a USB memory (the Storage page)" |
 
-設定値は `sys.<page>.<key>` というタグに入り、Apply で各ページの `apply()` が呼ばれます（結果は `sys.<page>.status`）。
-`project.local.json` は project.json と同じ場所に書かれ、起動時に `drivers` のスカラー値を上書きします
-（project.json 自体は変更しません。OPC UA には `sys.*` タグは公開されません）。
-保存されるのは project.json と値が違う項目だけです。project.json と同じ値に戻して Apply するとその項目は消え、
-何も残らなければファイルごと削除されます（変更していない項目は、あとから project.json を書き換えれば反映されます）。
+The setting values go into tags named `sys.<page>.<key>`, and Apply calls the `apply()` of each page (the result is in `sys.<page>.status`).
+`project.local.json` is written in the same place as project.json and overrides the scalar values of `drivers` at startup
+(project.json itself is not changed. `sys.*` tags are not published to OPC UA).
+Only the items whose value differs from project.json are saved. Setting an item back to the value of project.json and pressing Apply removes that item, and
+when nothing is left the whole file is deleted (items that were not changed follow a later rewrite of project.json).
 
-### デバイスモニター（Device ページ）
+### The device monitor (the Device page)
 
-立ち上げや保守で、画面もタグも作っていないアドレスの値を確かめる・変えるためのページです。ドライバーを選び、
-そのドライバーの書き方でアドレスを入れると、ページを開いている間その値を読み続けます。
+This page is for checking and changing the values of addresses that have neither a screen nor a tag, during commissioning and maintenance. Select a driver,
+enter an address in the notation of that driver, and the page keeps reading that value while it is open.
 
-| ドライバー | アドレスの書き方 |
+| Driver | Address notation |
 |---|---|
-| Modbus（TCP / RTU / ASCII） | `holding:100`、`input:5`、`coil:3`、`discrete:0`（`hr` `ir` `di` とも書ける）。別のユニットは `holding:100@2` |
-| SLMP | `D100`、`W1F`、`R0`、`ZR100`、`M10`、`X1F`、`Y20`、`SM400`、`SD0`、ワードの中のビットは `D100.3`（読むだけ） |
-| FINS | `D100`、`CIO10`、`W5`、`H3`、`A440`、`E0_100`、`T5`、`C5`、ビットは `CIO10.03` |
+| Modbus (TCP / RTU / ASCII) | `holding:100`, `input:5`, `coil:3`, `discrete:0` (`hr` `ir` `di` can also be written). Another unit is `holding:100@2` |
+| SLMP | `D100`, `W1F`, `R0`, `ZR100`, `M10`, `X1F`, `Y20`, `SM400`, `SD0`, a bit inside a word is `D100.3` (read only) |
+| FINS | `D100`, `CIO10`, `W5`, `H3`, `A440`, `E0_100`, `T5`, `C5`, a bit is `CIO10.03` |
 
-- **型**（ワードのアドレス）: `int16`、`uint16`、`int32`、`uint32`、`float`、`hex`。32 ビットの値のワードの順は、そのドライバーの
-  タグの既定と同じです（SLMP と FINS は下位ワードが先、Modbus は上位ワードが先）。ビットとコイルは `0` / `1` です。
-- **個数**: 1、8、16。そのアドレスから続けて読み、`+0:` `+1:` … と並べます。
-- **書き込み**: 値を入れて Write。ドライバーの `write_ranges` と `allow_system_write` の制限はここでも効きます。
-  書き込みは操作ログに `device` として残ります。システム設定画面全体が `system_level` で守られます。
-- PLC が断った理由（FINS と SLMP の終了コード、Modbus の例外）は、そのままページに出ます。タグの通信は止まりません。
-- 読み書きはドライバーのスレッドが、タグの書き込みと読み出しの間に行います。ページを開いていない間は何も送りません。
-- OPC UA と MQTT は対象外です（アドレスではなくノードやトピックを扱うため）。
+- **Type** (word addresses): `int16`, `uint16`, `int32`, `uint32`, `float`, `hex`. The word order of 32 bit values is the same as the default of
+  the tags of that driver (SLMP and FINS: low word first, Modbus: high word first). Bits and coils are `0` / `1`.
+- **Count**: 1, 8, 16. The page reads on from that address and lists the values as `+0:` `+1:` ….
+- **Writing**: enter a value and press Write. The limits `write_ranges` and `allow_system_write` of the driver apply here too.
+  A write is recorded in the operation log as `device`. The system settings screens as a whole are protected by `system_level`.
+- The reason for a refusal by the PLC (the end codes of FINS and SLMP, the exceptions of Modbus) appears on the page as it is. The communication of the tags does not stop.
+- The reads and writes are done by the thread of the driver, between the writes and the reads of the tags. While the page is not open, nothing is sent.
+- OPC UA and MQTT are not covered (they handle nodes and topics, not addresses).
 
-### USB メモリでの更新とバックアップ（Storage ページ）
+### Updates and backups with a USB memory (the Storage page)
 
-ネットワークのない現場では、Storage ページで USB メモリを使ってプロジェクトを入れ替えます。
+At a site without a network, the Storage page replaces the project by means of a USB memory.
 
-| 操作 | 内容 |
+| Operation | Meaning |
 |---|---|
-| Backup to this location | `<USB>/hml-backup/<名前>-<日付-時刻>/` に、プロジェクトファイル（`<名前>.hmlproj`）、`logs/`（記録したログ）、`project.local.json`（装置の設定）を書き出す。証明書と秘密鍵（`pki/`）は書き出さない |
-| Install this project | USB メモリの直下か `hml/` フォルダーにあるプロジェクトファイル（`.hmlproj`。デザイナーの「名前を付けて保存」で作る）を、今のプロジェクトと入れ替えてランタイムを再起動する |
-| Remove safely | 書き込みを終わらせて USB メモリをアンマウントする（抜く前に押す。Linux） |
-| Previous project | 最後のインストールで置き換えたプロジェクトに戻して再起動する（もう一度押すと元に戻る） |
+| Backup to this location | Writes the project file (`<name>.hmlproj`), `logs/` (the recorded logs) and `project.local.json` (the settings of the device) to `<USB>/hml-backup/<name>-<date-time>/`. Certificates and private keys (`pki/`) are not written |
+| Install this project | Replaces the current project with a project file (`.hmlproj`. Made with "Save As" in the designer) in the root or the `hml/` folder of the USB memory, and restarts the runtime |
+| Remove safely | Finishes the writes and unmounts the USB memory (press it before pulling the memory out. Linux) |
+| Previous project | Goes back to the project that the last installation replaced, and restarts (pressing it once more goes back again) |
 
-- インストールの前に検査します。**画面の大きさが違うプロジェクト、`--check` で問題が出るプロジェクト、壊れたファイルは
-  インストールせず、今のプロジェクトは変わりません。**
-- 装置が持っているもの（`logs/`、`pki/`、`project.local.json`）は、インストールしても残ります。
-- 置き換える前のプロジェクトは、プロジェクトのフォルダーの隣に `<フォルダー名>.previous.hmlproj` として 1 つ残します。
-- USB メモリは、Linux では `/media`、`/run/media`、`/mnt` の下にマウントされたもの、Windows では取り外し可能なドライブを
-  一覧に出します。環境変数 `HML_TRANSFER_DIR` にフォルダーを入れると、そのフォルダーも一覧に出ます（PC での確認や、
-  決まった場所にマウントする装置用）。
-- **デスクトップのない Linux（Raspberry Pi OS Lite など）は USB メモリを自動でマウントしません。** ランタイムが、挿された
-  USB メモリを udisks（`udisksctl mount`）でマウントします（Storage ページを開いている間、挿したことにも気づきます）。
-  サービスとして動くランタイムにはその権限がないので、装置で一度だけ次を実行します（`plugdev` グループのユーザーに、
-  マウントとアンマウントを許す polkit のルール）:
+- The project is checked before the installation. **A project with a different screen size, a project for which `--check` reports problems, and a broken file are
+  not installed, and the current project does not change.**
+- What belongs to the device (`logs/`, `pki/`, `project.local.json`) stays after an installation.
+- One copy of the project from before the replacement is kept next to the project folder as `<folder name>.previous.hmlproj`.
+- The list shows as USB memories: on Linux, what is mounted under `/media`, `/run/media` and `/mnt`; on Windows, the removable drives.
+  When the environment variable `HML_TRANSFER_DIR` holds a folder, that folder is listed too (for checking on a PC, and
+  for devices that mount at a fixed place).
+- **Linux without a desktop (Raspberry Pi OS Lite and others) does not mount a USB memory automatically.** The runtime mounts an inserted
+  USB memory with udisks (`udisksctl mount`) (while the Storage page is open, it also notices that one was inserted).
+  A runtime that runs as a service does not have that permission, so run the following once on the device (a polkit rule that allows
+  users of the `plugdev` group to mount and unmount):
 
   ```sh
   sudo install -m 644 ~/hml/tools/rpi/hml-usb.rules /etc/polkit-1/rules.d/50-hml-usb.rules
   ```
 
-  入っていないと、ページに「The USB memory ... is there, but the runtime may not mount it」と出ます。
-- 操作は操作ログに残り、システム設定全体と同じく `users.system_level` で守られます。
+  When it is not installed, the page shows "The USB memory ... is there, but the runtime may not mount it".
+- The operations are recorded in the operation log and, like the system settings as a whole, are protected by `users.system_level`.
 
-### 鍵の管理（Keys ページ）
+### Key management (the Keys page)
 
-デザイナーからのデプロイは SSH の鍵でログインします。Keys ページでは、この装置にログインできる鍵
-（ランタイムを実行しているユーザーの `~/.ssh/authorized_keys`）を、装置の画面から管理できます。
-新しい PC からデプロイしたいときや、鍵をなくしたときに、SSH で入らなくても鍵を登録できます。
+A deploy from the designer logs in with an SSH key. The Keys page manages, from the screen of the device, the keys that can log in to this device
+(`~/.ssh/authorized_keys` of the user that runs the runtime).
+When you want to deploy from a new PC, or when a key is lost, a key can be registered without logging in over SSH.
 
-**新しい鍵を登録する**
+**Registering a new key**
 
-1. 装置の画面で System > Keys を開き、**Key management** をオンにします（鍵管理モード）。
-   画面に、この装置の IP アドレスとポート番号が表示されます。
-2. PC のデザイナーで Deploy ダイアログを開き、private key の右の **Register…** を押します。
-   private key が空（またはファイルがない）ときは、新しい鍵（`~/.ssh/hml_deploy_ed25519`）を作ります。
-   デザイナーに、送った鍵のフィンガープリント（`SHA256:...`）が表示されます。
-3. 装置の画面に、送信元のアドレス、鍵のフィンガープリント、コメントが表示されます。
-   **デザイナーに表示されたフィンガープリントと同じことを確かめてから** Accept を押します。Reject で拒否できます。
+1. On the screen of the device, open System > Keys and turn **Key management** on (the key management mode).
+   The screen shows the IP address and the port number of this device.
+2. In the designer on the PC, open the Deploy dialog and press **Register…** to the right of private key.
+   When private key is empty (or the file does not exist), a new key (`~/.ssh/hml_deploy_ed25519`) is made.
+   The designer shows the fingerprint (`SHA256:...`) of the key that was sent.
+3. The screen of the device shows the address of the sender, the fingerprint of the key and the comment.
+   **Check that the fingerprint is the same as the one shown in the designer** and then press Accept. Reject refuses it.
 
-- 鍵管理モードがオフのあいだは、受付用のポートは閉じていて、外部から鍵を送ることはできません。
-  モードは 5 分で自動的にオフになります（ランタイムを再起動したときもオフに戻ります）。
-- 送られてきた鍵は、画面で Accept を押すまで登録されません。別の画面を表示していても、鍵が届くと Keys ページに切り替わります。
-  2 分以内に答えなければ、その申し出は取り消されます。
-- 受け付けるのは、形式の正しい公開鍵（ed25519 / rsa / ecdsa）だけです。
-- 通信は暗号化していません（公開鍵は秘密の情報ではありません）。他人の鍵を登録してしまわないことは、
-  画面でのフィンガープリントの確認が保証します。
+- While the key management mode is off, the port for receiving is closed and no key can be sent from outside.
+  The mode turns off automatically after 5 minutes (it also goes back to off when the runtime is restarted).
+- A key that was sent is not registered until Accept is pressed on the screen. Even when another screen is displayed, the runtime switches to the Keys page when a key arrives.
+  Without an answer within 2 minutes, the offer is cancelled.
+- Only public keys in a correct format (ed25519 / rsa / ecdsa) are accepted.
+- The communication is not encrypted (a public key is not secret information). That nobody else's key gets registered is
+  ensured by the check of the fingerprint on the screen.
 
-**登録済みの鍵を削除する**
+**Deleting a registered key**
 
-登録済みの鍵が、種類・フィンガープリント・コメントで一覧表示されます（8 個まで）。Delete を押すと確認が出て、
-もう一度 Delete で削除します。最後の 1 個も削除できますが、新しい鍵を登録するまで鍵でのログイン（デプロイ）はできなくなります。
-`authorized_keys` のコメント行や、オプション付きの行（`command="..."` など）は、そのまま残します。
+The registered keys are listed with type, fingerprint and comment (up to 8). Pressing Delete shows a confirmation, and
+Delete once more deletes the key. The last key can be deleted too, but then a login with a key (a deploy) is not possible until a new key is registered.
+Comment lines of `authorized_keys` and lines with options (`command="..."` and so on) are left as they are.
 
 ```json
 "key_management": { "enabled": true, "port": 4855, "file": "" }
 ```
 
-| キー      | 既定値                                    | 内容                                                                  |
+| Key | Default | Description |
 | --------- | ----------------------------------------- | --------------------------------------------------------------------- |
-| `enabled` | fbdev / drm では `true`、SDL では `false` | Keys ページを出すかどうか（PC では開発者自身の鍵ファイルを編集してしまうので既定でオフ） |
-| `port`    | `4855`                                    | 鍵管理モードのあいだだけ開く TCP ポート                               |
-| `file`    | `~/.ssh/authorized_keys`                  | 管理する鍵ファイル（相対パスは project.json から）                    |
+| `enabled` | `true` with fbdev / drm, `false` with SDL | Whether the Keys page is shown (off by default on a PC, because it would edit the developer's own key file) |
+| `port`    | `4855`                                    | The TCP port that is open only during the key management mode |
+| `file`    | `~/.ssh/authorized_keys`                  | The key file to manage (a relative path is from project.json) |
 
-コマンドラインからは `hml_designer --send-key <ホスト> [--key <秘密鍵>] [--key-port 4855]` で鍵を送れます。
+From the command line, `hml_designer --send-key <host> [--key <private key>] [--key-port 4855]` sends a key.
 
-ページを追加するには `src/system_settings.hpp` の `SettingsPage`（`id` / `title` / `fields()` / `apply()`）を
-実装して `register_builtin_pages()` で登録するだけで、画面とタグは自動で作られます。フィールド型は
-Text / Number / Bool / Select / Info。フォーム以外の画面が必要なページは、`custom_rows()`（ウィジェットを自分で並べる）、
-`command()`（`{ "action": "call", "fn": "system.do", "arg": "<page>:<command>" }` で呼ばれる）、`poll()`（定期的に呼ばれる）を
-実装します（例: `src/system_keys.cpp`）。
+To add a page, just implement `SettingsPage` (`id` / `title` / `fields()` / `apply()`) of `src/system_settings.hpp`
+and register it in `register_builtin_pages()`; the screen and the tags are made automatically. The field types are
+Text / Number / Bool / Select / Info. A page that needs a screen other than a form implements `custom_rows()` (it lays out the widgets itself),
+`command()` (called by `{ "action": "call", "fn": "system.do", "arg": "<page>:<command>" }`) and `poll()` (called periodically)
+(example: `src/system_keys.cpp`).
 
-## 画面 JSON
+## Screen JSON
 
 ```json
 {
@@ -1632,64 +1651,64 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 }
 ```
 
-### テンプレート画面（`template`）
+### Template screens (`template`)
 
-ヘッダーやナビゲーションのように、どの画面にも同じものを 1 か所に置いて、直すのも 1 か所で済ませる仕組みです。
-画面に `"template": "<別の画面の名前>"` を書くと、**その画面の部品が先に置かれ、自分の部品がその上に載ります**。
+Things that are the same on every screen, such as a header or the navigation, are put in one place and are changed in one place.
+When a screen has `"template": "<name of another screen>"`, **the widgets of that screen are placed first, and the screen's own widgets go on top of them**.
 
 ```json
-// screens/frame.json: 土台になる画面（ふつうの画面と同じ書き方）
+// screens/frame.json: the screen that is the base (written like any other screen)
 { "name": "frame", "scrollable": false, "style": { "bg_color": "#101820" }, "children": [
   { "type": "label", "x": 10, "y": 8, "text": "${title}", "style": { "font": 20 } },
   { "type": "button", "x": 4, "y": 272, "w": 112, "h": 44, "text": "Home", "on_click": { "action": "goto", "screen": "home" } } ] }
 
-// screens/pump.json: 土台の上に作る画面
-{ "name": "pump", "template": "frame", "template_args": { "title": "ポンプ 2" }, "children": [
+// screens/pump.json: a screen made on top of the base
+{ "name": "pump", "template": "frame", "template_args": { "title": "Pump 2" }, "children": [
   { "type": "label", "x": 16, "y": 60, "bind": { "text": { "tag": "temp", "format": "%.1f C" } } } ] }
 ```
 
-- テンプレートの文字の中の `${名前}` は、使う側の画面の `template_args` の値に置き換わります（`${screen}` は画面の名前。
-  渡されなかったものは空になります）。置き換わるのはテンプレートの部品だけで、画面自身の部品の文字はそのままです。
-- テンプレートの `style`・`scrollable`・`flex` などの画面そのものの設定も引き継ぎ、画面側に同じ設定があればそちらが優先です。
-- テンプレートはふつうの画面なので、タグの接続もボタンの動作も、使う画面ごとに動きます。テンプレート自身を表示することもできます
-  （そのときは `${...}` がそのまま出ます）。テンプレートの上にさらにテンプレートを重ねられます（8 段まで）。
-- ないテンプレート、ポップアップ、自分自身、輪になった指定は使わず、その画面は自分の部品だけで作ります（ログに警告、`--check` が見つけます）。
-  `--check` は、テンプレートが求める `${名前}` を画面が渡していないとき、使われない値を渡しているときも知らせます。
-- デザイナー: 画面のプロパティの「テンプレート」で選び、「テンプレートに渡す文字」に題名などを入れます。キャンバスにはテンプレートの
-  部品が薄く表示されます（その画面では選択・移動できません。直すときはテンプレートの画面を開きます）。Screens タブで、
-  「+ 画面を追加」の横のリストからテンプレートを選んで、新しい画面を作れます。
-- 部品は画面ごとに作られるので、メモリーと構築の時間は画面の数だけ増えます（51 画面・2090 部品の構築は PC で 0.14 秒）。
+- `${name}` in the texts of the template is replaced by the value in `template_args` of the screen that uses it (`${screen}` is the name of the screen.
+  A value that is not passed becomes empty). Only the widgets of the template are replaced; the texts of the screen's own widgets stay as they are.
+- The settings of the screen itself in the template, such as `style`, `scrollable` and `flex`, are inherited too. If the screen has the same setting, the screen's setting wins.
+- A template is an ordinary screen, so its tag bindings and its button actions work on every screen that uses it. The template itself can be shown too
+  (then `${...}` appears as it is). A template can be put on top of another template (up to 8 levels).
+- A template that does not exist, a popup, the screen itself and a circular reference are not used; that screen is made of its own widgets only (a warning in the log; `--check` finds it).
+  `--check` also reports when a screen does not pass a `${name}` that the template asks for, and when it passes a value that is not used.
+- The designer: choose the template in "template" of the screen's properties, and enter the title and so on in "template_args". The canvas shows the widgets of the
+  template faintly (they cannot be selected or moved on that screen. To change them, open the template screen). In the Screens tab,
+  a new screen can be made by choosing a template from the list next to "+ Add screen".
+- The widgets are created for each screen, so memory and build time grow with the number of screens (building 51 screens with 2090 widgets takes 0.14 seconds on a PC).
 
-### ウィジェット `type`
+### Widget `type`
 
-| type                  | 固有プロパティ                                                                                                            |
+| type                  | Properties of its own                                                                                                     |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `panel` (`container`) | `children`, `flex`                                                                                                        |
-| `label`               | `text`, `long_mode` (`wrap`/`dots`/`scroll`（`circular` も同じ）/`clip`)                                                                       |
+| `label`               | `text`, `long_mode` (`wrap`/`dots`/`scroll` (`circular` is the same)/`clip`)                                                                       |
 | `button`              | `text`, `checkable`, `style_label`                                                                                        |
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
 | `arc`                 | `min`, `max`, `value`, `start_angle`, `end_angle`, `rotation`, `adjustable`                                               |
-| `xy_chart`            | XY グラフ: `x_tag`, `y_tag`, `x_min`, `x_max`, `y_min`, `y_max`, `points`, `sample_ms`, `refresh_ms`, `mode`, `clear_tag`, `series`（下記「XY グラフ」） |
-| `table`               | 表: `columns`, `rows`, `header`（下記「表」）                                                                             |
-| `datetime_input`      | 日付・時刻の入力: `mode`, `seconds`, `year_min`, `year_max`（下記「日付と時刻の入力」）                                    |
-| `meter`               | 針のメーター: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones`（下記「メーター」） |
+| `xy_chart`            | XY chart: `x_tag`, `y_tag`, `x_min`, `x_max`, `y_min`, `y_max`, `points`, `sample_ms`, `refresh_ms`, `mode`, `clear_tag`, `series` (see "XY chart: `xy_chart`" below) |
+| `table`               | Table: `columns`, `rows`, `header` (see "Table: `table`" below)                                                           |
+| `datetime_input`      | Date and time input: `mode`, `seconds`, `year_min`, `year_max` (see "Date and time input: `datetime_input`" below)        |
+| `meter`               | Meter with a needle: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones` (see "Meter: `meter`" below) |
 | `led`                 | `color`, `on`                                                                                                             |
-| `dropdown` / `roller` | `options` (配列), `selected`, (`visible_rows`, `infinite`)                                                                |
+| `dropdown` / `roller` | `options` (array), `selected`, (`visible_rows`, `infinite`)                                                               |
 | `textarea`            | `text`, `placeholder`, `one_line`, `password`, `max_length`, `accepted_chars`                                             |
-| `numeric_display`     | 数値表示器: `input`, `decimals`, `format`, `unit`, `min`, `max`, `placeholder`, `accepted_chars`（下記「データ表示器」）  |
-| `text_display`        | 文字列表示器: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                   |
-| `password_display`    | パスワード入力器（常に伏せ字）: `input` (既定 true), `placeholder`, `max_length`, `accepted_chars`                         |
-| `image`               | 画像: `src`（project.json からの相対パス。PNG / JPEG / BMP / GIF）, `fit`, `zoom`, `rotation`（下記「画像」）            |
+| `numeric_display`     | Numeric display: `input`, `decimals`, `format`, `unit`, `min`, `max`, `placeholder`, `accepted_chars` (see "Data displays" below) |
+| `text_display`        | Text display: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                  |
+| `password_display`    | Password input (always masked): `input` (default true), `placeholder`, `max_length`, `accepted_chars`                     |
+| `image`               | Image: `src` (a path relative to project.json. PNG / JPEG / BMP / GIF), `fit`, `zoom`, `rotation` (see "Images" below)    |
 | `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
 | `spinner`             | `time`, `angle`                                                                                                           |
-| `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のタップ時に表示される（`numeric_display` ではテンキー）。✓ で確定、× で閉じる（入力は破棄）。`bottom_mid` / `top_mid` 配置なら、入力欄を隠す場合は反対側の端に出る。キーの大きさは `h` と `style_items: { "font": 18 }`、`style: { "pad", "pad_gap" }` で調整 |
+| `keyboard`            | Put one on a screen and it appears when a textarea or a display that accepts input is tapped (a numeric keypad for `numeric_display`). ✓ confirms, × closes (the input is discarded). With the `bottom_mid` / `top_mid` alignment, it appears at the opposite edge when it would hide the input field. The size of the keys is adjusted with `h`, `style_items: { "font": 18 }` and `style: { "pad", "pad_gap" }` |
 | `line`                | `points: [[x,y], ...]`                                                                                                    |
 
-#### データ表示器 (`numeric_display` / `text_display` / `password_display`)
+#### Data displays (`numeric_display` / `text_display` / `password_display`)
 
-タグの値を 1 行の枠内に表示する、用途を限定したウィジェットです。既定では表示専用（クリック不可、カーソルなし）で、
-`"input": true` にすると入力欄になります（`password_display` は既定で入力可）。
+These are widgets with a limited purpose: they show the value of a tag in a one-line box. By default they are display only (not clickable, no cursor);
+with `"input": true` they become input fields (`password_display` accepts input by default).
 
 ```json
 { "type": "numeric_display", "bind": "setpoint", "decimals": 1, "unit": " rpm",
@@ -1699,16 +1718,16 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 { "type": "password_display", "bind": "pin", "max_length": 4, "accepted_chars": "0123456789" }
 ```
 
-| プロパティ | 意味 |
+| Property | Meaning |
 |---|---|
-| `input` | true で入力可。タップすると現在値が全選択され、最初のキー入力で置き換わる。確定（キーボードの OK / Enter、またはフォーカスが外れたとき）にタグへ書き込み、キャンセルで元の値に戻る。`textarea` と違い 1 文字ごとには書き込まない |
-| `decimals` / `format` / `unit` | 数値の表示形式。`decimals: 1` は `%.1f` と同じ。`format` を書くとそちらを優先。`unit` は末尾に付加（例 `" rpm"`）。`bind` 側の `format` があればそれが最優先 |
-| `min` / `max` | 入力値の範囲。範囲外の入力は丸められ、丸めた値が表示に反映される（タグ側の `min`/`max` も別途適用） |
-| `accepted_chars` | 入力できる文字。`numeric_display` の既定は `0123456789.-+`。数字と `.` `-` `+` だけを受け付ける入力欄は、文字列の入力欄でも数字のキーパッドが出る（暗証番号など） |
+| `input` | true makes it accept input. A tap selects the whole current value, and the first key replaces it. On confirmation (OK / Enter on the keyboard, or when the focus leaves) the value is written to the tag; cancel restores the original value. Unlike `textarea`, it does not write on every character |
+| `decimals` / `format` / `unit` | The display format of the number. `decimals: 1` is the same as `%.1f`. If `format` is written, it has priority. `unit` is appended at the end (e.g. `" rpm"`). A `format` on the `bind` side has the highest priority |
+| `min` / `max` | The range of the input value. An input outside the range is clamped, and the clamped value is shown (the `min`/`max` of the tag are applied separately as well) |
+| `accepted_chars` | The characters that can be entered. The default of `numeric_display` is `0123456789.-+`. An input field that accepts only digits and `.` `-` `+` gets the numeric keypad even if it is a text input field (a PIN, for example) |
 
-短縮形 `"bind": "tag"` は `numeric_display` では `value`、`text_display` / `password_display` では `text` に結び付きます。
+The short form `"bind": "tag"` binds to `value` for `numeric_display` and to `text` for `text_display` / `password_display`.
 
-#### 画像 (`image`、背景画像)
+#### Images (`image`, background images)
 
 ```json
 { "type": "image", "src": "assets/logo.png" },
@@ -1717,35 +1736,35 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 { "type": "panel", "style": { "bg_image": "assets/plant.png", "bg_image_opa": 60 } }
 ```
 
-| 形式 | できること |
+| Format | What it can do |
 | --- | --- |
-| PNG | すべて（透過、`fit`、`zoom`、`rotation`） |
-| JPEG（ベースライン）/ BMP | 元の大きさで表示するだけ（描くときに少しずつ読むので、拡大・回転はできません。メモリは少なくて済みます） |
-| GIF | アニメーションとして再生（元の大きさ） |
+| PNG | Everything (transparency, `fit`, `zoom`, `rotation`) |
+| JPEG (baseline) / BMP | Shown at the original size only (it is read little by little while drawing, so it cannot be scaled or rotated. It needs little memory) |
+| GIF | Played as an animation (original size) |
 
-- `fit`（PNG）: `w` `h` の枠への合わせ方。`contain`（比率を保って全体）/ `stretch` / `tile`（敷き詰め）/ `center`。省くと元の大きさ。
-- `bind` の `src`: `map` で値ごとのファイル（bool は `"true"` / `"false"`、その他は `"default"`。当てはまらない値のときは非表示）。
-  文字列のタグにファイル名を入れても切り替えられます。
-- 背景画像: `style`（や `style_pressed` など）の `bg_image`、`bg_image_opa`（0-100）、`bg_image_tiled`。
-- **表示できるのはプロジェクトのフォルダーの中のファイルだけです**（絶対パスや `..` は表示しません。タグで指定する場合も同じ）。
-  壊れたファイル、1 枚で約 400 万ピクセルを超える画像は表示せず、警告を出します（PNG はメモリに 幅 × 高さ × 4 バイト展開されます）。
-- デザイナーでは、画像のプロパティの「…」でファイルを選ぶと `assets/` にコピーされます。
+- `fit` (PNG): how the image is fitted into the `w` `h` box. `contain` (the whole image, keeping the ratio) / `stretch` / `tile` (tiled) / `center`. Omitted: the original size.
+- `src` of `bind`: `map` gives a file for each value (`"true"` / `"false"` for a bool, `"default"` for the others. Hidden when no entry matches the value).
+  Putting a file name into a string tag also switches the image.
+- Background images: `bg_image`, `bg_image_opa` (0-100) and `bg_image_tiled` in `style` (or `style_pressed` and so on).
+- **Only files inside the project folder can be shown** (absolute paths and `..` are not shown. The same holds when the file is given by a tag).
+  A broken file, or an image of more than about 4 million pixels, is not shown and a warning is written (a PNG is expanded in memory to width × height × 4 bytes).
+- In the designer, choosing a file with "…" in the image's properties copies it to `assets/`.
 
-### 共通プロパティ
+### Common properties
 
-| キー                                                                    | 説明                                                                                                                                                                                |
+| Key                                                                     | Description                                                                                                                                                                         |
 | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y`                                                                | 位置（`align` 指定時はそこからのオフセット）                                                                                                                                        |
-| `w`, `h`                                                                | 数値 (px) / `"50%"` / `"content"` / `"full"`                                                                                                                                        |
+| `x`, `y`                                                                | Position (with `align`, the offset from there)                                                                                                                                      |
+| `w`, `h`                                                                | A number (px) / `"50%"` / `"content"` / `"full"`                                                                                                                                    |
 | `align`                                                                 | `center`, `top_left`, `top_mid`, `top_right`, `left_mid`, `right_mid`, `bottom_left`, `bottom_mid`, `bottom_right`                                                                  |
-| `hidden`, `disabled`, `checked`, `clickable`, `scrollable`, `checkable` | フラグ / 状態                                                                                                                                                                       |
-| `level`, `level_deny`                                                   | 操作に必要なユーザーレベルと、足りないときの扱い（`disable` / `hide` / `login`）→「ユーザー管理」                          |
+| `hidden`, `disabled`, `checked`, `clickable`, `scrollable`, `checkable` | Flags / states                                                                                                                                                                      |
+| `level`, `level_deny`                                                   | The user level needed to operate the widget, and what happens when it is not enough (`disable` / `hide` / `login`) → "Users"                |
 | `scrollbar`                                                             | `off` / `on` / `auto` / `active`                                                                                                                                                    |
-| `flex`                                                                  | `row` / `column` / `row_wrap` / `column_wrap`。`flex_main` / `flex_cross` / `flex_track` に `start`/`center`/`end`/`space_between`/`space_around`/`space_evenly`                    |
-| `flex_grow`                                                             | flex 子要素の伸長率                                                                                                                                                                 |
-| `style`                                                                 | 下記スタイル。`style_pressed`, `style_checked`, `style_disabled`, `style_focused`, `style_indicator`, `style_indicator_checked`, `style_knob`, `style_items`, `style_selected` も可 |
+| `flex`                                                                  | `row` / `column` / `row_wrap` / `column_wrap`. `flex_main` / `flex_cross` / `flex_track` take `start`/`center`/`end`/`space_between`/`space_around`/`space_evenly`                  |
+| `flex_grow`                                                             | The grow factor of a flex child                                                                                                                                                     |
+| `style`                                                                 | The style below. Also `style_pressed`, `style_checked`, `style_disabled`, `style_focused`, `style_indicator`, `style_indicator_checked`, `style_knob`, `style_items`, `style_selected` |
 
-### `style` のプロパティ
+### Properties of `style`
 
 `bg_color`, `bg_opa` (0-100), `bg_grad_color`, `bg_grad_dir` (`hor`/`ver`), `border_color`, `border_width`,
 `border_opa`, `outline_width`, `outline_color`, `radius`, `shadow_width`, `shadow_color`, `shadow_opa`,
@@ -1755,15 +1774,15 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 `margin`, `opa`, `line_color`, `line_width`, `line_rounded`, `arc_color`, `arc_width`, `arc_rounded`,
 `image_recolor`, `width`, `height`
 
-色は `#rgb` / `#rrggbb` またはパレット名 (`red`, `blue`, `green`, `orange`, `grey`, `teal`, ... , `white`, `black`)。
+A color is `#rgb` / `#rrggbb` or a palette name (`red`, `blue`, `green`, `orange`, `grey`, `teal`, ... , `white`, `black`).
 
-### `bind` — タグとウィジェットの接続
+### `bind` — connecting tags and widgets
 
-短縮形 `"bind": "tagname"` は、ウィジェットに自然なプロパティへ結び付けます
-（switch/checkbox/button → `checked`、slider/arc/dropdown/roller/bar/numeric_display → `value`、label/textarea/text_display/password_display → `text`、led → `on`）。
-入力系ウィジェットは自動的に双方向になります。
+The short form `"bind": "tagname"` binds to the property that is natural for the widget
+(switch/checkbox/button → `checked`, slider/arc/dropdown/roller/bar/numeric_display → `value`, label/textarea/text_display/password_display → `text`, led → `on`).
+Input widgets become two-way automatically.
 
-オブジェクト形式では複数のプロパティを指定できます。
+The object form can give several properties.
 
 ```json
 "bind": {
@@ -1782,19 +1801,19 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 }
 ```
 
-| キー                                    | 意味                                                                                                                                        |
+| Key | Description |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `format`                                | printf 形式（変換指定子は 1 つ）。`%d` `%x` → 整数、`%f` `%g` → 実数、`%s` → 文字列。`%%` で `%`                                            |
-| `scale` / `offset`                      | ウィジェット値 = タグ値 × scale + offset（双方向時は逆変換）                                                                                |
-| `invert`                                | 真偽を反転                                                                                                                                  |
-| `eq` / `ne` / `gt` / `lt` / `ge` / `le` | 条件付き真偽（`visible`, `enabled`, `checked`, `on` で使用）。比較対象は定数か、`{ "tag": "temp_hi" }` のように別のタグ（どちらのタグが変わっても再評価）。`checked` に `eq` を付けると、ON 時にその値をタグへ書く（ラジオボタン的動作） |
-| `map`                                   | 値 → 色 のマップ。`default` で既定色                                                                                                        |
-| `part`                                  | `bg_color` の対象パート: `main` (既定) / `indicator` / `knob`                                                                               |
-| `two_way`                               | 双方向の明示的な ON/OFF                                                                                                                     |
+| `format`                                | printf format (one conversion specifier). `%d` `%x` → integer, `%f` `%g` → real number, `%s` → string. `%%` gives `%`                       |
+| `scale` / `offset`                      | Widget value = tag value × scale + offset (the inverse conversion when two-way)                                                             |
+| `invert`                                | Inverts true and false                                                                                                                      |
+| `eq` / `ne` / `gt` / `lt` / `ge` / `le` | A conditional true / false (used with `visible`, `enabled`, `checked`, `on`). The value to compare with is a constant, or another tag as in `{ "tag": "temp_hi" }` (evaluated again when either tag changes). With `eq` on `checked`, that value is written to the tag when the widget turns ON (it behaves like a radio button) |
+| `map`                                   | A map of value → color. `default` gives the default color                                                                                   |
+| `part`                                  | The part that `bg_color` applies to: `main` (default) / `indicator` / `knob`                                                                |
+| `two_way`                               | Turns two-way ON/OFF explicitly                                                                                                             |
 
-### アニメーション (`animate`)
+### Animations (`animate`)
 
-部品を点滅させる、回す、動かす、色を変える、絵をコマ送りする、といった動きを付けます。どの部品にも書けます（1 つ、または配列）。
+An animation makes a widget blink, turn, move, change color, or show pictures frame by frame. It can be written on any widget (one, or an array).
 
 ```json
 { "type": "label", "text": "ALARM", "animate": { "preset": "blink", "when": "alarm_active" } },
@@ -1803,27 +1822,27 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 { "type": "image", "src": "assets/c1.png", "animate": { "prop": "frames", "files": ["assets/c1.png", "assets/c2.png", "assets/c3.png"], "time": 600 } }
 ```
 
-| キー | 意味 |
+| Key | Description |
 | --- | --- |
-| `preset` | `blink`（1 秒周期の点滅）/ `pulse`（ゆっくりした明滅）/ `spin`（1 回転 2 秒）。ほかのキーで上書きできる |
-| `prop` | `opa`（0-100）/ `x` `y` `w` `h`（px）/ `rotation`（度）/ `zoom`（1 = 元の大きさ）/ `bg_color` `text_color` / `frames`（`image`: `files` の絵を順に表示） |
-| `from` / `to` | 両端の値（`from` を省くと今の値） |
-| `time` / `delay` | 片道の時間と、始まるまでの時間（ミリ秒。`time` の既定は 1000。`frames` では一巡の時間） |
-| `playback` / `repeat` | 往復する / 回数（省くとずっと） |
-| `path` | `linear`（既定）/ `ease_in` / `ease_out` / `ease_in_out` / `step` |
-| `when` | タグ名か条件（`bind` と同じ書き方）。**成り立つ間だけ動き、止まると部品は元に戻ります** |
+| `preset` | `blink` (blinking with a 1 second period) / `pulse` (slow brightening and dimming) / `spin` (one turn in 2 seconds). The other keys can override it |
+| `prop` | `opa` (0-100) / `x` `y` `w` `h` (px) / `rotation` (degrees) / `zoom` (1 = the original size) / `bg_color` `text_color` / `frames` (`image`: shows the pictures in `files` in order) |
+| `from` / `to` | The values at both ends (if `from` is omitted, the current value) |
+| `time` / `delay` | The time for one way, and the time before it starts (milliseconds. The default of `time` is 1000. With `frames`, the time of one cycle) |
+| `playback` / `repeat` | Goes there and back / the number of times (omitted: forever) |
+| `path` | `linear` (default) / `ease_in` / `ease_out` / `ease_in_out` / `step` |
+| `when` | A tag name or a condition (written as in `bind`). **It moves only while the condition holds, and when it stops the widget returns to its original state** |
 
-- 動くのは、その画面（ポップアップ）が表示されている間だけです。見えていない画面のアニメーションは止まっていて、負荷になりません。
-- **1 秒に 3 回より速い点滅はできません**（光に敏感な人への配慮。`opa` と色のアニメーションは、その速さまで遅くして警告を出します）。
-- `rotation` と `zoom` は `image`（PNG）なら軽く、ほかの部品では描画が重くなります。
-- 確認: `hml_runtime project.json --check --render main,a.png --at 600` で、表示からおよそ 600 ms 後の絵を描けます。
-- デザイナーでは、プロパティの「アニメーション」に JSON で書きます（よく使うものはボタンで追加できます）。キャンバスでは再生されないので、
-  Preview / Run で確かめます。
+- It moves only while that screen (popup) is shown. The animations of a screen that is not visible are stopped and cause no load.
+- **Blinking faster than 3 times a second is not possible** (out of consideration for people who are sensitive to light. Animations of `opa` and of colors are slowed down to that speed, with a warning).
+- `rotation` and `zoom` are light for an `image` (PNG); for other widgets the drawing becomes heavy.
+- Checking: `hml_runtime project.json --check --render main,a.png --at 600` draws the picture about 600 ms after the screen is shown.
+- In the designer, write it as JSON in "Animation" of the properties (the common ones can be added with buttons). It is not played on the canvas, so
+  check it with Preview / Run.
 
-### アクション
+### Actions
 
-イベント: `on_click`, `on_press`, `on_release`, `on_long_press`, `on_long_press_repeat`, `on_change`, `on_ready`。
-値は単一オブジェクトか配列（順に実行）。
+Events: `on_click`, `on_press`, `on_release`, `on_long_press`, `on_long_press_repeat`, `on_change`, `on_ready`.
+The value is a single object or an array (run in order).
 
 ```json
 "on_click": [
@@ -1847,17 +1866,17 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 ]
 ```
 
-`script` は Lua スクリプトを実行します。`code` にその場で書くか、`name` で project.json の `scripts` に
-定義したスクリプトを呼びます（下記「スクリプト (Lua)」）。
+`script` runs a Lua script. Write it in place in `code`, or call a script defined in `scripts` of project.json
+with `name` (see "Scripts (Lua)" below).
 
-`login` はログイン画面を開き、`logout` はログアウトします（→「ユーザー管理」）。
+`login` opens the login screen, and `logout` logs out (→ "Users").
 
-`system` は組み込みのシステム設定画面（下記）を開きます。`call` はランタイムに登録された名前付きアクションを呼びます。
+`system` opens the built-in system settings screens (below). `call` calls a named action registered in the runtime.
 
-`restart` は Raspberry Pi（fbdev / drm バックエンド）では OS を再起動し、PC（SDL バックエンド）ではアプリを
-再起動します。`"what": "app"` / `"system"` で明示もできます。OS の再起動は `systemctl reboot` を `sudo -n`
-経由で呼ぶので、サービスを一般ユーザーで動かしている Pi では一度だけ次を実行してパスワードなしで許可してください
-（許可がない場合はアプリの再起動にフォールバックします）。
+`restart` reboots the OS on a Raspberry Pi (the fbdev / drm backends) and restarts the application on a PC (the SDL
+backend). `"what": "app"` / `"system"` states it explicitly. The OS reboot calls `systemctl reboot` through
+`sudo -n`, so on a Pi where the service runs as an ordinary user, run the following once to allow it without a password
+(without the permission it falls back to restarting the application).
 
 ```
 sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
@@ -1865,10 +1884,10 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
 
 `anim`: `none` / `fade` / `slide_left` / `slide_right` / `slide_top` / `slide_bottom` / `over_left` / `over_right`
 
-#### ポップアップ（`popup` / `close`）
+#### Popups (`popup` / `close`)
 
-画面ファイルに `"popup": true` を書くと、その画面は今の画面の上に重ねて開く**ポップアップ**になります
-（画面として切り替わることはありません。`goto` で指定しても開くだけです）。
+When a screen file has `"popup": true`, that screen becomes a **popup** that opens on top of the current screen
+(it is never switched to as a screen. Naming it in `goto` only opens it).
 
 ```json
 { "name": "temp_detail", "popup": true, "w": 420, "h": 260, "dim": true, "level": 0,
@@ -1876,20 +1895,20 @@ sudo install -m 440 tools/rpi/hml.sudoers /etc/sudoers.d/hml
   "children": [ ...,  { "type": "button", "text": "Close", "on_click": { "action": "close" } } ] }
 ```
 
-- 大きさと位置は部品と同じ `w` `h` `x` `y` `align`（既定: 60 % × 60 %、中央）。`dim: false` で下の画面を暗くしない。
-- 開いている間、下の画面には触れません（モーダル）。ポップアップからさらにポップアップを開けます（上に重なる）。
-- 閉じるのは `close`（いちばん上のもの。`"screen"` で名前を指定もできる）、`back`（ポップアップの中ではそれを閉じる）、
-  画面の切り替え（`goto` / `back` / ログイン画面）です。
-- `popup` の `"set": { "タグ": 値 }` は、開く前にタグへ書き込みます。どの装置の詳細かを渡すのに使います
-  （ポップアップの中の部品はそのタグや、それをもとにスクリプトで用意したタグを表示する）。
-- `level` は画面と同じで、足りなければログイン画面が出て、ポップアップは開きません。
-- 一度作ったポップアップは閉じても残して使い回すので、何度開閉してもメモリは増えません。閉じている間は部品を更新せず、
-  開いたときに最新の値にします。
+- The size and position use `w` `h` `x` `y` `align` as for a widget (default: 60 % × 60 %, centered). `dim: false` does not darken the screen below.
+- While it is open, the screen below cannot be touched (modal). A popup can open another popup (it goes on top).
+- It is closed by `close` (the topmost one. `"screen"` can also name one), by `back` (inside a popup it closes that popup) and by
+  a change of screen (`goto` / `back` / the login screen).
+- `"set": { "tag": value }` of `popup` writes to tags before the popup opens. Use it to pass which unit the details are for
+  (the widgets in the popup show those tags, or tags that a script prepares from them).
+- `level` is the same as for a screen: if it is not enough, the login screen appears and the popup does not open.
+- A popup that was created once is kept after it is closed and is used again, so memory does not grow however often it is opened and closed. While it is closed its widgets are not updated;
+  they get the latest values when it opens.
 
-## スクリプト (Lua)
+## Scripts (Lua)
 
-固定のアクション（`set` / `inc` / `goto` …）では書けない条件分岐や計算は、Lua 5.4 のスクリプトで書けます。
-project.json の `scripts` に定義し、`trigger` で実行のタイミングを選びます。
+Branches and calculations that the fixed actions (`set` / `inc` / `goto` …) cannot express can be written as Lua 5.4 scripts.
+Define them in `scripts` of project.json and choose with `trigger` when they run.
 
 ```json
 "scripts": [
@@ -1906,67 +1925,67 @@ project.json の `scripts` に定義し、`trigger` で実行のタイミング�
 ]
 ```
 
-| `trigger`                     | 実行されるとき                                                                                                   |
+| `trigger`                     | When it runs                                                                                                     |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `startup`                     | 起動時に 1 回（最初の画面を表示する前、定義順）。共通の関数や変数の定義に使う                                    |
-| `interval`                    | `interval_ms` ミリ秒ごと（既定 1000、最小 10）                                                                   |
-| `tag`                         | `tags`（配列）のどれかの値が変わったとき。`event.tag` / `event.value` で変化したタグが分かる                     |
-| `screen_show` / `screen_hide` | 画面が表示された / 別の画面に切り替わったとき。`screen` で画面を限定（省略時はすべての画面）。`event.screen` に画面名 |
-| `manual`（既定）              | 自動では実行しない。`{ "action": "script", "name": "..." }` や Lua の `run("...")` から呼ぶ                      |
+| `startup`                     | Once at startup (before the first screen is shown, in the order of definition). Use it to define shared functions and variables |
+| `interval`                    | Every `interval_ms` milliseconds (default 1000, minimum 10)                                                      |
+| `tag`                         | When the value of any of `tags` (an array) changes. `event.tag` / `event.value` tell which tag changed           |
+| `screen_show` / `screen_hide` | When a screen is shown / when it is switched to another screen. `screen` limits it to one screen (omitted: all screens). `event.screen` has the screen name |
+| `manual` (default)            | Not run automatically. Call it from `{ "action": "script", "name": "..." }` or from `run("...")` in Lua          |
 
-- コードは `code`（文字列、または行の配列）か `file`（project.json からの相対パスの `.lua` ファイル）で指定します。
-  `"enabled": false` で無効化できます。
-- スクリプトは画面と同じくメインスレッドで実行されます。全スクリプトが 1 つの Lua ステートを共有するので、
-  `startup` で定義したグローバル変数・関数を他のスクリプトから使えます。
-- ホットリロード（F5 / `SIGHUP`）でスクリプトも読み直されます。Lua のグローバル変数は初期化され、`startup`
-  スクリプトがもう一度実行されます（タグの値は維持されます）。
-- エラー（文法エラー、未定義のタグなど）はログに `[hml ERROR] script '<name>': <name>:<行>: ...` と出力され、
-  そのスクリプトの実行だけが中断されます。500 ms を超えて動き続けるスクリプト（無限ループなど）も打ち切られます。
-- `tag` トリガーのスクリプトが自分で書いたタグの変化では、自分自身は再実行されません（他のスクリプトは実行されます）。
+- The code is given by `code` (a string, or an array of lines) or by `file` (a `.lua` file, path relative to project.json).
+  `"enabled": false` disables a script.
+- Scripts run on the main thread, like the screens. All scripts share one Lua state, so
+  global variables and functions defined in `startup` can be used from the other scripts.
+- A hot reload (F5 / `SIGHUP`) reads the scripts again too. The Lua global variables are reset and the `startup`
+  scripts run once more (the tag values are kept).
+- An error (a syntax error, an undefined tag and so on) is written to the log as `[hml ERROR] script '<name>': <name>:<line>: ...`,
+  and only the run of that script is aborted. A script that keeps running for more than 500 ms (an endless loop, for example) is cut off too.
+- A script with the `tag` trigger is not run again by a tag change that it wrote itself (the other scripts are run).
 
-### Lua から使えるもの
+### What Lua can use
 
-| API                                   | 内容                                                                                                    |
+| API                                   | Description                                                                                             |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `tag.name` / `tag["sys.about.host"]`  | タグの読み書き。bool タグは `true` / `false`、int は整数、float は実数、string は文字列。書き込みはタグの型に変換され、`min` / `max` も適用される。未定義のタグはエラー |
-| `goto_screen("name" [, "anim"])`      | 画面を切り替える（`anim` 省略時は `fade`）。画面がなければ `false` を返す                               |
-| `back()` / `current_screen()`         | 前の画面に戻る / 表示中の画面名                                                                         |
-| `run("name")`                         | 別のスクリプトを実行                                                                                    |
-| `call("fn" [, "arg"])`                | `call` アクションと同じ（ランタイムに登録された名前付きアクション）                                     |
-| `log(...)` / `print(...)`             | ログに出力（`[hml INFO ] [script] ...`）                                                                |
-| `warn(...)`                           | 警告としてログに出力（`[hml WARN ] [script] ...`）                                                      |
-| `millis()`                            | 起動からの経過ミリ秒                                                                                    |
-| `os.time()` / `os.date(fmt)` / `os.clock()` | 時刻（`os.date("%H:%M:%S")` など）                                                                |
-| `event`                               | 実行のきっかけ: `event.trigger`（`startup` / `interval` / `tag` / `screen_show` / `screen_hide` / `action`）、`event.tag`、`event.value`、`event.screen` |
-| 標準ライブラリ                        | `string` / `table` / `math` / `utf8` / `coroutine` と基本関数。ファイル・プロセス操作（`io`、`os.execute`、`require`、`load` など）は使えません |
+| `tag.name` / `tag["sys.about.host"]`  | Reads and writes a tag. A bool tag is `true` / `false`, an int is an integer, a float is a real number, a string is a string. A write is converted to the type of the tag, and `min` / `max` are applied too. An undefined tag is an error |
+| `goto_screen("name" [, "anim"])`      | Switches the screen (`fade` when `anim` is omitted). Returns `false` if the screen does not exist        |
+| `back()` / `current_screen()`         | Goes back to the previous screen / the name of the screen being shown                                   |
+| `run("name")`                         | Runs another script                                                                                     |
+| `call("fn" [, "arg"])`                | The same as the `call` action (a named action registered in the runtime)                                |
+| `log(...)` / `print(...)`             | Writes to the log (`[hml INFO ] [script] ...`)                                                          |
+| `warn(...)`                           | Writes to the log as a warning (`[hml WARN ] [script] ...`)                                             |
+| `millis()`                            | Milliseconds since startup                                                                              |
+| `os.time()` / `os.date(fmt)` / `os.clock()` | Time (`os.date("%H:%M:%S")` and so on)                                                            |
+| `event`                               | What started the run: `event.trigger` (`startup` / `interval` / `tag` / `screen_show` / `screen_hide` / `action`), `event.tag`, `event.value`, `event.screen` |
+| Standard library                      | `string` / `table` / `math` / `utf8` / `coroutine` and the basic functions. File and process operations (`io`, `os.execute`, `require`, `load` and so on) cannot be used |
 
-bool タグは Lua の真偽値です。`if tag.run then` と書いてください（`tag.run == 1` は常に偽になります）。
+A bool tag is a Lua boolean. Write `if tag.run then` (`tag.run == 1` is always false).
 
-デモプロジェクトの `auto_speed` スクリプト（Auto mode かつ Run のとき、温度に応じて速度設定値を動かす）が例です。
+The `auto_speed` script of the demo project (when Auto mode and Run are on, it moves the speed setpoint according to the temperature) is an example.
 
-## ロギング
+## Logging
 
-変数（タグ値）、アラーム、オペレーターの操作を記録できます。どれも project.json に設定を書いたものだけが
-有効になり、それぞれ別の SQLite データベース（`logs/` フォルダ）に記録され、CSV で取り出せます。
-ランタイム自身のメッセージ（スクリプトのエラーなど）の記録は、次の「システムログ」です。
+Variables (tag values), alarms and the operator's operations can be recorded. Each of them is active only when
+its settings are written in project.json; each is recorded in its own SQLite database (the `logs/` folder) and can be exported as CSV.
+The record of the runtime's own messages (script errors and so on) is the "System log" that follows.
 
-共通の設定キー:
+Common setting keys:
 
-| キー             | 既定値                                   | 内容                                         |
+| Key              | Default                                  | Description                                  |
 | ---------------- | ---------------------------------------- | -------------------------------------------- |
-| `enabled`        | `true`                                   | `false` で設定を残したまま記録を止める       |
-| `path`           | `logs/data.db` / `alarm.db` / `operation.db` | データベースファイル（project.json からの相対） |
-| `retention_days` | `30`                                     | これより古い行を削除（`0` = 無期限）         |
-| `max_rows`       | 変数 `1000000`、ほかは `100000`          | これを超えたら古い行から削除（`0` = 無制限） |
-| `max_size_mb`    | `1000`                                   | データベースの容量（MB）がこれを超えたら古い行から削除（`0` = 無制限）。1 行に多くのタグを入れるグループは行が大きくなるので、行数だけでは容量を抑えられない |
+| `enabled`        | `true`                                   | `false` stops recording while keeping the settings |
+| `path`           | `logs/data.db` / `alarm.db` / `operation.db` | The database file (relative to project.json) |
+| `retention_days` | `30`                                     | Rows older than this are deleted (`0` = no limit) |
+| `max_rows`       | `1000000` for the data log, `100000` for the others | Above this, the oldest rows are deleted (`0` = unlimited) |
+| `max_size_mb`    | `1000`                                   | When the size of the database (MB) exceeds this, the oldest rows are deleted (`0` = unlimited). A group with many tags in one row has large rows, so the number of rows alone cannot keep the size down |
 
-書き込みは約 1 秒ごとにバックグラウンドでまとめて行います（電源断で直前の約 1 秒分が失われることがあります）。
-設定の変更はランタイムの再起動で反映されます。
+Writes are done in the background, in batches about every second (a power loss can lose about the last second).
+Changes of the settings take effect when the runtime is restarted.
 
-### 変数ロギング (`data_log`)
+### Data log (`data_log`)
 
-タグをグループにまとめ、グループごとに記録のタイミングを決めます。1 回の記録（サンプル）には、その時点の
-グループ内の全タグの値が入ります。
+Tags are put into groups, and each group decides when it records. One record (a sample) holds the values of
+all tags of the group at that moment.
 
 ```json
 "data_log": {
@@ -1979,52 +1998,52 @@ bool タグは Lua の真偽値です。`if tag.run then` と書いてくださ�
 }
 ```
 
-| `trigger`          | 記録されるとき                                                                                   |
+| `trigger`          | When it records                                                                                  |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
-| `interval`（既定） | `interval_ms` ミリ秒ごと（既定 1000、最小 100）                                                  |
-| `change`           | グループ内のタグのどれかが変化したとき。`interval_ms` を付けると、その時間内は 1 回にまとめる    |
-| `tag`              | `trigger_tag` がオフ（0 / 空）からオン（0 以外）になったとき                                     |
-| `manual`           | `{ "action": "call", "fn": "data_log.sample", "arg": "report" }`（Lua: `call("data_log.sample", "report")`）で記録 |
+| `interval` (default) | Every `interval_ms` milliseconds (default 1000, minimum 100)                                   |
+| `change`           | When any tag of the group changes. With `interval_ms`, the changes within that time become one record |
+| `tag`              | When `trigger_tag` goes from off (0 / empty) to on (not 0)                                       |
+| `manual`           | Recorded by `{ "action": "call", "fn": "data_log.sample", "arg": "report" }` (Lua: `call("data_log.sample", "report")`) |
 
-CSV はグループごとに、時刻 + タグごとの列になります（bool は 1 / 0）。
+The CSV is one per group: the time plus a column for each tag (a bool is 1 / 0).
 
 ```
 hml_runtime --export-data-log process.csv projects/demo/project.json --group process
 ```
 
-画面からは `{ "action": "call", "fn": "data_log.export", "arg": "process" }`（`arg` は `グループ` または
-`グループ,出力先`。出力先を省くとデータベースと同じフォルダ、`arg` が空なら全グループ）。
+From a screen: `{ "action": "call", "fn": "data_log.export", "arg": "process" }` (`arg` is `group` or
+`group,destination`. Without a destination, the folder of the database; with an empty `arg`, all groups).
 
-#### 画面で見る: `trend`（トレンド履歴）
+#### Viewing on a screen: `trend` (trend history)
 
-変数ロギングのグループを、時間の窓を指定して折れ線で表示します。
+It shows a group of the data log as lines, for a chosen window of time.
 
 ```json
 { "type": "trend", "group": "process", "w": "100%", "h": 300, "range_s": 3600,
   "tags": ["temp", { "tag": "pressure", "color": "#e91e63" }] }
 ```
 
-| キー         | 内容                                                                             |
+| Key          | Description                                                                      |
 | ------------ | -------------------------------------------------------------------------------- |
-| `group`      | 変数ロギングのグループ                                                           |
-| `tags`       | 表示するタグ（省略時はグループの全タグ、8 本まで）。`{ "tag", "color" }` で色も指定 |
-| `range_s`    | 表示する期間（既定 3600 秒）。`−` / `+` で 2 倍 / 半分（1 分〜1 年）              |
-| `min` / `max`| 縦軸の範囲（省略時はデータに合わせる）                                           |
-| `buckets`    | 横の点数（既定 200）。各点はその区間の最小値と最大値の 2 本の線になる              |
-| `refresh_ms` | 「今」を表示している間の更新周期（既定 2000）                                     |
+| `group`      | The group of the data log                                                        |
+| `tags`       | The tags to show (omitted: all tags of the group, up to 8 lines). `{ "tag", "color" }` gives the color too |
+| `range_s`    | The period to show (default 3600 seconds). `−` / `+` make it double / half (1 minute to 1 year) |
+| `min` / `max`| The range of the vertical axis (omitted: fitted to the data)                     |
+| `buckets`    | The number of points across (default 200). Each point becomes two lines, the minimum and the maximum of its interval |
+| `refresh_ms` | The update period while "now" is shown (default 2000)                            |
 
-- 各点は時間の区間で、その区間の**最小値と最大値**を描くので、長い期間を表示しても短いピークが消えません。
-- `◀` `▶` で半分ずつ移動、「Now」で最新に戻ります（最新を表示している間は自動で更新）。グラフに触れると、
-  その時刻の値（区間に幅があれば最小..最大）が出ます。
-- 変数ロギングは、記録と同時に**1 分ごとの要約**（各タグの最小・最大・最後の値、テーブル `minute`）を書きます。
-  1 区間が 1 分以上の長い期間はこの要約を読み、要約がまだない部分（今の 1 分と、以前のバージョンで記録した期間）
-  だけ記録そのものを読みます。100 万件の記録でも数十 ms で描けます（要約がなければ数秒）。
-- 読み出しは別スレッドで行うので、長い期間を表示しても画面は止まりません。
+- Each point is an interval of time and draws the **minimum and maximum** of that interval, so short peaks do not disappear even when a long period is shown.
+- `◀` `▶` move by half a window, and "Now" returns to the latest (it updates automatically while the latest is shown). Touching the chart
+  shows the values at that time (minimum..maximum if the interval has a width).
+- While recording, the data log also writes a **summary for every minute** (the minimum, maximum and last value of each tag, table `minute`).
+  A long period where one interval is 1 minute or more reads this summary, and reads the records themselves only for the parts that have no summary yet (the current minute, and periods recorded by an earlier version).
+  Even a million records are drawn in some tens of ms (a few seconds without the summary).
+- Reading is done on another thread, so the screen does not stop even when a long period is shown.
 
-### アラーム (`alarms`)
+### Alarms (`alarms`)
 
-タグに対する条件を定義します。条件が成立したとき（発生 `raised`）、成立しなくなったとき（復帰 `cleared`）、
-確認（アクノリッジ）されたとき（`acked`）に 1 行ずつ記録されます。
+An alarm defines a condition on a tag. One row is recorded when the condition becomes true (`raised`), when it is no longer true (`cleared`),
+and when the alarm is acknowledged (`acked`).
 
 ```json
 "alarms": {
@@ -2038,63 +2057,63 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 }
 ```
 
-| キー                  | 内容                                                                                               |
+| Key                   | Description                                                                                        |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
-| `name` / `tag`        | アラーム名（一意）と、監視するタグ                                                                 |
-| `condition`           | `true`（既定: タグがオン / 0 以外）、`false`、`eq` `ne` `gt` `lt` `ge` `le`（`==` `!=` `>` `<` `>=` `<=` も可） |
-| `value` / `value_tag` | 比較する値。`value_tag` を書くと、別のタグの現在値と比較する（設定値タグをしきい値にできる）       |
-| `severity`            | `warning`（既定）/ `critical` / `info` など。記録されるだけで、動作は変わらない                    |
-| `message`             | 記録するメッセージ（省略時はアラーム名）                                                           |
-| `ack`                 | `true`（既定）: 確認されるまで「発生中のアラーム」に残る。`false`: 復帰すれば消える（確認は不要）    |
-| `ack_level`（全体）   | 確認に必要なユーザーレベル（既定 0 = 誰でも。ユーザー管理を使うとき）。足りなければログイン画面が出る |
+| `name` / `tag`        | The name of the alarm (unique) and the tag to watch                                                |
+| `condition`           | `true` (default: the tag is on / not 0), `false`, `eq` `ne` `gt` `lt` `ge` `le` (`==` `!=` `>` `<` `>=` `<=` are accepted too) |
+| `value` / `value_tag` | The value to compare with. With `value_tag`, the comparison is with the current value of another tag (a setpoint tag can be the threshold) |
+| `severity`            | `warning` (default) / `critical` / `info` and so on. It is only recorded; the behavior does not change |
+| `message`             | The message to record (omitted: the name of the alarm)                                             |
+| `ack`                 | `true` (default): stays in the "active alarms" until it is acknowledged. `false`: disappears when it clears (no acknowledgment needed) |
+| `ack_level` (for all) | The user level needed to acknowledge (default 0 = anybody. For use with "Users"). If it is not enough, the login screen appears |
 
-- 状態（発生中か、確認済みか）は再起動しても残ります（データベースから読み戻します）。止まっている間に
-  発生していたアラームは起動時刻で発生、止まっている間に消えたアラームは起動時刻で復帰として記録されます。
-  状態が変わっていないアラームは記録し直しません。
-- 記録される列は、時刻、名前、`raised` / `cleared` / `acked`、重要度、メッセージ、そのときのタグ値、確認した人です。
-  以前のバージョンで作ったデータベースには、開いたときに列が追加されます。
-- 確認は操作ログにも記録されます（種別 `alarm`）。
-- タグ: `sys.alarm.active`（発生中の数）、`sys.alarm.unacked`（未確認の数）、`sys.alarm.latest`（いちばん新しい未確認の
-  アラーム、なければ発生中のアラームのメッセージ）、`sys.alarm.latest_severity`。
-- 動作: `{ "action": "call", "fn": "alarm.ack", "arg": "<名前>" }`（`arg` 省略 = いちばん新しい未確認）、
-  `{ "action": "call", "fn": "alarm.ack_all" }`。
+- The state (active or not, acknowledged or not) survives a restart (it is read back from the database). An alarm that
+  was raised while the runtime was stopped is recorded as raised at the startup time, and an alarm that went away while it was stopped is recorded as cleared at the startup time.
+  An alarm whose state has not changed is not recorded again.
+- The recorded columns are the time, the name, `raised` / `cleared` / `acked`, the severity, the message, the tag value at that moment, and who acknowledged it.
+  A database made by an earlier version gets the columns added when it is opened.
+- An acknowledgment is recorded in the operation log too (kind `alarm`).
+- Tags: `sys.alarm.active` (the number of active alarms), `sys.alarm.unacked` (the number of unacknowledged alarms), `sys.alarm.latest` (the message of the newest unacknowledged
+  alarm, or of an active alarm if there is none), `sys.alarm.latest_severity`.
+- Actions: `{ "action": "call", "fn": "alarm.ack", "arg": "<name>" }` (`arg` omitted = the newest unacknowledged one),
+  `{ "action": "call", "fn": "alarm.ack_all" }`.
 
-#### 集計を画面に出す: `alarm_summary`
+#### Showing a summary on a screen: `alarm_summary`
 
-期間を選んで、アラームごとの**発生回数**と**発生していた時間の合計**を出す部品です（「何が一番多いか」「何で一番長く止まったか」）。
-アラームのログから、その場で数えます。
+A widget that shows, for a chosen period, the **number of times** each alarm was raised and the **total time it was active** ("which one is the most frequent", "which one stopped us the longest").
+It counts from the alarm log on the spot.
 
 ```json
 { "type": "alarm_summary", "w": "100%", "h": 300, "days": 7, "sort": "count", "rows": 10 }
 ```
 
-| キー         | 内容                                                                                          |
+| Key          | Description                                                                                   |
 | ------------ | --------------------------------------------------------------------------------------------- |
-| `days`       | 期間: 直近 N 日（既定 7、`0` = すべて）。部品の上のドロップダウンでも 24 時間 / 7 日 / 30 日 / すべて を選べる |
-| `sort`       | `count`（回数の多い順。既定）/ `time`（時間の長い順）。部品の上でも選べる                      |
-| `rows`       | 上位 N 件を出す（既定 10）                                                                    |
-| `severity`   | この重要度だけ（省くとすべて）                                                                |
-| `bars`       | 数字の横に棒を出す（いちばん大きい値に対する割合。既定 `true`）                               |
-| `refresh_ms` | 表示中に数え直す間隔（既定 5000）。アラームの状態が変わったときは、すぐ数え直す                |
-| `labels`     | 部品の中の文字: `empty` `alarm` `count` `time` `day` `week` `month` `all` `by_count` `by_time` |
+| `days`       | The period: the last N days (default 7, `0` = all). The dropdown at the top of the widget also offers 24 hours / 7 days / 30 days / all |
+| `sort`       | `count` (most frequent first. Default) / `time` (longest first). It can be chosen at the top of the widget too |
+| `rows`       | Shows the top N (default 10)                                                                  |
+| `severity`   | This severity only (omitted: all)                                                             |
+| `bars`       | Shows a bar next to the number (the ratio to the largest value. Default `true`)               |
+| `refresh_ms` | The interval at which it counts again while shown (default 5000). When the state of an alarm changes, it counts again at once |
+| `labels`     | The texts in the widget: `empty` `alarm` `count` `time` `day` `week` `month` `all` `by_count` `by_time` |
 
-- 1 行は、アラームのメッセージ、回数、時間（`時:分:秒`。24 時間を超えても時間のまま）、棒です。右上は、表示している全アラームの
-  回数と時間の合計です。**いま発生中のアラームには印（⚠）が付き**、その時間は今も増えていきます。
-- 重要度は左の色の帯で、発生中かどうかは印で示します（色だけには頼りません）。
-- 読むだけの部品です。アラームの記録は変えません。数えるのは別スレッドなので、ログが大きくても画面は止まりません
-  （10 万件の記録で約 10 ms。PC での計測）。
-- **時間の数え方**: 「発生」から次の「復帰」までのうち、期間に入っている部分を足します。
-  - 期間の前から続いているアラームは、時間には入り、回数には入りません。
-  - 「復帰」の記録がないまま次の「発生」がある場合（電源断、ログの切り詰め）、前の発生は「そのログに最後に何かが書かれた時刻」で
-    終わったものとします。それより長くは数えません。
-  - 時計を戻したために「復帰」が「発生」より前になった区間は 0 とします。時間が負になることはありません。
-  - **アラームが発生したまま装置の電源を切っていた時間は、発生していた時間に入ります**（次に起動して条件が解けていれば、その時刻に
-    復帰が記録されるため）。夜間に電源を切る装置では、この分だけ長く出ます。
-- CSV への書き出し: `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }`（引数は日数。空か `0` ですべて）。アラームの
-  データベースと同じフォルダーに `alarm-summary-<日付-時刻>.csv` を書きます（列: `name,message,severity,count,active_s,longest_s,active_now`）。
-  `=` `+` `-` `@` で始まる文字には先頭に `'` を付けるので、表計算ソフトで開いても式として実行されません。
+- One row is the message of the alarm, the count, the time (`h:mm:ss`. It stays in hours beyond 24 hours) and the bar. The top right is the total
+  count and time of all alarms shown. **An alarm that is active now gets a mark (⚠)**, and its time keeps growing.
+- The severity is shown by the color band on the left, and whether it is active by the mark (it does not rely on color alone).
+- It is a read-only widget. It does not change the alarm records. The counting is on another thread, so the screen does not stop even when the log is large
+  (about 10 ms for 100,000 records. Measured on a PC).
+- **How the time is counted**: the part of each span from a "raised" to the next "cleared" that lies within the period is added up.
+  - An alarm that continues from before the period counts toward the time, and does not count toward the number of times.
+  - When a "raised" follows without a "cleared" record in between (a power loss, a truncated log), the earlier one is taken to have ended at "the time when anything was last written to that log".
+    It is not counted any longer than that.
+  - A span where the "cleared" is before the "raised" because the clock was set back is 0. The time never becomes negative.
+  - **The time during which the device was powered off with an alarm still active counts as time the alarm was active** (because the clear is recorded at the time of the next
+    startup, if the condition is gone by then). On a device that is powered off at night, the time comes out longer by that much.
+- Export to CSV: `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }` (the argument is the number of days. Empty or `0` for all). It writes
+  `alarm-summary-<date-time>.csv` to the same folder as the alarm database (columns: `name,message,severity,count,active_s,longest_s,active_now`).
+  A text that begins with `=` `+` `-` `@` gets a `'` in front, so it is not run as a formula when the file is opened in a spreadsheet program.
 
-#### 画面に出す: `alarm_list` と `alarm_banner`
+#### Showing on a screen: `alarm_list` and `alarm_banner`
 
 ```json
 { "type": "alarm_banner", "w": "100%", "h": 36 },
@@ -2102,35 +2121,35 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 { "type": "alarm_list", "w": "100%", "h": 200, "mode": "history", "rows": 10 }
 ```
 
-| キー           | 内容                                                                                                   |
+| Key            | Description                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `mode`         | `current`（既定: 発生中・未確認のアラーム、新しい順）/ `history`（記録、新しい順。ページ送りと重要度の絞り込み付き） |
-| `rows`         | `current`: 表示する最大行数（既定 50、超えた分は「+N more」）。`history`: 1 ページの行数（既定 20）     |
-| `row_height`   | 行の高さ（既定 40 px。指で押しやすい高さ）                                                             |
-| `columns`      | `time` / `severity` / `message` / `state` から選んで並べる（既定 `time, message, state`）              |
-| `ack_on_tap`   | `current`: 行をタップするとそのアラームを確認する（既定 `true`）。バナーでは既定 `false`               |
-| `severity`     | その重要度だけ表示する                                                                                 |
-| `days`         | `history`: 直近 N 日だけ（既定 0 = すべて）                                                            |
-| `blink`        | バナー: 未確認の間点滅する（既定 `true`）                                                              |
-| `labels`       | 表示文字の置き換え: `unacked` `active` `cleared` `empty` `idle` `all` `more`（`%d` が件数）`raised` `cleared_event` `acked_event` |
+| `mode`         | `current` (default: the active and the unacknowledged alarms, newest first) / `history` (the records, newest first. With paging and a severity filter) |
+| `rows`         | `current`: the maximum number of rows shown (default 50, the rest as "+N more"). `history`: the rows of one page (default 20) |
+| `row_height`   | The height of a row (default 40 px. A height that is easy to press with a finger)                      |
+| `columns`      | Chosen and ordered from `time` / `severity` / `message` / `state` (default `time, message, state`)     |
+| `ack_on_tap`   | `current`: a tap on a row acknowledges that alarm (default `true`). For the banner the default is `false` |
+| `severity`     | Shows that severity only                                                                               |
+| `days`         | `history`: the last N days only (default 0 = all)                                                      |
+| `blink`        | Banner: blinks while unacknowledged (default `true`)                                                   |
+| `labels`       | Replaces the displayed texts: `unacked` `active` `cleared` `empty` `idle` `all` `more` (`%d` is the count) `raised` `cleared_event` `acked_event` |
 
-- 色は重要度（`critical` 赤 / `warning` 琥珀 / `info` 青）、状態は塗り方（未確認 = 塗りつぶし、確認済み = 薄く、
-  復帰・未確認 = 灰色に色の帯）に加えて、文字とアイコンでも示します（色だけに頼らない）。
-- バナーは、いちばん新しい未確認のアラーム（なければ発生中のアラーム）と、ほかの件数を出します。`on_click` に
-  アラーム画面への `goto` などを書けます。
-- 一覧は表示中の画面にあるときだけ描き直します（250 ms ごとに変化を確認）。
-- 表示文字のフォントは Montserrat なので、`labels` で日本語を使う場合は日本語の字形を含むフォントが必要です
-  （多言語対応 #22 で扱います）。
+- The color is the severity (`critical` red / `warning` amber / `info` blue); the state is shown by the fill (unacknowledged = filled, acknowledged = faint,
+  cleared and unacknowledged = grey with a color band) and also by text and an icon (it does not rely on color alone).
+- The banner shows the newest unacknowledged alarm (or an active alarm if there is none) and the number of the others. `on_click` can
+  hold a `goto` to the alarm screen and the like.
+- The list is redrawn only while it is on the screen being shown (it checks for changes every 250 ms).
+- The font of the displayed texts is Montserrat, so using Japanese in `labels` needs a font that contains the Japanese glyphs
+  (handled in the multi-language support, #22).
 
 ```
 hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 ```
 
-画面からは `{ "action": "call", "fn": "alarm_log.export" }`（`arg` で出力先を指定可）。
+From a screen: `{ "action": "call", "fn": "alarm_log.export" }` (`arg` can give the destination).
 
-### レシピ (`recipes`)
+### Recipes (`recipes`)
 
-品種ごとの設定値など、タグの値の組に名前を付けておき、まとめて書き込みます（ドライバを通して PLC へ）。
+A set of tag values, such as the setpoints of a product type, is given a name and is written all at once (through the driver to the PLC).
 
 ```json
 "recipes": {
@@ -2144,73 +2163,73 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 }
 ```
 
-| キー         | 内容                                                                                                   |
+| Key          | Description                                                                                            |
 | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `level`      | 装置でレシピを書き込む・保存する・削除するのに必要なユーザーレベル（既定 0 = 誰でも。選ぶだけなら不要） |
-| `verify_ms`  | 書き込んでからこの時間（ms）後に、タグの値と書いた値を比べる（既定 2000、0 = 比べない）                |
-| `books`      | レシピブック: `name`（1〜32 文字、`/ \ : * ? " < > | .` は不可）、`items`（タグ）、`recipes`（初期のレシピ） |
+| `level`      | The user level needed to write, save and delete recipes on the device (default 0 = anybody. Not needed just to select) |
+| `verify_ms`  | This time (ms) after the write, the tag values are compared with the written values (default 2000, 0 = no comparison) |
+| `books`      | Recipe books: `name` (1 to 32 characters, `/ \ : * ? " < > | .` not allowed), `items` (tags), `recipes` (the initial recipes) |
 
-- **書き込み**: 先にすべての値を、型とタグの `min` / `max` で確かめます。1 つでも外れていれば何も書きません。
-  書いたあと `verify_ms` 経ったら値を比べ、PLC が受け付けなかった値があれば `sys.recipe.status` に出します。
-- **装置での保存**: 装置で保存・変更・削除したレシピは、project.json の隣の `recipes/<ブック名>.json` に保存します
-  （一時ファイルに書いてから置き換えるので、保存中に電源が切れても壊れません。形式は `{ "version": 1, "recipes": [...] }`）。
-  このファイルができてからは、プロジェクトのレシピではなくこちらを使います。デプロイでは上書きされません（`logs/` と同じ）。
-- **CSV**: 1 行に 1 レシピ（`name,<タグ>,<タグ>...`、UTF-8 BOM 付き）。表計算ソフトが数式と読むセル（`=` `+` `-` `@`
-  で始まる文字）は先頭に `'` を付けて書き出します（CSV インジェクション対策）。取り込みは、列がブックの項目か、
-  名前と値が正しいか、大きさ（4 MB まで）を確かめ、1 つでも問題があれば何も変えません。
-- 書き込み・保存・削除・取り込み・書き出しは操作ログに記録します（種別 `recipe`）。
-- タグ: `sys.recipe.status`（最後の操作の結果）、`sys.recipe.<ブック名>.selected`（選んでいるレシピ）。
-- 動作（`call`）: `recipe.select`（`"ブック,名前"`）、`recipe.write`（`"ブック[,名前]"`、省略時は選んでいるもの）、
-  `recipe.save`（`"ブック,名前"`: 今のタグの値で保存）、`recipe.delete`、`recipe.export`（`"ブック[,ファイル]"`）、`recipe.import`（`"ブック,ファイル"`）。
+- **Writing**: first all values are checked against the type and the `min` / `max` of the tags. If even one is out of range, nothing is written.
+  When `verify_ms` has passed after the write, the values are compared, and any value the PLC did not accept is reported in `sys.recipe.status`.
+- **Saving on the device**: recipes saved, changed or deleted on the device are stored in `recipes/<book name>.json` next to project.json
+  (it is written to a temporary file that then replaces the old one, so a power loss during the save does not corrupt it. The format is `{ "version": 1, "recipes": [...] }`).
+  Once this file exists, it is used instead of the recipes of the project. A deploy does not overwrite it (like `logs/`).
+- **CSV**: one recipe per row (`name,<tag>,<tag>...`, with a UTF-8 BOM). Cells that a spreadsheet program reads as a formula (texts that begin with `=` `+` `-` `@`)
+  are written with a `'` in front (against CSV injection). An import checks that the columns are the items of the book, that
+  the names and values are valid, and the size (up to 4 MB); if there is even one problem, nothing is changed.
+- Write, save, delete, import and export are recorded in the operation log (kind `recipe`).
+- Tags: `sys.recipe.status` (the result of the last operation), `sys.recipe.<book name>.selected` (the selected recipe).
+- Actions (`call`): `recipe.select` (`"book,name"`), `recipe.write` (`"book[,name]"`, the selected one when omitted),
+  `recipe.save` (`"book,name"`: saves the current tag values), `recipe.delete`, `recipe.export` (`"book[,file]"`), `recipe.import` (`"book,file"`).
 
-#### 画面に出す: `recipe_table`
+#### Showing on a screen: `recipe_table`
 
 ```json
 { "type": "recipe_table", "book": "process", "w": "100%", "h": 400 }
 ```
 
-左にレシピの一覧、右に「項目・レシピの値・現在値」の表と、書き込み・現在値の読み込み・名前を付けて保存・削除の
-ボタンが出ます。レシピの値と現在値が違うところは色と `*` で示します（書き込むと変わる値）。値をタップすると
-その値を変えられます。書き込み・読み込み・削除は確認してから行い、`level` が足りなければログイン画面が出ます。
-`labels` で表示文字を置き換えられます（`write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`
-`confirm_write` `confirm_read` `confirm_delete`。`%s` はレシピ名）。
+On the left is the list of recipes; on the right are a table of "item, recipe value, current value" and the buttons to write, to read the current values, to save under a name and to delete.
+Where the recipe value and the current value differ, it is shown by a color and `*` (the values that a write would change). A tap on a value
+lets you change it. Write, read and delete ask for confirmation first, and if `level` is not enough the login screen appears.
+`labels` replaces the displayed texts (`write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`
+`confirm_write` `confirm_read` `confirm_delete`. `%s` is the recipe name).
 
-デザイナーでは「レシピ」タブ（Ctrl+7）でブックとレシピを表の形で編集でき、表計算ソフトとの取り込み / 書き出しもできます。
-範囲外の値や存在しないブックは問題一覧に出ます。
+In the designer, the "Recipes" tab (Ctrl+7) edits the books and recipes as a table, and can also import from / export to a spreadsheet program.
+Values out of range and books that do not exist appear in the list of problems.
 
-### 操作ログ (`operation_log`)
+### Operation log (`operation_log`)
 
-オペレーターが画面で行った操作を記録します。
+It records what the operator does on the screens.
 
 ```json
 "operation_log": { "user_tag": "operator" }
 ```
 
-| 記録される操作（`kind`）        | 内容                                                                                          |
+| Recorded operation (`kind`)     | Description                                                                                   |
 | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `write`                         | スイッチ・スライダー・入力欄などからのタグ書き込みと、`set` / `toggle` / `inc` / `dec` アクション。変更前と変更後の値 |
-| `screen`                        | `goto` / `back` アクションによる画面切り替え                                                  |
-| `script` / `call` / `system`    | イベントから実行したスクリプト、`call` アクション、`reload` / `exit` / `restart`              |
+| `write`                         | Tag writes from switches, sliders, input fields and so on, and the `set` / `toggle` / `inc` / `dec` actions. The values before and after the change |
+| `screen`                        | Screen changes by the `goto` / `back` actions                                                 |
+| `script` / `call` / `system`    | Scripts run from events, `call` actions, `reload` / `exit` / `restart`                        |
 
-- ユーザー管理（`users`）を使っているときは、ログイン中のユーザー名が各行に入り、ログイン・ログアウト・
-  ログイン失敗・ロックも `kind` = `user` の行として記録されます（`user_tag` は使われません）。
-- `user_tag` に文字列タグ（ログイン中のオペレーター名など）を指定すると、その値が各行に記録されます。
-  各行には、操作した画面の名前も入ります。
-- 同じタグへの書き込みが 1 秒以内に続いたとき（スライダーのドラッグ、+ ボタンの連打）は 1 行にまとめ、
-  最初の変更前の値と最後の変更後の値を記録します。
-- パスワード入力欄に入力した内容は記録しません（`***` になります）。
-- 値が変わらなかった書き込み、スクリプトの中でのタグ書き込み、ドライバ（PLC）からの変化は記録しません。
+- When user management (`users`) is in use, the name of the logged-in user is put in every row, and logins, logouts,
+  failed logins and lockouts are recorded too, as rows with `kind` = `user` (`user_tag` is not used).
+- When `user_tag` names a string tag (the name of the logged-in operator, for example), its value is recorded in every row.
+  Every row also has the name of the screen where the operation was done.
+- When writes to the same tag follow each other within 1 second (dragging a slider, tapping a + button repeatedly), they become one row
+  that records the value before the first change and the value after the last change.
+- What is entered in a password input field is not recorded (it becomes `***`).
+- Writes that did not change the value, tag writes inside scripts, and changes from the driver (PLC) are not recorded.
 
 ```
 hml_runtime --export-operation-log operations.csv projects/demo/project.json
 ```
 
-画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+From a screen: `{ "action": "call", "fn": "operation_log.export" }` (`arg` can give the destination).
 
-## XY グラフ: `xy_chart`
+## XY chart: `xy_chart`
 
-横軸と縦軸にそれぞれタグを取るグラフです（プレスの位置と荷重、バルブの開度と流量など）。一定の間隔か、値が変わった
-ときに点を足し、古い点から捨てます。時間を横軸にするグラフは `chart` / `trend` を使います。
+A chart that takes one tag for the horizontal axis and one for the vertical axis (position and force of a press, opening and flow of a valve, and so on). It adds a point at a fixed interval or when
+a value changes, and discards the oldest points first. For a chart with time on the horizontal axis, use `chart` / `trend`.
 
 ```json
 { "type": "xy_chart", "w": 300, "h": 240,
@@ -2219,67 +2238,67 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
   "points": 200, "sample_ms": 100, "clear_tag": "cycle_start" }
 ```
 
-| キー                              | 内容                                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| `x_tag` / `y_tag`                 | 横軸・縦軸のタグ（`x` `y` は部品の位置なので、軸のキーは `x_tag` `x_min` … と書く）        |
-| `x_min` `x_max` `y_min` `y_max`   | 軸の範囲（既定 0 〜 100）。軸の両端に数字が出る                                            |
-| `points`                          | 残す点の数（2 〜 2000、既定 200）                                                          |
-| `sample_ms`                       | 点を取る間隔（20 以上、既定 100）。`0` は「x か y が変わったとき」                         |
-| `refresh_ms`                      | グラフを描き直す間隔の下限（50 以上、既定 250）                                            |
-| `mode`                            | `line`（来た順に線でつなぐ。既定）/ `dots`（点だけ）                                       |
-| `color`、`hdiv` / `vdiv`、`decimals` | 線の色、格子の線の数、軸の数字の小数の桁                                                |
-| `clear_tag`                       | このタグが真（0 以外）になった瞬間に、曲線を消して描き直す（1 サイクルごとの波形に使う）   |
-| `series`                          | 2 本目以降の曲線: `[ { "x_tag", "y_tag", "color" } ]`（全部で 4 本まで。軸は共通）         |
+| Key | Description |
+| --- | --- |
+| `x_tag` / `y_tag` | The tags of the horizontal and vertical axes (`x` `y` are the position of the widget, so the keys of the axes are written `x_tag` `x_min` …) |
+| `x_min` `x_max` `y_min` `y_max` | The range of the axes (default 0 to 100). Numbers appear at both ends of each axis |
+| `points` | The number of points to keep (2 to 2000, default 200) |
+| `sample_ms` | The interval for taking points (20 or more, default 100). `0` means "when x or y changes" |
+| `refresh_ms` | The lower limit of the interval for redrawing the chart (50 or more, default 250) |
+| `mode` | `line` (joins the points with a line in the order they arrive; the default) / `dots` (points only) |
+| `color`, `hdiv` / `vdiv`, `decimals` | The color of the line, the number of grid lines, the number of decimals of the axis numbers |
+| `clear_tag` | At the moment this tag becomes true (not 0), the curve is erased and drawn anew (use it for a waveform per cycle) |
+| `series` | The second and later curves: `[ { "x_tag", "y_tag", "color" } ]` (up to 4 curves in all; the axes are shared) |
 
-- デザイナーでは、2 本目以降の曲線（`series`）を部品の設定の一覧で足し引きできます（横軸のタグ・縦軸のタグ・色）。
-- 数値でない値（通信前の NaN など）は点になりません。範囲の外の点は、グラフの端に描かれます（値そのものは保持します）。
-- 点は、別の画面を表示している間も取り続けます（戻ったときに曲線が出ています）。描画は画面を表示している間だけです。
-- **負荷に注意してください。** このグラフは、点が増えるたびに全部の線を描き直します。Raspberry Pi 4（480x320、グラフ 300x264、
-  曲線 2 本、1 秒に 20 点）での計測:
+- In the designer, you can add and remove the second and later curves (`series`) in a list in the widget's settings (tag of the horizontal axis, tag of the vertical axis, color).
+- A value that is not a number (NaN before communication starts, and so on) does not become a point. A point outside the range is drawn at the edge of the chart (the value itself is kept).
+- Points are still taken while another screen is shown (the curve is there when you come back). Drawing happens only while the screen is shown.
+- **Mind the load.** This chart redraws all its lines every time a point is added. Measured on a Raspberry Pi 4 (480x320, chart 300x264,
+  2 curves, 20 points per second):
 
-  | 点の数（1 本あたり） | ランタイムの CPU 使用率 |
-  | -------------------- | ----------------------- |
-  | 300                  | 5 〜 8 %                |
-  | 2000                 | 25 〜 32 %              |
+  | Number of points (per curve) | CPU usage of the runtime |
+  | --- | --- |
+  | 300 | 5 to 8 % |
+  | 2000 | 25 to 32 % |
 
-  描き直しを 1 秒に 4 回（`refresh_ms` 250）にまとめた結果です（点ごとに描き直していた最初の実装では、300 点で約 30 %、
-  5000 点でほぼ 100 % でした）。小さな装置では `points` を数百にするか、`refresh_ms` を大きくしてください。
+  These are the results with the redraws gathered into 4 per second (`refresh_ms` 250) (the first implementation, which redrew for every point, took about 30 % at 300 points and
+  almost 100 % at 5000 points). On a small device, set `points` to a few hundred or make `refresh_ms` larger.
 
-## 表: `table`
+## Table: `table`
 
-文字とタグの値を、行と列に並べて見せる部品です。タグを指定したセルは、そのタグに追従します。表示だけです。
+A widget that shows text and tag values arranged in rows and columns. A cell with a tag follows that tag. It is display only.
 
 ```json
 { "type": "table", "w": "100%", "h": 200,
-  "columns": [ "機械", { "title": "生産数", "width": 90, "align": "right" }, { "title": "状態", "align": "center" } ],
-  "rows": [ [ "投入", { "tag": "m1_count" }, { "tag": "m1_state", "map": { "0": "停止", "1": "運転", "default": "?" } } ],
-            [ "加工", { "tag": "m2_count", "format": "%d 個" }, { "tag": "m2_state", "map": { "0": "停止", "1": "運転" } } ] ] }
+  "columns": [ "Machine", { "title": "Count", "width": 90, "align": "right" }, { "title": "State", "align": "center" } ],
+  "rows": [ [ "Loading", { "tag": "m1_count" }, { "tag": "m1_state", "map": { "0": "Stopped", "1": "Running", "default": "?" } } ],
+            [ "Machining", { "tag": "m2_count", "format": "%d pcs" }, { "tag": "m2_state", "map": { "0": "Stopped", "1": "Running" } } ] ] }
 ```
 
-| キー      | 内容                                                                                                                  |
-| --------- | --------------------------------------------------------------------------------------------------------------------- |
-| `columns` | 列の配列。見出しの文字か、`{ "title", "width"（px。書かない列は残りを分け合う）, "align"（`left` / `center` / `right`）}` |
-| `rows`    | 行の配列。1 行はセルの配列。セルは文字・数値か、`{ "tag", "format", "map" }`                                          |
-| `header`  | 見出しの行を出す（既定 `true`）                                                                                       |
+| Key | Description |
+| --- | --- |
+| `columns` | An array of columns. Each is the heading text, or `{ "title", "width" (px; columns without it share the rest), "align" (`left` / `center` / `right`) }` |
+| `rows` | An array of rows. One row is an array of cells. A cell is text or a number, or `{ "tag", "format", "map" }` |
+| `header` | Shows the heading row (default `true`) |
 
-- セルの `format` は、ほかの部品の `format` と同じ printf 形式（`"%.1f °C"`）。`map` は値ごとの文字で、キーは数値として
-  比べ（`"1"` は 1 にも `true` にも合う）、数値でなければ値の文字と比べます。どれにも合わなければ `default`、
-  `default` もなければ値そのものを出します。
-- 文字には `@ID`（多言語テキスト）が使えます。見出し、固定のセル、`map` の文字のどれでも使えます。
-- 行が多いと表の中でスクロールします。上限は 2000 行、32 列です（超えた分は出さず、システムログに警告を残します）。
-- タグのセルは、画面が表示されている間、1 秒に 4 回見直し、文字が変わったセルだけを描き直します
-  （1000 行・2000 セルで、変化なしの見直し 1 ms、全セル変化 4 ms。PC での計測）。
-- タグの文字列に含まれる改行・制御文字・壊れた UTF-8 は置き換えて 1 行で出し、200 文字で切ります。
-- セルを画面から書き換えることはできません（入力は `numeric_display` / `text_display` を使います）。
-- **デザイナーでの編集**: 列は部品の設定の「表示する列」で、見出し・幅・配置を 1 行ずつ編集します。セルは「セルを編集…」で開く表に
-  1 セル 1 行の文字で書きます: 文字はそのまま、タグは `{count}`、書式つきは `{temp|%.1f C}`、値ごとの文字は
-  `{state|0=停止,1=運転,*=?}`（`*` は `default`）。この書き方で表せないセル（`map` の文字に `,` や `|` を含むなど）は、
-  そのまま残して表では編集できない状態で出します。
+- The `format` of a cell is the same printf format as the `format` of other widgets (`"%.1f °C"`). `map` gives a text for each value; a key is compared as a
+  number (`"1"` matches both 1 and `true`), and if it is not a number, it is compared with the text of the value. If nothing matches, `default` is shown;
+  if there is no `default` either, the value itself is shown.
+- Text can use `@ID` (multilingual text). This works in headings, fixed cells and the texts of `map`.
+- With many rows, the table scrolls inside itself. The limits are 2000 rows and 32 columns (the excess is not shown, and a warning is left in the system log).
+- Cells with a tag are looked at again 4 times per second while the screen is shown, and only the cells whose text changed are redrawn
+  (with 1000 rows and 2000 cells: 1 ms for a pass with no change, 4 ms when all cells change. Measured on a PC).
+- Line breaks, control characters and broken UTF-8 in a tag's string are replaced so that it is shown on one line, and it is cut at 200 characters.
+- Cells cannot be changed from the screen (for input, use `numeric_display` / `text_display`).
+- **Editing in the designer**: the columns are edited under "columns" in the widget's settings, one line each with heading, width and alignment. The cells are written in the table that "Edit cells…" opens,
+  as one line of text per cell: text as it is, a tag as `{count}`, with a format as `{temp|%.1f C}`, a text for each value as
+  `{state|0=Stopped,1=Running,*=?}` (`*` is `default`). A cell that this notation cannot express (the text of a `map` contains `,` or `|`, and so on) is
+  left as it is and shown in the table in a state that cannot be edited.
 
-## 日付と時刻の入力: `datetime_input`
+## Date and time input: `datetime_input`
 
-年・月・日・時・分（・秒）のローラーを並べた入力部品です。キーボードは要りません。存在する日付しか選べません
-（日のローラーは、月と年に合わせて 28・29・30・31 日になります）。
+An input widget with rollers for year, month, day, hour and minute (and second) side by side. It needs no keyboard. Only dates that exist can be selected
+(the day roller has 28, 29, 30 or 31 days according to the month and the year).
 
 ```json
 { "type": "datetime_input", "bind": "start_at" },
@@ -2287,65 +2306,65 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 { "type": "datetime_input", "bind": "alarm_time", "mode": "time", "seconds": true }
 ```
 
-| キー                    | 内容                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `bind`                  | 値のタグ（文字列か数値）                                                          |
-| `mode`                  | `datetime`（既定）/ `date` / `time`                                               |
-| `seconds`               | 秒のローラーも出す（既定 `false`）                                                |
-| `year_min` / `year_max` | 年のローラーの範囲（既定 2020 〜 2040）。タグの値が範囲の外なら、その年まで広がる |
+| Key | Description |
+| --- | --- |
+| `bind` | The tag of the value (a string or a number) |
+| `mode` | `datetime` (default) / `date` / `time` |
+| `seconds` | Also shows the seconds roller (default `false`) |
+| `year_min` / `year_max` | The range of the year roller (default 2020 to 2040). If the value of the tag is outside the range, the range widens to that year |
 
-タグに入る値:
+The value that goes into the tag:
 
-| タグの型      | `datetime`                              | `date`                     | `time`                  |
-| ------------- | --------------------------------------- | -------------------------- | ----------------------- |
-| 文字列        | `2026-11-21 13:05`（秒ありは `:09` まで） | `2026-11-21`               | `13:05`（`13:05:09`）   |
-| 整数 / 実数   | Unix 時刻（秒）。装置の現地時刻で解釈   | その日の 0 時の Unix 時刻  | 0 時からの秒数          |
+| Type of the tag | `datetime` | `date` | `time` |
+| --- | --- | --- | --- |
+| String | `2026-11-21 13:05` (with seconds, up to `:09`) | `2026-11-21` | `13:05` (`13:05:09`) |
+| Integer / real | Unix time (seconds). Interpreted in the local time of the device | The Unix time of 0:00 of that day | The number of seconds since 0:00 |
 
-- 秒のローラーがないとき（`seconds` なし）は、書き込む値の秒は 0 になります。
-- ローラーが止まった時点でタグに書き込みます。書き込みは、ほかの部品と同じくタグの上下限・ドライバー・操作ログを通ります。
-- **`level` を付けると、レベルの足りないユーザーは回しても元に戻り、何も書き込まれません**（部品を入れたパネルに付けても同じ）。
-- タグが別の所（スクリプト、PLC、別の画面）で変わると、ローラーも追従します。同じタグに複数の入力部品をつないでも、
-  操作したローラーの分だけが反映され、ほかの部分は最新の値のままです。
-- タグの値が日付として読めないとき（空、別の書式）は、ローラーは今の時刻を示し、操作するまで何も書き込みません。
-- 大きさ: 日付 + 時刻で幅約 350 px、秒つきで約 420 px、高さ約 110 px。480 px の画面に収まります。
-- 夏時間のある地域では、数値タグ（Unix 時刻）への変換は OS のタイムゾーン設定に従います。日本（夏時間なし）以外の
-  切り替わりの時刻は確認していません。
+- When there is no seconds roller (no `seconds`), the seconds of the written value are 0.
+- The value is written to the tag at the moment a roller stops. As with other widgets, the write goes through the limits of the tag, the driver and the operation log.
+- **With `level`, when a user whose level is too low turns a roller, it goes back and nothing is written** (the same holds when `level` is on the panel that contains the widget).
+- When the tag changes somewhere else (a script, the PLC, another screen), the rollers follow. Even when several input widgets are connected to the same tag,
+  only the part of the roller that was operated is applied, and the other parts keep the latest value.
+- When the value of the tag cannot be read as a date (empty, another format), the rollers show the current time, and nothing is written until they are operated.
+- Size: about 350 px wide for date + time, about 420 px with seconds, about 110 px high. It fits on a 480 px screen.
+- In regions with daylight saving time, the conversion to a numeric tag (Unix time) follows the time zone setting of the OS. The times of the switch
+  outside Japan (which has no daylight saving time) have not been checked.
 
-## メーター: `meter`
+## Meter: `meter`
 
-丸い目盛りと針で値を見せる部品です。目盛りの数字、色を付けた区間、針、値の数字を持ちます。表示だけで、触っても値は変わりません。
+A widget that shows a value with a round scale and a needle. It has scale numbers, colored zones, a needle and the value as a number. It is display only; touching it does not change the value.
 
 ```json
 { "type": "meter", "w": 200, "h": 200, "bind": "temp", "min": 0, "max": 100, "decimals": 1, "unit": "°C",
   "zones": [ { "from": 60, "to": 80, "color": "#ffb300" }, { "from": 80, "to": 100, "color": "#e53935" } ] }
 ```
 
-| キー           | 内容                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------- |
-| `bind`         | 値のタグ（`"bind": "temp"`。`{ "value": { "tag": "rpm", "scale": 0.001 } }` の形も使える）     |
-| `min` / `max`  | 目盛りの範囲（既定 0 〜 100）。小数の範囲（0 〜 1.5 など）や負の範囲も使える                  |
-| `angle`        | 目盛りが回る角度（90 〜 360、既定 270）。開いた側が下になる                                   |
-| `ticks`        | 目盛りの線の数（2 〜 101、既定 21）                                                           |
-| `major_every`  | 何本ごとに長い線と数字を付けるか（既定 5）                                                    |
-| `decimals`     | 目盛りの数字と値の小数の桁（0 〜 3）                                                          |
-| `unit`         | 値の後ろに付ける単位                                                                          |
-| `show_value`   | 値を数字でも出す（既定 `true`）                                                               |
-| `needle_color` | 針の色                                                                                        |
-| `zones`        | 色を付ける区間の配列: `{ "from", "to", "color" }`（8 つまで）                                 |
+| Key | Description |
+| --- | --- |
+| `bind` | The tag of the value (`"bind": "temp"`. The form `{ "value": { "tag": "rpm", "scale": 0.001 } }` can also be used) |
+| `min` / `max` | The range of the scale (default 0 to 100). Fractional ranges (0 to 1.5 and so on) and negative ranges can also be used |
+| `angle` | The angle the scale covers (90 to 360, default 270). The open side is at the bottom |
+| `ticks` | The number of tick lines (2 to 101, default 21) |
+| `major_every` | Every how many ticks a long line and a number are put (default 5) |
+| `decimals` | The number of decimals of the scale numbers and the value (0 to 3) |
+| `unit` | The unit put after the value |
+| `show_value` | Also shows the value as a number (default `true`) |
+| `needle_color` | The color of the needle |
+| `zones` | An array of the zones to color: `{ "from", "to", "color" }` (up to 8) |
 
-- **針は目盛りの端で止まり、数字は実際の値を出します。** 範囲の外の値（100 までの目盛りで 150）も、数字で正しく読めます。
-  数値でない値（通信前など）は、針が始点、数字が `---` になります。
-- 区間の色の意味は、目盛りの上の位置（どこからどこまで）と値の数字でも分かります。色だけには頼りません。
-- 部品の中で、目盛りは幅と高さの短いほうに合わせた正方形になります。**一辺が 140 px より小さいと、目盛りの数字は出ません**
-  （線と値の数字は出ます）。数字を読ませたいメーターは 160 px 以上にしてください。
-- 文字の大きさと色は、ほかの部品と同じく `style`（`font`、`text_color`）で決めます。
-- デザイナーでは、色を付ける区間（`zones`）を部品の設定の一覧で足し引きできます（開始・終了・色）。
-- 負荷の目安: メーター 12 個が毎フレーム変わる画面で、1 フレーム約 1 ms（PC、320x240、ソフトウェア描画）。
+- **The needle stops at the end of the scale, and the number shows the actual value.** A value outside the range (150 on a scale up to 100) can still be read correctly from the number.
+  For a value that is not a number (before communication starts, and so on), the needle is at the start and the number is `---`.
+- The meaning of a zone's color can also be understood from its position on the scale (from where to where) and from the number of the value. It does not rely on color alone.
+- Inside the widget, the scale becomes a square that fits the shorter of the width and the height. **When a side is smaller than 140 px, the scale numbers are not shown**
+  (the lines and the number of the value are shown). Make a meter whose numbers are to be read 160 px or larger.
+- The size and color of the text are set with `style` (`font`, `text_color`), as with other widgets.
+- In the designer, you can add and remove the zones to color (`zones`) in a list in the widget's settings (start, end, color).
+- A guide to the load: on a screen where 12 meters change every frame, about 1 ms per frame (PC, 320x240, software rendering).
 
-## ログを画面に出す: `log_view`
+## Showing logs on a screen: `log_view`
 
-システムログ・操作ログ・変数ロギング（データログ）のグループを、装置の画面で表として見る部品です。新しい行が上で、
-ページを送って古い行を見ます。CSV に書き出して PC で見なくても、その場で確かめられます。
+A widget for looking at the system log, the operation log or a group of the data log as a table on the screen of the device. New rows are at the top, and
+you turn the pages to see older rows. You can check on the spot, without exporting to CSV and looking on a PC.
 
 ```json
 { "type": "log_view", "w": "100%", "h": 300, "source": "system" },
@@ -2353,150 +2372,150 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 { "type": "log_view", "w": "100%", "h": 300, "source": "data", "group": "process", "rows": 8 }
 ```
 
-| キー         | 内容                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| `source`     | `system`（既定）/ `operation` / `data`                                                                  |
-| `group`      | `data` のとき: 変数ロギングのグループ名                                                                 |
-| `columns`    | 出す列と順番。`system`: `time` `level` `source` `message` `count`、`operation`: `time` `user` `screen` `kind` `target` `old` `new`、`data`: `time` とグループのタグ名。省くと、よく使う列 |
-| `rows`       | 1 ページの行数（既定 10）                                                                               |
-| `days`       | 直近 N 日だけ（既定 0 = すべて）                                                                        |
-| `min_level`  | `system` のとき: `info`（既定）/ `warn` / `error`。部品の上のドロップダウンでも選べる（`"filter": false` で消す） |
-| `filter_tag` | 文字列タグの名前。その文字を含む行だけを出す（`system` はメッセージ、`operation` はどの列でも）。画面に `text_display`（`"input": true`）を置いて、そのタグに結び付ける |
-| `refresh_ms` | 先頭のページを読み直す間隔（既定 2000、0 = 画面を出したときだけ）                                       |
-| `widths`     | 列の幅（px）。`{ "time": 150 }`。書かない列は残りを分け合う                                             |
-| `labels`     | `empty`（行がないときの文字）と、列の見出し（`"message": "内容"` など）                                 |
+| Key | Description |
+| --- | --- |
+| `source` | `system` (default) / `operation` / `data` |
+| `group` | For `data`: the name of the data log group |
+| `columns` | The columns to show and their order. `system`: `time` `level` `source` `message` `count`; `operation`: `time` `user` `screen` `kind` `target` `old` `new`; `data`: `time` and the tag names of the group. If omitted, the commonly used columns |
+| `rows` | The number of rows per page (default 10) |
+| `days` | Only the last N days (default 0 = all) |
+| `min_level` | For `system`: `info` (default) / `warn` / `error`. It can also be selected with the dropdown at the top of the widget (`"filter": false` removes it) |
+| `filter_tag` | The name of a string tag. Only the rows that contain that text are shown (for `system` in the message, for `operation` in any column). Put a `text_display` (`"input": true`) on the screen and bind it to that tag |
+| `refresh_ms` | The interval for reading the first page again (default 2000, 0 = only when the screen is shown) |
+| `widths` | The widths of the columns (px). `{ "time": 150 }`. Columns without one share the rest |
+| `labels` | `empty` (the text when there are no rows) and the headings of the columns (`"message": "Details"` and so on) |
 
-- **読むだけの部品です。** 画面からログを消したり書き換えたりはできません。
-- デザイナーでは、列ごとの見出し（`labels`）と幅（`widths`）を、いま出している列の一覧に 1 つずつ入力できます。
-- **誰が見られるか**は、ほかの部品と同じく `level`（部品または画面）で決めます。操作ログのように見せる相手を限りたい
-  ログは、`"level": 2` を付けた画面に置いてください。
-- ログは別スレッドで読みます。10 万行のログでも、画面の動きは止まりません（10 万行の操作ログで、PC: 1 ページ 4 ms、後ろのページ 7 ms、
-  文字での絞り込み 17 ms。Raspberry Pi 4 の SD カード: 34 ms、56 ms、373 ms）。表示中でない画面の部品は何も読みません。
-- 幅が狭いとき（480 px の画面など）は、列を減らして横に収めます: `system` は `time` `level` `message`、`operation` は `time` `user` `target` `new`
-  （`columns` を書けばそのとおりに出し、収まらない分は表の中で横にスクロールします）。
-- 警告とエラーは、`level` の列の文字（`WARN` / `ERROR`）と行の色の両方で区別できます。
-- ログの文字列に含まれる改行・制御文字・壊れた UTF-8 は、空白や `?` に置き換えて 1 行で出します（長い文字列は 200 文字で切ります）。
-- 絞り込みの文字は、そのまま「含むかどうか」で比べます（`%` や `'` も普通の文字です。SQL として解釈されません）。
-- そのログを記録していないプロジェクト（`system_log` / `operation_log` / `data_log` がない）では、部品に理由が出ます。
-  `--check` とデザイナーの問題一覧でも指摘します。
-- アラームの履歴は `alarm_list`（`"mode": "history"`）、値の変化を線で見るなら `trend` を使います。
+- **It is a read-only widget.** Logs cannot be deleted or changed from the screen.
+- In the designer, you can enter the heading (`labels`) and the width (`widths`) of each column one by one in the list of the columns that are currently shown.
+- **Who can see it** is set with `level` (on the widget or on the screen), as with other widgets. Put a log whose audience you want to limit, such as the operation log,
+  on a screen with `"level": 2`.
+- The logs are read in another thread. Even with a log of 100,000 rows, the screen does not stop moving (with an operation log of 100,000 rows, PC: 4 ms for one page, 7 ms for a later page,
+  17 ms for filtering by text. SD card of a Raspberry Pi 4: 34 ms, 56 ms, 373 ms). A widget on a screen that is not shown reads nothing.
+- When the width is narrow (a 480 px screen and so on), the columns are reduced to fit across: for `system`, `time` `level` `message`; for `operation`, `time` `user` `target` `new`
+  (if you write `columns`, they are shown exactly so, and what does not fit scrolls sideways inside the table).
+- Warnings and errors can be told apart both by the text of the `level` column (`WARN` / `ERROR`) and by the color of the row.
+- Line breaks, control characters and broken UTF-8 in a log string are replaced by spaces or `?` so that it is shown on one line (long strings are cut at 200 characters).
+- The filter text is compared as it is, by "contains or not" (`%` and `'` are ordinary characters too. It is not interpreted as SQL).
+- In a project that does not record that log (no `system_log` / `operation_log` / `data_log`), the widget shows the reason.
+  `--check` and the problem list of the designer point it out too.
+- For the alarm history use `alarm_list` (`"mode": "history"`), and to see the changes of values as lines use `trend`.
 
-## システムログ
+## System log
 
-スクリプトのエラー、ドライバの接続・切断、プロジェクトの読み込み結果など、ランタイムがコンソールに出す
-メッセージ（`[hml INFO ]` / `[hml WARN ]` / `[hml ERROR]`）を SQLite データベースに記録し、あとから CSV で
-取り出せます。project.json に `system_log` を書くと有効になります（書かなければ記録しません）。
+The messages that the runtime prints on the console (`[hml INFO ]` / `[hml WARN ]` / `[hml ERROR]`), such as script errors, driver connections and disconnections and
+the results of loading the project, are recorded in an SQLite database and can be exported to CSV
+later. Writing `system_log` in project.json enables it (without it, nothing is recorded).
 
 ```json
 "system_log": { "path": "logs/system.db", "level": "info", "retention_days": 30, "max_rows": 100000 }
 ```
 
-| キー             | 既定値        | 内容                                                                      |
-| ---------------- | ------------- | ------------------------------------------------------------------------- |
-| `enabled`        | `true`        | `false` で設定を残したまま記録を止める                                    |
-| `path`           | `logs/system.db` | データベースファイル（project.json からの相対パス。フォルダは自動で作成） |
-| `level`          | `info`        | 記録する最低レベル: `info` / `warn` / `error`                             |
-| `retention_days` | `30`          | これより古い行を削除（`0` = 無期限）                                      |
-| `max_rows`       | `100000`      | これを超えたら古い行から削除（`0` = 無制限）                              |
+| Key | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | `false` stops recording while keeping the settings |
+| `path` | `logs/system.db` | The database file (a path relative to project.json. The folder is created automatically) |
+| `level` | `info` | The lowest level to record: `info` / `warn` / `error` |
+| `retention_days` | `30` | Rows older than this are deleted (`0` = no limit in time) |
+| `max_rows` | `100000` | Beyond this, rows are deleted from the oldest (`0` = unlimited) |
 
-記録される列は、時刻、レベル、種別（`source`: `script` / `driver` / `system`）、メッセージ、回数です。
+The recorded columns are time, level, kind (`source`: `script` / `driver` / `system`), message and count.
 
-- 同じメッセージが連続したとき（周期スクリプトが毎回同じエラーになる、など）は 1 行にまとめ、回数と最後の時刻を
-  更新します。
-- 書き込みは約 1 秒ごとにバックグラウンドでまとめて行います（画面の動作を止めず、SD カードへの書き込み回数も
-  抑えます）。電源断でファイルが壊れることはありませんが、直前の約 1 秒分は失われることがあります。
-- Lua の `log(...)` / `warn(...)` と、スクリプトのエラーも記録されます。
-- 設定の変更はランタイムの再起動で反映されます（ホットリロードでは反映されません）。
-- OPC UA ライブラリ（open62541）が直接コンソールに出すメッセージは記録されません。
+- When the same message repeats in a row (a periodic script fails with the same error every time, and so on), it is gathered into one row, and the count and the last time are
+  updated.
+- Writes are done in the background in batches about every 1 second (this does not stop the screen and also keeps the number of writes to the SD card
+  low). A power loss does not corrupt the file, but about the last 1 second may be lost.
+- Lua's `log(...)` / `warn(...)` and script errors are recorded too.
+- Changes to the settings take effect when the runtime is restarted (they do not take effect on a hot reload).
+- Messages that the OPC UA library (open62541) prints directly on the console are not recorded.
 
-### CSV に取り出す
+### Exporting to CSV
 
 ```
 hml_runtime --export-system-log out.csv projects/demo/project.json
 hml_runtime --export-system-log errors.csv projects/demo/project.json --log-level warn
 ```
 
-HMI の実行中でも別プロセスとして実行できます。HMI の画面から取り出すには `call` アクションの `system_log.export` を
-使います（`arg` が出力先。省略するとデータベースと同じフォルダに `system-log-日付-時刻.csv`）。
+It can run as a separate process even while the HMI is running. To export from a screen of the HMI, use `system_log.export` of the `call` action
+(`arg` is the destination. If omitted, `system-log-date-time.csv` in the same folder as the database).
 
 ```json
 "on_click": { "action": "call", "fn": "system_log.export", "arg": "/media/usb/system-log.csv" }
 ```
 
-Lua からは `call("system_log.export", "/media/usb/system-log.csv")` です。CSV は UTF-8（BOM 付き）で、Excel でそのまま
-開けます。列は `time,level,source,message,count,last_time` です。データベースは SQLite なので、`sqlite3` コマンドや
-DB Browser for SQLite でも直接見られます（テーブル `log`）。
+From Lua it is `call("system_log.export", "/media/usb/system-log.csv")`. The CSV is UTF-8 (with BOM) and opens in Excel as it
+is. The columns are `time,level,source,message,count,last_time`. The database is SQLite, so you can also look at it directly with the `sqlite3` command or
+DB Browser for SQLite (table `log`).
 
-## ソース構成
+## Source layout
 
-| ファイル                       | 役割                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `src/main.cpp`                 | 起動、コマンドライン、メインループ、テスト自動化（`--click` など）                                  |
-| `src/platform.hpp`             | 表示 / 入力バックエンドの共通インターフェース（`hml::platform`）                                    |
-| `src/platform_sdl.cpp`         | SDL2 バックエンド（Windows / デスクトップ）: ウィンドウ、F5 / Esc、スクリーンショット               |
-| `src/platform_linux.cpp`       | Linux fbdev / DRM + evdev バックエンド（Raspberry Pi）: シグナル制御、スナップショット              |
-| `src/tag.[ch]pp`               | `hml::Tag` / `hml::TagStore`: タグストア（スレッドセーフ、変更通知、書き込み元の追跡）              |
-| `src/ui.[ch]pp`                | `hml::Ui`: JSON → LVGL ウィジェット、バインディング、アクション、画面遷移                           |
-| `src/system_log.[ch]pp`        | `hml::SystemLog`: システムログ（SQLite への記録、検索、CSV エクスポート）                            |
-| `src/key_service.[ch]pp`       | `hml::KeyService`: SSH の鍵の管理（authorized_keys の一覧・追加・削除、鍵管理モードでの受付）        |
-| `src/users.[ch]pp`             | `hml::Users`: ユーザー管理（ユーザーとレベル、PIN ログイン、ロック、自動ログアウト）                 |
-| `src/system_users.cpp`         | ログイン画面（`__login`）と、システム設定の Users ページ                                             |
-| `src/system_keys.cpp`          | システム設定の Keys ページ（`KeyService` の画面）                                                    |
-| `src/logdb.[ch]pp`             | `hml::LogDb`: ロギング共通の SQLite 記録（バックグラウンド書き込み、保持日数・件数、CSV 出力）      |
-| `src/data_log.[ch]pp`          | `hml::DataLog`: 変数ロギング（グループ、周期 / 変化 / タグ / 手動トリガー）                         |
-| `src/alarm.[ch]pp`             | `hml::Alarms`: アラームの判定と発生・復帰の記録                                                     |
-| `src/operation_log.[ch]pp`     | `hml::OperationLog`: 操作ログ（ウィジェットからの書き込み、イベントのアクション）                   |
-| `src/script.[ch]pp`            | `hml::ScriptEngine`: Lua スクリプト（トリガー、タグ / 画面 API、サンドボックス、タイムアウト）      |
-| `src/project.[ch]pp`           | `hml::Project`: project.json の読み込み、画面構築とホットリロード                                   |
-| `src/driver.[ch]pp`            | `hml::Driver` 基底クラスと `hml::DriverRegistry`（登録 / 起動 / 停止）                              |
-| `src/driver_sim.cpp`           | シミュレーションドライバ                                                                            |
-| `src/driver_modbus.cpp`        | Modbus TCP クライアント（std::thread で別スレッド）                                                 |
-| `src/modbus_link.[ch]pp`       | Modbus の通信路（TCP / シリアルポート）とフレーム（MBAP / RTU の CRC-16 / ASCII の LRC）          |
-| `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
-| `src/project_archive.[ch]pp`   | プロジェクトファイル（`.hmlproj`）の作成と展開、プロジェクトを構成するファイルの一覧（デザイナーと共用） |
-| `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
-| `src/driver_opcua_client.cpp`  | OPC UA クライアント（open62541 + mbedTLS、サブスクリプションで読み、`rw` の行だけ書く）             |
-| `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバ |
-| `src/check.[ch]pp` / `src/check_schema.inc` | プロジェクトの検査（`hml_runtime --check`）。知っている部品・キーの一覧は `schema.js` から生成 |
-| `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
-| `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |
-| `legacy_c/`                    | 書き直し前の C 版（参照用、ビルド対象外。不要なら削除可）                                           |
-| `lv_conf.h`                    | LVGL 設定（`HML_BACKEND_*` でドライバ切替、フォント、ウィジェット有効化）                           |
-| `build.cmd` / `build.sh`       | Windows (MSVC) / Linux・Raspberry Pi (gcc, クロスコンパイル対応) のビルドスクリプト                 |
-| `test.cmd` / `tests/`          | 単体テスト（doctest）: `test_jsonutil.cpp`, `test_tag.cpp`。`hml_tests` にビルドされ CTest にも登録 |
-| `cmake/toolchain-*.cmake`      | aarch64 / armhf クロスコンパイル用ツールチェーンファイル                                            |
-| `tools/modbus_server.py`       | テスト用 Modbus TCP サーバー（標準ライブラリのみ）                                                  |
-| `tools/karakuri_check.py`      | PLC シミュレーター Karakuri を相手にしたドライバの接続確認（SLMP / FINS / Modbus / OPC UA）         |
-| `tools/opcua_client_test.py`   | OPC UA 動作確認クライアント（asyncua）                                                              |
-| `tools/bmp2png.py`             | スクリーンショット BMP → PNG 変換                                                                   |
-| `tools/designer/host/main.cpp` | デザイナーのホスト（webview、ファイルダイアログ、ランタイム起動）                                   |
-| `tools/designer/renderer/`     | デザイナーの画面（HTML / CSS / JS、ビルド不要）                                                     |
-| `tools/rpi/`                   | Raspberry Pi の LCD 設定スクリプト、systemd ユニット、タッチ生データ確認                            |
+| File | Role |
+| --- | --- |
+| `src/main.cpp` | Startup, command line, main loop, test automation (`--click` and so on) |
+| `src/platform.hpp` | The common interface of the display / input backends (`hml::platform`) |
+| `src/platform_sdl.cpp` | SDL2 backend (Windows / desktop): window, F5 / Esc, screenshots |
+| `src/platform_linux.cpp` | Linux fbdev / DRM + evdev backend (Raspberry Pi): signal handling, snapshots |
+| `src/tag.[ch]pp` | `hml::Tag` / `hml::TagStore`: the tag store (thread-safe, change notification, tracking of the origin of a write) |
+| `src/ui.[ch]pp` | `hml::Ui`: JSON → LVGL widgets, bindings, actions, screen changes |
+| `src/system_log.[ch]pp` | `hml::SystemLog`: the system log (recording to SQLite, search, CSV export) |
+| `src/key_service.[ch]pp` | `hml::KeyService`: management of SSH keys (listing, adding and removing authorized_keys, accepting keys in key management mode) |
+| `src/users.[ch]pp` | `hml::Users`: user management (users and levels, PIN login, lock, automatic logout) |
+| `src/system_users.cpp` | The login screen (`__login`) and the Users page of the system settings |
+| `src/system_keys.cpp` | The Keys page of the system settings (the screen of `KeyService`) |
+| `src/logdb.[ch]pp` | `hml::LogDb`: the SQLite recording shared by the logs (background writes, retention by days and by count, CSV output) |
+| `src/data_log.[ch]pp` | `hml::DataLog`: the data log (groups, periodic / on change / tag / manual triggers) |
+| `src/alarm.[ch]pp` | `hml::Alarms`: evaluation of alarms and recording of their occurrence and return to normal |
+| `src/operation_log.[ch]pp` | `hml::OperationLog`: the operation log (writes from widgets, actions of events) |
+| `src/script.[ch]pp` | `hml::ScriptEngine`: Lua scripts (triggers, tag / screen API, sandbox, timeout) |
+| `src/project.[ch]pp` | `hml::Project`: loading project.json, building the screens and hot reload |
+| `src/driver.[ch]pp` | The `hml::Driver` base class and `hml::DriverRegistry` (register / start / stop) |
+| `src/driver_sim.cpp` | The simulation driver |
+| `src/driver_modbus.cpp` | Modbus TCP client (a separate thread with std::thread) |
+| `src/modbus_link.[ch]pp` | The Modbus links (TCP / serial port) and frames (MBAP / CRC-16 of RTU / LRC of ASCII) |
+| `src/serial_ports.[ch]pp` | The list of the serial ports of the machine (Linux: sysfs and by-id, Windows: SetupAPI) |
+| `src/project_archive.[ch]pp` | Creating and extracting project files (`.hmlproj`), the list of the files that make up a project (shared with the designer) |
+| `src/driver_opcua.cpp` | OPC UA server (open62541, exposes tags with DataSource callbacks) |
+| `src/driver_opcua_client.cpp` | OPC UA client (open62541 + mbedTLS, reads by subscription and writes only the `rw` rows) |
+| `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 packets (no I/O) and the connection (TCP / TLS with mbedTLS), the MQTT client driver |
+| `src/check.[ch]pp` / `src/check_schema.inc` | Checking a project (`hml_runtime --check`). The list of known widgets and keys is generated from `schema.js` |
+| `src/jsonutil.[ch]pp` | nlohmann/json and accessors that absorb missing keys and wrong types with default values (`jstr` / `jnum` / `jbool`) |
+| `src/util.[ch]pp` | Logging (`HML_INFO` and so on), `iequals`, monotonic clock |
+| `legacy_c/` | The C version from before the rewrite (for reference, not built. Can be deleted if not needed) |
+| `lv_conf.h` | LVGL configuration (driver selection with `HML_BACKEND_*`, fonts, enabling widgets) |
+| `build.cmd` / `build.sh` | Build scripts for Windows (MSVC) / Linux and Raspberry Pi (gcc, supports cross-compiling) |
+| `test.cmd` / `tests/` | Unit tests (doctest): `test_jsonutil.cpp`, `test_tag.cpp`. Built into `hml_tests` and also registered with CTest |
+| `cmake/toolchain-*.cmake` | Toolchain files for cross-compiling to aarch64 / armhf |
+| `tools/modbus_server.py` | Modbus TCP server for tests (standard library only) |
+| `tools/karakuri_check.py` | Checking the drivers against the PLC simulator Karakuri (SLMP / FINS / Modbus / OPC UA) |
+| `tools/opcua_client_test.py` | OPC UA client for checking operation (asyncua) |
+| `tools/bmp2png.py` | Converts screenshots from BMP to PNG |
+| `tools/designer/host/main.cpp` | The host of the designer (webview, file dialogs, starting the runtime) |
+| `tools/designer/renderer/` | The screens of the designer (HTML / CSS / JS, no build needed) |
+| `tools/rpi/` | LCD setup scripts for the Raspberry Pi, systemd unit, checking raw touch data |
 
-### 組み込みターゲットへの移植
+### Porting to an embedded target
 
-ランタイム本体（tag / ui / project / driver / script / ロギング）は LVGL、nlohmann/json、Lua、SQLite と C++17 標準ライブラリ
-（`std::thread` / `std::mutex` / `std::function`）にしか依存しません。
-Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動きます。それ以外の RTOS /
-ベアメタルへは、`platform.hpp` を実装するファイルを 1 つ追加して対象ボードの表示・入力
-ドライバを呼び出します（`std::thread` が無い環境では `driver_modbus.cpp` のスレッド部分も
-その OS の API に置き換えます）。JSON ファイルの読み込みは `std::ifstream` なので、
-ファイルシステムの無いターゲットでは `project.cpp` の `read_file()` を差し替えてください。
+The runtime itself (tag / ui / project / driver / script / logging) depends only on LVGL, nlohmann/json, Lua, SQLite and the C++17 standard library
+(`std::thread` / `std::mutex` / `std::function`).
+Linux boards run as they are with the `fbdev` / `drm` backends described above. For any other RTOS or
+bare metal, add one file that implements `platform.hpp` and call the display and input
+drivers of the target board from it (in an environment without `std::thread`, also replace the thread part of `driver_modbus.cpp`
+with the API of that OS). JSON files are read with `std::ifstream`, so
+on a target without a file system, replace `read_file()` in `project.cpp`.
 
-### 拡張のしかた
+### Extending the runtime
 
-- **ウィジェットを追加**: `ui.cpp` の `Ui::Impl::build_widget()` に `type` の分岐を 1 つ足します。
-  バインド対象にするなら `Widget` 列挙と `Binding::apply_value()` / `on_widget_changed()` にも追加します。
-- **ドライバを追加**: `hml::Driver` を継承したクラスを書き、`DriverRegistry::register_builtins()`
-  にファクトリを登録します（`driver_sim.cpp` が最小の例です）。
-- **アクションを追加**: `ui.cpp` の `ActionKind` と `parse_action()` / `run_actions()` に追加します。
-- **Lua の関数を追加**: `script.cpp` の `ScriptEngine::Impl::ensure_state()` の `funcs` に登録します
-  （デザイナーの Scripts タブに出るヘルプは `panels.js` の `SCRIPT_HELP`）。
+- **Adding a widget**: add one branch for the `type` to `Ui::Impl::build_widget()` in `ui.cpp`.
+  To make it a target of binding, also add it to the `Widget` enumeration and to `Binding::apply_value()` / `on_widget_changed()`.
+- **Adding a driver**: write a class derived from `hml::Driver` and register a factory in `DriverRegistry::register_builtins()`
+  (`driver_sim.cpp` is the smallest example).
+- **Adding an action**: add it to `ActionKind` and to `parse_action()` / `run_actions()` in `ui.cpp`.
+- **Adding a Lua function**: register it in `funcs` of `ScriptEngine::Impl::ensure_state()` in `script.cpp`
+  (the help shown in the Scripts tab of the designer is `SCRIPT_HELP` in `panels.js`).
 
-### スレッドモデル
+### Threads
 
-- LVGL と UI バインディング、Lua スクリプトは常にメインスレッドで動作します。
-- ドライバは任意のスレッドから `Tag::set_number()` / `set_string()` を呼べます。変更はメインループの
-  `TagStore::dispatch()` で購読者（ウィジェット・ドライバ）に配信されます。
-- 各書き込みには「書き込み元」が付くため、スライダー自身の書き込みがスライダーに戻って
-  ドラッグ中に跳ねる、Modbus ドライバが自分で読んだ値を PLC に書き戻す、といったループは起きません。
+- LVGL, the UI bindings and the Lua scripts always run on the main thread.
+- A driver can call `Tag::set_number()` / `set_string()` from any thread. The changes are delivered to the subscribers (widgets and drivers) by
+  `TagStore::dispatch()` in the main loop.
+- Every write carries its "origin", so loops such as a slider's own write coming back to the slider and
+  making it jump during a drag, or the Modbus driver writing a value it read itself back to the PLC, do not happen.

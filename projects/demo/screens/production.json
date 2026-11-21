@@ -1,0 +1,71 @@
+{
+  "name": "production",
+  "template": "frame",
+  "template_args": {
+    "title": "@production"
+  },
+  "children": [
+    { "type": "panel", "x": 276, "y": 476, "w": 120, "h": 4, "scrollable": false, "style": { "bg_color": "#2196f3", "radius": 2, "border_width": 0 } },
+    {
+      "type": "panel", "x": 16, "y": 56, "w": 176, "h": 192, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 6 },
+      "children": [
+        { "type": "label", "text": "@pressure", "style": { "text_color": "#9fb3c8" } },
+        { "type": "meter", "y": 20, "w": 160, "h": 160, "min": 0, "max": 4, "ticks": 9, "major_every": 2,
+          "decimals": 1, "unit": "bar", "bind": "pressure",
+          "zones": [ { "from": 3, "to": 3.5, "color": "#fb8c00" }, { "from": 3.5, "to": 4, "color": "#e53935" } ] }
+      ]
+    },
+    {
+      "type": "panel", "x": 200, "y": 56, "w": 176, "h": 192, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 6 },
+      "children": [
+        { "type": "label", "text": "@pump_speed", "style": { "text_color": "#9fb3c8" } },
+        { "type": "meter", "y": 20, "w": 160, "h": 160, "min": 0, "max": 100, "ticks": 11, "major_every": 2,
+          "unit": "%", "bind": "speed_pv",
+          "zones": [ { "from": 90, "to": 100, "color": "#fb8c00" } ] }
+      ]
+    },
+    {
+      "type": "panel", "x": 384, "y": 56, "w": 176, "h": 192, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 6 },
+      "children": [
+        { "type": "label", "text": "@level", "style": { "text_color": "#9fb3c8" } },
+        { "type": "meter", "y": 20, "w": 160, "h": 160, "min": 0, "max": 100, "ticks": 11, "major_every": 2,
+          "unit": "%", "bind": "level",
+          "zones": [ { "from": 0, "to": 10, "color": "#fb8c00" }, { "from": 95, "to": 100, "color": "#fb8c00" } ] }
+      ]
+    },
+    {
+      "type": "panel", "x": 568, "y": 56, "w": 216, "h": 192, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 6 },
+      "children": [
+        { "type": "label", "text": "@xy_title", "style": { "text_color": "#9fb3c8" } },
+        { "type": "xy_chart", "y": 20, "w": 200, "h": 160,
+          "x_tag": "speed_pv", "x_min": 0, "x_max": 100,
+          "y_tag": "pressure", "y_min": 0, "y_max": 4,
+          "points": 200, "sample_ms": 500, "decimals": 0, "color": "#42a5f5" }
+      ]
+    },
+    {
+      "type": "panel", "x": 16, "y": 256, "w": 768, "h": 160, "scrollable": false,
+      "style": { "bg_color": "#1b2430", "radius": 10, "border_width": 0, "pad": 4 },
+      "children": [
+        { "type": "table", "w": "100%", "h": 152,
+          "columns": [
+            "@col_item",
+            { "title": "@col_value", "width": 160, "align": "right" },
+            { "title": "@col_state", "width": 200 }
+          ],
+          "rows": [
+            [ "@pump", { "tag": "speed_pv", "format": "%d %%" },
+              { "tag": "pump_state", "map": { "0": "@ps_idle", "1": "@ps_starting", "2": "@ps_running", "3": "@ps_stopping" } } ],
+            [ "@operation_mode", { "tag": "speed_sp", "format": "SP %d %%" },
+              { "tag": "auto_mode", "map": { "true": "@mode_auto_s", "false": "@mode_manual_s" } } ],
+            [ "PLC", "Modbus TCP",
+              { "tag": "plc_online", "map": { "true": "@st_online", "false": "@st_offline" } } ]
+          ] }
+      ]
+    }
+  ]
+}
