@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'LICENSE', '.gitignore']
   pull_request:
+    paths-ignore: ['**.md', 'LICENSE', '.gitignore']
   workflow_dispatch:
 
 concurrency:
@@ -23,10 +25,12 @@ jobs:
             os: windows-latest
             # same as build.cmd: SDL2 built from source, OPC UA + designer on
             cmake_args: ''
+            cache: sccache
           - name: Linux (gcc, fbdev)
             os: ubuntu-latest
             # fbdev needs no extra packages; designer is off on Linux by default
             cmake_args: -DHML_BACKEND=fbdev
+            cache: ccache
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +43,7 @@ jobs:
 
       - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
+        run: command -v ninja || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build)
 
       - name: Install Ninja (Windows)
         if: runner.os == 'Windows'
@@ -59,12 +63,24 @@ jobs:
           restore-keys: |
             deps-${{ runner.os }}-
 
+      # Most of a build is the libraries (LVGL, open62541, mbedTLS, SQLite, Lua, SDL2), which change
+      # only when their version does: what the compiler made of them is kept between runs. Our own
+      # files are compiled again only when they or their headers changed.
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: ${{ matrix.cache }}
+          key: ${{ runner.os }}
+          max-size: 500M
+
       # FetchContent downloads from github.com; retry so that a transient 5xx does not fail the run
       - name: Configure
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }} && exit 0
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=${{ matrix.cache }} -DCMAKE_CXX_COMPILER_LAUNCHER=${{ matrix.cache }} \
+              ${{ matrix.cmake_args }} && exit 0
             echo "::warning::configure attempt $attempt failed, retrying in 30 s"
             sleep 30
           done
