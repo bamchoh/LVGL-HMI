@@ -25,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <functional>
 #include "logdb.hpp"
 
 namespace hml {
@@ -83,6 +84,8 @@ public:
     // CSV: time,name,event,severity,message,value,user. Empty path = next to the database.
     int64_t export_csv(std::string path = "");
     LogDb& db();
+    // Told about every event as it is recorded ("raised", "cleared", "acked"), on the UI thread.
+    void set_listener(std::function<void(const AlarmEvent&)> fn);
 
 private:
     struct Impl;

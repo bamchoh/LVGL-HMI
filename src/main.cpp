@@ -51,6 +51,7 @@
 #include "project_archive.hpp"
 #include "transfer.hpp"
 #include "data_transfer.hpp"
+#include "mail.hpp"
 #include "schedule.hpp"
 #include "sound.hpp"
 #include "vnc.hpp"
@@ -426,9 +427,10 @@ int main(int argc, char** argv)
     hml::vnc_server().start(hml::project().section("remote"), disp, info.title);
     hml::scheduler().start();
     hml::sound().start();
+    hml::mail().start();
     hml::transfers().start();
     // pages that follow outside events; auto logout
-    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); hml::screen_saver().poll(); hml::sound().poll(); }, 250, nullptr);
+    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); hml::screen_saver().poll(); hml::sound().poll(); hml::mail().poll(); }, 250, nullptr);
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
     hml::ui().register_action("system_log.export", [](const std::string& arg) {
         std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;

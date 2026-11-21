@@ -79,6 +79,7 @@ private:
     json        local_users_;          // "users" of project.local.json (users edited on the device)
     json        local_screen_saver_;   // "screen_saver" of project.local.json (time changed on the device)
     json        local_sound_;          // "sound" of project.local.json (mute and volume set on the device)
+    json        local_mail_;           // "mail" of project.local.json (recipients, the password: set on the device)
     json        local_schedules_;      // "schedules" of project.local.json (times changed on the device)
 };
 

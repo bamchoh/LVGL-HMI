@@ -1085,6 +1085,25 @@ const M = {
       seenTag.add(t.name);
     });
     this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
+    // mail: a server, addresses that are addresses; no password in the project file
+    if (p.mail !== undefined) {
+      const loc = { view: 'project' }, m = p.mail, say = text => out.push(Object.assign({ text: 'mail: ' + text }, loc));
+      const addr = a => typeof a === 'string' && a.length <= 254 && /^[^\s<>,;:"()\[\]\\@\x00-\x20\x7f-\uffff]+@[^\s<>,;:"()\[\]\\@\x00-\x20\x7f-\uffff]+$/.test(a) && !/\.\.|@\.|\.$/.test(a);
+      if (!m || typeof m !== 'object' || Array.isArray(m)) say('an object is needed');
+      else {
+        if (!m.host || typeof m.host !== 'string') say('no mail server (host)');
+        else if (!/^[A-Za-z0-9.\-:\[\]]{1,253}$/.test(m.host)) say('"host" is not the name of a server');
+        if (m.security !== undefined && !['starttls', 'tls', 'none'].includes(m.security)) say('"security" is starttls, tls or none');
+        if (m.port !== undefined && !(Number.isInteger(m.port) && m.port >= 1 && m.port <= 65535)) say('"port" is 1 to 65535');
+        if (!addr(m.from)) say('"from" is the mail address of the sender');
+        const to = Array.isArray(m.to) ? m.to : typeof m.to === 'string' ? m.to.split(/[\s,;]+/).filter(Boolean) : null;
+        if (!to || to.some(a => !addr(a)) || to.length > 20) say('"to" is a mail address, or a list of them (20 at most)');
+        else if (!to.length) say('no recipient (to)');
+        if (typeof m.password === 'string' && m.password) say('the password is in the project file: everybody who gets the project can read it. Set it on the device instead (System > Mail)');
+        if (m.security === 'none') say('"security": "none": the mails can be read on the network');
+        if (m.verify === false) say('"verify": false: the certificate of the server is not checked');
+      }
+    }
     // transfers: tags, a trigger that is one, no rings
     const xfers = Array.isArray(p.transfers) ? p.transfers : [], xferNames = new Set(), xferNext = new Map();
     for (const t of xfers) if (t && typeof t === 'object' && typeof t.from === 'string' && typeof t.to === 'string') { if (!xferNext.has(t.from)) xferNext.set(t.from, []); xferNext.get(t.from).push(t.to); }

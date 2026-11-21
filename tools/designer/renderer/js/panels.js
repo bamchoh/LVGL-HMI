@@ -520,6 +520,24 @@ const Panels = {
         { k: 'gpio_active_low', t: 'bool', hint: 'the buzzer sounds while the line is low' },
         { k: 'device', t: 'text', placeholder: 'default', hint: 'Linux: the ALSA device (default, plughw:1,0 ...)' }]), fk + '.snd'),
       U.el('div', { class: 'hint' }, 'A sound file is a WAV (PCM, 8 or 16 bit) inside the project folder. Tags: sys.sound.mute, sys.sound.volume, sys.sound.alarm (1 while the alarm sound is on; a button that writes 0 silences it until the next alarm). A button can play a sound: { "action": "call", "fn": "sound.play", "arg": "beep" }. A device without a sound output stays silent and works as before.')));
+    // "mail": there at all = alarms can be mailed (src/mail.hpp)
+    const mailHolder = new Proxy({}, {
+      get: (t, k) => (k === 'on' ? !!p.mail : (p.mail || {})[k]),
+      set: (t, k, v) => { if (k === 'on') { if (v) p.mail = p.mail || { host: '', from: '', to: [] }; else delete p.mail; } else p.mail = Object.assign({}, p.mail, { [k]: v }); return true; },
+      deleteProperty: (t, k) => { if (k === 'on') delete p.mail; else if (p.mail) delete p.mail[k]; return true; },
+      has: (t, k) => (k === 'on' ? !!p.mail : !!p.mail && k in p.mail),
+    });
+    el.append(Props.section('Mail', !!p.mail,
+      ...Props.fields(mailHolder, [{ k: 'on', t: 'bool', label: 'mail', hint: 'alarms are sent by e-mail' }].concat(!p.mail ? [] : [
+        { k: 'host', t: 'text', label: 'mail_host', placeholder: 'smtp.example.com', hint: 'the mail server (SMTP)' },
+        { k: 'security', t: 'select', o: ['', 'tls', 'none'], empty: 'starttls', hint: 'starttls: secured before anything is sent (port 587). tls: TLS from the first byte (port 465). none: nothing is secured - a relay of your own only' },
+        { k: 'port', t: 'number', hint: 'empty: 587 (starttls), 465 (tls), 25 (none)' },
+        { k: 'from', t: 'text', label: 'mail_from', placeholder: 'hmi@example.com', hint: 'the address of the sender' },
+        { k: 'to', t: 'csv', label: 'mail_to', hint: 'the recipients, separated by commas. Can be changed on the device: System > Mail' },
+        { k: 'username', t: 'text', hint: 'the user name for the mail server (empty: no login). The password is not kept in the project: set it on the device, System > Mail' },
+        { k: 'verify', t: 'bool', hint: 'check the certificate of the server (leave this on)' },
+        { k: 'ca_file', t: 'text', hint: 'a file with the certificate of the CA of the server (empty: the certificates the system trusts)' }]), fk + '.mail'),
+      U.el('div', { class: 'hint' }, 'A new alarm is sent as a mail to the recipients. A mail that cannot be delivered waits and is tried again; the screen never waits for the mail server. Which alarms, the subject and the text: "alarms" under "mail" in project.json (see the README). The password belongs on the device (System > Mail), not into the project file. A button can send a mail: { "action": "call", "fn": "mail.send", "arg": "Subject\\nText with {tag}" }.')));
     // transfers: values of one device copied to another (src/data_transfer.hpp)
     el.append(Props.section('Transfers', Array.isArray(p.transfers) && p.transfers.length > 0,
       Props.listEditor(p, { k: 'transfers', t: 'list', max: 500, hint: 'values copied from one tag to another',

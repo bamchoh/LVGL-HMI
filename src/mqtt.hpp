@@ -71,6 +71,9 @@ struct MqttTls {
     bool enabled = true;
     bool verify = true;                    // the broker's certificate against ca_file
     std::string ca_file, cert_file, key_file;
+    // without a ca_file: the certificates the operating system trusts (mail, uploads: public
+    // servers). Off for MQTT, where the broker is one's own and its CA is named.
+    bool system_ca = false;
 };
 
 class MqttLink {
@@ -79,6 +82,9 @@ public:
     ~MqttLink();
     // TCP connect, then the TLS handshake when tls.enabled. false and error() on failure.
     bool open(const std::string& host, uint16_t port, const MqttTls& tls, uint32_t timeout_ms);
+    // The TLS handshake on a connection that was opened without TLS (SMTP: STARTTLS). On failure
+    // the connection is closed.
+    bool start_tls(const MqttTls& tls, uint32_t timeout_ms);
     void close();
     bool is_open() const;
     bool write(const MqttBytes& b);

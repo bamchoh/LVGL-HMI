@@ -44,6 +44,8 @@ public:
     // Return "" on success, otherwise a message shown on the page.
     virtual std::string apply(const std::map<std::string, std::string>& values) = 0;
     virtual bool has_apply() const { return true; }
+    // More buttons under the form: { text, command } - a press calls command(<command>, "").
+    virtual std::vector<std::pair<std::string, std::string>> buttons() const { return {}; }
 
     // ---- pages that are more than a form (optional)
     // The rows of the page body, as widgets bound to the page's tags. null = one row per field.
@@ -108,6 +110,7 @@ std::unique_ptr<SettingsPage> make_storage_page(Project& proj);  // System > Sto
 std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags: values of all tags, write one
 std::unique_ptr<SettingsPage> make_sound_page();               // System > Sound: mute, volume, a test (projects with "sound")
 std::unique_ptr<SettingsPage> make_transfers_page();           // System > Transfers: what runs, what waits and why (projects with "transfers")
+std::unique_ptr<SettingsPage> make_mail_page();                // System > Mail: recipients, the password, a test mail (projects with "mail")
 std::unique_ptr<SettingsPage> make_schedule_page();            // System > Schedule: time, days, on / off of the schedules (projects that have some)
 // System > Device: an address of a PLC without a tag (system_device.cpp); for projects with a
 // driver that can do it.

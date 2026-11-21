@@ -392,6 +392,10 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                                  { "style", { { "bg_color", "#2e7d32" } } }, { "style_label", { { "font", font + 2 } } },
                                  { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", id } } } });
         }
+        for(const auto& [text, cmd] : p->buttons())
+            rows.push_back(json{ { "type", "button" }, { "text", text }, { "w", compact ? 200 : 260 }, { "h", compact ? 34 : 44 },
+                                 { "style", { { "bg_color", "#37474f" } } }, { "style_label", { { "font", font + 2 } } },
+                                 { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":" + cmd } } } });
         out.push_back(json{
             { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
             { "children", json::array({
@@ -752,6 +756,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     add_driver_pages(s, proj);
     if(const json* so = proj.section("sound"); so && so->is_object()) s.add_page(make_sound_page());
     if(const json* tr = proj.section("transfers"); tr && tr->is_array() && !tr->empty()) s.add_page(make_transfers_page());
+    if(const json* ml = proj.section("mail"); ml && ml->is_object()) s.add_page(make_mail_page());
     if(const json* sc = proj.section("schedules"); sc && sc->is_array() && !sc->empty()) s.add_page(make_schedule_page());
     s.add_page(make_monitor_page());
     if(has_device_driver(proj.drivers_config())) s.add_page(make_device_page());

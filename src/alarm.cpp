@@ -99,9 +99,17 @@ struct Alarms::Impl {
     uint64_t seq = 0;
     int      ack_level = 0;
 
+    std::function<void(const AlarmEvent&)> listener;
+
     void record(Alarm& a, int64_t ts, const char* event, const std::string& user = "")
     {
-        db.add(ts, { a.name, event, a.severity, texts().resolve(a.message), a.value, user });
+        const std::string message = texts().resolve(a.message);
+        db.add(ts, { a.name, event, a.severity, message, a.value, user });
+        if(listener) {
+            AlarmEvent e;
+            e.ts_ms = ts; e.name = a.name; e.event = event; e.severity = a.severity; e.message = message; e.value = a.value; e.user = user;
+            listener(e);
+        }
     }
 
     void changed()
@@ -273,6 +281,7 @@ std::optional<AlarmStatus> Alarms::status(const std::string& name) const
     return std::nullopt;
 }
 
+void Alarms::set_listener(std::function<void(const AlarmEvent&)> fn) { impl_->listener = std::move(fn); }
 size_t Alarms::active_count() const { size_t n = 0; for(const auto& a : impl_->items) n += a->active ? 1 : 0; return n; }
 size_t Alarms::unacked_count() const { size_t n = 0; for(const auto& a : impl_->items) n += a->acked ? 0 : 1; return n; }
 
