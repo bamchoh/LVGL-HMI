@@ -428,6 +428,46 @@ const M = {
     return langs.includes(p.language) ? p.language : langs[0];
   },
   // "@id" -> the text in the preview language, as the runtime does (texts.cpp)
+  // ---- the cells of a "table" widget as one line of text (the grid of the cell editor) ----
+  //   a text                    -> "Loader"            (a number stays a number: 5, 2.5)
+  //   { tag }                   -> "{count}"
+  //   { tag, format }           -> "{temp|%.1f C}"
+  //   { tag, map }              -> "{state|0=Stop,1=Run,*=?}"      (* is "default")
+  //   { tag, format, map }      -> "{state|%d|0=Stop,1=Run}"
+  // A text that itself starts with "{" is written with a backslash in front: "\{not a tag}".
+  cellToText(c) {
+    if (c === undefined || c === null) return '';
+    if (typeof c === 'string') return /^\\*\{/.test(c) ? '\\' + c : c;
+    if (typeof c !== 'object') return String(c);
+    let s = '{' + (c.tag === undefined ? '' : c.tag);
+    if (c.format !== undefined) s += '|' + c.format;
+    if (c.map && typeof c.map === 'object') s += '|' + Object.entries(c.map).map(([k, v]) => (k === 'default' ? '*' : k) + '=' + v).join(',');
+    return s + '}';
+  },
+  textToCell(t) {
+    const s = String(t === undefined || t === null ? '' : t);
+    if (/^\\+\{/.test(s)) return s.slice(1);
+    const m = /^\{([^|{}]*)((?:\|[^|{}]*){0,2})\}$/.exec(s.trim());
+    if (!m) { const n = Number(s); return s.trim() !== '' && String(n) === s.trim() ? n : s; }
+    const cell = { tag: m[1].trim() };
+    for (const part of m[2] ? m[2].slice(1).split('|') : []) {
+      if (/^[^%=]+=/.test(part)) {
+        cell.map = {};
+        for (const kv of part.split(',')) { const i = kv.indexOf('='); if (i > 0) cell.map[kv.slice(0, i).trim() === '*' ? 'default' : kv.slice(0, i).trim()] = kv.slice(i + 1); }
+      } else if (part !== '') cell.format = part;
+    }
+    return cell;
+  },
+  // Can the grid show this cell and give back the very same cell? (A map whose texts hold , | { } or =,
+  // or keys the grid does not know: such a cell is left as it is and edited as JSON.)
+  cellEditable(c) {
+    try {
+      const back = this.textToCell(this.cellToText(c)), orig = c === undefined || c === null ? '' : c;
+      if (typeof back !== 'object' && typeof orig !== 'object') return String(back) === String(orig);     // ("5" and 5 show the same)
+      return JSON.stringify(back) === JSON.stringify(orig);
+    } catch (e) { return false; }
+  },
+
   resolveText(s) {
     if (typeof s !== 'string' || s.length < 2 || s[0] !== '@') return s;
     if (s[1] === '@') return s.slice(1);

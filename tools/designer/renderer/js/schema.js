@@ -80,19 +80,28 @@ const SCHEMA = {
     xy_chart: { label: 'XY chart', def: { w: 300, h: 240, x_min: 0, x_max: 100, y_min: 0, y_max: 100 },
                 props: [{ k: 'x_tag', t: 'tag' }, { k: 'x_min', t: 'number' }, { k: 'x_max', t: 'number' }, { k: 'y_tag', t: 'tag' }, { k: 'y_min', t: 'number' }, { k: 'y_max', t: 'number' },
                         { k: 'points', t: 'number' }, { k: 'sample_ms', t: 'number' }, { k: 'refresh_ms', t: 'number' }, { k: 'mode', t: 'select', o: ['', 'line', 'dots'], empty: 'line' }, { k: 'color', t: 'color' },
-                        { k: 'hdiv', t: 'number' }, { k: 'vdiv', t: 'number' }, { k: 'decimals', t: 'number' }, { k: 'clear_tag', t: 'tag' }] },
+                        { k: 'hdiv', t: 'number' }, { k: 'vdiv', t: 'number' }, { k: 'decimals', t: 'number' }, { k: 'clear_tag', t: 'tag' },
+                        { k: 'series', t: 'list', max: 3, hint: 'more curves on the same axes (4 in all)', fields: [{ k: 'x_tag', t: 'tag' }, { k: 'y_tag', t: 'tag' }, { k: 'color', t: 'color' }],
+                          item: w => ({ x_tag: w.x_tag || '', y_tag: w.y_tag || '' }) }] },
     table: { label: 'Table', def: { w: '100%', h: 200, columns: ['Name', { title: 'Value', align: 'right' }], rows: [['A', '1'], ['B', '2']] },
-             props: [{ k: 'header', t: 'bool' }] },
+             props: [{ k: 'header', t: 'bool' },
+                     { k: 'columns', t: 'list', wrap: 'title', max: 32, hint: 'a title per column; width in pixels (empty: the columns share what is left)',
+                       fields: [{ k: 'title', t: 'text' }, { k: 'width', t: 'number' }, { k: 'align', t: 'select', o: ['', 'left', 'center', 'right'], empty: 'left' }], item: { title: '' } },
+                     { k: 'rows', t: 'cells', label: 'cells', hint: 'the cells: texts and tags' }] },
     datetime_input: { label: 'Date and time input', def: { mode: 'datetime' },
                       props: [{ k: 'mode', t: 'select', o: ['datetime', 'date', 'time'] }, { k: 'seconds', t: 'bool' }, { k: 'year_min', t: 'number' }, { k: 'year_max', t: 'number' }] },
     meter: { label: 'Meter', def: { w: 200, h: 200, min: 0, max: 100 },
              props: [{ k: 'min', t: 'number' }, { k: 'max', t: 'number' }, { k: 'value', t: 'number' }, { k: 'angle', t: 'number' }, { k: 'ticks', t: 'number' },
                      { k: 'major_every', t: 'number' }, { k: 'decimals', t: 'number' }, { k: 'unit', t: 'text' }, { k: 'show_value', t: 'bool' },
-                     { k: 'needle_color', t: 'color' }] },
+                     { k: 'needle_color', t: 'color' },
+                     { k: 'zones', t: 'list', max: 8, hint: 'parts of the scale in a colour (a warning range, an alarm range)', fields: [{ k: 'from', t: 'number' }, { k: 'to', t: 'number' }, { k: 'color', t: 'color' }],
+                       item: w => { const lo = Number(w.min === undefined ? 0 : w.min), hi = Number(w.max === undefined ? 100 : w.max); return { from: lo + (hi - lo) * 0.8, to: hi, color: '#e53935' }; } }] },
     log_view: { label: 'Log view', def: { w: '100%', h: 300, source: 'system' },
                 props: [{ k: 'source', t: 'select', o: ['system', 'operation', 'data'] }, { k: 'group', t: 'loggroup' }, { k: 'columns', t: 'csv' },
                         { k: 'rows', t: 'number' }, { k: 'days', t: 'number' }, { k: 'min_level', t: 'select', o: ['', 'info', 'warn', 'error'], empty: 'info' },
-                        { k: 'filter', t: 'bool' }, { k: 'filter_tag', t: 'tag' }, { k: 'refresh_ms', t: 'number' }] },
+                        { k: 'filter', t: 'bool' }, { k: 'filter_tag', t: 'tag' }, { k: 'refresh_ms', t: 'number' },
+                        { k: 'labels', t: 'map', hint: 'the title of each column, and the text shown when there is no row (empty)', keys: w => SCHEMA.logColumns(w).concat(['empty']) },
+                        { k: 'widths', t: 'map', vt: 'number', hint: 'the width of a column in pixels (empty: the columns share what is left)', keys: w => SCHEMA.logColumns(w) }] },
     alarm_list: { label: 'Alarm list', def: { w: '100%', h: 240, ack_on_tap: true },
                 props: [{ k: 'mode', t: 'select', o: ['', 'current', 'history'], empty: 'current' }, { k: 'rows', t: 'number' },
                         { k: 'row_height', t: 'number' }, { k: 'columns', t: 'csv' }, { k: 'ack_on_tap', t: 'bool' },
@@ -149,7 +158,18 @@ const SCHEMA = {
 
   bindKinds: ['text', 'value', 'checked', 'on', 'visible', 'hidden', 'enabled', 'disabled', 'bg_color', 'text_color', 'options', 'src'],
   // the property a plain "bind": "tag" means for each widget type
-  naturalBind: { switch: 'checked', checkbox: 'checked', button: 'checked', slider: 'value', arc: 'value', dropdown: 'value',
+  // the columns a log view shows: those it names, else the usual ones of its source
+  logColumns(w) {
+    const asked = Array.isArray(w.columns) ? w.columns : typeof w.columns === 'string' ? w.columns.split(',').map(x => x.trim()).filter(Boolean) : [];
+    if (asked.length) return asked;
+    if (w.source === 'operation') return ['time', 'user', 'kind', 'target', 'old', 'new'];
+    if (w.source === 'data') {
+      const p = typeof M !== 'undefined' && M.st ? M.st.project : null, g = ((p && p.data_log && p.data_log.groups) || []).find(x => x.name === w.group);
+      return ['time'].concat(((g && g.tags) || []).map(t => typeof t === 'string' ? t : (t && t.tag)).filter(Boolean));
+    }
+    return ['time', 'level', 'source', 'message'];
+  },
+  naturalBind: { meter: 'value', datetime_input: 'value', switch: 'checked', checkbox: 'checked', button: 'checked', slider: 'value', arc: 'value', dropdown: 'value',
                  roller: 'value', bar: 'value', label: 'text', led: 'on', textarea: 'text', image: 'src', spinner: 'visible', panel: 'visible',
                  numeric_display: 'value', text_display: 'text', password_display: 'text' },
   bindOps: ['', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'],

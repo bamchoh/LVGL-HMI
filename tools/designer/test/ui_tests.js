@@ -372,6 +372,107 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('editors of the new widgets: zones of a meter, curves of an XY chart, columns and cells of a table, titles of a log view', async () => {
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const press = fk => { const b = field(fk); if (!b) throw new Error('no button ' + fk); b.click(); App.doRefresh(); };
+
+    // ---- meter: zones
+    App.addWidget('meter'); await frame();
+    let p = M.st.sel, fk = 'w:' + U.pathStr(p);
+    eq(M.get(p).zones, undefined);
+    press(fk + '.zones.add');
+    eq(M.get(p).zones, [{ from: 80, to: 100, color: '#e53935' }], 'a new zone: the top fifth of the scale');
+    press(fk + '.zones.add');
+    type(fk + '.zones.1.from', '60'); type(fk + '.zones.1.to', '80');
+    eq(M.get(p).zones[1].from, 60);
+    eq(M.get(p).zones[1].to, 80);
+    press(fk + '.zones.1.up');
+    eq(M.get(p).zones.map(z => z.from), [60, 80], 'moved up');
+    ok([...Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]').querySelectorAll('svg path')].length >= 3, 'the zones are drawn');
+    press(fk + '.zones.0.del'); press(fk + '.zones.0.del');
+    eq(M.get(p).zones, undefined, 'the last zone removed: no key left');
+    M.deleteWidget(p); App.doRefresh();
+
+    // ---- XY chart: more curves
+    App.addWidget('xy_chart'); await frame();
+    p = M.st.sel; fk = 'w:' + U.pathStr(p);
+    const tag = M.st.project.tags[0].name;
+    type(fk + '.x_tag', tag); type(fk + '.y_tag', tag);
+    press(fk + '.series.add');
+    eq(M.get(p).series, [{ x_tag: tag, y_tag: tag }], 'a new curve starts with the tags of the first');
+    type(fk + '.series.0.y_tag', 'no_such_tag');
+    ok(M.problems().some(x => /no_such_tag/.test(x.text)), 'an unknown tag is a problem');
+    press(fk + '.series.add'); press(fk + '.series.add');
+    eq(M.get(p).series.length, 3);
+    ok(field(fk + '.series.add').disabled, 'four curves in all: no more');
+    M.deleteWidget(p); App.doRefresh();
+
+    // ---- table: columns (a title alone, or with a width and an alignment) and cells
+    App.addWidget('table'); await frame();
+    p = M.st.sel; fk = 'w:' + U.pathStr(p);
+    eq(field(fk + '.columns.0.title').value, 'Name', 'a column written as its title');
+    type(fk + '.columns.0.title', 'Machine');
+    eq(M.get(p).columns[0], { title: 'Machine' });
+    type(fk + '.columns.0.width', '120');
+    eq(M.get(p).columns[0], { title: 'Machine', width: 120 });
+    eq(field(fk + '.columns.1.align').value, 'right');
+    press(fk + '.columns.add');
+    type(fk + '.columns.2.title', 'State');
+    eq(M.get(p).columns.length, 3);
+    M.mutate(() => { M.get(p).rows.push(['kept', { tag: tag, map: { 0: 'a,b' } }]); }); App.doRefresh();       // a cell the grid cannot write as a text
+    press(fk + '.rows.edit');
+    const modal = document.getElementById('modal');
+    ok(!modal.hidden, 'the dialog is open');
+    const cell = rc => modal.querySelector('input[data-rc="' + rc + '"]');
+    const put = (rc, v) => { const c = cell(rc); if (!c) throw new Error('no cell ' + rc); c.value = v; c.dispatchEvent(new Event('input', { bubbles: true })); };
+    eq(cell('0,0').value, 'A');
+    eq([...modal.querySelectorAll('table.cells th')].map(t => t.textContent).join('|'), '|Machine|Value|State|', 'the titles of the columns over the grid');
+    ok(modal.querySelector('table.cells input[disabled]'), 'the cell that cannot be a text is shown, locked');
+    put('0,0', 'Loader'); put('0,1', '{' + tag + '|%.1f C}'); put('0,2', '{' + tag + '|0=Stop,1=Run,*=?}');
+    modal.querySelector('[data-act="addrow"]').click();
+    put('3,0', 'Total'); put('3,1', '42');
+    modal.querySelector('[data-delrow="1"]').click();                    // the row "B"
+    eq(cell('1,0').value, 'kept', 'what was typed stays when a row goes');
+    modal.querySelector('#modal-buttons button.primary').click(); App.doRefresh(); await frame();
+    ok(modal.hidden, 'closed by OK');
+    eq(M.get(p).rows, [['Loader', { tag: tag, format: '%.1f C' }, { tag: tag, map: { 0: 'Stop', 1: 'Run', default: '?' } }], ['kept', { tag: tag, map: { 0: 'a,b' } }], ['Total', 42]]);
+    const drawn = [...Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]').querySelectorAll('tr')].map(r => [...r.children].map(c => c.textContent).join('|'));
+    eq(drawn[0], 'Machine|Value|State');
+    ok(drawn[1].startsWith('Loader|'), 'the canvas shows the new cells: ' + drawn[1]);
+    // Cancel changes nothing; one undo takes the whole edit back
+    press(fk + '.rows.edit');
+    put('0,0', 'never');
+    modal.querySelector('[data-act="delcol"]').click();
+    [...modal.querySelectorAll('#modal-buttons button')].find(b => !b.classList.contains('primary')).click(); App.doRefresh();
+    eq(M.get(p).rows[0][0], 'Loader');
+    eq(M.get(p).columns.length, 3);
+    M.undo(); App.doRefresh();
+    eq(M.get(p).rows[0][0], 'A', 'one undo for the dialog');
+    // a column taken away in the dialog takes its title with it
+    press(fk + '.rows.edit');
+    modal.querySelector('[data-act="delcol"]').click();
+    modal.querySelector('#modal-buttons button.primary').click(); App.doRefresh();
+    eq(M.get(p).columns.length, 2);
+    M.deleteWidget(p); App.doRefresh();
+
+    // ---- log view: titles and widths of the columns it shows
+    App.addWidget('log_view'); await frame();
+    p = M.st.sel; fk = 'w:' + U.pathStr(p);
+    for (const k of ['time', 'level', 'source', 'message', 'empty']) ok(field(fk + '.labels.' + k), 'a title field for ' + k);
+    ok(!field(fk + '.widths.empty') && field(fk + '.widths.message'), 'a width per column');
+    type(fk + '.labels.message', '内容'); type(fk + '.labels.empty', '記録なし'); type(fk + '.widths.time', '150');
+    eq(M.get(p).labels, { message: '内容', empty: '記録なし' });
+    eq(M.get(p).widths, { time: 150 });
+    ok(Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]').textContent.includes('内容'), 'the title on the canvas');
+    type(fk + '.source', 'operation');
+    ok(field(fk + '.labels.user') && field(fk + '.labels.message'), 'the columns of the other source, and what the file still holds');
+    type(fk + '.labels.message', ''); type(fk + '.labels.empty', ''); type(fk + '.widths.time', '');
+    eq(M.get(p).labels, undefined, 'emptied: no key left');
+    eq(M.get(p).widths, undefined);
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('XY chart: in the palette, the numbers at the ends of the axes, a curve per series', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /XY グラフ/.test(t)), 'palette: ' + pal.join(','));
