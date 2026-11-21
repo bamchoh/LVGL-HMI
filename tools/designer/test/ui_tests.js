@@ -931,6 +931,35 @@
     Panels.show('widgets');
   });
 
+  await test('mail: switched on and set on the Project tab; there is no field for the password', async () => {
+    Panels.show('project'); App.doRefresh();
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const had = M.st.project.mail;
+    M.mutate(() => { delete M.st.project.mail; }); App.doRefresh();
+    const base = M.problems().length;
+    ok(field('proj.mail.on') && !field('proj.mail.on').checked, 'the switch, off');
+    ok(!field('proj.mail.host'), 'nothing else while it is off');
+    field('proj.mail.on').click(); App.doRefresh();
+    ok(M.st.project.mail && field('proj.mail.host'), 'on: the settings appear');
+    ok(M.problems().length > base, 'not usable yet: a server and addresses are wanted');
+    type('proj.mail.host', 'smtp.example.com');
+    type('proj.mail.from', 'hmi@example.com');
+    type('proj.mail.to', 'shift@example.com, boss@example.com');
+    eq(M.st.project.mail.to, ['shift@example.com', 'boss@example.com']);
+    eq(M.problems().length, base, M.problems().map(p => p.text).join(' | '));
+    ok(!field('proj.mail.password'), 'the password is set on the device, not here');
+    type('proj.mail.to', 'shift@example.com, not an address');
+    ok(M.problems().some(p => /mail: "to" is/.test(p.text)), 'an address that is none is a problem');
+    type('proj.mail.to', 'shift@example.com');
+    field('proj.mail.security').value = 'none'; field('proj.mail.security').dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh();
+    ok(M.problems().some(p => /can be read on the network/.test(p.text)), 'no security is said');
+    field('proj.mail.on').click(); App.doRefresh();
+    eq(M.st.project.mail, undefined, 'off: no key left');
+    if (had) M.mutate(() => { M.st.project.mail = had; });
+    Panels.show('widgets');
+  });
+
   await test('transfers: added and edited on the Project tab; the tags are picked from the list; a ring is a problem', async () => {
     Panels.show('project'); App.doRefresh();
     const field = fk => document.querySelector('[data-fk="' + fk + '"]');

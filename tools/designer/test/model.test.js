@@ -1360,6 +1360,28 @@ test('M library: from outside nothing but data gets in - no prototypes, no paths
   for (const bad of [null, 5, 'x', [], { widgets: [{ type: 'label' }] }]) assert.equal(M.libraryClean(bad).part, null);
 });
 
+test('M mail: a server and addresses that are addresses; a password in the project file is a problem', () => {
+  const { M, p } = tagProject();
+  const base = M.problems().length;
+  for (const ok of [{ host: 'smtp.example.com', from: 'hmi@example.com', to: ['a@example.com'] }, { host: '[::1]', port: 2525, security: 'tls', from: 'a@b.c', to: 'x@y.z, q@y.z', username: 'u', verify: true, ca_file: 'ca.pem' },
+                    { host: '10.0.0.5', security: 'starttls', from: 'a_b-c+tag@d.example', to: ['x@y.z'], alarms: { events: ['raised'] } }]) {
+    p.mail = ok;
+    assert.equal(M.problems().length, base, JSON.stringify(ok) + ': ' + M.problems().map(x => x.text).join(' | '));
+  }
+  const good = { host: 'h', from: 'a@b.c', to: ['x@y.z'] };
+  const bad = [[5, /an object/], [{}, /no mail server/], [Object.assign({}, good, { host: 'h; rm -rf /' }), /not the name of a server/], [Object.assign({}, good, { security: 'ssl' }), /"security" is/],
+               [Object.assign({}, good, { port: 0 }), /"port" is/], [Object.assign({}, good, { port: 70000 }), /"port" is/], [Object.assign({}, good, { from: 'Name <a@b.c>' }), /"from" is/],
+               [Object.assign({}, good, { from: 'a@b.c\r\nBcc: x@evil.example' }), /"from" is/], [Object.assign({}, good, { to: [] }), /no recipient/], [Object.assign({}, good, { to: ['x@y.z', 'nope'] }), /"to" is/],
+               [Object.assign({}, good, { to: 'a@b..c' }), /"to" is/], [Object.assign({}, good, { to: 5 }), /"to" is/], [Object.assign({}, good, { to: Array(25).fill('x@y.z') }), /"to" is/],
+               [Object.assign({}, good, { password: 'secret' }), /password is in the project file/], [Object.assign({}, good, { security: 'none' }), /can be read on the network/],
+               [Object.assign({}, good, { verify: false }), /certificate of the server is not checked/]];
+  for (const [mail, re] of bad) {
+    p.mail = mail;
+    assert.ok(M.problems().some(x => re.test(x.text)), JSON.stringify(mail).slice(0, 80) + ' -> ' + M.problems().map(x => x.text).join(' | '));
+  }
+  delete p.mail;
+});
+
 test('M transfers: the tags follow a rename; a ring, a wrong trigger and a destination of the runtime are problems', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;

@@ -8,6 +8,7 @@
 #include "system_settings.hpp"
 #include "texts.hpp"
 #include "data_transfer.hpp"
+#include "mail.hpp"
 #include "screen_saver.hpp"
 #include "sound.hpp"
 #include <algorithm>
@@ -62,6 +63,7 @@ void Project::apply_local_overlay()
     local_users_ = json();
     local_screen_saver_ = json();
     local_schedules_ = json();
+    local_mail_ = json();
     local_sound_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
@@ -72,6 +74,7 @@ void Project::apply_local_overlay()
     if(const json* lu = jget(overlay, "users")) local_users_ = *lu;
     if(const json* ls = jget(overlay, "screen_saver")) local_screen_saver_ = *ls;
     if(const json* lc = jget(overlay, "schedules")) local_schedules_ = *lc;
+    if(const json* lm = jget(overlay, "mail")) local_mail_ = *lm;
     if(const json* lo = jget(overlay, "sound")) local_sound_ = *lo;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
@@ -226,6 +229,8 @@ bool Project::load(const std::string& path)
     // the screen goes dark after a while without input ("screen_saver")
     screen_saver().configure(jget(root_, "screen_saver"), local_screen_saver_.is_null() ? nullptr : &local_screen_saver_, local_overlay_path());
     scheduler().load(jget(root_, "schedules"), local_schedules_.is_null() ? nullptr : &local_schedules_, local_overlay_path());
+    mail().configure(jget(root_, "mail"), local_mail_.is_null() ? nullptr : &local_mail_, info_.dir, local_overlay_path(), info_.title);
+    alarms().set_listener(mail().configured() ? std::function<void(const AlarmEvent&)>([](const AlarmEvent& e) { mail().on_alarm(e); }) : nullptr);
     sound().configure(jget(root_, "sound"), local_sound_.is_null() ? nullptr : &local_sound_, info_.dir, local_overlay_path());
 
     // languages and texts ("@id"), and the font they are drawn with
@@ -269,6 +274,7 @@ void Project::start_logs(bool read_only, const std::string& log_dir)
 {
     const std::string& dir = log_dir.empty() ? info_.dir : log_dir;
     data_log().load(jget(root_, "data_log"), dir, read_only);
+    mail().set_read_only(read_only);                             // (before the alarms are looked at: an alarm of a check mails nobody)
     alarms().load(jget(root_, "alarms"), dir, read_only);
     operation_log().load(jget(root_, "operation_log"), dir, read_only);
     if(read_only) return;
@@ -290,6 +296,7 @@ void Project::start_logs(bool read_only, const std::string& log_dir)
     register_alarm_actions();
     register_alarm_summary_actions();
     register_sound_actions();
+    register_mail_actions();
     ui().register_action("alarm_log.export", [](const std::string& arg) {
         int64_t n = alarms().export_csv(arg);
         if(n >= 0) HML_INFO("alarm log: %lld rows exported", static_cast<long long>(n));
@@ -406,6 +413,8 @@ void Project::unload()
     screen_saver().clear();
     scheduler().clear();
     sound().clear();
+    alarms().set_listener(nullptr);
+    mail().clear();
     transfers().clear();
     root_ = nullptr;
 }

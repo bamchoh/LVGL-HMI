@@ -1,5 +1,6 @@
 #include "check.hpp"
 #include "data_transfer.hpp"
+#include "mail.hpp"
 #include "schedule.hpp"
 #include "sound.hpp"
 #include <functional>
@@ -442,6 +443,29 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     const std::string start = jstr(root, "start_screen", "");
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
+
+    // ---- mail: a server, addresses that are addresses; what should not be in a project file
+    if(const json* ml = jget(root, "mail")) {
+        MailConfig mc;
+        for(const std::string& p : mail_parse(*ml, nullptr, mc)) c.add("mail", p);
+        if(ml->is_object()) {
+            static const std::set<std::string> known{ "host", "port", "security", "username", "password", "from", "to", "verify", "ca_file", "timeout_ms", "retry_s", "retries", "queue", "alarms", "enabled" };
+            for(auto k = ml->begin(); k != ml->end(); ++k)
+                if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add("mail", "unknown key \"" + k.key() + "\"");
+            if(!jstr(*ml, "password", "").empty()) c.add("mail", "the password is in the project file: everybody who gets the project can read it. Better: leave it out and set it on the device (System > Mail; kept in project.local.json)");
+            if(jstr(*ml, "security", "starttls") == "none") c.add("mail", "\"security\": \"none\": the mails" + std::string(jstr(*ml, "username", "").empty() ? "" : ", the user name and the password") + " can be read on the network");
+            if(!jbool(*ml, "verify", true)) c.add("mail", "\"verify\": false: the certificate of the server is not checked (anybody can pose as the server)");
+            if(const std::string ca = jstr(*ml, "ca_file", ""); !ca.empty()) {
+                std::error_code ec;
+                if(!fs::is_regular_file(fs::u8path(ca).is_absolute() ? fs::u8path(ca) : c.dir / fs::u8path(ca), ec)) c.add("mail", "ca_file: no file \"" + ca + "\"");
+            }
+            if(const json* al = jget(*ml, "alarms"); al && al->is_object()) {
+                static const std::set<std::string> ak{ "events", "severities", "min_interval_s", "subject", "body" };
+                for(auto k = al->begin(); k != al->end(); ++k) if(!k.key().empty() && k.key()[0] != '_' && !ak.count(k.key())) c.add("mail", "alarms: unknown key \"" + k.key() + "\"");
+                if(!c.has_alarms && !(al->contains("events") && (*al)["events"].is_array() && (*al)["events"].empty())) c.add("mail", "alarms are to be mailed, but the project has no \"alarms\"");
+            }
+        }
+    }
 
     // ---- transfers: tags that exist, no rings
     if(const json* tr = jget(root, "transfers")) {

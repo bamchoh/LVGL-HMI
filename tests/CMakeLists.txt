@@ -37,6 +37,9 @@ add_executable(hml_tests
   test_sound.cpp
   test_data_transfer.cpp
   test_template.cpp
+  test_smtp.cpp
+  test_smtp_socket.cpp
+  test_mail.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp
@@ -74,7 +77,7 @@ if(HML_OPCUA)
   target_compile_definitions(hml_tests PRIVATE HML_WITH_OPCUA=1)
 endif()
 if(WIN32)
-  target_link_libraries(hml_tests PRIVATE ws2_32 setupapi winmm)
+  target_link_libraries(hml_tests PRIVATE ws2_32 setupapi winmm crypt32)
 endif()
 if(MSVC)
   target_compile_definitions(hml_tests PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)

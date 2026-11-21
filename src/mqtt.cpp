@@ -5,6 +5,7 @@
 #ifdef _WIN32
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
+#  include <wincrypt.h>
 #else
 #  include <fcntl.h>
 #  include <netdb.h>
@@ -210,6 +211,7 @@ struct MqttLink::Impl {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context drbg;
     bool tls = false, open = false, inited = false;
+    bool tls_up = false;                   // the handshake is done: what is sent and read goes through TLS
     std::string host;
     uint16_t port = 0;
 
@@ -329,9 +331,35 @@ bool MqttLink::open(const std::string& host, uint16_t port, const MqttTls& tls, 
     const int fd = connect_with_timeout(host, port, timeout_ms, keep_going_, err_);
     if(fd < 0) { close(); return false; }
     m.net.fd = fd;
-    int rc = 0;
-    if(!tls.enabled) { m.open = true; return true; }
+    m.open = true;
+    if(!tls.enabled) return true;
+    return start_tls(tls, timeout_ms);
+}
 
+// The certificates the operating system trusts. Returns how many sources were read.
+static int load_system_ca(mbedtls_x509_crt* ca)
+{
+    int n = 0;
+#ifdef _WIN32
+    if(HCERTSTORE store = CertOpenSystemStoreA(0, "ROOT")) {
+        for(PCCERT_CONTEXT c = nullptr; (c = CertEnumCertificatesInStore(store, c)) != nullptr;)
+            if(mbedtls_x509_crt_parse_der(ca, c->pbCertEncoded, c->cbCertEncoded) == 0) n++;
+        CertCloseStore(store, 0);
+    }
+#else
+    for(const char* path : { "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/cert.pem" })
+        if(mbedtls_x509_crt_parse_file(ca, path) >= 0) { n++; break; }          // (> 0: some entries of the bundle were not understood)
+#endif
+    return n;
+}
+
+bool MqttLink::start_tls(const MqttTls& tls, uint32_t timeout_ms)
+{
+    Impl& m = *impl_;
+    if(!m.open || m.tls_up) { err_ = "TLS: no plain connection to secure"; return false; }
+    const std::string& host = m.host;
+    m.tls = true;
+    int rc = 0;
     const char* pers = "hml-mqtt";
     if((rc = mbedtls_ctr_drbg_seed(&m.drbg, mbedtls_entropy_func, &m.entropy, reinterpret_cast<const unsigned char*>(pers), std::strlen(pers))) != 0) {
         err_ = "TLS: random generator: " + tls_error(rc); close(); return false;
@@ -342,8 +370,11 @@ bool MqttLink::open(const std::string& host, uint16_t port, const MqttTls& tls, 
     mbedtls_ssl_conf_min_tls_version(&m.conf, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_rng(&m.conf, mbedtls_ctr_drbg_random, &m.drbg);
     if(tls.verify) {
-        if(tls.ca_file.empty()) { err_ = "TLS: no ca_file to check the broker's certificate with"; close(); return false; }
-        if((rc = mbedtls_x509_crt_parse_file(&m.ca, tls.ca_file.c_str())) < 0) { err_ = "TLS: ca_file '" + tls.ca_file + "': " + tls_error(rc); close(); return false; }
+        if(tls.ca_file.empty() && tls.system_ca) {
+            if(load_system_ca(&m.ca) == 0) { err_ = "TLS: the certificates this system trusts could not be read: name a \"ca_file\""; close(); return false; }
+        }
+        else if(tls.ca_file.empty()) { err_ = "TLS: no ca_file to check the broker's certificate with"; close(); return false; }
+        else if((rc = mbedtls_x509_crt_parse_file(&m.ca, tls.ca_file.c_str())) < 0) { err_ = "TLS: ca_file '" + tls.ca_file + "': " + tls_error(rc); close(); return false; }
         mbedtls_ssl_conf_ca_chain(&m.conf, &m.ca, nullptr);
         mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_REQUIRED);
     }
@@ -381,15 +412,16 @@ bool MqttLink::open(const std::string& host, uint16_t port, const MqttTls& tls, 
     }
     mbedtls_net_set_block(&m.net);
     mbedtls_ssl_set_bio(&m.ssl, &m.net, mbedtls_net_send, nullptr, mbedtls_net_recv_timeout);
-    m.open = true;
+    m.tls_up = true;
     return true;
 }
 
 void MqttLink::close()
 {
     Impl& m = *impl_;
-    if(m.open && m.tls) mbedtls_ssl_close_notify(&m.ssl);
+    if(m.open && m.tls_up) mbedtls_ssl_close_notify(&m.ssl);
     m.open = false;
+    m.tls_up = false;
     m.free_all();
 }
 
@@ -399,7 +431,7 @@ bool MqttLink::write(const MqttBytes& b)
     if(!m.open) return false;
     size_t done = 0;
     while(done < b.size()) {
-        int rc = m.tls ? mbedtls_ssl_write(&m.ssl, b.data() + done, b.size() - done) : mbedtls_net_send(&m.net, b.data() + done, b.size() - done);
+        int rc = m.tls_up ? mbedtls_ssl_write(&m.ssl, b.data() + done, b.size() - done) : mbedtls_net_send(&m.net, b.data() + done, b.size() - done);
         if(rc == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
         if(rc <= 0) { err_ = "write: " + tls_error(rc); return false; }
         done += static_cast<size_t>(rc);
@@ -412,7 +444,7 @@ int MqttLink::read(uint8_t* buf, size_t max, uint32_t timeout_ms)
     Impl& m = *impl_;
     if(!m.open) return -1;
     int rc;
-    if(m.tls) {
+    if(m.tls_up) {
         // pending decrypted bytes first, else wait for the socket
         if(mbedtls_ssl_get_bytes_avail(&m.ssl) == 0) {
             mbedtls_ssl_conf_read_timeout(&m.conf, timeout_ms);

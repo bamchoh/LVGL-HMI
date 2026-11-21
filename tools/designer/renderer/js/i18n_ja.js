@@ -418,6 +418,15 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.KEYS_JA, { mail: 'メールを使う', mail_host: 'メールサーバー', mail_from: '差出人', mail_to: '宛先', security: '暗号化', ca_file: 'CA 証明書のファイル' });
+Object.assign(I18N.TEXT_JA, { 'Mail': 'メール', 'alarms are sent by e-mail': 'アラームをメールで知らせる', 'the mail server (SMTP)': 'メールサーバー（SMTP）',
+  'starttls: secured before anything is sent (port 587). tls: TLS from the first byte (port 465). none: nothing is secured - a relay of your own only': 'starttls: 何かを送る前に暗号化する（ポート 587）。tls: 最初から TLS（ポート 465）。none: 暗号化しない（自社内の中継サーバーだけ）',
+  'empty: 587 (starttls), 465 (tls), 25 (none)': '空なら 587（starttls）、465（tls）、25（none）', 'the address of the sender': '差出人のアドレス',
+  'the recipients, separated by commas. Can be changed on the device: System > Mail': '宛先（コンマ区切り）。装置の System > Mail で変えられます',
+  'the user name for the mail server (empty: no login). The password is not kept in the project: set it on the device, System > Mail': 'メールサーバーのユーザー名（空ならログインしない）。パスワードはプロジェクトには入れず、装置の System > Mail で設定します',
+  'check the certificate of the server (leave this on)': 'サーバーの証明書を検証する（オンのままにしてください）', 'a file with the certificate of the CA of the server (empty: the certificates the system trusts)': 'サーバーの CA 証明書のファイル（空なら、OS が信頼する証明書を使う）',
+  'A new alarm is sent as a mail to the recipients. A mail that cannot be delivered waits and is tried again; the screen never waits for the mail server. Which alarms, the subject and the text: "alarms" under "mail" in project.json (see the README). The password belongs on the device (System > Mail), not into the project file. A button can send a mail: { "action": "call", "fn": "mail.send", "arg": "Subject\\nText with {tag}" }.':
+    '新しいアラームを宛先にメールで送ります。届けられなかったメールは待ち行列に残り、送り直します。画面がメールサーバーを待つことはありません。どのアラームを送るか・件名・本文は、project.json の "mail" の "alarms" に書きます（README を参照）。パスワードはプロジェクトのファイルではなく、装置（System > Mail）で設定してください。ボタンからも送れます: { "action": "call", "fn": "mail.send", "arg": "件名\\n本文 {タグ名}" }。' });
 Object.assign(I18N.KEYS_JA, { template: 'テンプレート', template_args: 'テンプレートに渡す文字' });
 Object.assign(I18N.TEXT_JA, { '(none)': '(なし)', '(no template)': '(テンプレートなし)', 'The new screen is built on this one (its header, its navigation)': '新しい画面を、この画面（ヘッダーやナビゲーション）の上に作る',
   'this screen is built on another one: the widgets of that screen (a header, a navigation) come first, the widgets of this screen on top. Change the template and every screen that uses it follows':
