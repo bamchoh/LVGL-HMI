@@ -581,6 +581,29 @@
     M.deleteWidget(p); App.doRefresh();
   });
 
+  await test('alarm summary: in the palette, the alarms of the project with counts, times and bars; order and texts', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /アラーム集計/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('alarm_summary'); await frame();
+    const p = M.st.sel, fk = 'w:' + U.pathStr(p), find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    ok(find() && find().classList.contains('lv-alarm_summary'), 'drawn');
+    const rows = () => [...find().querySelectorAll('.lv-as-row')].map(r => r.textContent);
+    const first = M.resolveText(M.st.project.alarms.items[0].message || M.st.project.alarms.items[0].name);
+    ok(rows().some(r => r.includes(first)), 'the alarm "' + first + '" of the project is shown: ' + rows().join(' / '));
+    ok(rows()[0].includes('Alarm') && rows()[0].includes('Count') && rows()[0].includes('Time'), 'the titles: ' + rows()[0]);
+    ok(/\d+:\d\d:\d\d/.test(rows()[1]), 'a time as h:mm:ss: ' + rows()[1]);
+    ok(find().textContent.includes('7 d') && find().textContent.includes('Count ▾'), 'the span and the order on the widget');
+    const order = () => rows().slice(1).map(r => r.replace(/[^0-9:]/g, ' ').trim());
+    const byCount = order();
+    M.mutate(() => { Object.assign(M.get(p), { sort: 'time', days: 30, labels: { alarm: 'アラーム', by_time: '時間順' } }); }); App.doRefresh(); await frame();
+    ok(find().textContent.includes('30 d') && find().textContent.includes('時間順'), 'the other span and the text of the order');
+    ok(rows()[0].includes('アラーム'), 'a title from "labels"');
+    ok(JSON.stringify(order()) !== JSON.stringify(byCount) || rows().length <= 2, 'longest first is another order');
+    ok(document.querySelector('[data-fk="' + fk + '.labels.empty"]'), 'the texts are edited as a list of fields');
+    M.mutate(() => { M.get(p).bars = false; }); App.doRefresh(); await frame();
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('alarm widgets: in the palette, drawn with the alarms of the project, settings on the Logs page', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /アラーム一覧/.test(t)) && pal.some(t => /アラームバナー/.test(t)), 'palette: ' + pal.join(','));

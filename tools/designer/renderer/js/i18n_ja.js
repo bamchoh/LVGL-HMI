@@ -415,7 +415,8 @@ Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表�
 Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
 Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター', 'Date and time input': '日付・時刻の入力', 'Table': '表' });
 Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
-Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ' });
+Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
+Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { zones: '色を付ける区間', widths: '列の幅', cells: 'セル', from: '開始', to: '終了' });
 Object.assign(I18N.TEXT_JA, { 'Edit cells…': 'セルを編集…', '+ row': '+ 行', '+ column': '+ 列', '− column': '− 列', 'Table cells': '表のセル', 'Move up': '上へ', 'Remove': '削除', 'Remove this row': 'この行を削除',
   'This cell is kept as it is (edit it as JSON in the project file)': 'このセルはそのまま残します（プロジェクトのファイルで JSON として編集してください）',

@@ -111,6 +111,7 @@ const Tree = {
       case 'recipe_table': return '☷';
       case 'trend': return '〰';
       case 'alarm_list': return '⚠';
+      case 'alarm_summary': return '∑';
       case 'log_view': return '☰';
       case 'meter': return '◔';
       case 'datetime_input': return '◷';

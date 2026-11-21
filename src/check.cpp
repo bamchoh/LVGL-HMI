@@ -274,7 +274,7 @@ struct Checker {
             const std::string b = jstr(w, "book", "");
             if(!books.count(b) && !(b.empty() && books.size() == 1)) add(where, b.empty() ? "no \"book\" (a recipe book)" : "unknown recipe book \"" + b + "\"");
         }
-        if((type == "alarm_list" || type == "alarm_banner") && !has_alarms) add(where, "the project has no \"alarms\"");
+        if((type == "alarm_list" || type == "alarm_banner" || type == "alarm_summary") && !has_alarms) add(where, "the project has no \"alarms\"");
         if(type == "xy_chart") {
             for(const char* k : { "x_tag", "y_tag" }) { if(w.contains(k)) need_tag(where, k, w[k]); else add(where, std::string("no \"") + k + "\""); }
             if(w.contains("clear_tag")) need_tag(where, "clear_tag", w["clear_tag"]);
