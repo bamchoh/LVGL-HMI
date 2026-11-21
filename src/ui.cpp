@@ -2125,6 +2125,15 @@ void Ui::register_action(const std::string& name, std::function<void(const std::
     impl_->named_actions[name] = std::move(fn);
 }
 
+int Ui::run_actions(const json& actions)
+{
+    ActionList list;
+    if(actions.is_array()) { for(const json& j : actions) if(j.is_object()) if(auto a = impl_->parse_action(j)) list.actions.push_back(std::move(*a)); }
+    else if(actions.is_object()) { if(auto a = impl_->parse_action(actions)) list.actions.push_back(std::move(*a)); }
+    impl_->run_actions(list);
+    return static_cast<int>(list.actions.size());
+}
+
 bool Ui::call_action(const std::string& name, const std::string& arg)
 {
     auto it = impl_->named_actions.find(name);

@@ -476,6 +476,14 @@ const Panels = {
         { k: 'wake_on_alarm', t: 'bool', hint: 'a new alarm wakes the screen' },
         { k: 'logout', t: 'bool', hint: 'log the user out when the screen goes dark' }], fk + '.ss'),
       U.el('div', { class: 'hint' }, 'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.')));
+    // schedules: actions that run by the clock (src/schedule.hpp)
+    el.append(Props.section('Schedules', Array.isArray(p.schedules) && p.schedules.length > 0,
+      Props.listEditor(p, { k: 'schedules', t: 'list', max: 200, hint: 'actions that run by the clock',
+        fields: [{ k: 'name', t: 'text' }, { k: 'at', t: 'text', placeholder: '08:00', hint: 'HH:MM, or YYYY-MM-DD HH:MM for once' },
+                 { k: 'days', t: 'csv', label: 'weekdays', hint: 'mon, tue, wed, thu, fri, sat, sun (empty = every day)' }, { k: 'enabled', t: 'bool', hint: 'off: kept, not run' },
+                 { k: 'do', t: 'json', below: true, hint: 'what it does: an action of a screen, or a list of them. { "action": "set", "tag": "run", "value": true }' }],
+        item: () => ({ name: 'schedule' + ((p.schedules || []).length + 1), at: '08:00', do: { action: 'set', tag: M.tagNames()[0] || '', value: true } }) }, fk + '.sched'),
+      U.el('div', { class: 'hint' }, 'A schedule runs the actions a button can run, at a time of day on the days named (or once, at a date). On the device the time, the days and on / off can be changed under System > Schedule; what it does cannot. "catch_up": true (in the project file) runs a time that passed while the device was off, once, when it starts again.')));
     // "font" exists only while it names a file
     const fontHolder = new Proxy({}, {
       get: (t, k) => (k === 'file' ? (p.font && p.font.file) : undefined),

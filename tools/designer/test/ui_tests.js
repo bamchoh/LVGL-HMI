@@ -697,6 +697,40 @@
     Panels.show('widgets');
   });
 
+  await test('schedules: added and edited on the Project tab; a wrong time is a problem', async () => {
+    Panels.show('project'); App.doRefresh();
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const base = M.problems().length, had = M.st.project.schedules;
+    M.mutate(() => { delete M.st.project.schedules; }); App.doRefresh();
+    ok(field('proj.sched.schedules.add'), 'the add button');
+    field('proj.sched.schedules.add').click(); App.doRefresh();
+    const s = () => M.st.project.schedules;
+    eq(s().length, 1);
+    eq(s()[0].at, '08:00');
+    eq(s()[0].do.action, 'set');
+    eq(M.problems().length, base, 'a new schedule is a valid one: ' + M.problems().map(x => x.text).join(' | '));
+    type('proj.sched.schedules.0.name', 'start');
+    type('proj.sched.schedules.0.at', '07:30');
+    type('proj.sched.schedules.0.days', 'mon, wed');
+    eq(s()[0], Object.assign({}, s()[0], { name: 'start', at: '07:30', days: ['mon', 'wed'] }));
+    const doField = field('proj.sched.schedules.0.do');
+    ok(doField && doField.tagName === 'TEXTAREA' && doField.closest('.list-below'), 'what it does: a line of its own');
+    type('proj.sched.schedules.0.do', '[{"action":"back"},{"action":"toggle","tag":"' + M.st.project.tags[0].name + '"}]');
+    eq(s()[0].do.length, 2);
+    eq(M.problems().length, base);
+    type('proj.sched.schedules.0.at', '7:30');
+    ok(M.problems().some(x => /schedule "start": "at" is HH:MM/.test(x.text)), 'a wrong time is a problem');
+    type('proj.sched.schedules.0.at', '2026-12-01 09:00');
+    eq(M.problems().length, base, 'once, at a date');
+    type('proj.sched.schedules.0.days', '');
+    eq(s()[0].days, undefined, 'no days: every day');
+    field('proj.sched.schedules.0.del').click(); App.doRefresh();
+    eq(M.st.project.schedules, undefined, 'the last one removed: no key left');
+    if (had) M.mutate(() => { M.st.project.schedules = had; });
+    Panels.show('widgets');
+  });
+
   await test('animation: a ready one is added from the properties; a wrong one is a problem', async () => {
     App.addWidget('label'); await frame();
     const w = M.selected();

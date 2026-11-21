@@ -750,6 +750,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     if(auto up = make_users_page()) s.add_page(std::move(up));
     if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
+    if(const json* sc = proj.section("schedules"); sc && sc->is_array() && !sc->empty()) s.add_page(make_schedule_page());
     s.add_page(make_monitor_page());
     if(has_device_driver(proj.drivers_config())) s.add_page(make_device_page());
     s.add_page(make_storage_page(proj));

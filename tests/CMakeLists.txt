@@ -33,6 +33,7 @@ add_executable(hml_tests
   test_xy_chart.cpp
   test_touch_filter.cpp
   test_alarm_stats.cpp
+  test_schedule.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp

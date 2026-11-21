@@ -50,6 +50,7 @@
 #include "texts.hpp"
 #include "project_archive.hpp"
 #include "transfer.hpp"
+#include "schedule.hpp"
 #include "vnc.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
@@ -421,6 +422,7 @@ int main(int argc, char** argv)
     hml::register_user_actions();
     // "remote": the screen in a VNC viewer
     hml::vnc_server().start(hml::project().section("remote"), disp, info.title);
+    hml::scheduler().start();
     // pages that follow outside events; auto logout
     lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); hml::screen_saver().poll(); }, 250, nullptr);
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)

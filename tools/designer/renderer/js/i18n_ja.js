@@ -417,6 +417,12 @@ Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター
 Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
+Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.TEXT_JA, { 'Schedules': 'スケジュール', 'actions that run by the clock': '時刻で実行する動作', 'HH:MM, or YYYY-MM-DD HH:MM for once': 'HH:MM。1 回だけなら YYYY-MM-DD HH:MM',
+  'mon, tue, wed, thu, fri, sat, sun (empty = every day)': 'mon, tue, wed, thu, fri, sat, sun（空なら毎日）', 'off: kept, not run': 'オフ: 残すが実行しない',
+  'what it does: an action of a screen, or a list of them. { "action": "set", "tag": "run", "value": true }': '実行する内容: 画面のボタンと同じ動作 1 つ、またはその配列。{ "action": "set", "tag": "run", "value": true }',
+  'A schedule runs the actions a button can run, at a time of day on the days named (or once, at a date). On the device the time, the days and on / off can be changed under System > Schedule; what it does cannot. "catch_up": true (in the project file) runs a time that passed while the device was off, once, when it starts again.':
+    'スケジュールは、ボタンと同じ動作を、指定した曜日の時刻に（または日付を指定して 1 回だけ）実行します。装置では System > Schedule で時刻・曜日・オン / オフを変えられますが、実行する内容は変えられません。プロジェクトのファイルに "catch_up": true を書くと、装置が止まっている間に過ぎた時刻を、次の起動時に 1 回だけ実行します。' });
 Object.assign(I18N.KEYS_JA, { zones: '色を付ける区間', widths: '列の幅', cells: 'セル', from: '開始', to: '終了' });
 Object.assign(I18N.TEXT_JA, { 'Edit cells…': 'セルを編集…', '+ row': '+ 行', '+ column': '+ 列', '− column': '− 列', 'Table cells': '表のセル', 'Move up': '上へ', 'Remove': '削除', 'Remove this row': 'この行を削除',
   'This cell is kept as it is (edit it as JSON in the project file)': 'このセルはそのまま残します（プロジェクトのファイルで JSON として編集してください）',

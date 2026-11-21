@@ -1,4 +1,5 @@
 #include "check.hpp"
+#include "schedule.hpp"
 #include <cctype>
 #include <filesystem>
 #include <map>
@@ -438,6 +439,28 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     const std::string start = jstr(root, "start_screen", "");
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
+
+    // ---- schedules: when, and what they do (the actions of a screen)
+    if(const json* sc = jget(root, "schedules")) {
+        if(!sc->is_array()) c.add("schedules", "a list is needed");
+        else {
+            std::set<std::string> names;
+            for(size_t i = 0; i < sc->size(); i++) {
+                const json& s = (*sc)[i];
+                const std::string where = "schedules[" + std::to_string(i) + "]" + (s.is_object() && s.contains("name") && s["name"].is_string() ? " (" + s["name"].get<std::string>() + ")" : "");
+                ScheduleItem item;
+                std::string err;
+                if(!schedule_parse(s, item, &err)) { c.add(where, err); continue; }
+                if(!names.insert(item.name).second) c.add(where, "the name is used twice");
+                for(auto k = s.begin(); k != s.end(); ++k) {
+                    static const std::set<std::string> known{ "name", "at", "days", "do", "enabled", "catch_up" };
+                    if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add(where, "unknown key \"" + k.key() + "\"");
+                }
+                if(item.once && s.contains("days")) c.add(where, "\"days\" has no meaning for a schedule with a date");
+                c.check_actions(where, "do", item.actions);
+            }
+        }
+    }
 
     for(const Screen& s : screens) {
         if(!s.def.is_object()) continue;

@@ -313,3 +313,5 @@ table.cells th { font-weight: normal; font-size: 12px; color: var(--dim); text-a
 table.cells td { padding: 1px 2px; }
 table.cells td input { width: 100%; min-width: 90px; box-sizing: border-box; }
 .cells-tools { display: flex; gap: 6px; margin: 8px 0; }
+.list-below > textarea { flex: 1; min-width: 0; }
+.list-below { margin-bottom: 6px; }
