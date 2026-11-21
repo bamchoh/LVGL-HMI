@@ -231,12 +231,24 @@
 | 部品 | 要るもの | 例 |
 | --- | --- | --- |
 | `alarm_banner` | `project.json` の `alarms` | `{ "type": "alarm_banner", "align": "top_mid", "w": "100%", "h": 36 }`（いちばん新しい未確認のアラームを帯で出す） |
+| `alarm_summary` | `alarms` | `{ "type": "alarm_summary", "w": "100%", "h": 300, "days": 7 }`（アラームごとの回数と時間） |
 | `alarm_list` | `alarms` | `{ "type": "alarm_list", "w": "100%", "h": 300, "mode": "current" }`（`history` で履歴） |
 | `log_view` | 出すログの設定（`system_log` / `operation_log` / `data_log`） | `{ "type": "log_view", "w": "100%", "h": 300, "source": "system" }`（`operation`、`data` + `group`） |
 | `trend` | `data_log` のグループ | `{ "type": "trend", "w": "100%", "h": 300, "group": "process", "tags": ["temp", "level"], "range_s": 3600 }` |
 | `chart` | なし（表示している間の値だけ） | `{ "type": "chart", "w": 300, "h": 160, "series": [ { "tag": "temp", "color": "#ff9800" } ], "min": 0, "max": 100 }` |
 | `recipe_table` | `recipes` のブック | `{ "type": "recipe_table", "w": "100%", "h": 300, "book": "products" }` |
 | `keyboard` | なし | `{ "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "45%" }`（入力欄がある画面に 1 つ。ふだんは隠れている） |
+
+### `alarm_summary`
+
+- アラームごとの発生回数と発生時間の合計を、期間を選んで出す部品（保全向け: 「何が多いか」「何で長く止まったか」）。`alarms` が要る。
+- 中に、上の帯（期間と並べ方のドロップダウン、合計。高さ約 46px）と行を持つ。1 行 36px、見出し 28px。
+  **高さは「90 + 39 × 行数」を目安**にし、`rows` をそれに合わせる（480x320 の画面なら `rows` 5〜6）。幅は 320 以上。
+- `days` で最初の期間（1 / 7 / 30 / 0 = すべて）、`sort` で `count`（回数）か `time`（時間）。どちらも操作者が部品の上で変えられる。
+- 部品の中の文字は英語（`Alarm` `Count` `Time` `24 h` …）。日本語にするには `labels` に書く:
+  `"labels": { "alarm": "アラーム", "count": "回数", "time": "時間", "day": "24 時間", "week": "7 日", "month": "30 日", "all": "すべて", "by_count": "回数順", "by_time": "時間順", "empty": "アラームなし" }`
+- CSV に書き出すボタンを付けるなら `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }`（引数は日数）。
+- `--check --render` の画像では、行は出ない（ログを数えないため）。行の見え方は、コピーを動かす手順で確かめる。
 
 ### `alarm_list` / `alarm_banner`
 

@@ -5,6 +5,7 @@
 #include "trend_view.hpp"
 #include "recipe.hpp"
 #include "alarm_view.hpp"
+#include "alarm_summary_view.hpp"
 #include "log_view.hpp"
 #include "meter_view.hpp"
 #include "datetime_view.hpp"
@@ -1982,6 +1983,9 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "meter")) {
         wk = Widget::Meter;
         obj = build_meter(parent, w);
+    }
+    else if(iequals(type, "alarm_summary")) {
+        obj = build_alarm_summary(parent, w);
     }
     else if(iequals(type, "alarm_banner")) {
         obj = build_alarm_banner(parent, w);

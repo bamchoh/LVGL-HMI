@@ -134,6 +134,7 @@ const Canvas = {
       case 'recipe_table': return ['100%', 300];
       case 'trend': return ['100%', 300];
       case 'alarm_list': return ['100%', 240];
+      case 'alarm_summary': return ['100%', 300];
       case 'log_view': return ['100%', 300];
       case 'meter': return [200, 200];
       case 'datetime_input': return [null, null];
@@ -608,6 +609,32 @@ const Canvas = {
     }
     el.style.display = 'flex'; el.style.flexDirection = 'column'; el.style.padding = '6px'; el.style.overflow = 'hidden';
     el.append(bar, table);
+  },
+  // the alarms of the project with sample numbers, as the device lays them out
+  w_alarm_summary(el, w) {
+    const lab = Object.assign({ empty: 'No alarms', alarm: 'Alarm', count: 'Count', time: 'Time', day: '24 h', week: '7 d', month: '30 d', all: 'All', by_count: 'Count', by_time: 'Time' }, w.labels || {});
+    const txt = t => document.createTextNode(String(M.resolveText(t)));
+    const days = U.num(w.days, 7), period = days === 1 ? lab.day : days === 7 ? lab.week : days === 30 ? lab.month : days === 0 ? lab.all : days + ' d';
+    const byTime = w.sort === 'time', bars = w.bars !== false;
+    const items = this.alarmSamples().filter(a => !w.severity || String(a.severity || 'warning').toLowerCase() === String(w.severity).toLowerCase()).slice(0, Math.max(1, Math.min(U.num(w.rows, 10), 6)));
+    const sample = items.map((a, i) => ({ a, count: Math.max(1, 12 - i * 4), secs: [754, 2710, 95, 31, 12, 5][i % 6] })).sort((x, y) => byTime ? y.secs - x.secs : y.count - x.count);
+    const hms = s => Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    const most = Math.max(1, ...sample.map(x => byTime ? x.secs : x.count));
+    const dd = t => { const e = U.el('span', { class: 'lv-al-dd' }); e.append(txt(t), document.createTextNode(' ▾')); return e; };
+    const total = U.el('span', { style: { flex: '1', textAlign: 'right' } }, document.createTextNode(sample.reduce((n, x) => n + x.count, 0) + ' / ' + hms(sample.reduce((n, x) => n + x.secs, 0))));
+    const line = (cells, style) => U.el('div', { class: 'lv-as-row', style: Object.assign({ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 8px', minHeight: '28px' }, style || {}) }, ...cells);
+    const c = (node, w2, align) => U.el('span', { style: w2 ? { width: w2 + 'px', textAlign: align || 'right', flex: 'none' } : { flex: '1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, node);
+    el.style.display = 'flex'; el.style.flexDirection = 'column'; el.style.gap = '4px'; el.style.padding = '6px'; el.style.overflow = 'hidden';
+    el.append(U.el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, dd(period), dd(byTime ? lab.by_time : lab.by_count), total));
+    el.append(line([c(txt(lab.alarm)), c(txt(lab.count), 52), c(txt(lab.time), 78), bars ? c(document.createTextNode(''), 96, 'left') : null], { opacity: '.7' }));
+    if (!sample.length) el.append(U.el('div', { class: 'lv-al-empty' }, txt(lab.empty)));
+    sample.forEach((x, i) => {
+      const col = this.alarmColor(x.a.severity || 'warning');
+      const bar = bars ? U.el('span', { style: { width: '96px', height: '10px', flex: 'none', background: 'rgba(128,128,128,.3)', borderRadius: '5px', overflow: 'hidden' } },
+        U.el('span', { style: { display: 'block', height: '100%', width: Math.round((byTime ? x.secs : x.count) * 100 / most) + '%', background: col } })) : null;
+      el.append(line([c(document.createTextNode((i === 0 ? '⚠ ' : '') + String(M.resolveText(x.a.message || x.a.name)))), c(document.createTextNode(String(x.count)), 52), c(document.createTextNode(hms(x.secs)), 78), bar],
+        { minHeight: '36px', borderLeft: '5px solid ' + col, borderRadius: '4px', background: col + (i === 0 ? '4d' : '1a') }));
+    });
   },
   w_alarm_list(el, w) {
     const history = w.mode === 'history', lab = w.labels || {};

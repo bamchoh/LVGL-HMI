@@ -9,6 +9,7 @@
 #include "screen_saver.hpp"
 #include <algorithm>
 #include "recipe.hpp"
+#include "alarm_summary_view.hpp"
 #include "alarm_view.hpp"
 #include "tag.hpp"
 #include "ui.hpp"
@@ -269,6 +270,7 @@ void Project::start_logs(bool read_only, const std::string& log_dir)
     });
     ui().register_action("data_log.sample", [](const std::string& arg) { data_log().sample(arg); });
     register_alarm_actions();
+    register_alarm_summary_actions();
     ui().register_action("alarm_log.export", [](const std::string& arg) {
         int64_t n = alarms().export_csv(arg);
         if(n >= 0) HML_INFO("alarm log: %lld rows exported", static_cast<long long>(n));
