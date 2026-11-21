@@ -1,7 +1,10 @@
 #include "smtp.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <ctime>
 
 #include "mqtt.hpp"

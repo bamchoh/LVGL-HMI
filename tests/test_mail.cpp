@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <sstream>

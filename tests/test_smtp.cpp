@@ -3,6 +3,9 @@
 #include <doctest.h>
 #include "smtp.hpp"
 
+#include <algorithm>
+#include <cstring>
+
 #include <deque>
 
 using namespace hml;
