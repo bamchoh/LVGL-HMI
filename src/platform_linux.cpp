@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include "platform.hpp"
 #include "screenshot.hpp"
+#include "touch_filter.hpp"
+#include <unordered_map>
 #include "util.hpp"
 
 namespace hml::platform {
@@ -37,9 +39,38 @@ void on_signal(int sig)
     else s_sig_reload = 1;
 }
 
+// A touch device read through a TouchFilter: LVGL asks us, we ask the evdev driver and steady
+// what it says.
+struct FilteredTouch { lv_indev_read_cb_t inner = nullptr; TouchFilter filter; bool log = false; };
+std::unordered_map<lv_indev_t*, FilteredTouch>& filtered_touches() { static std::unordered_map<lv_indev_t*, FilteredTouch> m; return m; }
+
+void filtered_read(lv_indev_t* indev, lv_indev_data_t* data)
+{
+    auto it = filtered_touches().find(indev);
+    if(it == filtered_touches().end() || !it->second.inner) return;
+    FilteredTouch& ft = it->second;
+    ft.inner(indev, data);
+    const TouchFilter::Point p = ft.filter.feed(data->point.x, data->point.y, data->state == LV_INDEV_STATE_PRESSED, lv_tick_get());
+    data->point.x = p.x;
+    data->point.y = p.y;
+    data->state = p.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    if(ft.log && ft.filter.finished()) HML_INFO("%s", ft.filter.describe().c_str());
+}
+
 void apply_touch_settings(lv_indev_t* indev)
 {
     if(!indev || !s_info) return;
+    const TouchFilterConfig& tf = s_info->touch_filter;
+    if(tf.active() && lv_indev_get_read_cb(indev) != filtered_read) {
+        FilteredTouch ft;
+        ft.inner = lv_indev_get_read_cb(indev);
+        ft.filter = TouchFilter(tf);
+        ft.log = tf.log;
+        filtered_touches()[indev] = ft;
+        lv_indev_set_read_cb(indev, filtered_read);
+        HML_INFO("touch: settle %d, smooth %d, jitter %d px%s", tf.settle, tf.smooth, tf.jitter, tf.log ? ", every touch is logged" : "");
+    }
+    if(tf.scroll_limit > 0) lv_indev_set_scroll_limit(indev, static_cast<uint8_t>(tf.scroll_limit));
     if(s_info->touch_swap_axes) lv_evdev_set_swap_axes(indev, true);
     if(s_info->touch_has_calib) {
         lv_evdev_set_calibration(indev, s_info->touch_calib[0], s_info->touch_calib[1], s_info->touch_calib[2], s_info->touch_calib[3]);

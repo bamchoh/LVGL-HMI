@@ -1,6 +1,7 @@
 // Project file: tags, drivers, display settings and the list of screens.
 #pragma once
 #include <string>
+#include "touch_filter.hpp"
 #include "lvgl.h"
 #include "jsonutil.hpp"
 #include "system_log.hpp"
@@ -25,6 +26,7 @@ struct ProjectInfo {
     bool touch_swap_axes = false;
     bool touch_has_calib = false;
     int  touch_calib[4] = { 0, 0, 0, 0 };   // min_x, min_y, max_x, max_y
+    TouchFilterConfig touch_filter;         // steadying a panel whose readings wander (touch_filter.hpp)
     bool dark = true;
     lv_color_t  primary{}, secondary{};
     std::string start_screen;

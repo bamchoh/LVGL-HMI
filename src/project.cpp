@@ -154,6 +154,7 @@ bool Project::load(const std::string& path)
     info_.splash_bg = parse_color(jstr(d, "splash_bg", ""), lv_color_black());
     if(const json* touch = jget(d, "touch")) {
         info_.touch_swap_axes = jbool(*touch, "swap_axes", false);
+        info_.touch_filter = parse_touch_filter(touch);
         const json* calib = jget(*touch, "calibration");
         if(calib && calib->is_array() && calib->size() == 4) {
             info_.touch_has_calib = true;

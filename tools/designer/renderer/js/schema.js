@@ -13,7 +13,7 @@ const SCHEMA = {
   // Displays whose size and touch correction are known. "touch" is what goes into
   // display.touch (null: the panel needs no correction).
   displayPresets: [
-    { name: '3.5" LCD 480x320 (ADS7846 touch)', width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220] } },
+    { name: '3.5" LCD 480x320 (ADS7846 touch)', width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220], jitter: 8, smooth: 3, settle: 1, scroll_limit: 16 } },
     { name: '7" touch display 800x480', width: 800, height: 480, touch: null },
     { name: '10.1" touch display 1024x600', width: 1024, height: 600, touch: null },
     { name: 'HD 1280x720', width: 1280, height: 720, touch: null },
