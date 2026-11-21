@@ -43,6 +43,7 @@ build.cmd Debug
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
+| `test_datetime.cpp`                                  | 日付・時刻の入力（うるう年と月末、書式、数値との変換、ローラーとタグ、レベル、操作ログ、`--check`）                        |
 | `test_meter.cpp`                                     | メーター（針と数字、範囲外・数値でない値、極端な設定、描画時間、`--check`）                                                 |
 | `test_log_view.cpp`                                  | ログの画面表示（ページ・絞り込み・期間、SQL 注入、壊れた文字、10 万行の時間、レベル、`--check`）                           |
 | `test_karakuri.cpp`                                  | Karakuri（PLC シミュレーター）を相手にしたデバイスモニターの読み書き。`tools/karakuri_check.py device` から動かすときだけ実行                           |
@@ -1303,6 +1304,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
 | `arc`                 | `min`, `max`, `value`, `start_angle`, `end_angle`, `rotation`, `adjustable`                                               |
+| `datetime_input`      | 日付・時刻の入力: `mode`, `seconds`, `year_min`, `year_max`（下記「日付と時刻の入力」）                                    |
 | `meter`               | 針のメーター: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones`（下記「メーター」） |
 | `led`                 | `color`, `on`                                                                                                             |
 | `dropdown` / `roller` | `options` (配列), `selected`, (`visible_rows`, `infinite`)                                                                |
@@ -1801,6 +1803,41 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 ```
 
 画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+
+## 日付と時刻の入力: `datetime_input`
+
+年・月・日・時・分（・秒）のローラーを並べた入力部品です。キーボードは要りません。存在する日付しか選べません
+（日のローラーは、月と年に合わせて 28・29・30・31 日になります）。
+
+```json
+{ "type": "datetime_input", "bind": "start_at" },
+{ "type": "datetime_input", "bind": "work_day", "mode": "date" },
+{ "type": "datetime_input", "bind": "alarm_time", "mode": "time", "seconds": true }
+```
+
+| キー                    | 内容                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `bind`                  | 値のタグ（文字列か数値）                                                          |
+| `mode`                  | `datetime`（既定）/ `date` / `time`                                               |
+| `seconds`               | 秒のローラーも出す（既定 `false`）                                                |
+| `year_min` / `year_max` | 年のローラーの範囲（既定 2020 〜 2040）。タグの値が範囲の外なら、その年まで広がる |
+
+タグに入る値:
+
+| タグの型      | `datetime`                              | `date`                     | `time`                  |
+| ------------- | --------------------------------------- | -------------------------- | ----------------------- |
+| 文字列        | `2026-11-21 13:05`（秒ありは `:09` まで） | `2026-11-21`               | `13:05`（`13:05:09`）   |
+| 整数 / 実数   | Unix 時刻（秒）。装置の現地時刻で解釈   | その日の 0 時の Unix 時刻  | 0 時からの秒数          |
+
+- 秒のローラーがないとき（`seconds` なし）は、書き込む値の秒は 0 になります。
+- ローラーが止まった時点でタグに書き込みます。書き込みは、ほかの部品と同じくタグの上下限・ドライバー・操作ログを通ります。
+- **`level` を付けると、レベルの足りないユーザーは回しても元に戻り、何も書き込まれません**（部品を入れたパネルに付けても同じ）。
+- タグが別の所（スクリプト、PLC、別の画面）で変わると、ローラーも追従します。同じタグに複数の入力部品をつないでも、
+  操作したローラーの分だけが反映され、ほかの部分は最新の値のままです。
+- タグの値が日付として読めないとき（空、別の書式）は、ローラーは今の時刻を示し、操作するまで何も書き込みません。
+- 大きさ: 日付 + 時刻で幅約 350 px、秒つきで約 420 px、高さ約 110 px。480 px の画面に収まります。
+- 夏時間のある地域では、数値タグ（Unix 時刻）への変換は OS のタイムゾーン設定に従います。日本（夏時間なし）以外の
+  切り替わりの時刻は確認していません。
 
 ## メーター: `meter`
 

@@ -113,6 +113,7 @@ const Tree = {
       case 'alarm_list': return '⚠';
       case 'log_view': return '☰';
       case 'meter': return '◔';
+      case 'datetime_input': return '◷';
       case 'alarm_banner': return '⚑';
       default: return '□';
     }

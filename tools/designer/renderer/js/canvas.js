@@ -136,6 +136,7 @@ const Canvas = {
       case 'alarm_list': return ['100%', 240];
       case 'log_view': return ['100%', 300];
       case 'meter': return [200, 200];
+      case 'datetime_input': return [null, null];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
@@ -469,6 +470,19 @@ const Canvas = {
   alarmSamples() {
     const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
     return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  // the rollers the mode has, three rows each, a sample date in the middle row
+  w_datetime_input(el, w) {
+    const mode = ['date', 'time'].includes(w.mode) ? w.mode : 'datetime', sec = !!w.seconds && mode !== 'date';
+    const roll = (width, vals) => U.el('div', { class: 'lv-dt-roll', style: { width: width + 'px', border: '1px solid rgba(128,128,128,.5)', borderRadius: '6px', textAlign: 'center',
+      lineHeight: '1.9', overflow: 'hidden' } }, ...vals.map((v, i) => U.el('div', { style: i === 1 ? { background: 'rgba(33,150,243,.45)' } : { opacity: '.55' } }, document.createTextNode(v))));
+    const sep = t => U.el('span', null, document.createTextNode(t));
+    const parts = [];
+    if (mode !== 'time') parts.push(roll(84, ['2025', '2026', '2027']), sep('-'), roll(60, ['10', '11', '12']), sep('-'), roll(60, ['20', '21', '22']));
+    if (mode === 'datetime') parts.push(sep('\u00a0'));
+    if (mode !== 'date') { parts.push(roll(60, ['12', '13', '14']), sep(':'), roll(60, ['04', '05', '06'])); if (sec) parts.push(sep(':'), roll(60, ['08', '09', '10'])); }
+    el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.gap = '4px';
+    el.append(...parts);
   },
   // the scale, its numbers and zones as the device draws them; the needle at "value" (or a third of the way)
   w_meter(el, w) {

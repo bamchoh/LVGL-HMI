@@ -413,7 +413,8 @@ Object.assign(I18N.TEXT_JA, {
 // ---- trend
 Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表示する期間 (秒)', buckets: '横の点数', refresh_ms: '更新周期 (ms)' });
 Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
-Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター' });
+Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター', 'Date and time input': '日付・時刻の入力' });
+Object.assign(I18N.KEYS_JA, { seconds: '秒も入力する', year_min: '年の下限', year_max: '年の上限' });
 Object.assign(I18N.KEYS_JA, { ticks: '目盛りの数', major_every: '数字を付ける間隔', show_value: '値を数字で出す', needle_color: '針の色' });
 Object.assign(I18N.KEYS_JA, { source: 'ログの種類', min_level: '出すレベル', filter: 'レベルの選択を出す', filter_tag: '絞り込みのタグ' });
 I18N.PATTERNS_JA.push(

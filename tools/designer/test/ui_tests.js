@@ -372,6 +372,24 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('date and time input: in the palette, the rollers of each mode', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /日付・時刻の入力/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('datetime_input'); await frame();
+    const p = M.st.sel, find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    ok(find() && find().classList.contains('lv-datetime_input'), 'drawn');
+    const rolls = () => find().querySelectorAll('.lv-dt-roll').length;
+    eq(rolls(), 5, 'year month day hour minute');
+    M.mutate(() => { M.get(p).seconds = true; }); App.doRefresh(); await frame();
+    eq(rolls(), 6);
+    M.mutate(() => { M.get(p).mode = 'date'; }); App.doRefresh(); await frame();
+    eq(rolls(), 3, 'a date has no seconds');
+    M.mutate(() => { M.get(p).mode = 'time'; }); App.doRefresh(); await frame();
+    eq(rolls(), 3, 'hour minute second');
+    ok(/2026/.test(find().textContent) === false, 'no year in time mode');
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('meter: in the palette, drawn with its scale, zones and needle; its properties', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /メーター/.test(t)), 'palette: ' + pal.join(','));
