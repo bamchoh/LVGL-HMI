@@ -112,6 +112,7 @@ const Tree = {
       case 'trend': return '〰';
       case 'alarm_list': return '⚠';
       case 'log_view': return '☰';
+      case 'meter': return '◔';
       case 'alarm_banner': return '⚑';
       default: return '□';
     }

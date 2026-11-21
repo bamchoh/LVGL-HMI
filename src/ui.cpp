@@ -6,6 +6,7 @@
 #include "recipe.hpp"
 #include "alarm_view.hpp"
 #include "log_view.hpp"
+#include "meter_view.hpp"
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
@@ -470,7 +471,7 @@ void apply_styles(lv_obj_t* obj, const json& w)
 
 // ================================================================ model
 
-enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line };
+enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line, Meter };
 enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options, Anim };
 enum class Cmp { None, Eq, Ne, Gt, Lt, Ge, Le };
 
@@ -643,6 +644,7 @@ void Binding::apply_value(double n)
         case Widget::Slider:   lv_slider_set_value(obj, iv, LV_ANIM_OFF); break;
         case Widget::Bar:      lv_bar_set_value(obj, iv, LV_ANIM_ON); break;
         case Widget::Arc:      lv_arc_set_value(obj, iv); break;
+        case Widget::Meter:    meter_set_value(obj, n * scale + offset); break;
         case Widget::Dropdown: lv_dropdown_set_selected(obj, static_cast<uint32_t>(iv < 0 ? 0 : iv)); break;
         case Widget::Roller:   lv_roller_set_selected(obj, static_cast<uint32_t>(iv < 0 ? 0 : iv), LV_ANIM_OFF); break;
         case Widget::Led:      lv_led_set_brightness(obj, static_cast<uint8_t>(iv < 0 ? 0 : iv > 255 ? 255 : iv)); break;
@@ -1411,8 +1413,8 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
         switch(wk) {
             case Widget::Switch: case Widget::Checkbox: case Widget::Led: add_binding(obj, wk, BindKind::Checked, *bind, wk != Widget::Led); break;
             case Widget::Button: add_binding(obj, wk, BindKind::Checked, *bind, true); break;
-            case Widget::Slider: case Widget::Bar: case Widget::Arc: case Widget::Dropdown: case Widget::Roller:
-                add_binding(obj, wk, BindKind::Value, *bind, wk != Widget::Bar); break;
+            case Widget::Slider: case Widget::Bar: case Widget::Arc: case Widget::Dropdown: case Widget::Roller: case Widget::Meter:
+                add_binding(obj, wk, BindKind::Value, *bind, wk != Widget::Bar && wk != Widget::Meter); break;
             case Widget::Textarea: add_binding(obj, wk, BindKind::Text, *bind, true); break;
             case Widget::Panel: case Widget::Spinner: add_binding(obj, wk, BindKind::Visible, *bind, false); break;
             default: add_binding(tobj, wk, BindKind::Text, *bind, false); break;
@@ -1961,6 +1963,10 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     }
     else if(iequals(type, "log_view")) {
         obj = build_log_view(parent, w);
+    }
+    else if(iequals(type, "meter")) {
+        wk = Widget::Meter;
+        obj = build_meter(parent, w);
     }
     else if(iequals(type, "alarm_banner")) {
         obj = build_alarm_banner(parent, w);

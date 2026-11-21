@@ -43,6 +43,7 @@ build.cmd Debug
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
+| `test_meter.cpp`                                     | メーター（針と数字、範囲外・数値でない値、極端な設定、描画時間、`--check`）                                                 |
 | `test_log_view.cpp`                                  | ログの画面表示（ページ・絞り込み・期間、SQL 注入、壊れた文字、10 万行の時間、レベル、`--check`）                           |
 | `test_karakuri.cpp`                                  | Karakuri（PLC シミュレーター）を相手にしたデバイスモニターの読み書き。`tools/karakuri_check.py device` から動かすときだけ実行                           |
 | `test_vnc.cpp`, `test_transfer.cpp`                  | 遠隔表示（認証、ピクセル形式、差分、内蔵クライアントとの接続）、USB メモリでの更新とバックアップ                           |
@@ -1302,6 +1303,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
 | `arc`                 | `min`, `max`, `value`, `start_angle`, `end_angle`, `rotation`, `adjustable`                                               |
+| `meter`               | 針のメーター: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones`（下記「メーター」） |
 | `led`                 | `color`, `on`                                                                                                             |
 | `dropdown` / `roller` | `options` (配列), `selected`, (`visible_rows`, `infinite`)                                                                |
 | `textarea`            | `text`, `placeholder`, `one_line`, `password`, `max_length`, `accepted_chars`                                             |
@@ -1799,6 +1801,36 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 ```
 
 画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+
+## メーター: `meter`
+
+丸い目盛りと針で値を見せる部品です。目盛りの数字、色を付けた区間、針、値の数字を持ちます。表示だけで、触っても値は変わりません。
+
+```json
+{ "type": "meter", "w": 200, "h": 200, "bind": "temp", "min": 0, "max": 100, "decimals": 1, "unit": "°C",
+  "zones": [ { "from": 60, "to": 80, "color": "#ffb300" }, { "from": 80, "to": 100, "color": "#e53935" } ] }
+```
+
+| キー           | 内容                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| `bind`         | 値のタグ（`"bind": "temp"`。`{ "value": { "tag": "rpm", "scale": 0.001 } }` の形も使える）     |
+| `min` / `max`  | 目盛りの範囲（既定 0 〜 100）。小数の範囲（0 〜 1.5 など）や負の範囲も使える                  |
+| `angle`        | 目盛りが回る角度（90 〜 360、既定 270）。開いた側が下になる                                   |
+| `ticks`        | 目盛りの線の数（2 〜 101、既定 21）                                                           |
+| `major_every`  | 何本ごとに長い線と数字を付けるか（既定 5）                                                    |
+| `decimals`     | 目盛りの数字と値の小数の桁（0 〜 3）                                                          |
+| `unit`         | 値の後ろに付ける単位                                                                          |
+| `show_value`   | 値を数字でも出す（既定 `true`）                                                               |
+| `needle_color` | 針の色                                                                                        |
+| `zones`        | 色を付ける区間の配列: `{ "from", "to", "color" }`（8 つまで）                                 |
+
+- **針は目盛りの端で止まり、数字は実際の値を出します。** 範囲の外の値（100 までの目盛りで 150）も、数字で正しく読めます。
+  数値でない値（通信前など）は、針が始点、数字が `---` になります。
+- 区間の色の意味は、目盛りの上の位置（どこからどこまで）と値の数字でも分かります。色だけには頼りません。
+- 部品の中で、目盛りは幅と高さの短いほうに合わせた正方形になります。**一辺が 140 px より小さいと、目盛りの数字は出ません**
+  （線と値の数字は出ます）。数字を読ませたいメーターは 160 px 以上にしてください。
+- 文字の大きさと色は、ほかの部品と同じく `style`（`font`、`text_color`）で決めます。
+- 負荷の目安: メーター 12 個が毎フレーム変わる画面で、1 フレーム約 1 ms（PC、320x240、ソフトウェア描画）。
 
 ## ログを画面に出す: `log_view`
 
