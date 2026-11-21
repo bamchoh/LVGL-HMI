@@ -1216,6 +1216,17 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 - 対応していないもの: FTPS / SFTP、差分だけの送信（毎回そのログの全体を送ります）、圧縮、OAuth などのトークン認証、プロキシ。
 - 大きなログ: ファイルは 16 KB ずつ読んで送るので、送信でメモリーは増えません。ただし CSV の書き出しは今ある書き出し機能と同じで、
   UI スレッドで全行を読みます（10 万行で数秒かかることがあります）。夜間など、操作のない時刻に実行してください。
+- 確かめた範囲:
+  - 自作でないサーバー（Python 標準の `http.server`、pyftpdlib 2.2.0。WSL で起動）を相手に、Windows のランタイムから:
+    HTTP の PUT、HTTPS の PUT と POST（ログインあり）、FTP（パッシブ、ログインあり）で**ファイルが届き、中身が CSV として読めること**、
+    パスワード違い（HTTPS / FTP）・信頼できない証明書・サーバーの容量不足（507）・リダイレクト（301）・ないフォルダー・書き込み権限のないフォルダーでは
+    届かず、理由がログに出て、ファイルが残ること、残ったファイルが正しいパスワードでの次の起動で送られること、サーバーがいないときに残ること
+    （`tools/upload_check/check.py`、23 項目）。
+  - **確かめていないこと**: Raspberry Pi からの送信、インターネット上のサーバー（nginx の WebDAV、S3 の署名付き URL など）、10 万行のログ。
+- 上の確認をもう一度するには: メールの確認（「メールで知らせる」）と同じ WSL のフォルダーに `tools/upload_check/servers.py` を置き、
+  `python3 get.py . pyftpdlib pyasyncore pyasynchat` で FTP サーバーを取得して `python3 servers.py` を起動し、Windows で
+  `python -I tools/upload_check/check.py <WSL のフォルダー> <ca.crt>` を実行します。サーバーは 127.0.0.1 だけで待ち受け、受け取ったファイルを `received/` に置くだけです。
+  （Windows では `localhost` が先に IPv6 に解決され、WSL のサーバーへの接続に 2 秒ほど余計にかかります。確認では `127.0.0.1` を使っています。）
 
 ## 機器間のデータ転送
 
