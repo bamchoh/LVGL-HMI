@@ -149,7 +149,7 @@ bool Project::load(const std::string& path)
     if(root_.is_null()) return false;
     apply_local_overlay();
 
-    info_.title = jstr(root_, "title", "HML Runtime");
+    info_.title = jstr(root_, "title", "Tsukuraku");
     const json* disp = jget(root_, "display");
     const json  none = json::object();
     const json& d = disp ? *disp : none;

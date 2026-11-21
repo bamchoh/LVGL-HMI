@@ -1,13 +1,52 @@
-# HML Runtime — LVGL 宣言型 HMI ランタイム
+# ツクラク (Tsukuraku) — AI が作画する HMI
 
 [English](README.md) | **日本語**
 
 > 英語版（[README.md](README.md)）が基準です。この日本語版は訳で、内容が食い違うときは英語版が正しいものとします。
 
-[![CI](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml)
+[![CI](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml)
 
-JSON で書いた画面定義を LVGL (v9.6) で描画し、タグ（プロセス変数）とウィジェットを
-双方向にバインドする HMI ランタイムです。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
+> **AI に任せて、楽々 HMI 作画。**
+
+ツクラクは、**画面を AI に描いてもらえる HMI デザイナーとランタイム**です。Claude などの AI に
+「メーター 3 つと XY グラフ、状態の表がある生産画面を作って」のように頼むと、AI が画面を書き、ランタイムで描き、
+その画像を見て自分で直します。開いているデザイナーが結果を読み直すので、仕上げは手で行えます。
+できたプロジェクトは、PC でも、タッチパネル（Raspberry Pi などの Linux ボード）でもそのまま動き、
+Modbus、SLMP（MELSEC）、FINS（オムロン）、OPC UA、MQTT で PLC につながります。
+
+名前は「作る」＋「楽」です。
+
+| | | |
+| --- | --- | --- |
+| ![生産: メーター、XY グラフ、表](docs/images/demo_production_ja.png) | ![記録: ログ表示とアラーム集計](docs/images/demo_reports_ja.png) | ![予定: 日付と時刻、データ転送、音、メール](docs/images/demo_planner_ja.png) |
+
+デモのこの 3 画面と、スケジュール・音・データ転送の設定は、**Skill だけを渡した AI が作ったもの**です（説明書もソースも見せていません）。
+
+### AI が画面を描ける仕組み
+
+1. **画面はテキストです。** プロジェクトは `project.json` と、画面ごとの JSON ファイルです（HML: ランタイムが読む HMI の記述形式）。AI はふつうのファイルとして書けます。
+2. **Skill が書き方を教えます。** `tools/skill/hml-screens/` に、部品・プロパティ・動作の一覧（デザイナー自身の定義から生成するので、ずれません）、
+   レイアウトとタッチの決まり、そのまま動く見本があります。デザイナーと一緒に配られます。
+3. **ランタイムが確かめます。** `hml_runtime --check --render` は、ウィンドウを出さず、機器にもつながずに、間違い
+   （知らないキー、ないタグ、訳のない文字）の一覧と、各画面の画像を出します。AI は両方を見て自分で直します。
+4. **デザイナーが追いかけます。** AI が変えたファイルを読み直し、問題一覧を出します。位置も見た目も、あとから手で直せます。
+
+しないこと: AI は PLC との接続を設定しません（ドライバー、ユーザー、装置の設定は人が決めます）。画面の**意味**
+（出すタグ、単位が正しいか）は、人の目で確かめる必要があります。デモで試したのは、1 つのモデルで 1 回です。→「AI に画面を作ってもらう（Skill）」
+
+### 入っているもの
+
+- **デザイナー**（`hml_designer`）: 画面、タグ、アラーム、レシピ、多言語の文字、装置へのデプロイを GUI で行います。
+- **ランタイム**（`hml_runtime`）: アラーム、トレンド、レシピ、変数 / 操作 / システムのログ、ユーザーとレベル、Lua スクリプト、スケジュール、音、
+  メール、ログの送信、機器間のデータ転送、遠隔操作（VNC）、OPC UA サーバー。
+- **デモ**（`projects/`）: `demo`（800x480）、`factory`、`metro`、3.5 インチのパネル用の 480x320 のプロジェクト。
+
+実行ファイルとファイル形式は、短い名前 `hml` のままです（`hml_runtime`、`hml_designer`、`.hmlproj`）。
+
+## ランタイムの概要
+
+ランタイムは、JSON で書いた画面定義を LVGL (v9.6) で描画し、タグ（プロセス変数）とウィジェットを
+双方向にバインドします。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
 Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作します。
 データソースはドライバ方式で、シミュレーション、Modbus TCP クライアント、OPC UA サーバー
 （タグを OPC UA 変数として公開）を同梱しています。

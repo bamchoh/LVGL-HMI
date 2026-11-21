@@ -1760,7 +1760,7 @@ int app_main(const std::vector<std::string>& args)
     if(h.renderer.empty()) {
         std::fprintf(stderr, "hml_designer: renderer/index.html not found (looked next to the executable in designer/)\n");
 #ifdef _WIN32
-        MessageBoxW(nullptr, L"designer/index.html not found next to hml_designer.exe", L"HML Designer", MB_ICONERROR);
+        MessageBoxW(nullptr, L"designer/index.html not found next to hml_designer.exe", L"Tsukuraku Designer", MB_ICONERROR);
 #endif
         return 1;
     }
@@ -1774,7 +1774,7 @@ int app_main(const std::vector<std::string>& args)
 
     webview::webview w(debug, nullptr);
     h.w = &w;
-    w.set_title("HML Designer");
+    w.set_title("Tsukuraku Designer");
     w.set_size(1400, 860, WEBVIEW_HINT_NONE);
     h.bind_all();
 #ifdef _WIN32

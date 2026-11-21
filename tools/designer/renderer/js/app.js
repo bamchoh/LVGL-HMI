@@ -491,7 +491,7 @@ const App = {
     const name = !st.path ? '(unsaved)' : st.archive ? U.basename(st.path) : U.basename(U.dirname(st.path)) + '/project.json';
     const title = (st.dirty ? '● ' : '') + (st.project ? st.project.title || '' : '') + '  —  ' + name;
     document.getElementById('title-label').textContent = title;
-    host.setTitle('HML Designer — ' + title);
+    host.setTitle('Tsukuraku Designer — ' + title);
     const noRt = !this.info.runtime;
     document.getElementById('b-preview').disabled = noRt; document.getElementById('b-run').disabled = noRt;
   },
