@@ -1141,8 +1141,11 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 - Linux の audio は ALSA（`libasound.so.2`）を実行時に読み込みます（ビルドには要りません）。GPIO のブザーは、
   電圧をかけると鳴るタイプ（アクティブブザー）を、GPIO の文字デバイス（`/dev/gpiochipN`）で On / Off します。
   実行するユーザーが `audio` / `gpio` グループに入っている必要があります。
-- 確認した範囲: Windows は音声デバイスへの再生命令が通ること、Raspberry Pi 4 は ALSA が再生状態になること・GPIO の
-  線が音に合わせて切り替わることまでです。**スピーカーやブザーをつないで、耳で聞く確認はしていません。**
+- **Raspberry Pi のイヤホン端子**: ALSA の既定の出力先（`"default"`）は、ふつう HDMI です。イヤホン端子（3.5 mm）に出すには
+  `"device": "plughw:CARD=Headphones,DEV=0"` と書きます（カードの名前は `aplay -L` で見られます）。
+- 確認した範囲: Raspberry Pi 4 のイヤホン端子で、アラーム音が鳴る・確認すると止まる・新しいアラームでまた鳴る・
+  Silence で止まることを、耳で聞いて確かめました。GPIO のブザーは、線が音に合わせて切り替わることまで（実物のブザーは未確認）、
+  Windows は音声デバイスへの再生命令が通ることまでです（耳での確認はしていません）。
 
 ## 多言語表示とフォント
 
