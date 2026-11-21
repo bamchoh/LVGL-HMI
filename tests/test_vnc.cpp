@@ -119,7 +119,7 @@ struct Client {
     }
     void request(bool incremental, int w, int h) { wr({ 3, static_cast<uint8_t>(incremental), 0, 0, 0, 0, static_cast<uint8_t>(w >> 8), static_cast<uint8_t>(w), static_cast<uint8_t>(h >> 8), static_cast<uint8_t>(h) }); }
     void pointer(bool down, int x, int y) { wr({ 5, static_cast<uint8_t>(down ? 1 : 0), static_cast<uint8_t>(x >> 8), static_cast<uint8_t>(x), static_cast<uint8_t>(y >> 8), static_cast<uint8_t>(y) }); }
-    struct Rect { int x, y, w, h; Bytes pixels; };
+    struct Rect { int x, y, w, h; Bytes pixels; bool cursor = false; Bytes mask; };
     // one FramebufferUpdate (bytes per pixel as agreed)
     std::vector<Rect> update(int bytes_per_pixel = 4, int timeout_ms = 5000)
     {
@@ -128,9 +128,11 @@ struct Client {
         if(h.empty() || h[0] != 0) { failed = true; return out; }
         for(int n = u16(h.data() + 2); n > 0; n--) {
             Bytes r = rd(12);
-            if(r.empty() || u32(r.data() + 8) != 0) { failed = true; return out; }
+            const uint32_t enc = r.empty() ? 1 : u32(r.data() + 8);
+            if(enc != 0 && enc != 0xFFFFFF11u) { failed = true; return out; }
             Rect rc{ u16(r.data()), u16(r.data() + 2), u16(r.data() + 4), u16(r.data() + 6), {} };
             rc.pixels = rd(rc.w * rc.h * bytes_per_pixel);
+            if(enc != 0) { rc.cursor = true; rc.mask = rd(((rc.w + 7) / 8) * rc.h); }
             out.push_back(std::move(rc));
         }
         return out;
@@ -299,6 +301,55 @@ TEST_CASE("vnc: a viewer logs in, sees the screen, touches a button and sees the
     CHECK(srv.client_connected());
     srv.stop();
     CHECK_FALSE(srv.running());
+}
+
+TEST_CASE("vnc: a viewer that draws the pointer itself gets an arrow, once")
+{
+    // the rectangle itself: 12 x 18, hot spot at the tip, black edge, white inside
+    std::vector<uint8_t> r;
+    vnc_cursor(VncPixelFormat(), r);
+    REQUIRE(r.size() == 12u + 12 * 18 * 4 + 2 * 18);
+    CHECK(std::vector<int>(r.begin(), r.begin() + 12) == std::vector<int>{ 0, 0, 0, 0, 0, 12, 0, 18, 0xFF, 0xFF, 0xFF, 0x11 });
+    const uint8_t* px = r.data() + 12;
+    const uint8_t* mask = px + 12 * 18 * 4;
+    CHECK(mask[0] == 0x80);                                      // row 0: the tip only
+    CHECK(mask[1] == 0x00);
+    CHECK(mask[2 * 4] == 0xF8);                                  // row 4: X...X
+    CHECK(px[0] == 0);                                           // the tip is black
+    CHECK(px[(4 * 12 + 2) * 4] == 255);                          // inside is white
+    std::vector<uint8_t> r16;
+    VncPixelFormat f16;
+    f16.bpp = 16; f16.depth = 16; f16.r_max = 31; f16.g_max = 63; f16.b_max = 31; f16.r_shift = 11; f16.g_shift = 5; f16.b_shift = 0;
+    vnc_cursor(f16, r16);
+    CHECK(r16.size() == 12u + 12 * 18 * 2 + 2 * 18);
+
+    Runtime rt;
+    show_test_screen();
+    rt.advance(50);
+    lv_display_t* disp = lv_display_get_default();
+    VncServer srv;
+    const json cfg = remote(", \"password\": \"secret12\"");
+    REQUIRE(srv.start(&cfg, disp, "Test HMI"));
+    Client c;
+    std::vector<Client::Rect> first, second;
+    with_client(rt, [&] {
+        if(!c.connect_to(srv.port()) || c.login("secret12") != 0) { c.failed = true; return; }
+        Client::Init init = c.init();
+        c.wr({ 2, 0, 0, 2, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x11 });   // SetEncodings: raw, Cursor
+        c.request(false, init.w, init.h);
+        first = c.update();
+        c.request(false, init.w, init.h);
+        second = c.update();
+    });
+    CHECK_FALSE(c.failed);
+    REQUIRE(first.size() == 2);
+    CHECK_FALSE(first[0].cursor);
+    CHECK(first[1].cursor);
+    CHECK(first[1].w == 12);
+    CHECK(first[1].h == 18);
+    CHECK(first[1].mask.size() == 36);
+    REQUIRE(second.size() == 1);                                 // not again
+    CHECK_FALSE(second[0].cursor);
 }
 
 TEST_CASE("vnc: a wrong password is not let in; older protocol versions; other pixel formats")

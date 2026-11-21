@@ -105,6 +105,45 @@ void vnc_convert(const uint8_t* p, size_t pixels, const VncPixelFormat& f, std::
     }
 }
 
+void vnc_cursor(const VncPixelFormat& f, std::vector<uint8_t>& out)
+{
+    // X = black, . = white, the rest is not drawn; the tip (0, 0) is the hot spot
+    static const char* const kArrow[kVncCursorH] = {
+        "X           ",
+        "XX          ",
+        "X.X         ",
+        "X..X        ",
+        "X...X       ",
+        "X....X      ",
+        "X.....X     ",
+        "X......X    ",
+        "X.......X   ",
+        "X........X  ",
+        "X.........X ",
+        "X......XXXXX",
+        "X...X..X    ",
+        "X..X X..X   ",
+        "X.X  X..X   ",
+        "XX    X..X  ",
+        "X     X..X  ",
+        "       XX   ",
+    };
+    auto put16 = [&](int v) { out.push_back(static_cast<uint8_t>(v >> 8)); out.push_back(static_cast<uint8_t>(v)); };
+    put16(0); put16(0); put16(kVncCursorW); put16(kVncCursorH);
+    out.push_back(0xFF); out.push_back(0xFF); out.push_back(0xFF); out.push_back(0x11);      // -239
+    std::vector<uint8_t> px(static_cast<size_t>(kVncCursorW) * kVncCursorH * 4, 0);
+    for(int y = 0; y < kVncCursorH; y++)
+        for(int x = 0; x < kVncCursorW; x++)
+            if(kArrow[y][x] == '.') std::fill_n(px.begin() + (static_cast<size_t>(y) * kVncCursorW + x) * 4, 3, static_cast<uint8_t>(255));
+    vnc_convert(px.data(), px.size() / 4, f, out);
+    for(int y = 0; y < kVncCursorH; y++)
+        for(int x0 = 0; x0 < kVncCursorW; x0 += 8) {
+            uint8_t m = 0;
+            for(int x = x0; x < x0 + 8 && x < kVncCursorW; x++) if(kArrow[y][x] != ' ') m = static_cast<uint8_t>(m | (0x80 >> (x - x0)));
+            out.push_back(m);
+        }
+}
+
 std::vector<VncRect> vnc_diff(const uint8_t* a, const uint8_t* b, int width, int height, int tile)
 {
     std::vector<VncRect> out;
@@ -349,6 +388,7 @@ struct VncServer::Impl {
         std::vector<uint8_t> sent;                   // what the viewer has
         uint64_t sent_seq = 0;
         bool pending = false, full = false;
+        bool cursor_wanted = false, cursor_sent = false;   // the viewer draws the pointer we give it
         std::vector<uint8_t> msg, cur;
         while(running) {
             if(wait_readable(c, pending ? 30 : 200)) {
@@ -360,12 +400,18 @@ struct VncServer::Impl {
                         pf = VncPixelFormat::read(b + 3);
                         if(!pf.usable()) { HML_WARN("remote: the viewer asks for a pixel format that is not supported (%d bits, %s)", pf.bpp, pf.true_colour ? "true colour" : "colour map"); return; }
                         full = true;                    // (what it has is in the old format)
+                        cursor_sent = false;
                         break;
-                    case 2: {                           // SetEncodings: only raw is sent, whatever it lists
+                    case 2: {                           // SetEncodings: pixels go raw whatever it lists; "Cursor" is taken
                         if(!read_exact(c, b, 3, 5000)) return;
                         int n = (b[1] << 8) | b[2];
-                        uint8_t skip[4];
-                        while(n-- > 0) if(!read_exact(c, skip, 4, 5000)) return;
+                        uint8_t e[4];
+                        cursor_wanted = false;
+                        while(n-- > 0) {
+                            if(!read_exact(c, e, 4, 5000)) return;
+                            if(e[0] == 0xFF && e[1] == 0xFF && e[2] == 0xFF && e[3] == 0x11) cursor_wanted = true;
+                        }
+                        cursor_sent = false;
                         break;
                     }
                     case 3:                             // FramebufferUpdateRequest
@@ -411,16 +457,18 @@ struct VncServer::Impl {
             if(full || sent.size() != cur.size()) rects.push_back({ 0, 0, width, height });
             else rects = vnc_diff(sent.data(), cur.data(), width, height);
             sent_seq = seq_now;
-            if(rects.empty()) continue;
+            const bool with_cursor = cursor_wanted && !cursor_sent;
+            if(rects.empty() && !with_cursor) continue;
             msg.clear();
             msg.push_back(0); msg.push_back(0);
-            put16(msg, static_cast<int>(rects.size()));
+            put16(msg, static_cast<int>(rects.size()) + (with_cursor ? 1 : 0));
             for(const VncRect& r : rects) {
                 put16(msg, r.x); put16(msg, r.y); put16(msg, r.w); put16(msg, r.h);
                 put32(msg, 0);                           // raw
                 for(int y = r.y; y < r.y + r.h; y++)
                     vnc_convert(cur.data() + (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(r.x)) * 4, static_cast<size_t>(r.w), pf, msg);
             }
+            if(with_cursor) { vnc_cursor(pf, msg); cursor_sent = true; }
             if(!send_all(c, msg)) return;
             sent.swap(cur);
             pending = false;
