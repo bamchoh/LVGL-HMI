@@ -15,6 +15,10 @@
 #    define NOMINMAX
 #  endif
 #  include <windows.h>
+#else
+#  include <cstdio>
+#  include <set>
+#  include <unistd.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -128,6 +132,122 @@ std::vector<std::string> transfer_locations()
     }
 #endif
     return out;
+}
+
+namespace {
+void lsblk_walk(const json& list, std::vector<UsbVolume>& out)
+{
+    if(!list.is_array()) return;
+    auto truth = [](const json& o, const char* key) {
+        const json* v = jget(o, key);
+        if(!v) return false;
+        if(v->is_boolean()) return v->get<bool>();
+        if(v->is_number()) return v->get<double>() != 0;
+        return v->is_string() && (v->get<std::string>() == "1" || v->get<std::string>() == "true");
+    };
+    auto text = [](const json& o, const char* key) {
+        const json* v = jget(o, key);
+        return v && v->is_string() ? v->get<std::string>() : std::string();
+    };
+    for(const json& d : list) {
+        if(!d.is_object()) continue;
+        const std::string fs_type = text(d, "fstype"), type = text(d, "type");
+        if((truth(d, "rm") || truth(d, "hotplug")) && (type == "part" || type == "disk") && !fs_type.empty() && fs_type != "swap") {
+            UsbVolume v;
+            v.device = text(d, "path");
+            v.fstype = fs_type;
+            v.label = text(d, "label");
+            v.mountpoint = text(d, "mountpoint");
+            if(!v.device.empty()) out.push_back(std::move(v));
+        }
+        if(const json* c = jget(d, "children")) lsblk_walk(*c, out);
+    }
+}
+
+#ifndef _WIN32
+std::string run(const std::string& cmd, int* rc)
+{
+    std::string out;
+    FILE* p = popen((cmd + " 2>&1").c_str(), "r");
+    if(!p) { if(rc) *rc = -1; return out; }
+    char buf[512];
+    while(size_t n = fread(buf, 1, sizeof(buf), p)) out.append(buf, n);
+    const int st = pclose(p);
+    if(rc) *rc = st;
+    return out;
+}
+std::vector<UsbVolume> usb_volumes()
+{
+    int rc = 0;
+    const std::string text = run("lsblk -J -o PATH,RM,HOTPLUG,TYPE,FSTYPE,LABEL,MOUNTPOINT", &rc);
+    return rc == 0 ? transfer_parse_lsblk(text) : std::vector<UsbVolume>();
+}
+std::set<std::string>& usb_refused() { static std::set<std::string> s; return s; }    // could not be mounted: said once
+std::set<std::string>& usb_ejected() { static std::set<std::string> s; return s; }    // taken out by the operator
+#endif
+} // namespace
+
+std::vector<UsbVolume> transfer_parse_lsblk(const std::string& json_text)
+{
+    std::vector<UsbVolume> out;
+    const json j = json::parse(json_text, nullptr, false);
+    if(j.is_object()) if(const json* list = jget(j, "blockdevices")) lsblk_walk(*list, out);
+    return out;
+}
+
+std::string transfer_mount_usb()
+{
+#ifdef _WIN32
+    return "";
+#else
+    std::string problem;
+    const std::vector<UsbVolume> vols = usb_volumes();
+    // what was unplugged is forgotten: plugged in again it is mounted (and complained about) anew
+    auto forget = [&](std::set<std::string>& set) {
+        for(auto it = set.begin(); it != set.end();) {
+            const bool there = std::any_of(vols.begin(), vols.end(), [&](const UsbVolume& v) { return v.device == *it; });
+            it = there ? std::next(it) : set.erase(it);
+        }
+    };
+    forget(usb_refused());
+    forget(usb_ejected());
+    for(const UsbVolume& v : vols) {
+        if(!v.mountpoint.empty() || usb_refused().count(v.device) || usb_ejected().count(v.device)) continue;
+        if(v.device.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-") != std::string::npos) continue;
+        int rc = 0;
+        const std::string out = run("udisksctl mount -b " + v.device + " --no-user-interaction", &rc);
+        if(rc == 0) { HML_INFO("storage: mounted %s (%s)", v.device.c_str(), v.label.empty() ? v.fstype.c_str() : v.label.c_str()); continue; }
+        usb_refused().insert(v.device);
+        const std::string name = v.label.empty() ? v.device : "'" + v.label + "'";
+        if(out.find("NotAuthorized") != std::string::npos)
+            problem = "The USB memory " + name + " is there, but the runtime may not mount it (install tools/rpi/hml-usb.rules, see the README).";
+        else if(out.find("not found") != std::string::npos && out.find("udisksctl") != std::string::npos)
+            problem = "The USB memory " + name + " is there but not mounted, and udisks2 is not installed to mount it.";
+        else problem = "The USB memory " + name + " cannot be mounted: " + out.substr(0, 160);
+        HML_WARN("storage: %s", problem.c_str());
+    }
+    return problem;
+#endif
+}
+
+std::string transfer_eject(const std::string& location)
+{
+    if(location.empty()) return "there is no location";
+#ifdef _WIN32
+    return "take the drive out with \"Safely Remove Hardware\" of Windows";
+#else
+    sync();
+    for(const UsbVolume& v : usb_volumes()) {
+        if(v.mountpoint != location) continue;
+        int rc = 0;
+        const std::string out = run("udisksctl unmount -b " + v.device + " --no-user-interaction", &rc);
+        if(rc != 0) return out.substr(0, 160);
+        usb_ejected().insert(v.device);
+        HML_INFO("storage: unmounted %s", v.device.c_str());
+        return "";
+    }
+    return "this location is not a removable drive (everything is written out; nothing was unmounted)";
+#endif
 }
 
 std::vector<std::string> transfer_project_files(const std::string& location)

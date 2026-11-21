@@ -174,6 +174,42 @@ TEST_CASE("transfer: a project that does not fit or has problems is refused, and
     CHECK_FALSE(fs::exists(tmp.dir / "device" / "projects" / "pump.incoming"));
 }
 
+TEST_CASE("transfer: the removable file systems in what lsblk says")
+{
+    // a Raspberry Pi with an empty card reader (sda), a USB memory with two partitions (sdb), its own SD card
+    const char* flat = R"({ "blockdevices": [
+        { "path": "/dev/loop0", "rm": false, "hotplug": false, "type": "loop", "fstype": "swap", "label": null, "mountpoint": null },
+        { "path": "/dev/sda", "rm": true, "hotplug": true, "type": "disk", "fstype": null, "label": null, "mountpoint": null },
+        { "path": "/dev/sdb", "rm": true, "hotplug": true, "type": "disk", "fstype": null, "label": null, "mountpoint": null },
+        { "path": "/dev/sdb1", "rm": true, "hotplug": true, "type": "part", "fstype": "vfat", "label": "rpi4", "mountpoint": null },
+        { "path": "/dev/sdb2", "rm": true, "hotplug": true, "type": "part", "fstype": "ext3", "label": null, "mountpoint": "/media/pi/data" },
+        { "path": "/dev/mmcblk0p2", "rm": false, "hotplug": false, "type": "part", "fstype": "ext4", "label": "rootfs", "mountpoint": "/" } ] })";
+    std::vector<UsbVolume> v = transfer_parse_lsblk(flat);
+    REQUIRE(v.size() == 2);
+    CHECK(v[0].device == "/dev/sdb1");
+    CHECK(v[0].fstype == "vfat");
+    CHECK(v[0].label == "rpi4");
+    CHECK(v[0].mountpoint == "");
+    CHECK(v[1].device == "/dev/sdb2");
+    CHECK(v[1].mountpoint == "/media/pi/data");
+
+    // older lsblk: partitions as children, flags as text; a memory without a partition table
+    const char* tree = R"({ "blockdevices": [
+        { "path": "/dev/sdc", "rm": "1", "type": "disk", "fstype": null, "children": [
+            { "path": "/dev/sdc1", "rm": "1", "type": "part", "fstype": "exfat", "label": "STICK", "mountpoint": null } ] },
+        { "path": "/dev/sdd", "rm": "0", "hotplug": "1", "type": "disk", "fstype": "vfat", "label": "WHOLE", "mountpoint": null },
+        { "path": "/dev/sde", "rm": "0", "hotplug": "0", "type": "disk", "fstype": "ext4", "label": "fixed", "mountpoint": null } ] })";
+    v = transfer_parse_lsblk(tree);
+    REQUIRE(v.size() == 2);
+    CHECK(v[0].device == "/dev/sdc1");
+    CHECK(v[0].label == "STICK");
+    CHECK(v[1].device == "/dev/sdd");
+
+    CHECK(transfer_parse_lsblk("").empty());
+    CHECK(transfer_parse_lsblk("lsblk: command not found").empty());
+    CHECK(transfer_parse_lsblk("{}").empty());
+}
+
 TEST_CASE("transfer: a runtime started from a project file gets that file replaced")
 {
     Temp tmp;
@@ -231,6 +267,8 @@ TEST_CASE("System > Storage: backup, install after a question, the restart is as
     CHECK(flag("has_file"));
     CHECK_FALSE(flag("has_previous"));
     CHECK(text("file__options") == "new.hmlproj");
+    CHECK_FALSE(flag("no_location"));
+    CHECK(text("hint") == "");
 
     sys.command("storage", "backup");
     CHECK(text("status").find("Backup written to ") == 0);

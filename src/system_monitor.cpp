@@ -75,6 +75,14 @@ public:
         Tag* sel = selected_.empty() ? nullptr : tags().find(selected_);
         if(!sel) selected_.clear();
         flag("selected", sel != nullptr);
+        // the form to write with follows the type: two buttons, the number pad, the keyboard
+        const bool is_bool = sel && sel->type() == TagType::Bool;
+        const bool is_number = sel && (sel->type() == TagType::Int || sel->type() == TagType::Float);
+        flag("sel_bool", is_bool);
+        flag("sel_number", is_number);
+        flag("sel_text", sel && !is_bool && !is_number);
+        flag("sel_typed", sel && !is_bool);
+        flag("filtered", !filter_.empty());
         info("sel_name", sel ? sel->name() + "  (" + tag_type_name(sel->type()) + ")" : "");
         info("sel_value", sel ? sel->get().format() : "");
         for(int i = 0; i < kRows; i++) {
@@ -118,13 +126,16 @@ public:
             }
         }
         else if(cmd == "close") selected_.clear();
-        else if(cmd == "write") {
+        else if(cmd == "clear") { filter_.clear(); first_ = 0; }
+        else if(cmd == "write" || cmd == "set") {
+            // "set:<value>" = the buttons of a bool, "write" = what was typed
+            const std::string text = cmd == "set" ? arg : value_;
             Tag* t = selected_.empty() ? nullptr : tags().find(selected_);
             if(!t) msg = "Pick a tag first.";
             else if(SystemSettings::is_system_tag(t->name())) msg = "The tags of the runtime (sys.) are not written here.";
             else {
-                auto v = Value::parse(t->type(), value_);
-                if(!v) msg = "\"" + value_ + "\" is not a value for a tag of type " + tag_type_name(t->type()) + ".";
+                auto v = Value::parse(t->type(), text);
+                if(!v) msg = "\"" + text + "\" is not a value for a tag of type " + tag_type_name(t->type()) + ".";
                 else {
                     const std::string old = t->get().format();
                     t->set(*v, nullptr);
@@ -132,6 +143,7 @@ public:
                     operation_log().record("monitor", t->name(), old, now);
                     HML_INFO("system: tag monitor: '%s' %s -> %s", t->name().c_str(), old.c_str(), now.c_str());
                     msg = t->name() + " = " + now;
+                    if(cmd == "set") value_ = now;
                     if(now != v->format()) msg += "  (kept inside the limits of the tag)";
                 }
             }
@@ -165,9 +177,17 @@ public:
             return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                          { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 6 } } }, { "children", std::move(children) } };
         };
-        auto button = [&](const char* text, const char* color, const std::string& cmd, int w) {
-            return json{ { "type", "button" }, { "text", text }, { "w", w }, { "h", compact ? 30 : 40 }, { "style", { { "bg_color", color } } },
-                         { "style_label", { { "font", font } } }, { "on_click", call(cmd) } };
+        auto button = [&](const char* text, const char* color, const std::string& cmd, int w, const char* shown = nullptr) {
+            json b = json{ { "type", "button" }, { "text", text }, { "w", w }, { "h", compact ? 30 : 40 }, { "style", { { "bg_color", color } } },
+                           { "style_label", { { "font", font } } }, { "on_click", call(cmd) } };
+            if(shown) b["bind"] = { { "visible", tag(shown) } };
+            return b;
+        };
+        auto entry = [&](const char* shown, const char* accepted) {
+            json e = json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 64 }, { "bind", { { "text", tag("value") }, { "visible", tag(shown) } } },
+                           { "style", { { "font", font }, { "pad", 6 } } } };
+            if(accepted) e["accepted_chars"] = accepted;
+            return e;
         };
         auto label = [&](const std::string& key, const char* color, int f) {
             return json{ { "type", "label" }, { "long_mode", "dots" }, { "bind", { { "text", tag(key) } } }, { "style", { { "font", f }, { "text_color", color } } } };
@@ -183,8 +203,11 @@ public:
         form["children"] = json::array({
             row(json::array({ name, value, button("x", "#455a64", "close", compact ? 34 : 44) })),
             row(json::array({
-                json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 64 }, { "bind", tag("value") }, { "style", { { "font", font }, { "pad", 6 } } } },
-                button("Write", "#c62828", "write", compact ? 80 : 110),
+                entry("sel_text", nullptr),                                  // the keyboard
+                entry("sel_number", "0123456789.-"),                         // the number pad
+                button("Write", "#c62828", "write", compact ? 80 : 110, "sel_typed"),
+                button("TRUE", "#2e7d32", "set:true", compact ? 110 : 150, "sel_bool"),
+                button("FALSE", "#455a64", "set:false", compact ? 110 : 150, "sel_bool"),
             })),
         });
         rows.push_back(std::move(form));
@@ -192,7 +215,7 @@ public:
         json filter = json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 32 }, { "placeholder", "part of a name (sys. = the runtime's tags)" },
                             { "bind", tag("filter") }, { "style", { { "font", font }, { "pad", 6 } } }, { "on_change", call("find") } };
         json range = label("range", muted, font); range["w"] = compact ? 86 : 120; range["style"]["text_align"] = "center";
-        rows.push_back(row(json::array({ filter, button("<", "#2c3e50", "prev", compact ? 40 : 56), range, button(">", "#2c3e50", "next", compact ? 40 : 56) })));
+        rows.push_back(row(json::array({ filter, button("x", "#455a64", "clear", compact ? 34 : 44, "filtered"), button("<", "#2c3e50", "prev", compact ? 40 : 56), range, button(">", "#2c3e50", "next", compact ? 40 : 56) })));
 
         for(int i = 1; i <= kRows; i++) {
             json n = label("r" + std::to_string(i), "#ffffff", font + 2); n["flex_grow"] = 1;

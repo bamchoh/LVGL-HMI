@@ -1854,6 +1854,8 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         if(!accepted.empty()) {
             owned_strings.push_back(std::make_unique<std::string>(accepted));
             lv_textarea_set_accepted_chars(obj, owned_strings.back()->c_str());
+            // a text field that takes nothing but what the number pad has gets the number pad
+            if(accepted.find_first_not_of("0123456789.-+") == std::string::npos) set_mark(obj, MARK_NUMBER_PAD, true);
         }
         bind_opts.has_natural = true;
         bind_opts.natural = numeric ? BindKind::Value : BindKind::Text;

@@ -522,9 +522,37 @@ TEST_CASE("System > Tags: lists the tags, filters, pages, writes a value")
     type("value", "true");
     sys.command("monitor", "write");
     CHECK(tags().find("flag")->get_number() == 1);
+    // the form follows the type: a bool has two buttons that write at once
+    auto on = [](const char* key) { return tags().find(std::string("sys.monitor.") + key)->get_number() != 0; };
+    CHECK(on("sel_bool"));
+    CHECK_FALSE(on("sel_number"));
+    CHECK_FALSE(on("sel_text"));
+    CHECK_FALSE(on("sel_typed"));
+    sys.command("monitor", "set", "false");
+    CHECK(tags().find("flag")->get_number() == 0);
+    CHECK(text("status") == "flag = false");
+    CHECK(text("sel_value") == "false");
+    sys.command("monitor", "set", "true");
+    CHECK(tags().find("flag")->get_number() == 1);
+    // a number is typed on the number pad, a text on the keyboard
+    type("filter", "lim");
+    sys.command("monitor", "find");
+    sys.command("monitor", "select", "1");
+    CHECK(on("sel_number"));
+    CHECK(on("sel_typed"));
+    CHECK_FALSE(on("sel_bool"));
+    CHECK_FALSE(on("sel_text"));
+    // the filter is emptied with one button
+    CHECK(on("filtered"));
+    sys.command("monitor", "clear");
+    CHECK_FALSE(on("filtered"));
+    CHECK(text("filter") == "");
+    CHECK(text("range") == "1 - 8 / 13");
     type("filter", "text");
     sys.command("monitor", "find");
     sys.command("monitor", "select", "1");
+    CHECK(on("sel_text"));
+    CHECK(on("sel_typed"));
     type("value", "hello world");
     sys.command("monitor", "write");
     CHECK(tags().find("text")->get().str == "hello world");

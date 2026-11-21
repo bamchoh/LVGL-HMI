@@ -1,0 +1,13 @@
+// Lets the HML runtime (a service without a desktop session) mount and unmount USB memories
+// through udisks, for System > Storage (backup, installing a project). For the users of the
+// group "plugdev" (the first user of Raspberry Pi OS is in it).
+// Install with:
+//   sudo install -m 644 ~/hml/tools/rpi/hml-usb.rules /etc/polkit-1/rules.d/50-hml-usb.rules
+polkit.addRule(function(action, subject) {
+    var ids = [
+        "org.freedesktop.udisks2.filesystem-mount",
+        "org.freedesktop.udisks2.filesystem-mount-other-seat",
+        "org.freedesktop.udisks2.filesystem-unmount-others"
+    ];
+    if (ids.indexOf(action.id) >= 0 && subject.isInGroup("plugdev")) return polkit.Result.YES;
+});
