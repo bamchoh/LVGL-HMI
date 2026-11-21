@@ -41,37 +41,41 @@ bool Value::truthy() const
 
 namespace {
 
-// Find the single printf conversion in fmt; returns the conversion char or 0.
-char find_conversion(const std::string& fmt)
+// A format of a project ("%.1f C", "%d pcs", "%s") as a format that is safe to hand to printf
+// with exactly one argument: the first conversion is kept (with its flags; width at most 64,
+// precision at most 20; the length modifiers replaced by ours), every other '%' becomes a
+// literal one. A conversion we do not format (%n, %p, %*d ...) is shown as text. Returns the
+// conversion character, 0 when there is none.
+char safe_format(const std::string& fmt, std::string& out)
 {
+    char conv = 0;
+    out.clear();
     for(size_t i = 0; i < fmt.size(); i++) {
-        if(fmt[i] != '%') continue;
-        i++;
-        if(i < fmt.size() && fmt[i] == '%') continue;
-        while(i < fmt.size() && std::strchr("-+ #0123456789.lhjzt", fmt[i])) i++;
-        return i < fmt.size() ? fmt[i] : 0;
-    }
-    return 0;
-}
-
-// Rebuild the format with length modifiers stripped so that we control the argument type
-// (%d becomes %lld, %f stays double).
-std::string normalize_format(const std::string& fmt)
-{
-    std::string out;
-    for(size_t i = 0; i < fmt.size(); i++) {
-        char c = fmt[i];
+        const char c = fmt[i];
         if(c != '%') { out += c; continue; }
         if(i + 1 < fmt.size() && fmt[i + 1] == '%') { out += "%%"; i++; continue; }
-        out += '%';
-        i++;
-        while(i < fmt.size() && std::strchr("-+ #0123456789.", fmt[i])) out += fmt[i++];
-        while(i < fmt.size() && std::strchr("lhjzt", fmt[i])) i++;
-        if(i >= fmt.size()) break;
-        if(std::strchr("diuxXo", fmt[i])) out += "ll";
-        out += fmt[i];
+        if(conv) { out += "%%"; continue; }                      // a second conversion: there is one value only
+        size_t j = i + 1;
+        std::string spec = "%";
+        while(j < fmt.size() && std::strchr("-+ #0", fmt[j])) spec += fmt[j++];
+        auto digits = [&](int most) {
+            long v = 0;
+            bool any = false;
+            while(j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') { if(v < 100000) v = v * 10 + (fmt[j] - '0'); j++; any = true; }
+            if(any) spec += std::to_string(std::min<long>(v, most));
+        };
+        digits(64);
+        if(j < fmt.size() && fmt[j] == '.') { spec += '.'; j++; const size_t before = spec.size(); digits(20); if(spec.size() == before) spec += '0'; }
+        while(j < fmt.size() && std::strchr("lhjztL", fmt[j])) j++;
+        if(j < fmt.size() && std::strchr("diuxXofFeEgGsc", fmt[j])) {
+            conv = fmt[j];
+            if(std::strchr("diuxXo", conv)) spec += "ll";
+            out += spec + conv;
+            i = j;
+        }
+        else out += "%%";                                        // (the rest follows as text)
     }
-    return out;
+    return conv;
 }
 
 } // namespace
@@ -86,9 +90,11 @@ std::string Value::format(const std::string& fmt) const
             default: return str;
         }
     }
-    char conv = find_conversion(fmt);
-    std::string f2 = normalize_format(fmt);
+    std::string f2;
+    const char conv = safe_format(fmt, f2);
     double n = as_number();
+    // (a whole-number conversion of what is no number, or of what no integer holds, shows 0)
+    if(std::strchr("diuxXoc", conv ? conv : ' ') && !(std::fabs(n) < 9.0e18)) n = 0;
     switch(conv) {
         case 'd': case 'i':
             return vformat(f2.c_str(), static_cast<long long>(std::llround(n)));
@@ -100,8 +106,15 @@ std::string Value::format(const std::string& fmt) const
             return vformat(f2.c_str(), (is_string() ? str : format()).c_str());
         case 'c':
             return vformat(f2.c_str(), static_cast<int>(n));
-        default:   // no conversion: literal text
-            return fmt;
+        default:   // no conversion: literal text ("%%" is one '%')
+        {
+            std::string text;                                // (not through printf: there is nothing to format)
+            for(size_t i = 0; i < f2.size(); i++) {
+                text += f2[i];
+                if(f2[i] == '%' && i + 1 < f2.size() && f2[i + 1] == '%') i++;
+            }
+            return text;
+        }
     }
 }
 

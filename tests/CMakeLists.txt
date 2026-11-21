@@ -29,6 +29,7 @@ add_executable(hml_tests
   test_log_view.cpp
   test_meter.cpp
   test_datetime.cpp
+  test_table.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp

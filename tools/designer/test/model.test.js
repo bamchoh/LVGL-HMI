@@ -904,6 +904,24 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+test('M renameTag: the cells of a table and the filter tag of a log view follow; unknown ones are problems', () => {
+  const { M } = tagProject();
+  const s = M.screen().children;
+  s.push({ type: 'table', rows: [['Temp', { tag: 'temp', format: '%.1f' }], [{ tag: 'run', map: { 1: 'on' } }, 5, null, 'x']] });
+  s.push({ type: 'log_view', source: 'operation', filter_tag: 'temp' });
+  const before = M.problems().length;
+  M.renameTag(0, 'temp_pv');
+  const t = M.screen().children[M.screen().children.length - 2], lv = M.screen().children[M.screen().children.length - 1];
+  assert.equal(t.rows[0][1].tag, 'temp_pv');
+  assert.equal(t.rows[1][0].tag, 'run');
+  assert.equal(lv.filter_tag, 'temp_pv');
+  assert.equal(M.problems().length, before);
+  t.rows[0][1].tag = 'gone'; lv.filter_tag = 'lost';
+  const texts = M.problems().map(x => x.text);
+  assert.ok(texts.some(x => /unknown tag "gone" \(table\)/.test(x)), texts.join('; '));
+  assert.ok(texts.some(x => /unknown tag "lost" \(filter\)/.test(x)), texts.join('; '));
+});
+
 test('M moveWidgets: reorder, into a panel and out again; never into itself', () => {
   const { M } = tagProject();
   const types = () => M.screen().children.map(w => w.type);

@@ -43,6 +43,7 @@ build.cmd Debug
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
+| `test_table.cpp`                                     | 表（タグへの追従、`format` と `map`、極端な行数・列数と壊れた設定、1000 行の時間、`--check`）                               |
 | `test_datetime.cpp`                                  | 日付・時刻の入力（うるう年と月末、書式、数値との変換、ローラーとタグ、レベル、操作ログ、`--check`）                        |
 | `test_meter.cpp`                                     | メーター（針と数字、範囲外・数値でない値、極端な設定、描画時間、`--check`）                                                 |
 | `test_log_view.cpp`                                  | ログの画面表示（ページ・絞り込み・期間、SQL 注入、壊れた文字、10 万行の時間、レベル、`--check`）                           |
@@ -1304,6 +1305,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `switch` / `checkbox` | `checked`, (`text`)                                                                                                       |
 | `slider` / `bar`      | `min`, `max`, `value`                                                                                                     |
 | `arc`                 | `min`, `max`, `value`, `start_angle`, `end_angle`, `rotation`, `adjustable`                                               |
+| `table`               | 表: `columns`, `rows`, `header`（下記「表」）                                                                             |
 | `datetime_input`      | 日付・時刻の入力: `mode`, `seconds`, `year_min`, `year_max`（下記「日付と時刻の入力」）                                    |
 | `meter`               | 針のメーター: `min`, `max`, `angle`, `ticks`, `major_every`, `decimals`, `unit`, `show_value`, `needle_color`, `zones`（下記「メーター」） |
 | `led`                 | `color`, `on`                                                                                                             |
@@ -1803,6 +1805,33 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 ```
 
 画面からは `{ "action": "call", "fn": "operation_log.export" }`（`arg` で出力先を指定可）。
+
+## 表: `table`
+
+文字とタグの値を、行と列に並べて見せる部品です。タグを指定したセルは、そのタグに追従します。表示だけです。
+
+```json
+{ "type": "table", "w": "100%", "h": 200,
+  "columns": [ "機械", { "title": "生産数", "width": 90, "align": "right" }, { "title": "状態", "align": "center" } ],
+  "rows": [ [ "投入", { "tag": "m1_count" }, { "tag": "m1_state", "map": { "0": "停止", "1": "運転", "default": "?" } } ],
+            [ "加工", { "tag": "m2_count", "format": "%d 個" }, { "tag": "m2_state", "map": { "0": "停止", "1": "運転" } } ] ] }
+```
+
+| キー      | 内容                                                                                                                  |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `columns` | 列の配列。見出しの文字か、`{ "title", "width"（px。書かない列は残りを分け合う）, "align"（`left` / `center` / `right`）}` |
+| `rows`    | 行の配列。1 行はセルの配列。セルは文字・数値か、`{ "tag", "format", "map" }`                                          |
+| `header`  | 見出しの行を出す（既定 `true`）                                                                                       |
+
+- セルの `format` は、ほかの部品の `format` と同じ printf 形式（`"%.1f °C"`）。`map` は値ごとの文字で、キーは数値として
+  比べ（`"1"` は 1 にも `true` にも合う）、数値でなければ値の文字と比べます。どれにも合わなければ `default`、
+  `default` もなければ値そのものを出します。
+- 文字には `@ID`（多言語テキスト）が使えます。見出し、固定のセル、`map` の文字のどれでも使えます。
+- 行が多いと表の中でスクロールします。上限は 2000 行、32 列です（超えた分は出さず、システムログに警告を残します）。
+- タグのセルは、画面が表示されている間、1 秒に 4 回見直し、文字が変わったセルだけを描き直します
+  （1000 行・2000 セルで、変化なしの見直し 1 ms、全セル変化 4 ms。PC での計測）。
+- タグの文字列に含まれる改行・制御文字・壊れた UTF-8 は置き換えて 1 行で出し、200 文字で切ります。
+- セルを画面から書き換えることはできません（入力は `numeric_display` / `text_display` を使います）。
 
 ## 日付と時刻の入力: `datetime_input`
 

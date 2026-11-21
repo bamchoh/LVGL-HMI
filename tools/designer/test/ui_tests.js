@@ -372,6 +372,29 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('table: in the palette, its rows and columns, tag cells show the first value of the tag', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /^表$|表/.test(t.trim())), 'palette: ' + pal.join(','));
+    App.addWidget('table'); await frame();
+    const p = M.st.sel, find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    ok(find() && find().classList.contains('lv-table'), 'drawn');
+    const grid = () => [...find().querySelectorAll('tr')].map(r => [...r.children].map(c => c.textContent).join('|'));
+    eq(grid(), ['Name|Value', 'A|1', 'B|2'], 'the table a new widget starts with');
+    const tag = M.st.project.tags.find(t => t.type === 'int' || t.type === 'float') || M.st.project.tags[0];
+    M.mutate(() => { Object.assign(M.get(p), { columns: ['What', { title: 'Now', align: 'right', width: 80 }, 'State'],
+      rows: [['Speed', { tag: tag.name }, { tag: tag.name, map: { default: 'other' } }], ['Gone', { tag: 'no_such_tag' }], [5]] }); }); App.doRefresh(); await frame();
+    const g = grid();
+    eq(g[0], 'What|Now|State');
+    ok(g[1].startsWith('Speed|') && g[1].endsWith('|other'), 'a tag cell and a map: ' + g[1]);
+    eq(g[2], 'Gone|{no_such_tag}|', 'an unknown tag is shown as such');
+    eq(g[3], '5||');
+    eq(find().querySelectorAll('th')[1].style.textAlign, 'right');
+    M.mutate(() => { M.get(p).header = false; }); App.doRefresh(); await frame();
+    eq(find().querySelectorAll('th').length, 0, 'no titles');
+    ok(M.problems().some(x => /no_such_tag/.test(x.text)), 'the unknown tag is a problem');
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('date and time input: in the palette, the rollers of each mode', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /日付・時刻の入力/.test(t)), 'palette: ' + pal.join(','));

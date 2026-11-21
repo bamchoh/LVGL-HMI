@@ -1,4 +1,5 @@
 #include <doctest.h>
+#include <limits>
 #include "tag.hpp"
 
 #include <string>
@@ -504,4 +505,54 @@ TEST_CASE("a subscriber may write other tags from inside dispatch")
 TEST_CASE("the global tags() store is a singleton")
 {
     CHECK(&tags() == &tags());
+}
+
+// ================================================================ security: a format is text from a project file
+
+TEST_CASE("Value::format: one value, one conversion; whatever else a format says is shown, never executed")
+{
+    const Value n = Value::number(12.345, TagType::Float), i = Value::number(42, TagType::Int), s = Value::string("abc");
+    // what projects write
+    CHECK(n.format("%.1f C") == "12.3 C");
+    CHECK(i.format("%d pcs") == "42 pcs");
+    CHECK(i.format("%5d|") == "   42|");
+    CHECK(i.format("%-5d|") == "42   |");
+    CHECK(i.format("%05d") == "00042");
+    CHECK(i.format("%x") == "2a");
+    CHECK(i.format("%ld") == "42");                           // (a length modifier is ours to choose)
+    CHECK(n.format("%8.3f") == "  12.345");
+    CHECK(n.format("%.f") == "12");
+    CHECK(s.format("[%s]") == "[abc]");
+    CHECK(i.format("%s") == "42");
+    CHECK(i.format("%d %%") == "42 %");
+    CHECK(i.format("100%%") == "100%");
+    CHECK(i.format("no value") == "no value");
+    // a second conversion has no value: it is text
+    CHECK(i.format("%d %d") == "42 %d");
+    CHECK(s.format("%s%s%s%s") == "abc%s%s%s");
+    CHECK(i.format("%d%n") == "42%n");
+    // conversions that are not for a value of a tag
+    CHECK(i.format("%n") == "%n");
+    CHECK(i.format("%p") == "%p");
+    CHECK(i.format("%*d") == "%*d");
+    CHECK(i.format("%.*f") == "%.*f");
+    CHECK(i.format("%") == "%");
+    CHECK(i.format("%5") == "%5");
+    CHECK(i.format("%-") == "%-");
+    CHECK(i.format("%ll") == "%ll");
+    CHECK(i.format("%lln") == "%lln");
+    CHECK(s.format("%n%s") == "%nabc");
+    // a width or a precision without end
+    CHECK(i.format("%999999999d").size() == 64);
+    CHECK(i.format("%99999999999999999999999999d").size() == 64);
+    CHECK(n.format("%.999999f").size() < 40);
+    CHECK(s.format("%999999s").size() == 64);
+    CHECK(i.format(std::string(10000, '%')).size() == 5000);
+    CHECK(n.format(std::string(3000, 'x') + "%.1f").size() == 3004);
+    // values that are no numbers
+    const Value nan = Value::number(std::numeric_limits<double>::quiet_NaN(), TagType::Float), inf = Value::number(std::numeric_limits<double>::infinity(), TagType::Float);
+    for(const char* f : { "%d", "%u", "%x", "%c", "%.1f", "%e", "%g", "%s" }) { CHECK(nan.format(f).size() < 40); CHECK(inf.format(f).size() < 40); }
+    CHECK(Value::number(1e300, TagType::Float).format("%d").size() < 40);
+    CHECK(Value::number(1e300, TagType::Float).format("%.2f").size() < 400);
+    CHECK(Value::number(0, TagType::Int).format("%c").size() <= 1);
 }

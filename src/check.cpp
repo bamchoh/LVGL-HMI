@@ -216,6 +216,7 @@ struct Checker {
             own = str_set(S["types"][type]);
             if(type == "log_view") own.insert("widths");                         // (an object: edited as JSON)
             if(type == "meter") own.insert("zones");
+            if(type == "table") { own.insert("columns"); own.insert("rows"); }
         }
         for(auto it = w.begin(); it != w.end(); ++it) {
             const std::string& k = it.key();
@@ -273,6 +274,26 @@ struct Checker {
             if(!books.count(b) && !(b.empty() && books.size() == 1)) add(where, b.empty() ? "no \"book\" (a recipe book)" : "unknown recipe book \"" + b + "\"");
         }
         if((type == "alarm_list" || type == "alarm_banner") && !has_alarms) add(where, "the project has no \"alarms\"");
+        if(type == "table") {
+            if(const json* cl = jget(w, "columns"); cl && !cl->is_array()) add(where, "columns: a list is needed");
+            if(const json* rw = jget(w, "rows")) {
+                if(!rw->is_array()) add(where, "rows: a list of rows is needed");
+                else for(size_t r = 0; r < rw->size(); r++) {
+                    const json& row = (*rw)[r];
+                    const std::string at = "rows[" + std::to_string(r) + "]";
+                    if(!row.is_array()) { add(where, at + ": a list of cells is needed"); continue; }
+                    for(size_t i = 0; i < row.size(); i++) {
+                        const json& cell = row[i];
+                        if(!cell.is_object()) continue;
+                        const std::string cat = at + "[" + std::to_string(i) + "]";
+                        if(!cell.contains("tag")) { add(where, cat + ": a cell is a text or { \"tag\": ... }"); continue; }
+                        need_tag(where, cat, cell["tag"]);
+                        for(auto k = cell.begin(); k != cell.end(); ++k)
+                            if(k.key() != "tag" && k.key() != "format" && k.key() != "map") add(where, cat + ": unknown key \"" + k.key() + "\"");
+                    }
+                }
+            }
+        }
         if(type == "log_view") {
             const std::string src = jstr(w, "source", "system");
             if(src == "data") {
