@@ -499,6 +499,18 @@ const Panels = {
         { k: 'gpio_active_low', t: 'bool', hint: 'the buzzer sounds while the line is low' },
         { k: 'device', t: 'text', placeholder: 'default', hint: 'Linux: the ALSA device (default, plughw:1,0 ...)' }]), fk + '.snd'),
       U.el('div', { class: 'hint' }, 'A sound file is a WAV (PCM, 8 or 16 bit) inside the project folder. Tags: sys.sound.mute, sys.sound.volume, sys.sound.alarm (1 while the alarm sound is on; a button that writes 0 silences it until the next alarm). A button can play a sound: { "action": "call", "fn": "sound.play", "arg": "beep" }. A device without a sound output stays silent and works as before.')));
+    // transfers: values of one device copied to another (src/data_transfer.hpp)
+    el.append(Props.section('Transfers', Array.isArray(p.transfers) && p.transfers.length > 0,
+      Props.listEditor(p, { k: 'transfers', t: 'list', max: 500, hint: 'values copied from one tag to another',
+        fields: [{ k: 'name', t: 'text' }, { k: 'from', t: 'tag', label: 'transfer_from', hint: 'the tag the value is taken from' }, { k: 'to', t: 'tag', label: 'transfer_to', hint: 'the tag the value is written to' },
+                 { k: 'trigger', t: 'select', o: ['', 'cyclic'], empty: '(on change)', hint: 'on change: when the source changes. cyclic: also every period (sets the destination right again when it was changed elsewhere)' },
+                 { k: 'every_ms', t: 'number', hint: 'cyclic: the period in ms (default 1000, at least 100)' },
+                 { k: 'scale', t: 'number', hint: 'the value is multiplied by this (default 1)' }, { k: 'offset', t: 'number', hint: '... and this is added (default 0)' },
+                 { k: 'out_of_range', t: 'select', o: ['', 'clamp'], empty: '(not written)', hint: 'a value outside the limits of the destination tag: not written, or the nearest limit is written (clamp)' },
+                 { k: 'enabled', t: 'bool', hint: 'off: kept, not run' },
+                 { k: 'when', t: 'json', below: true, label: 'transfer_when', hint: 'only while this holds (optional): "run" or { "tag": "mode", "eq": 2 }' }],
+        item: () => ({ name: 'transfer' + ((p.transfers || []).length + 1), from: M.tagNames()[0] || '', to: M.tagNames()[1] || '' }) }, fk + '.xfer'),
+      U.el('div', { class: 'hint' }, 'A transfer copies the value of one tag to another: from one PLC to another, or to a higher system. Nothing is written while the driver of either tag has no connection; after the connection is back the transfer waits until the values were read again and goes on with the newest value. A value that is not a number or outside the limits of the destination tag is not written. Transfers that form a ring are not run. On the device: System > Transfers shows what runs and what waits, and why.')));
     // schedules: actions that run by the clock (src/schedule.hpp)
     el.append(Props.section('Schedules', Array.isArray(p.schedules) && p.schedules.length > 0,
       Props.listEditor(p, { k: 'schedules', t: 'list', max: 200, hint: 'actions that run by the clock',

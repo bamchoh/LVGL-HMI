@@ -904,6 +904,47 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+test('M transfers: the tags follow a rename; a ring, a wrong trigger and a destination of the runtime are problems', () => {
+  const { M, p } = tagProject();
+  const base = M.problems().length;
+  p.transfers = [
+    { name: 'a', from: 'temp', to: 'run' },
+    { name: 'b', from: 'run', to: 'count', trigger: 'cyclic', every_ms: 500, scale: 2, offset: -1, out_of_range: 'clamp', enabled: false, when: { tag: 'temp', gt: 10 } },
+    { name: 'c', from: 'temp', to: 'count', when: 'run' },
+  ];
+  if (!p.tags.some(t => t.name === 'count')) p.tags.push({ name: 'count', type: 'int' });
+  assert.equal(M.problems().length, base, M.problems().map(x => x.text).join(' | '));
+  M.renameTag(p.tags.findIndex(t => t.name === 'temp'), 'temp_pv');
+  assert.equal(p.transfers[0].from, 'temp_pv');
+  assert.equal(p.transfers[1].when.tag, 'temp_pv');
+  assert.equal(p.transfers[2].from, 'temp_pv');
+  assert.equal(M.problems().length, base);
+  M.renameTag(p.tags.findIndex(t => t.name === 'run'), 'running');
+  assert.equal(p.transfers[0].to, 'running');
+  assert.equal(p.transfers[2].when, 'running');
+  assert.equal(M.problems().length, base);
+  const has = (list, re) => { p.transfers = list; const t = M.problems().map(x => x.text); assert.ok(t.some(x => re.test(x)), String(re) + ' in: ' + t.join(' | ')); };
+  has([{ name: 'a', from: 'temp_pv', to: 'running' }, { name: 'b', from: 'running', to: 'count' }, { name: 'c', from: 'count', to: 'temp_pv' }], /transfer "b": part of a ring/);
+  has([{ name: 'a', from: 'temp_pv', to: 'temp_pv' }], /the same tag/);
+  has([{ name: 'a', from: 'temp_pv', to: 'sys.user.level' }], /tag of the runtime/);
+  has([{ name: 'a', from: 'temp_pv', to: 'gone' }], /unknown tag "gone" \(transfer\)/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', when: { tag: 'nope', eq: 1 } }], /unknown tag "nope"/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count' }, { name: 'a', from: 'temp_pv', to: 'running' }], /the name is used twice/);
+  has([{ from: 'temp_pv', to: 'count' }], /a transfer has no name/);
+  has([{ name: 'a', to: 'count' }], /no tag to take the value from/);
+  has([{ name: 'a', from: 'temp_pv' }], /no tag to write the value to/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', trigger: 'often' }], /"trigger" is/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', trigger: 'cyclic', every_ms: 5 }], /"every_ms" is 100/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', every_ms: 500 }], /no meaning without/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', scale: '2' }], /"scale" is a number/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', out_of_range: 'wrap' }], /"out_of_range" is/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', when: { tag: 'running', eq: 1, gt: 0 } }], /"when" is a tag/);
+  has([{ name: 'a', from: 'temp_pv', to: 'count', when: { tag: 'running', like: 1 } }], /"when" is a tag/);
+  has([5], /transfer #1 is not a transfer/);
+  has({ name: 'a' }, /transfers: a list is needed/);
+  delete p.transfers;
+});
+
 test('M sound: a wrong output, volume, line or sound is a problem; the sys.sound tags are offered', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;

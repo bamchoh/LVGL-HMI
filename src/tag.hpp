@@ -39,7 +39,7 @@ struct Value {
 
 // Subscription groups let the UI drop all of its subscriptions on hot reload
 // without touching the drivers'.
-enum class SubGroup { Driver, UI, Script, DataLog, Alarm, Texts, Screen, Sound };
+enum class SubGroup { Driver, UI, Script, DataLog, Alarm, Texts, Screen, Sound, Transfer };
 
 class TagStore;
 
@@ -61,6 +61,8 @@ public:
     // A value read from a device (PLC): coerced to the tag's type but NOT clamped, so that the
     // HMI shows what the device really holds. The limits only restrict what the HMI writes.
     // The first value outside the limits is reported once per tag (warning in the log).
+    // While a value written on the HMI side waits to be handed to the drivers, what a device
+    // reports is dropped: it was read before that write and would undo it.
     bool set_from_device(const Value& v, const void* source);
     bool set_number_from_device(double n, const void* source) { return set_from_device(Value::number(n), source); }
     bool set_number(double n, const void* source) { return set(Value::number(n), source); }
@@ -74,7 +76,7 @@ private:
 
     Tag(TagStore& store, std::string name, TagType type, bool has_limits, double min, double max);
     Value coerce(const Value& in, bool clamp = true) const;
-    bool  store(Value nv, const void* source);
+    bool  store(Value nv, const void* source, bool from_device = false);
 
     TagStore&   store_;
     std::string name_;
@@ -85,6 +87,7 @@ private:
     std::atomic<bool> range_reported_{ false };   // set_from_device: out-of-limits warning given
     bool        dirty_ = false;          // initial values are pulled by the UI, never pushed to drivers
     const void* last_source_ = nullptr;
+    bool        last_from_device_ = false;   // the pending change is what a device reported (not a write of the HMI side)
     std::vector<Subscriber> subs_;
 };
 

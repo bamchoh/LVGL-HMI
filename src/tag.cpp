@@ -194,17 +194,23 @@ bool Tag::set_from_device(const Value& v, const void* source)
                  "values written from the HMI)",
                  name_.c_str(), nv.format().c_str(), Value::number(min_).format().c_str(), Value::number(max_).format().c_str());
     }
-    return store(std::move(nv), source);
+    return store(std::move(nv), source, true);
 }
 
-bool Tag::store(Value nv, const void* source)
+bool Tag::store(Value nv, const void* source, bool from_device)
 {
     std::lock_guard<std::mutex> lock(store_.mutex_);
+    // A write of the HMI side (a button, a script, a transfer) that the drivers have not been told
+    // yet: the value a device reports now is older than it. Taking it would put the old value
+    // back and the write would never reach the device (the driver sees "its own" value at the
+    // next dispatch and has nothing to send).
+    if(from_device && dirty_ && last_source_ != source && !last_from_device_) return false;
     bool changed = (type_ == TagType::String) ? value_.str != nv.str : value_.num != nv.num;
     if(changed) {
         value_ = std::move(nv);
         dirty_ = true;
         last_source_ = source;
+        last_from_device_ = from_device;
     }
     return changed;
 }

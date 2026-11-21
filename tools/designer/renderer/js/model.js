@@ -289,6 +289,14 @@ const M = {
       };
       visit(s.data, []);
     });
+    // transfers: from, to, and the tags of the condition
+    (Array.isArray(p.transfers) ? p.transfers : []).forEach((t, i) => {
+      if (!t || typeof t !== 'object') return;
+      const loc = { view: 'project', index: i };
+      prop(t, 'from', loc, 'transfer');
+      prop(t, 'to', loc, 'transfer');
+      cond(t, 'when', loc, 'transfer', false);
+    });
     // what a schedule does: the actions of a screen
     (Array.isArray(p.schedules) ? p.schedules : []).forEach((sc, i) => {
       if (!sc || typeof sc !== 'object') return;
@@ -781,6 +789,31 @@ const M = {
       seenTag.add(t.name);
     });
     this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
+    // transfers: tags, a trigger that is one, no rings
+    const xfers = Array.isArray(p.transfers) ? p.transfers : [], xferNames = new Set(), xferNext = new Map();
+    for (const t of xfers) if (t && typeof t === 'object' && typeof t.from === 'string' && typeof t.to === 'string') { if (!xferNext.has(t.from)) xferNext.set(t.from, []); xferNext.get(t.from).push(t.to); }
+    const xferRing = t => { const seen = new Set(), todo = [t.to]; while (todo.length) { const g = todo.pop(); if (g === t.from) return true; if (seen.has(g)) continue; seen.add(g); for (const n of xferNext.get(g) || []) todo.push(n); } return false; };
+    if (p.transfers !== undefined && !Array.isArray(p.transfers)) out.push({ text: 'transfers: a list is needed', view: 'project' });
+    xfers.forEach((t, i) => {
+      const loc = { view: 'project', index: i }, n = t && t.name ? '"' + t.name + '"' : '#' + (i + 1), bad = text => out.push(Object.assign({ text: 'transfer ' + n + ': ' + text }, loc));
+      if (!t || typeof t !== 'object' || Array.isArray(t)) { out.push(Object.assign({ text: 'transfer ' + n + ' is not a transfer' }, loc)); return; }
+      if (!t.name) out.push(Object.assign({ text: 'a transfer has no name' }, loc));
+      else if (xferNames.has(t.name)) bad('the name is used twice');
+      xferNames.add(t.name);
+      if (typeof t.from !== 'string' || !t.from) bad('no tag to take the value from');
+      if (typeof t.to !== 'string' || !t.to) bad('no tag to write the value to');
+      if (typeof t.from !== 'string' || typeof t.to !== 'string' || !t.from || !t.to) return;
+      if (t.from === t.to) bad('"from" and "to" are the same tag');
+      else if (/^sys\./.test(t.to)) bad('"to" is a tag of the runtime (sys.*): a transfer does not write those');
+      else if (xferRing(t)) bad('part of a ring of transfers (' + t.from + ' -> ' + t.to + ' -> ... -> ' + t.from + '): not run');
+      if (t.trigger !== undefined && t.trigger !== 'change' && t.trigger !== 'cyclic') bad('"trigger" is "change" or "cyclic"');
+      if (t.every_ms !== undefined && !(typeof t.every_ms === 'number' && t.every_ms >= 100 && t.every_ms <= 86400000)) bad('"every_ms" is 100 to 86400000');
+      if (t.every_ms !== undefined && t.trigger !== 'cyclic') bad('"every_ms" has no meaning without the trigger "cyclic"');
+      for (const k of ['scale', 'offset']) if (t[k] !== undefined && !(typeof t[k] === 'number' && isFinite(t[k]))) bad('"' + k + '" is a number');
+      if (t.out_of_range !== undefined && t.out_of_range !== 'skip' && t.out_of_range !== 'clamp') bad('"out_of_range" is "skip" or "clamp"');
+      if (t.when !== undefined && !(typeof t.when === 'string' && t.when) && !(t.when && typeof t.when === 'object' && !Array.isArray(t.when) && typeof t.when.tag === 'string' && t.when.tag &&
+          Object.keys(t.when).filter(k => k !== 'tag').length <= 1 && Object.keys(t.when).every(k => ['tag', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'].includes(k)))) bad('"when" is a tag, or { "tag": ..., "eq": ... } (eq ne gt lt ge le)');
+    });
     // sound: an output that exists, sounds that can be played
     if (p.sound !== undefined) {
       const loc = { view: 'project' }, so = p.sound;

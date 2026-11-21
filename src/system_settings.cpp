@@ -751,6 +751,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     if(auto keys = make_keys_page(proj)) s.add_page(std::move(keys));
     add_driver_pages(s, proj);
     if(const json* so = proj.section("sound"); so && so->is_object()) s.add_page(make_sound_page());
+    if(const json* tr = proj.section("transfers"); tr && tr->is_array() && !tr->empty()) s.add_page(make_transfers_page());
     if(const json* sc = proj.section("schedules"); sc && sc->is_array() && !sc->empty()) s.add_page(make_schedule_page());
     s.add_page(make_monitor_page());
     if(has_device_driver(proj.drivers_config())) s.add_page(make_device_page());

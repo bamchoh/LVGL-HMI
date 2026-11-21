@@ -54,7 +54,8 @@
 namespace hml {
 namespace {
 
-constexpr size_t kWriteQueueLen = 64;
+constexpr size_t kWriteQueueLen = 64;        // more than these waiting: from there on a tag has one place in the queue (its newest value)
+constexpr size_t kWriteQueueMax = 2048;      // ... and this is all there is room for (many tags written at once: data_transfer.hpp)
 enum class Framing { Tcp, Rtu, Ascii };
 
 // transact() results below zero
@@ -103,6 +104,7 @@ private:
     static double decode(const Item& it, const uint8_t* b);
     static void   encode(const Item& it, double raw, uint8_t* b);
     void set_online(bool on);
+    bool link_polls_cyclically() const override { return true; }
     void note_unit(uint8_t unit, bool answers);
     void thread_main();
     void on_tag_changed(Tag& tag, const Value& v, const void* source);
@@ -134,6 +136,7 @@ private:
 
 ModbusDriver::ModbusDriver(const json& cfg, Framing framing) : framing_(framing)
 {
+    link_set(false);
     std::memset(unit_state_, -1, sizeof(unit_state_));
     const json* map = jget(cfg, "map");
     if(!map || !map->is_array()) { HML_WARN("%s: \"map\" array missing", type()); return; }
@@ -385,7 +388,7 @@ int ModbusDriver::read_item(Item& it)
         pdu[4] = 1;
         int n = transact(it.unit, pdu, 5, resp, sizeof(resp));
         if(n == kFatal || n == kNoAnswer) return n;
-        if(n >= 3 && !write_pending()) it.tag->set_number((resp[2] & 1) ? 1 : 0, this);
+        if(n >= 3 && !write_pending()) it.tag->set_number_from_device((resp[2] & 1) ? 1 : 0, this);
         return 1;
     }
     int nregs = it.regs();
@@ -528,6 +531,7 @@ int ModbusDriver::device_do(const DeviceRequest& rq, DeviceResult& rs)
 
 void ModbusDriver::set_online(bool on)
 {
+    link_set(on);
     // online_ starts as "unknown" so that the status tag is written on the first attempt
     // even when the server was never reachable.
     if(online_ == (on ? 1 : 0)) return;
@@ -632,6 +636,7 @@ void ModbusDriver::thread_main()
             }
         }
 
+        link_polled();
         uint32_t elapsed = millis() - cycle_start;
         uint32_t rest = elapsed < poll_ms_ ? poll_ms_ - elapsed : 0;
         for(uint32_t t = 0; t < rest && running_; t += 10) sleep_ms(rest - t < 10 ? rest - t : 10);
@@ -653,14 +658,17 @@ void ModbusDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
             it.pending_writes++;
             continue;
         }
-        // Full: nothing has been sent for a while (no connection). The newest value of a tag is
-        // the one that counts: it replaces the one waiting, or the oldest write gives its place.
-        if(!queue_full_said_) {
+        // Many are waiting: nothing has been sent for a while (no connection), or many tags were
+        // written at once. The newest value of a tag is the one that counts: it replaces the one
+        // waiting. A tag that is not waiting yet gets a place while there is room; with none left
+        // the oldest write gives its place.
+        if(!queue_full_said_ && link_state() != 1) {
             queue_full_said_ = true;
             HML_WARN("%s: %zu writes are waiting (no connection?): from now on only the newest value of each tag is kept", type(), queue_.size());
         }
         auto old = std::find_if(queue_.rbegin(), queue_.rend(), [i](const Write& w) { return w.item == i; });
         if(old != queue_.rend()) { old->value = v.as_number(); continue; }
+        if(queue_.size() < kWriteQueueMax) { queue_.push_back({ i, v.as_number() }); it.pending_writes++; continue; }
         items_[queue_.front().item].pending_writes--;
         queue_.pop_front();
         queue_.push_back({ i, v.as_number() });

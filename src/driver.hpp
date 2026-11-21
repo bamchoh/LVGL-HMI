@@ -2,6 +2,7 @@
 // the outside world (PLC, simulation, ...). Each driver is created from one object of
 // the project's "drivers" array, keyed by its "type".
 #pragma once
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -33,7 +34,18 @@ public:
     // UI thread. True once the request is done (the answer is handed out once).
     bool     device_take(uint64_t id, DeviceResult& out);
 
+    // ---- the connection, for those who must not act on old values (data_transfer.hpp)
+    // -1: this driver has no connection to lose (a simulation, a server); 0: not connected; 1: connected
+    int      link_state() const { return link_.load(); }
+    // counts the times the connection came (back): what was read before is old then
+    uint64_t link_epoch() const { return link_epoch_.load(); }
+    // counts the complete rounds of reading all values (drivers that read in cycles)
+    uint64_t link_polls() const { return link_polls_.load(); }
+    virtual bool link_polls_cyclically() const { return false; }
+
 protected:
+    void link_set(bool on) { if(link_.exchange(on ? 1 : 0) != 1 && on) link_epoch_++; }      // any thread
+    void link_polled() { link_polls_++; }
     bool device_next(uint64_t& id, DeviceRequest& r);           // the driver's thread
     void device_done(uint64_t id, DeviceResult r);
     void device_fail_all(const std::string& why);               // no connection: nobody waits in vain
@@ -44,6 +56,8 @@ private:
     std::deque<std::pair<uint64_t, DeviceRequest>> device_in_;
     std::deque<std::pair<uint64_t, DeviceResult>>  device_out_;
     uint64_t    device_id_ = 0;
+    std::atomic<int>      link_{ -1 };
+    std::atomic<uint64_t> link_epoch_{ 0 }, link_polls_{ 0 };
 };
 
 // Returns nullptr when the configuration is unusable.

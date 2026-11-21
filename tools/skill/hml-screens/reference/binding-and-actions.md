@@ -343,6 +343,19 @@
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
 
+## 機器間のデータ転送（`project.json` の `transfers`）
+
+「PLC1 の値を PLC2 に写す」は、スクリプトではなく `transfers` に書く（切断中は書かない、範囲外は書かない、を任せられる）。
+
+```json
+"transfers": [ { "name": "speed", "from": "plc1_speed", "to": "plc2_speed" },
+               { "name": "temp", "from": "plc1_temp", "to": "plc2_temp", "trigger": "cyclic", "every_ms": 1000, "when": "run" } ]
+```
+
+- `from` / `to` はタグ名。`trigger`: `"change"`（既定）/ `"cyclic"`。`scale` / `offset`、`out_of_range`（`"skip"` / `"clamp"`）、`when`、`enabled`。
+- 輪（A → B → A）は実行されない。`to` に `sys.*` は書けない。`--check` が見つける。
+- 機器との接続（`drivers`）に関わるので、頼まれずに足したり変えたりしない。
+
 ## 音（`project.json` の `sound`）
 
 `"sound": {}` があると、タッチ音とアラーム音が鳴る（`"touch"` / `"alarm"`: `"click"` `"beep"` `"alarm"`、プロジェクトの中の

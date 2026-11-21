@@ -167,6 +167,7 @@ std::string resolve_path(const std::string& p)
 
 OpcUaClientDriver::OpcUaClientDriver(const json& cfg)
 {
+    link_set(false);
     endpoint_ = jstr(cfg, "endpoint", "");
     if(endpoint_.rfind("opc.tcp://", 0) != 0) { HML_ERROR("opcua_client: \"endpoint\" must be opc.tcp://host:port (is '%s')", endpoint_.c_str()); return; }
     const std::string sec = jstr(cfg, "security", "sign_encrypt");
@@ -254,6 +255,7 @@ void OpcUaClientDriver::stop()
 
 void OpcUaClientDriver::set_online(bool on)
 {
+    link_set(on);
     if(online_ == (on ? 1 : 0)) return;
     if(on || online_ == 1) HML_INFO("opcua_client %s %s", endpoint_.c_str(), on ? "connected" : "disconnected");
     online_ = on ? 1 : 0;

@@ -1,4 +1,5 @@
 #include "check.hpp"
+#include "data_transfer.hpp"
 #include "schedule.hpp"
 #include "sound.hpp"
 #include <cctype>
@@ -440,6 +441,41 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     const std::string start = jstr(root, "start_screen", "");
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
+
+    // ---- transfers: tags that exist, no rings
+    if(const json* tr = jget(root, "transfers")) {
+        if(!tr->is_array()) c.add("transfers", "a list is needed");
+        else {
+            std::set<std::string> names;
+            std::vector<TransferItem> good;
+            std::vector<std::string> where_of;
+            if(tr->size() > kTransferMax) c.add("transfers", "more than " + std::to_string(kTransferMax) + " transfers (the rest is not run)");
+            for(size_t i = 0; i < tr->size(); i++) {
+                const json& t = (*tr)[i];
+                const std::string where = "transfers[" + std::to_string(i) + "]" + (t.is_object() && t.contains("name") && t["name"].is_string() ? " (" + t["name"].get<std::string>() + ")" : "");
+                TransferItem item;
+                std::string err;
+                if(!transfer_parse(t, item, &err)) { c.add(where, err); continue; }
+                if(!names.insert(item.name).second) { c.add(where, "the name is used twice"); continue; }
+                for(auto k = t.begin(); k != t.end(); ++k) {
+                    static const std::set<std::string> known{ "name", "from", "to", "trigger", "every_ms", "scale", "offset", "out_of_range", "enabled", "when" };
+                    if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add(where, "unknown key \"" + k.key() + "\"");
+                }
+                c.need_tag(where, "from", t["from"]);
+                c.need_tag(where, "to", t["to"]);
+                if(item.when.op != TransferCond::Op::None) {
+                    c.need_tag(where, "when", json(item.when.tag));
+                    if(!item.when.other_tag.empty()) c.need_tag(where, "when", json(item.when.other_tag));
+                }
+                if(!item.cyclic && t.contains("every_ms")) c.add(where, "\"every_ms\" has no meaning without \"trigger\": \"cyclic\"");
+                good.push_back(item);
+                where_of.push_back(where);
+            }
+            const std::vector<std::string> rings = transfer_rings(good);
+            for(size_t i = 0; i < good.size(); i++)
+                if(std::find(rings.begin(), rings.end(), good[i].name) != rings.end()) c.add(where_of[i], "part of a ring of transfers (" + good[i].from + " -> " + good[i].to + " -> ... -> " + good[i].from + "): not run");
+        }
+    }
 
     // ---- sound: an output that exists, sounds that can be played
     if(const json* so = jget(root, "sound")) {

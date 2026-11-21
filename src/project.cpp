@@ -7,6 +7,7 @@
 #include "script.hpp"
 #include "system_settings.hpp"
 #include "texts.hpp"
+#include "data_transfer.hpp"
 #include "screen_saver.hpp"
 #include "sound.hpp"
 #include <algorithm>
@@ -105,14 +106,23 @@ const json* Project::driver_base_config(const std::string& key) const
     return nullptr;
 }
 
+// The transfers hold on to the drivers: gone before them, back after them.
+static int load_drivers_and_transfers(const json& root)
+{
+    const int n = drivers().load(jget(root, "drivers"));
+    transfers().load(jget(root, "transfers"), jget(root, "drivers"), drivers());
+    return n;
+}
+
 int Project::restart_drivers()
 {
+    transfers().clear();
     drivers().stop_all();
     json fresh = parse_json_file(info_.path);
     if(!fresh.is_null()) root_ = std::move(fresh);
     apply_local_overlay();
     // (the system pages are not refreshed here: unsaved edits on other pages must survive an Apply)
-    return drivers().load(jget(root_, "drivers"));
+    return load_drivers_and_transfers(root_);
 }
 
 std::string Project::resolve_path(const std::string& rel) const
@@ -252,7 +262,7 @@ void Project::apply_theme(lv_display_t* disp)
 
 int Project::start_drivers()
 {
-    return drivers().load(jget(root_, "drivers"));
+    return load_drivers_and_transfers(root_);
 }
 
 void Project::start_logs(bool read_only, const std::string& log_dir)
@@ -396,6 +406,7 @@ void Project::unload()
     screen_saver().clear();
     scheduler().clear();
     sound().clear();
+    transfers().clear();
     root_ = nullptr;
 }
 

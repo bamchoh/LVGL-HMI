@@ -101,6 +101,7 @@ std::string resolve(const std::string& p)
 
 MqttDriver::MqttDriver(const json& cfg)
 {
+    link_set(false);
     host_ = jstr(cfg, "host", "");
     if(host_.empty()) { HML_ERROR("mqtt: \"host\" is needed"); return; }
     tls_.enabled = jbool(cfg, "tls", true);
@@ -237,6 +238,7 @@ bool MqttDriver::apply_command(const Sub& s, const std::string& raw)
 
 void MqttDriver::set_online(bool on)
 {
+    link_set(on);
     if(online_ == (on ? 1 : 0)) return;
     if(on || online_ == 1) HML_INFO("mqtt %s %s", link_.describe().c_str(), on ? "connected" : "disconnected");
     online_ = on ? 1 : 0;

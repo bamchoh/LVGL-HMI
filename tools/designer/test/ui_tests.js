@@ -697,6 +697,42 @@
     Panels.show('widgets');
   });
 
+  await test('transfers: added and edited on the Project tab; the tags are picked from the list; a ring is a problem', async () => {
+    Panels.show('project'); App.doRefresh();
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const had = M.st.project.transfers;
+    M.mutate(() => { delete M.st.project.transfers; }); App.doRefresh();
+    const base = M.problems().length, names = M.tagNames();
+    ok(names.length >= 2, 'the demo project has tags');
+    ok(field('proj.xfer.transfers.add'), 'the add button');
+    field('proj.xfer.transfers.add').click(); App.doRefresh();
+    const x = () => M.st.project.transfers;
+    eq(x(), [{ name: 'transfer1', from: names[0], to: names[1] }], 'a new transfer: the first two tags');
+    eq(field('proj.xfer.transfers.0.from').getAttribute('list'), 'dl-tags', 'the source is picked from the tags');
+    eq(field('proj.xfer.transfers.0.to').getAttribute('list'), 'dl-tags');
+    eq(M.problems().length, base, M.problems().map(p => p.text).join(' | '));
+    type('proj.xfer.transfers.0.name', 'speed');
+    field('proj.xfer.transfers.0.trigger').value = 'cyclic'; field('proj.xfer.transfers.0.trigger').dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh();
+    type('proj.xfer.transfers.0.every_ms', '500');
+    type('proj.xfer.transfers.0.scale', '0.1');
+    type('proj.xfer.transfers.0.when', '{"tag":"' + names[0] + '","gt":5}');
+    eq(x()[0], { name: 'speed', from: names[0], to: names[1], trigger: 'cyclic', every_ms: 500, scale: 0.1, when: { tag: names[0], gt: 5 } });
+    ok(field('proj.xfer.transfers.0.when').closest('.list-below'), 'the condition: a line of its own');
+    eq(M.problems().length, base);
+    field('proj.xfer.transfers.add').click(); App.doRefresh();
+    type('proj.xfer.transfers.1.from', names[1]);
+    type('proj.xfer.transfers.1.to', names[0]);
+    ok(M.problems().some(p => /part of a ring/.test(p.text)), 'a ring is a problem');
+    type('proj.xfer.transfers.1.to', 'no_such_tag');
+    ok(M.problems().some(p => /unknown tag "no_such_tag" \(transfer\)/.test(p.text)), 'an unknown tag is a problem');
+    field('proj.xfer.transfers.1.del').click(); App.doRefresh();
+    field('proj.xfer.transfers.0.del').click(); App.doRefresh();
+    eq(M.st.project.transfers, undefined, 'the last one removed: no key left');
+    if (had) M.mutate(() => { M.st.project.transfers = had; });
+    Panels.show('widgets');
+  });
+
   await test('sound: switched on and set on the Project tab; "off" is false; switched off leaves nothing', async () => {
     Panels.show('project'); App.doRefresh();
     const field = fk => document.querySelector('[data-fk="' + fk + '"]');

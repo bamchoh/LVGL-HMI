@@ -418,6 +418,15 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.KEYS_JA, { transfers: 'データ転送', transfer_from: '転送元', transfer_to: '転送先', trigger: 'きっかけ', every_ms: '周期 (ms)', out_of_range: '範囲外の値', transfer_when: '条件' });
+Object.assign(I18N.TEXT_JA, { 'Transfers': 'データ転送', '(on change)': '(変化したとき)', '(not written)': '(書かない)', 'values copied from one tag to another': 'タグの値を別のタグに写す',
+  'the tag the value is taken from': '値を取るタグ', 'the tag the value is written to': '値を書くタグ',
+  'on change: when the source changes. cyclic: also every period (sets the destination right again when it was changed elsewhere)': '変化したとき: 転送元が変わったとき。cyclic: 周期ごとにも書く（転送先がほかで書き換えられても元に戻す）',
+  'cyclic: the period in ms (default 1000, at least 100)': 'cyclic のときの周期 ms（既定 1000、100 以上）', 'the value is multiplied by this (default 1)': '値にこれを掛ける（既定 1）', '... and this is added (default 0)': '…さらにこれを足す（既定 0）',
+  'a value outside the limits of the destination tag: not written, or the nearest limit is written (clamp)': '転送先のタグの上下限を外れた値: 書かない、または近いほうの限界値を書く（clamp）',
+  'only while this holds (optional): "run" or { "tag": "mode", "eq": 2 }': 'この条件が成り立つ間だけ転送する（省略可）: "run" または { "tag": "mode", "eq": 2 }',
+  'A transfer copies the value of one tag to another: from one PLC to another, or to a higher system. Nothing is written while the driver of either tag has no connection; after the connection is back the transfer waits until the values were read again and goes on with the newest value. A value that is not a number or outside the limits of the destination tag is not written. Transfers that form a ring are not run. On the device: System > Transfers shows what runs and what waits, and why.':
+    '転送は、あるタグの値を別のタグに写します（PLC から別の PLC へ、上位のシステムへ）。どちらかのドライバーが切断されている間は書きません。再接続のあとは、値を読み直してから最新の値で再開します。数値でない値、転送先のタグの上下限を外れた値は書きません。輪になった転送は実行しません。装置では System > Transfers で、動いているもの・待っているものとその理由を見られます。' });
 Object.assign(I18N.KEYS_JA, { sound: '音を使う', output: '出力先', volume: '音量', touch: 'タッチ音', alarm_sound: 'アラーム音', alarm_every_s: 'アラーム音の間隔 (秒)', gpio: 'ブザーの GPIO', gpio_active_low: 'Low で鳴る', device: 'ALSA デバイス' });
 Object.assign(I18N.TEXT_JA, { 'Sound': '音', '(auto)': '(自動)', 'a sound for a touch and for a new alarm': 'タッチしたときと、新しいアラームのときに音を出す',
   'audio: the sound device (Windows, ALSA). gpio: a buzzer on a GPIO line (Raspberry Pi). auto: gpio when a line is given, else audio': 'audio: 音声デバイス（Windows、ALSA）。gpio: GPIO につないだブザー（Raspberry Pi）。自動: GPIO の番号があれば gpio、なければ audio',
