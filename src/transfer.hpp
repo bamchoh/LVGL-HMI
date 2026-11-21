@@ -28,6 +28,8 @@ struct UsbVolume {
 };
 // The removable file systems in the output of "lsblk -J -o PATH,RM,HOTPLUG,TYPE,FSTYPE,LABEL,MOUNTPOINT".
 std::vector<UsbVolume> transfer_parse_lsblk(const std::string& json_text);
+// Why a volume could not be mounted, for the operator: from what "udisksctl mount" printed.
+std::string transfer_mount_problem(const UsbVolume& v, const std::string& output);
 // A device without a desktop mounts nothing by itself: mount the removable file systems that
 // are not mounted yet (udisks, as the user the runtime runs as). Returns "" or what stands in
 // the way (told once per device). Volumes taken out with transfer_eject stay out until they

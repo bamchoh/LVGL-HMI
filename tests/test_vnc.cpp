@@ -19,6 +19,7 @@ static void close_sock(sock_t s) { close(s); }
 #endif
 
 #include <doctest.h>
+#include <random>
 #include "lvgl_fixture.hpp"
 #include "util.hpp"
 #include "vnc.hpp"
@@ -454,4 +455,141 @@ TEST_CASE("vnc: view only; without a password only this machine; off by default"
     CHECK(result == 0);
     CHECK(first.size() == 1);
     CHECK(tags().find("clicks")->get_number() == 0);              // the pointer of the viewer does nothing
+}
+
+// ================================================================ reliability / security: a hostile viewer
+
+TEST_CASE("vnc: garbage from a viewer, before and after the login, never takes the server down")
+{
+    Runtime rt;
+    rt.tag("clicks", TagType::Int);
+    show_test_screen();
+    rt.advance(50);
+    lv_display_t* disp = lv_display_get_default();
+    VncServer srv;
+    const json cfg = remote(", \"password\": \"secret12\"");
+    REQUIRE(srv.start(&cfg, disp, "Test HMI"));
+
+    // a well-behaved viewer gets in and gets the picture (the server may still be letting the last one go)
+    auto alive = [&] {
+        bool ok = false;
+        with_client(rt, [&] {
+            for(int i = 0; i < 50 && !ok; i++) {
+                Client c;
+                if(c.connect_to(srv.port()) && c.login("secret12") == 0) {
+                    Client::Init init = c.init();
+                    c.request(false, init.w, init.h);
+                    ok = c.update().size() == 1 && !c.failed;
+                }
+                if(!ok) sleep_ms(100);
+            }
+        });
+        return ok;
+    };
+    // how much the server sends to a viewer that says this (it must never be a picture)
+    auto bytes_back = [&](const std::function<void(Client&)>& say) {
+        size_t n = 0;
+        with_client(rt, [&] {
+            Client c;
+            if(!c.connect_to(srv.port())) return;
+            say(c);
+            uint8_t buf[4096];
+            for(;;) {
+                fd_set set; FD_ZERO(&set); FD_SET(c.s, &set);
+                timeval tv{ 0, 300 * 1000 };
+                if(select(static_cast<int>(c.s + 1), &set, nullptr, nullptr, &tv) <= 0) break;
+                const int r = static_cast<int>(recv(c.s, reinterpret_cast<char*>(buf), sizeof(buf), 0));
+                if(r <= 0) break;
+                n += static_cast<size_t>(r);
+            }
+        });
+        return n;
+    };
+    std::mt19937 rng(20261121);
+    auto noise = [&](size_t n) { Bytes b(n); for(uint8_t& x : b) x = static_cast<uint8_t>(rng()); return b; };
+    REQUIRE(alive());
+
+    // ---- before the login: nothing of the screen is given away
+    CHECK(bytes_back([&](Client& c) { c.wr(noise(12)); }) < 64);
+    CHECK(bytes_back([&](Client& c) { c.wr(noise(3000)); }) < 64);
+    CHECK(bytes_back([](Client&) {}) < 64);                                             // says nothing
+    CHECK(bytes_back([](Client& c) { c.wr(Bytes{ 'R', 'F', 'B' }); }) < 64);              // half a version
+    CHECK(bytes_back([](Client& c) {                                                     // "no authentication, please"
+        c.rd(12);
+        const char* v = "RFB 003.008\n";
+        c.wr(Bytes(v, v + 12));
+        c.rd(2);
+        c.wr({ 1 });
+        c.wr({ 1 });                                                                     // ClientInit
+        c.wr({ 3, 0, 0, 0, 0, 0, 0x03, 0x20, 0x01, 0xE0 });                              // "send me the screen"
+    }) < 64);
+    CHECK(alive());
+
+    // ---- after the login: broken messages end that connection, nothing else
+    auto after_login = [&](const Bytes& msg) {
+        with_client(rt, [&] {
+            for(int i = 0; i < 50; i++) {
+                Client c;
+                if(c.connect_to(srv.port()) && c.login("secret12") == 0) {
+                    c.init();
+                    c.wr(msg);
+                    sleep_ms(150);
+                    return;
+                }
+                sleep_ms(100);
+            }
+        });
+    };
+    after_login({ 2, 0, 0xFF, 0xFF });                                        // SetEncodings: 65535 entries, none follow
+    CHECK(alive());
+    after_login({ 6, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF });                      // ClientCutText: 4 GB
+    CHECK(alive());
+    after_login({ 200 });                                                     // no such message
+    CHECK(alive());
+    after_login({ 0, 0, 0, 0, 24, 24, 0, 1, 0, 255, 0, 255, 0, 255, 16, 8, 0, 0, 0, 0 });   // 24 bits per pixel: not offered
+    CHECK(alive());
+    after_login({ 0, 0, 0, 0, 32, 24, 0, 1, 0, 0, 0, 0, 0, 0, 200, 200, 200, 0, 0, 0 });    // colours of no bits, shifted out of the pixel
+    CHECK(alive());
+    after_login({ 3 });                                                       // a request cut short
+    CHECK(alive());
+    after_login({ 5, 1, 0xFF, 0xFF, 0xFF, 0xFF });                            // a touch far outside the screen
+    CHECK(alive());
+    for(int i = 0; i < 6; i++) { after_login(noise(4000)); }
+    CHECK(alive());
+    CHECK(tags().find("clicks")->get_number() >= 0);
+    srv.stop();
+}
+
+// ================================================================ performance efficiency
+
+TEST_CASE("vnc: taking the picture and finding what changed is quick")
+{
+    Runtime rt;
+    rt.tag("clicks", TagType::Int);
+    show_test_screen();
+    rt.advance(50);
+    lv_display_t* disp = lv_display_get_default();
+    std::vector<uint8_t> a, b, out;
+    int w = 0, h = 0;
+    const int rounds = 20;
+    uint32_t t0 = millis();
+    for(int i = 0; i < rounds; i++) REQUIRE(capture_display(disp, a, w, h));
+    const double capture_ms = static_cast<double>(millis() - t0) / rounds;
+    b = a;
+    for(uint8_t& x : b) x = static_cast<uint8_t>(~x);                           // every pixel another one
+    t0 = millis();
+    size_t rects = 0;
+    for(int i = 0; i < rounds; i++) rects += vnc_diff(a.data(), b.data(), w, h).size() + vnc_diff(a.data(), a.data(), w, h).size();
+    const double diff_ms = static_cast<double>(millis() - t0) / (rounds * 2);
+    VncPixelFormat f16;
+    f16.bpp = 16; f16.depth = 16; f16.r_max = 31; f16.g_max = 63; f16.b_max = 31; f16.r_shift = 11; f16.g_shift = 5; f16.b_shift = 0;
+    t0 = millis();
+    for(int i = 0; i < rounds; i++) { out.clear(); vnc_convert(a.data(), static_cast<size_t>(w) * h, VncPixelFormat(), out); out.clear(); vnc_convert(a.data(), static_cast<size_t>(w) * h, f16, out); }
+    const double convert_ms = static_cast<double>(millis() - t0) / (rounds * 2);
+    MESSAGE(w << " x " << h << ": capture " << capture_ms << " ms, diff " << diff_ms << " ms, convert a whole frame " << convert_ms << " ms");
+    CHECK(rects == static_cast<size_t>(rounds) * static_cast<size_t>((h + 31) / 32));   // every row of tiles, nothing for the same picture
+    // (loose: a debug build on a busy CI machine. The numbers of a release build are in the README.)
+    CHECK(capture_ms < 200);
+    CHECK(diff_ms < 50);
+    CHECK(convert_ms < 100);
 }
