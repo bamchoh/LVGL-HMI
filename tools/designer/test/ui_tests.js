@@ -697,6 +697,62 @@
     Panels.show('widgets');
   });
 
+  await test('templates: a new screen on a template shows its widgets (not selectable); the title is given in the properties', async () => {
+    const $ = id => document.getElementById(id);
+    const later = () => new Promise(r => setTimeout(r, 60));
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    // a template: a header with a title that each screen gives
+    M.addScreen('ui_frame'); M.mutate(() => { M.screen().children = [{ type: 'label', x: 10, y: 6, text: 'Header ${title}' }, { type: 'button', x: 10, y: 400, w: 120, h: 48, text: 'Nav' }]; });
+    const frameIndex = M.st.cur, n = M.st.screens.length;
+    Panels.show('screens'); App.doRefresh();
+    ok([...$('new-screen-template').options].some(o => o.value === 'ui_frame'), 'the template can be picked for a new screen');
+    $('new-screen-template').value = 'ui_frame'; $('new-screen-template').dispatchEvent(new Event('change'));
+    $('add-screen').click(); await later();
+    document.querySelector('#modal-body input').value = 'ui_page';
+    document.querySelector('#modal-buttons [data-label="OK"]').click(); await later(); await frame();
+    eq(M.st.screens.length, n + 1);
+    eq(M.screen().name, 'ui_page');
+    eq(M.screen().template, 'ui_frame');
+    App.doRefresh(); await frame();
+    // drawn: the widgets of the template, marked, without a path of their own
+    const tpl = [...Canvas.root.querySelectorAll('.lv-template')];
+    eq(tpl.length, 2, 'the two widgets of the template');
+    ok(tpl.every(e => e.dataset.path === undefined && !e.querySelector('[data-path]')), 'they are not widgets of this screen');
+    ok(tpl[0].textContent.includes('Header'), 'the header: ' + tpl[0].textContent);
+    ok(!tpl[0].textContent.includes('${title}'), 'the placeholder is filled (with nothing yet)');
+    ok(M.problems().some(p => /the template has \$\{title\}/.test(p.text)), 'a title that is not given is a problem');
+    // a click on a widget of the template selects the screen, not that widget
+    const r = tpl[1].getBoundingClientRect();
+    mouse(document.elementFromPoint(r.left + 5, r.top + 5), 'mousedown', r.left + 5, r.top + 5); mouse(document, 'mouseup', r.left + 5, r.top + 5);
+    eq(M.st.sel, [], 'the screen is selected');
+    // the properties of the screen: the template and what it wants
+    App.select([]); App.doRefresh();
+    eq(field('w:.template').value, 'ui_frame');
+    ok(![...field('w:.template').options].some(o => o.value === 'ui_page'), 'a screen is not offered as its own template');
+    const arg = document.querySelector('[data-map="template_args"] [data-fk="w:.template_args.title"]');
+    ok(arg, 'a field for the title the template wants');
+    arg.value = 'Pump <b>2</b>'; arg.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); await frame();
+    eq(M.screen().template_args, { title: 'Pump <b>2</b>' });
+    const head = Canvas.root.querySelector('.lv-template');
+    ok(head.textContent.includes('Header Pump <b>2</b>'), 'shown as text: ' + head.textContent);
+    eq(head.querySelectorAll('b').length, 0, 'no markup from the title');
+    eq(M.problems().filter(p => /ui_page/.test(p.text)).length, 0, 'no problem left');
+    // the template is changed in one place: the screen that uses it follows
+    M.mutate(() => { M.st.screens[frameIndex].data.children[0].text = 'Top ${title}'; }); App.doRefresh(); await frame();
+    ok(Canvas.root.querySelector('.lv-template').textContent.includes('Top Pump'), 'follows the template');
+    // own widgets go on top and are selectable as ever
+    App.addWidget('label'); await frame();
+    eq(M.st.sel, [0], 'the first widget of the screen itself');
+    ok(el('0'), 'drawn with its path');
+    // the template taken away: a plain screen again
+    App.select([]); App.doRefresh();
+    field('w:.template').value = ''; field('w:.template').dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); await frame();
+    eq(M.screen().template, undefined);
+    eq(Canvas.root.querySelectorAll('.lv-template').length, 0);
+    Panels.newScreenTemplate = '';
+    Panels.show('widgets');
+  });
+
   await test('library: widgets are kept as a part and used again with the mouse; a name with markup is text; import and export', async () => {
     const $ = id => document.getElementById(id);
     const later = () => new Promise(r => setTimeout(r, 60));

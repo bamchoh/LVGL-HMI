@@ -2,6 +2,7 @@
 #include "data_transfer.hpp"
 #include "schedule.hpp"
 #include "sound.hpp"
+#include <functional>
 #include <cctype>
 #include <filesystem>
 #include <map>
@@ -207,7 +208,7 @@ struct Checker {
         const json& S = schema();
         static const std::set<std::string> common = str_set(S["common"]), selectors = str_set(S["selectors"]), events = str_set(S["events"]);
         static const std::set<std::string> any{ "type", "name", "children", "bind", "labels", "checked", "checkable", "animate" };
-        static const std::set<std::string> screen_keys{ "name", "children", "popup", "dim" };
+        static const std::set<std::string> screen_keys{ "name", "children", "popup", "dim", "template", "template_args" };
         if(!w.is_object()) { add(path, "a widget is an object { \"type\": ... }"); return; }
         std::string type = screen ? "" : jstr(w, "type", "");
         if(type == "container") type = "panel";
@@ -525,6 +526,58 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
                 c.check_actions(where, "do", item.actions);
             }
         }
+    }
+
+    // ---- templates: a screen built on another one
+    std::map<std::string, const json*> by_name;
+    for(const Screen& s : screens) if(s.def.is_object()) by_name.emplace(jstr(s.def, "name", ""), &s.def);
+    // the "${name}" in the texts of a widget tree
+    std::function<void(const json&, std::set<std::string>&)> placeholders = [&](const json& j, std::set<std::string>& out) {
+        if(j.is_string()) {
+            const std::string& t = j.get_ref<const std::string&>();
+            for(size_t a = t.find("${"); a != std::string::npos; a = t.find("${", a + 2)) {
+                const size_t b = t.find('}', a + 2);
+                if(b == std::string::npos) break;
+                out.insert(t.substr(a + 2, b - a - 2));
+            }
+        }
+        else if(j.is_structured()) for(const json& x : j) placeholders(x, out);
+    };
+    for(const Screen& s : screens) {
+        if(!s.def.is_object()) continue;
+        c.file = s.file;
+        const std::string name = jstr(s.def, "name", "");
+        const json* t = jget(s.def, "template");
+        const json* args = jget(s.def, "template_args");
+        if(args && !t) c.add("", "template_args without \"template\"");
+        if(args && !args->is_object()) c.add("template_args", "an object { \"name\": value }");
+        if(!t) continue;
+        if(!t->is_string() || t->get<std::string>().empty()) { c.add("template", "the name of a screen"); continue; }
+        // up the chain: every template there is, until one is missing or met twice
+        std::set<std::string> wanted, seen{ name };
+        bool ok = true;
+        for(std::string next = t->get<std::string>(); !next.empty();) {
+            auto it = by_name.find(next);
+            if(next == name && seen.size() == 1) { c.add("template", "a screen is not its own template"); ok = false; break; }
+            if(it == by_name.end()) { c.add("template", "unknown screen \"" + next + "\""); ok = false; break; }
+            if(!seen.insert(next).second) { c.add("template", "the templates form a ring (" + next + ")"); ok = false; break; }
+            if(jbool(*it->second, "popup", false)) { c.add("template", "\"" + next + "\" is a popup"); ok = false; break; }
+            if(seen.size() > 9) { c.add("template", "more than 8 templates on top of each other"); ok = false; break; }
+            if(const json* ch = jget(*it->second, "children")) placeholders(*ch, wanted);
+            const json* up = jget(*it->second, "template");
+            next = up && up->is_string() ? up->get<std::string>() : "";
+        }
+        if(!ok) continue;
+        wanted.erase("screen");
+        if(args && args->is_object()) {
+            for(auto a = args->begin(); a != args->end(); ++a) {
+                if(a.key().empty() || a.key()[0] == '_') continue;
+                if(!(a.value().is_string() || a.value().is_number() || a.value().is_boolean())) c.add("template_args", "\"" + a.key() + "\" is a text, a number or true / false");
+                if(!wanted.count(a.key()) && a.key() != "screen") c.add("template_args", "\"" + a.key() + "\" is not used by the template");
+                wanted.erase(a.key());
+            }
+        }
+        for(const std::string& w : wanted) c.add("template", "\"" + t->get<std::string>() + "\" has ${" + w + "}, which \"template_args\" does not give (it is shown as nothing)");
     }
 
     for(const Screen& s : screens) {

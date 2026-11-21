@@ -36,6 +36,7 @@ add_executable(hml_tests
   test_schedule.cpp
   test_sound.cpp
   test_data_transfer.cpp
+  test_template.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp

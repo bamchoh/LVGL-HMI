@@ -1013,7 +1013,8 @@ struct Ui::Impl {
         if(r->deny == AccessRule::Deny::Login) users().request_login(r->level);
     }
     void parse_access(lv_obj_t* obj, const json& w);
-    void ensure_built(Screen& scr);   // build the widgets of a screen registered with add_screen()
+    void ensure_built(Screen& scr);
+    std::vector<json> template_layers(const Screen& scr, const json& def);   // build the widgets of a screen registered with add_screen()
     // The screen at `idx` becomes the one on the display: bring its widgets up to date with the
     // tags that changed while it was not shown.
     void set_shown(int idx)
@@ -2160,6 +2161,51 @@ bool Ui::add_screen(const json& screen, const std::string& base_dir)
     return true;
 }
 
+// "${name}" in the texts of a template -> what the screen that uses it gives ("template_args"),
+// "${screen}" -> the name of that screen. What nobody gives is empty.
+json template_fill(const json& j, const std::map<std::string, std::string>& args)
+{
+    if(j.is_string()) {
+        const std::string& s = j.get_ref<const std::string&>();
+        if(s.find("${") == std::string::npos) return j;
+        std::string out;
+        for(size_t i = 0; i < s.size();) {
+            const size_t a = s.find("${", i);
+            if(a == std::string::npos) { out += s.substr(i); break; }
+            const size_t b = s.find('}', a + 2);
+            if(b == std::string::npos) { out += s.substr(i); break; }
+            out += s.substr(i, a - i);
+            auto it = args.find(s.substr(a + 2, b - a - 2));
+            if(it != args.end()) out += it->second;
+            i = b + 1;
+        }
+        return out;
+    }
+    if(j.is_array()) { json out = json::array(); for(const json& x : j) out.push_back(template_fill(x, args)); return out; }
+    if(j.is_object()) { json out = json::object(); for(auto it = j.begin(); it != j.end(); ++it) out[it.key()] = template_fill(it.value(), args); return out; }
+    return j;
+}
+
+// The screens a screen is built on, the outermost first: its "template", the template of that ...
+// A template that is not there, is a popup, or leads back to a screen already taken ends the chain.
+std::vector<json> Ui::Impl::template_layers(const Screen& scr, const json& def)
+{
+    std::vector<json> out;
+    std::vector<std::string> seen{ scr.name };
+    std::string next = jstr(def, "template", "");
+    while(!next.empty()) {
+        Screen* t = find_screen(next);
+        if(!t) { HML_WARN("screen '%s': unknown template '%s'", scr.name.c_str(), next.c_str()); break; }
+        if(std::find(seen.begin(), seen.end(), next) != seen.end()) { HML_WARN("screen '%s': the templates form a ring (at '%s')", scr.name.c_str(), next.c_str()); break; }
+        if(t->popup) { HML_WARN("screen '%s': the template '%s' is a popup", scr.name.c_str(), next.c_str()); break; }
+        if(seen.size() > 8) { HML_WARN("screen '%s': more than 8 templates on top of each other", scr.name.c_str()); break; }
+        seen.push_back(next);
+        out.insert(out.begin(), t->source);
+        next = jstr(t->source, "template", "");
+    }
+    return out;
+}
+
 void Ui::Impl::ensure_built(Screen& scr)
 {
     if(scr.obj) return;
@@ -2189,6 +2235,26 @@ void Ui::Impl::ensure_built(Screen& scr)
     else scr.obj = lv_obj_create(nullptr);
     building = &scr;
 
+    // "template": the look and the widgets of another screen come first (a header, a navigation
+    // that is the same everywhere), what this screen has itself goes on top
+    if(jhas(def, "template")) {
+        std::map<std::string, std::string> args{ { "screen", scr.name } };
+        if(const json* a = jget(def, "template_args"); a && a->is_object())
+            for(auto it = a->begin(); it != a->end(); ++it) {
+                if(it.value().is_string()) args[it.key()] = it.value().get<std::string>();
+                else if(it.value().is_number() || it.value().is_boolean()) args[it.key()] = it.value().dump();
+            }
+        for(const json& layer : template_layers(scr, def)) {
+            if(!scr.popup) {
+                apply_layout(scr.obj, layer);
+                apply_styles(scr.obj, layer);
+                if(jhas(layer, "scrollable") && !jbool(layer, "scrollable", true)) lv_obj_set_scrollable(scr.obj, false);
+            }
+            json filled = json::object();
+            if(const json* ch = jget(layer, "children")) filled["children"] = template_fill(*ch, args);
+            build_children(scr.obj, filled);
+        }
+    }
     if(!scr.popup) {
         apply_layout(scr.obj, def);
         apply_styles(scr.obj, def);

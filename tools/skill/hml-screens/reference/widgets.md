@@ -146,7 +146,7 @@ Events: `on_click`, `on_press`, `on_release`, `on_long_press`, `on_long_press_re
 | `call` | `fn` (text), `arg` (text) |
 | `script` | `name` (script name), `code` (Lua code) |
 
-An event can be put on any widget. A screen file itself takes `name`, `children`, the style objects, the common keys (`scrollable`, `flex` ..., `level`) and, for a popup, `popup`, `dim`, `w`, `h`, `x`, `y`, `align`. It takes no `bind` and no events.
+An event can be put on any widget. A screen file itself takes `name`, `children`, the style objects, the common keys (`scrollable`, `flex` ..., `level`) and, for a popup, `popup`, `dim`, `w`, `h`, `x`, `y`, `align`. It takes no `bind` and no events. `template` (the name of another screen) builds the screen on that one: the widgets of the template come first, the screen's own on top; `template_args` (`{ "title": "Pump 2" }`) fills the `${title}` in the texts of the template, `${screen}` is the name of the screen.
 
 Screen change animations (`"anim"`): `none`, `fade`, `slide_left`, `slide_right`, `slide_top`, `slide_bottom`, `over_left`, `over_right`, `move_left`, `move_right`, `move_top`, `move_bottom`.
 

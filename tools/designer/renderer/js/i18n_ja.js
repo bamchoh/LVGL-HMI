@@ -418,6 +418,11 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.KEYS_JA, { template: 'テンプレート', template_args: 'テンプレートに渡す文字' });
+Object.assign(I18N.TEXT_JA, { '(none)': '(なし)', '(no template)': '(テンプレートなし)', 'The new screen is built on this one (its header, its navigation)': '新しい画面を、この画面（ヘッダーやナビゲーション）の上に作る',
+  'this screen is built on another one: the widgets of that screen (a header, a navigation) come first, the widgets of this screen on top. Change the template and every screen that uses it follows':
+    'この画面を別の画面の上に作ります。その画面の部品（ヘッダー、ナビゲーション）が先に置かれ、この画面の部品がその上に載ります。テンプレートを直すと、使っている画面すべてに反映されます',
+  'what this screen puts where the template has ${name} in a text (a title ...). ${screen} is the name of the screen': 'テンプレートの文字の ${名前} の所に、この画面が入れる文字（題名など）。${screen} は画面の名前になります' });
 Object.assign(I18N.TEXT_JA, { 'Library': 'ライブラリ', '+ Keep selection': '+ 選択を登録', 'Import / export': '取込 / 書出',
   'Add this part to the selected panel (or the screen)': 'この部品を、選択中のパネル（または画面）に追加', 'Keep the selected widgets as a part, for this and any other project': '選択中の部品を登録する（このプロジェクトでも、ほかのプロジェクトでも使えます）',
   'The library as text: to pass it on, or to take the parts of another library': 'ライブラリを文字として取り出す（人に渡す、ほかのライブラリの部品を取り込む）',

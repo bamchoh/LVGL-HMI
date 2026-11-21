@@ -227,7 +227,11 @@ const Props = {
       el.append(U.el('div', { class: 'props-head' }, 'Screen'));
       el.append(this.section('Screen', true, this.row('name', name), ...this.fields(w, [{ k: 'scrollable', t: 'bool' },
         { k: 'level', t: 'number', hint: 'minimum user level to open this screen (0 / empty = everybody); the login screen is shown first. Needs users (Users tab)' },
-        { k: 'popup', t: 'bool', hint: 'shown over the current screen by the action "popup" (closed by "close", "back" or a screen change), never as a screen of its own' }], fk)));
+        { k: 'popup', t: 'bool', hint: 'shown over the current screen by the action "popup" (closed by "close", "back" or a screen change), never as a screen of its own' },
+        { k: 'template', t: 'select', o: [''].concat(M.st.screens.map(s => s.data).filter(s => s !== w && !s.popup).map(s => s.name)), empty: '(none)',
+          hint: 'this screen is built on another one: the widgets of that screen (a header, a navigation) come first, the widgets of this screen on top. Change the template and every screen that uses it follows' }], fk)));
+      if (w.template !== undefined) el.append(this.mapEditor(w, { k: 'template_args', t: 'map', keys: s => M.templatePlaceholders(s),
+        hint: 'what this screen puts where the template has ${name} in a text (a title ...). ${screen} is the name of the screen' }, fk));
       if (w.popup) el.append(this.section('Popup', true, ...this.fields(w, [{ k: 'w', t: 'size' }, { k: 'h', t: 'size' }, { k: 'align', t: 'select', o: SCHEMA.aligns },
         { k: 'x', t: 'number' }, { k: 'y', t: 'number' }, { k: 'dim', t: 'bool', hint: 'darken the screen below (it cannot be touched either way)' }], fk)));
       el.append(this.section('Layout (flex)', false, ...this.fields(w, SCHEMA.flex.filter(f => f.k !== 'flex_grow'), fk)));

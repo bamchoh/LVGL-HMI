@@ -592,6 +592,69 @@ const M = {
     return r.part.widgets.length;
   },
 
+  // ---- templates: a screen built on another one ("template": "<screen>") ----------
+  // The screens a screen is built on, the outermost first, and why the chain ends early ('' = it does not).
+  templateChain(scr) {
+    const layers = [], seen = [scr && scr.name];
+    let problem = '', next = scr && scr.template;
+    if (next !== undefined && (typeof next !== 'string' || !next)) return { layers, problem: 'template: the name of a screen' };
+    while (next) {
+      const t = this.st.screens.find(s => s.data.name === next);
+      if (next === seen[0] && seen.length === 1) { problem = 'a screen is not its own template'; break; }
+      if (!t) { problem = 'unknown template "' + next + '"'; break; }
+      if (seen.includes(next)) { problem = 'the templates form a ring (' + next + ')'; break; }
+      if (t.data.popup) { problem = 'the template "' + next + '" is a popup'; break; }
+      if (seen.length > 8) { problem = 'more than 8 templates on top of each other'; break; }
+      seen.push(next);
+      layers.unshift(t.data);
+      next = typeof t.data.template === 'string' ? t.data.template : '';
+    }
+    return { layers, problem };
+  },
+  // the names in "${name}" of the texts of the templates of a screen (without the built-in "screen")
+  templatePlaceholders(scr) {
+    const out = new Set();
+    const visit = v => {
+      if (typeof v === 'string') { for (const m of v.matchAll(/\$\{([^}]*)\}/g)) out.add(m[1]); }
+      else if (v && typeof v === 'object') for (const x of Array.isArray(v) ? v : Object.values(v)) visit(x);
+    };
+    for (const layer of this.templateChain(scr).layers) visit(layer.children);
+    out.delete('screen');
+    return [...out];
+  },
+  // a widget tree of a template with its "${name}" filled by what the screen gives
+  templateFill(v, scr) {
+    const args = { screen: scr.name };
+    if (scr.template_args && typeof scr.template_args === 'object' && !Array.isArray(scr.template_args))
+      for (const [k, x] of Object.entries(scr.template_args)) if (['string', 'number', 'boolean'].includes(typeof x)) args[k] = String(x);
+    const fill = x => {
+      if (typeof x === 'string') return x.includes('${') ? x.replace(/\$\{([^}]*)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(args, k) ? args[k] : '')) : x;
+      if (Array.isArray(x)) return x.map(fill);
+      if (x && typeof x === 'object') { const o = {}; for (const k of Object.keys(x)) o[k] = fill(x[k]); return o; }
+      return x;
+    };
+    return fill(v);
+  },
+  templateProblems() {
+    const out = [];
+    this.st.screens.forEach((s, si) => {
+      const scr = s.data, loc = { screen: si, path: [] }, say = text => out.push(Object.assign({ text: 'screen "' + scr.name + '": ' + text }, loc));
+      const args = scr.template_args;
+      if (args !== undefined && scr.template === undefined) say('template_args without a template');
+      if (args !== undefined && (!args || typeof args !== 'object' || Array.isArray(args))) say('template_args is { "name": value }');
+      if (scr.template === undefined) return;
+      const chain = this.templateChain(scr);
+      if (chain.problem) { say(chain.problem); return; }
+      const given = args && typeof args === 'object' && !Array.isArray(args) ? args : {}, wanted = this.templatePlaceholders(scr);
+      for (const k of Object.keys(given)) {
+        if (!['string', 'number', 'boolean'].includes(typeof given[k])) say('template_args: "' + k + '" is a text, a number or true / false');
+        if (!wanted.includes(k) && k !== 'screen') say('template_args: "' + k + '" is not used by the template');
+      }
+      for (const k of wanted) if (!(k in given)) say('the template has ${' + k + '}: give it under "template_args" (it is shown as nothing)');
+    });
+    return out;
+  },
+
   // ---- style: copy the look of one widget onto others ------------------------
   styleOf(w) { const o = {}; for (const k of Object.keys(w || {})) if (/^style/.test(k)) o[k] = U.clone(w[k]); return o; },
   pasteStyle(styles) {
@@ -1047,6 +1110,7 @@ const M = {
       if (t.when !== undefined && !(typeof t.when === 'string' && t.when) && !(t.when && typeof t.when === 'object' && !Array.isArray(t.when) && typeof t.when.tag === 'string' && t.when.tag &&
           Object.keys(t.when).filter(k => k !== 'tag').length <= 1 && Object.keys(t.when).every(k => ['tag', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'].includes(k)))) bad('"when" is a tag, or { "tag": ..., "eq": ... } (eq ne gt lt ge le)');
     });
+    for (const pr of this.templateProblems()) out.push(pr);
     // sound: an output that exists, sounds that can be played
     if (p.sound !== undefined) {
       const loc = { view: 'project' }, so = p.sound;
@@ -1306,11 +1370,18 @@ const M = {
   },
 
   // ---- screens -----------------------------------------------------------
-  addScreen(name) {
+  // (template: the name of a screen the new one is built on)
+  addScreen(name, template) {
     name = String(name || '').trim().replace(/[^A-Za-z0-9_\-]/g, '_');
     if (!name || this.screenNames().includes(name)) return false;
     this.mutate(() => {
-      this.st.screens.push({ file: 'screens/' + name + '.json', data: this.blankScreen(name) });
+      const data = this.blankScreen(name);
+      if (template && this.screenNames().includes(template)) {
+        // (what the template says about the screen itself counts unless the screen says it too: say nothing)
+        delete data.style; delete data.scrollable;
+        data.template = template;
+      }
+      this.st.screens.push({ file: 'screens/' + name + '.json', data });
       this.st.cur = this.st.screens.length - 1;
       this.st.sel = [];
     });
@@ -1333,6 +1404,7 @@ const M = {
       if (this.st.project.start_screen === old) this.st.project.start_screen = name;
       // keep goto actions and screen_show / screen_hide scripts pointing at the renamed screen
       this.eachAction(a => { if (a.action === 'goto' && a.screen === old) a.screen = name; });
+      for (const o of this.st.screens) if (o.data.template === old) o.data.template = name;
       for (const sc of this.st.project.scripts || []) if (sc && sc.screen === old) sc.screen = name;
     });
   },
