@@ -1,10 +1,49 @@
-# HML Runtime — a declarative HMI runtime on LVGL
+# Tsukuraku (ツクラク) — HMI screens drawn by an AI
 
 **English** | [日本語](README.ja.md)
 
-[![CI](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/LVGL-HMI/actions/workflows/ci.yml)
+[![CI](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml)
 
-HML is an HMI runtime that draws screen definitions written in JSON with LVGL (v9.6) and binds tags
+> **Leave the drawing to an AI: HMI screens the easy way.**
+
+Tsukuraku is an **HMI designer and runtime whose screens an AI can draw**. Tell an AI such as Claude what you want,
+for example "make a production screen with three meters, an XY chart and a table of the states", and it writes the screens,
+draws them with the runtime, looks at the images and fixes what is wrong. The designer you have open reloads the result,
+and you finish it by hand. The same project then runs on a PC and on a touch panel (Raspberry Pi and other Linux boards),
+connected to PLCs over Modbus, SLMP (MELSEC), FINS (OMRON), OPC UA and MQTT.
+
+The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
+
+| | | |
+| --- | --- | --- |
+| ![Production: meters, an XY chart, a table](docs/images/demo_production_en.png) | ![Reports: a log view and the alarm summary](docs/images/demo_reports_en.png) | ![Planner: date and time, data transfer, sound, mail](docs/images/demo_planner_en.png) |
+
+These three screens of the demo, and its schedules, sound and data transfers, **were made by an AI that was given nothing but the skill** (no documentation, no source code).
+
+### How an AI can draw the screens
+
+1. **Screens are text.** A project is `project.json` and one JSON file per screen (HML: the HMI markup that the runtime reads). An AI writes it like any other file.
+2. **A skill tells the AI how.** `tools/skill/hml-screens/` lists every widget, property and action (generated from the designer's own definitions, so it cannot drift),
+   with the rules for layout and touch and working examples. It ships with the designer.
+3. **The runtime checks the work.** `hml_runtime --check --render` opens no window and connects to no device; it prints the mistakes
+   (an unknown key, a tag that does not exist, a text without a translation) and writes an image of each screen. The AI reads both and corrects itself.
+4. **The designer follows.** It reloads the files the AI changed, shows its own list of problems, and you move, restyle or rewrite anything.
+
+What it does not do: an AI does not set up the connection to your PLC (drivers, users and the settings of the device stay with you), and what a screen
+*means* (the right tag, the right unit) still needs a person's eye. The trial behind the demo was one run with one model. → "Having an AI make screens (the skill)"
+
+### What is in it
+
+- **The designer** (`hml_designer`): a GUI for screens, tags, alarms, recipes, texts in several languages, and deployment to the device.
+- **The runtime** (`hml_runtime`): alarms, trends, recipes, data / operation / system logs, users and levels, Lua scripts, schedules, sound,
+  mail, log uploads, data transfer between devices, remote operation (VNC), an OPC UA server.
+- **Demos** (`projects/`): `demo` (800x480), `factory`, `metro`, and a 480x320 project for a 3.5 inch panel.
+
+The executables and the file format keep the short name `hml` (`hml_runtime`, `hml_designer`, `.hmlproj`).
+
+## The runtime in one paragraph
+
+The runtime draws screen definitions written in JSON with LVGL (v9.6) and binds tags
 (process variables) and widgets in both directions. On a PC it runs in an SDL2 window; on Linux boards
 such as the Raspberry Pi it runs on the framebuffer / DRM + evdev (touch panel).
 Data sources are drivers. Simulation, a Modbus TCP client and an OPC UA server

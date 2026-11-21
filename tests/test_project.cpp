@@ -92,7 +92,7 @@ TEST_CASE("Project::load applies defaults for everything that is missing")
     const ProjectInfo& i = p.info();
     CHECK(i.path == path);
     CHECK(i.dir == tp.dir.generic_string());
-    CHECK(i.title == "HML Runtime");
+    CHECK(i.title == "Tsukuraku");
     CHECK(i.width == 800);
     CHECK(i.height == 480);
     CHECK(i.zoom == doctest::Approx(1.0));

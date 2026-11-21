@@ -212,7 +212,7 @@ bool OpcUaServerDriver::start()
     UA_StatusCode rc = UA_ServerConfig_setMinimal(&config, port_, nullptr);
     if(rc != UA_STATUSCODE_GOOD) { HML_ERROR("opcua: config failed: %s", UA_StatusCode_name(rc)); UA_ServerConfig_clean(&config); return false; }
     UA_LocalizedText_clear(&config.applicationDescription.applicationName);
-    config.applicationDescription.applicationName = UA_LOCALIZEDTEXT_ALLOC("en-US", "HML Runtime");
+    config.applicationDescription.applicationName = UA_LOCALIZEDTEXT_ALLOC("en-US", "Tsukuraku Runtime");
 
     server_ = UA_Server_newWithConfig(&config);
     if(!server_) { HML_ERROR("opcua: cannot create server"); return false; }

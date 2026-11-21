@@ -338,7 +338,7 @@ UA_Client* OpcUaClientDriver::make_client()
     UA_String_clear(&cc->clientDescription.applicationUri);
     cc->clientDescription.applicationUri = UA_STRING_ALLOC(app_uri_.c_str());
     UA_LocalizedText_clear(&cc->clientDescription.applicationName);
-    cc->clientDescription.applicationName = UA_LOCALIZEDTEXT_ALLOC("en-US", "HML Runtime");
+    cc->clientDescription.applicationName = UA_LOCALIZEDTEXT_ALLOC("en-US", "Tsukuraku Runtime");
     if(!user_.empty()) UA_ClientConfig_setAuthenticationUsername(cc, user_.c_str(), pass_.c_str());
     cc->timeout = timeout_ms_;
     // (noReconnect stays off: open62541 also uses its reconnect to move from the None channel it

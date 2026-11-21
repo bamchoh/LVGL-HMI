@@ -263,7 +263,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
     CHECK(driver_keys(nullptr).empty());
 
     // about page values
-    CHECK(tags().find("sys.about.project")->get().str == "HML Runtime");
+    CHECK(tags().find("sys.about.project")->get().str == "Tsukuraku");
     CHECK_FALSE(tags().find("sys.about.ip")->get().str.empty());
 
     // driver page tags mirror the configuration
