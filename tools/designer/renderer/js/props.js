@@ -132,18 +132,21 @@ const Props = {
       set: (t, k, v) => { const it = list[i]; if (it && typeof it === 'object') it[k] = v; else list[i] = f.wrap && k !== f.wrap && it !== undefined && it !== null ? { [f.wrap]: it, [k]: v } : { [k]: v }; return true; },
       deleteProperty: (t, k) => { const it = list[i]; if (it && typeof it === 'object') delete it[k]; else if (f.wrap && k === f.wrap) list[i] = ''; return true; },
     });
-    const rows = list.map((it, i) => U.el('div', { class: 'row sub list-item' },
-      ...f.fields.map(sf => { const e = this.editor(holder(i), sf.k, sf, fk + '.' + f.k + '.' + i); e.title = I18N.label(sf.k) + (sf.hint ? '\n' + I18N.t(sf.hint) : '');
-        if (e.placeholder !== undefined && !e.placeholder) e.placeholder = I18N.label(sf.k); return e; }),
+    const one = (i, sf) => { const e = this.editor(holder(i), sf.k, sf, fk + '.' + f.k + '.' + i); e.title = I18N.label(sf.label || sf.k) + (sf.hint ? '\n' + I18N.t(sf.hint) : '');
+      if (e.placeholder !== undefined && !e.placeholder) e.placeholder = I18N.label(sf.label || sf.k); return e; };
+    // (a field marked "below" gets a line of its own under the item: a text that is long)
+    const rows = list.map((it, i) => [U.el('div', { class: 'row sub list-item' },
+      ...f.fields.filter(sf => !sf.below).map(sf => one(i, sf)),
       U.el('button', { class: 'mini', title: 'Move up', disabled: i === 0, dataset: { fk: fk + '.' + f.k + '.' + i + '.up' }, onclick: () => M.mutate(() => { list.splice(i - 1, 0, list.splice(i, 1)[0]); }) }, '↑'),
-      U.el('button', { class: 'mini danger', title: 'Remove', dataset: { fk: fk + '.' + f.k + '.' + i + '.del' }, onclick: () => M.mutate(() => { list.splice(i, 1); if (!list.length) delete obj[f.k]; }) }, '×')));
+      U.el('button', { class: 'mini danger', title: 'Remove', dataset: { fk: fk + '.' + f.k + '.' + i + '.del' }, onclick: () => M.mutate(() => { list.splice(i, 1); if (!list.length) delete obj[f.k]; }) }, '×')),
+      ...f.fields.filter(sf => sf.below).map(sf => U.el('div', { class: 'row sub list-item list-below' }, one(i, sf)))]).flat();
     const full = f.max !== undefined && list.length >= f.max;
     const add = U.el('button', { class: 'mini', disabled: full, dataset: { fk: fk + '.' + f.k + '.add' }, onclick: () => M.mutate(() => {
       if (!Array.isArray(obj[f.k])) obj[f.k] = [];
       obj[f.k].push(typeof f.item === 'function' ? f.item(obj) : U.clone(f.item || {}));
     }) }, '+');
     const head = U.el('div', { class: 'row', title: f.k + (f.hint ? '\n' + I18N.t(f.hint) : '') }, U.el('label', null, I18N.label(f.label || f.k)),
-      U.el('span', { class: 'dim list-head' }, f.fields.map(sf => I18N.label(sf.k)).join(' / ')), add);
+      U.el('span', { class: 'dim list-head' }, f.fields.filter(sf => !sf.below).map(sf => I18N.label(sf.label || sf.k)).join(' / ')), add);
     return U.el('div', { class: 'list-editor', dataset: { list: f.k } }, head, ...rows);
   },
 

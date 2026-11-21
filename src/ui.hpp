@@ -45,6 +45,10 @@ public:
     // Named actions for { "action": "call", "fn": "<name>", "arg": "..." }. Registering a name again replaces it.
     void register_action(const std::string& name, std::function<void(const std::string& arg)> fn);
     bool call_action(const std::string& name, const std::string& arg);   // false if the name is unknown
+    // Run actions written as in a screen file ("on_click": one action or a list), without a
+    // widget: a schedule. Returns how many were run (an action that names an unknown tag or
+    // screen is left out, with a warning).
+    int run_actions(const json& actions);
 
     // A screen with "level" that the current user may not see is not shown: the login screen
     // comes up instead and continues to it after a login (false is returned).

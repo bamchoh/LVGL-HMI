@@ -288,6 +288,16 @@ const M = {
       };
       visit(s.data, []);
     });
+    // what a schedule does: the actions of a screen
+    (Array.isArray(p.schedules) ? p.schedules : []).forEach((sc, i) => {
+      if (!sc || typeof sc !== 'object') return;
+      const loc = { view: 'project', index: i };
+      for (const act of Array.isArray(sc.do) ? sc.do : [sc.do]) {
+        if (!act || typeof act !== 'object') continue;
+        if (['set', 'toggle', 'inc', 'dec'].includes(act.action)) prop(act, 'tag', loc, 'schedule');
+        if (act.action === 'script') lua(act, 'code', loc);
+      }
+    });
     (p.drivers || []).forEach((d, i) => {
       const loc = { view: 'drivers', index: i };
       for (const [k, v] of Object.entries(d || {})) {
@@ -770,6 +780,27 @@ const M = {
       seenTag.add(t.name);
     });
     this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
+    // schedules: a name, a time that is one, days that are days, something to do
+    const schedNames = new Set(), dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'daily', 'weekdays', 'weekend', 'all'];
+    (Array.isArray(p.schedules) ? p.schedules : []).forEach((sc, i) => {
+      const loc = { view: 'project', index: i }, n = sc && sc.name ? '"' + sc.name + '"' : '#' + (i + 1);
+      if (!sc || typeof sc !== 'object') { out.push(Object.assign({ text: 'schedule ' + n + ' is not a schedule' }, loc)); return; }
+      if (!sc.name) out.push(Object.assign({ text: 'a schedule has no name' }, loc));
+      else if (schedNames.has(sc.name)) out.push(Object.assign({ text: 'schedule ' + n + ' is defined twice' }, loc));
+      schedNames.add(sc.name);
+      const at = String(sc.at === undefined ? '' : sc.at).trim(), daily = /^([01]\d|2[0-3]):[0-5]\d$/.test(at), once = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[ T]([01]\d|2[0-3]):[0-5]\d$/.test(at);
+      if (!daily && !once) out.push(Object.assign({ text: 'schedule ' + n + ': "at" is HH:MM, or YYYY-MM-DD HH:MM for once' }, loc));
+      const days = sc.days === undefined ? [] : Array.isArray(sc.days) ? sc.days : String(sc.days).split(/[ ,]+/).filter(Boolean);
+      const bad = days.filter(d => !dayNames.includes(String(d).toLowerCase()));
+      if (bad.length) out.push(Object.assign({ text: 'schedule ' + n + ': "' + bad[0] + '" is not a day (mon tue wed thu fri sat sun)' }, loc));
+      if (sc.days !== undefined && !days.length) out.push(Object.assign({ text: 'schedule ' + n + ': no day is named' }, loc));
+      const acts = Array.isArray(sc.do) ? sc.do : sc.do === undefined ? [] : [sc.do];
+      if (!acts.length || acts.some(a => !a || typeof a !== 'object' || !SCHEMA.actions[a.action])) out.push(Object.assign({ text: 'schedule ' + n + ': "do" is an action of a screen, or a list of them' }, loc));
+      for (const a of acts) {
+        if (a && (a.action === 'goto' || a.action === 'popup') && !screens.has(a.screen)) out.push(Object.assign({ text: 'schedule ' + n + ': unknown screen "' + a.screen + '"' }, loc));
+        if (a && a.action === 'script' && a.name && !scripts.has(a.name)) out.push(Object.assign({ text: 'schedule ' + n + ': unknown script "' + a.name + '"' }, loc));
+      }
+    });
 
     if (p.start_screen && !screens.has(p.start_screen)) out.push({ text: 'start screen "' + p.start_screen + '" does not exist', view: 'project' });
     const startPopup = st.screens.find(x => x.data.name === p.start_screen && x.data.popup);

@@ -1,4 +1,5 @@
 #include "project.hpp"
+#include "schedule.hpp"
 #include "alarm.hpp"
 #include "data_log.hpp"
 #include "driver.hpp"
@@ -58,6 +59,7 @@ void Project::apply_local_overlay()
     base_drivers_ = root_.is_object() && root_.contains("drivers") ? root_["drivers"] : json();
     local_users_ = json();
     local_screen_saver_ = json();
+    local_schedules_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
@@ -66,6 +68,7 @@ void Project::apply_local_overlay()
     if(!overlay.is_object()) return;
     if(const json* lu = jget(overlay, "users")) local_users_ = *lu;
     if(const json* ls = jget(overlay, "screen_saver")) local_screen_saver_ = *ls;
+    if(const json* lc = jget(overlay, "schedules")) local_schedules_ = *lc;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
     if(!od || !od->is_object() || !drivers) return;
@@ -209,6 +212,7 @@ bool Project::load(const std::string& path)
 
     // the screen goes dark after a while without input ("screen_saver")
     screen_saver().configure(jget(root_, "screen_saver"), local_screen_saver_.is_null() ? nullptr : &local_screen_saver_, local_overlay_path());
+    scheduler().load(jget(root_, "schedules"), local_schedules_.is_null() ? nullptr : &local_schedules_, local_overlay_path());
 
     // languages and texts ("@id"), and the font they are drawn with
     texts().load(root_);
@@ -385,6 +389,7 @@ int Project::build_screens()
 void Project::unload()
 {
     screen_saver().clear();
+    scheduler().clear();
     root_ = nullptr;
 }
 

@@ -904,6 +904,51 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+test('M schedules: the tag of an action follows a rename; what is no schedule is a problem', () => {
+  const { M, p } = tagProject();
+  const base = M.problems().length;
+  p.schedules = [
+    { name: 'start', at: '08:00', days: ['mon', 'fri'], do: { action: 'set', tag: 'temp', value: 1 } },
+    { name: 'night', at: '2026-12-01 22:30', do: [{ action: 'toggle', tag: 'run' }, { action: 'inc', tag: 'temp', by: 2 }] },
+    { name: 'daily', at: '23:59', days: 'weekdays', do: { action: 'back' } },
+  ];
+  assert.equal(M.problems().length, base);
+  M.renameTag(0, 'temp_pv');
+  assert.equal(p.schedules[0].do.tag, 'temp_pv');
+  assert.equal(p.schedules[1].do[1].tag, 'temp_pv');
+  assert.equal(p.schedules[1].do[0].tag, 'run');
+  assert.equal(M.problems().length, base);
+  p.schedules = [
+    { at: '08:00', do: { action: 'back' } },
+    { name: 'a', at: '8:00', do: { action: 'back' } },
+    { name: 'a', at: '24:00', do: { action: 'back' } },
+    { name: 'b', at: '2026-13-01 08:00', do: { action: 'back' } },
+    { name: 'c', at: '08:00', days: ['mon', 'someday'], do: { action: 'back' } },
+    { name: 'd', at: '08:00', days: [], do: { action: 'back' } },
+    { name: 'e', at: '08:00' },
+    { name: 'f', at: '08:00', do: { action: 'launch' } },
+    { name: 'g', at: '08:00', do: 'reboot' },
+    { name: 'h', at: '08:00', do: { action: 'set', tag: 'gone', value: 1 } },
+    { name: 'i', at: '08:00', do: [{ action: 'goto', screen: 'nowhere' }, { action: 'script', name: 'nothing' }] },
+    5,
+  ];
+  const t = M.problems().map(x => x.text);
+  const has = re => assert.ok(t.some(x => re.test(x)), String(re) + ' in: ' + t.join(' | '));
+  has(/a schedule has no name/);
+  has(/schedule "a": "at" is HH:MM/);
+  has(/schedule "a" is defined twice/);
+  has(/schedule "b": "at" is/);
+  has(/schedule "c": "someday" is not a day/);
+  has(/schedule "d": no day is named/);
+  has(/schedule "e": "do" is an action/);
+  has(/schedule "f": "do" is an action/);
+  has(/schedule "g": "do" is an action/);
+  has(/unknown tag "gone" \(schedule\)/);
+  has(/schedule "i": unknown screen "nowhere"/);
+  has(/schedule "i": unknown script "nothing"/);
+  has(/schedule #12 is not a schedule/);
+});
+
 test('M table cells: a cell as a line of text and back', () => {
   const { M } = load();
   const pairs = [

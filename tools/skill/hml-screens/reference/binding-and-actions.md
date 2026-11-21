@@ -342,3 +342,19 @@
 
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
+
+## 時刻で実行する（`project.json` の `schedules`）
+
+「毎朝 8 時に〜する」は画面ではなくプロジェクトに書く。`do` は上の「動作」と同じ書き方。
+
+```json
+"schedules": [
+  { "name": "start", "at": "08:00", "days": "weekdays", "do": { "action": "set", "tag": "run_enable", "value": true } },
+  { "name": "service", "at": "2026-12-01 09:00", "do": { "action": "popup", "screen": "service_due" } }
+]
+```
+
+- `at`: `"HH:MM"`、または 1 回だけの `"YYYY-MM-DD HH:MM"`。`days`: `"daily"`（既定） / `"weekdays"` / `"weekend"` / `["mon", "wed"]`。
+- `enabled: false` で止める。`catch_up: true` で、装置が止まっていた間に過ぎた時刻を次の起動時に 1 回実行する。
+- 時刻・曜日・オン / オフは、装置の System > Schedule でも変えられる。頼まれずに既存の予定を変えない。
+- `--check` が、時刻や曜日の書き間違い、ないタグ・画面を見つける。予定は画像には出ないので、報告に書く。
