@@ -7,6 +7,7 @@
 #include "alarm_view.hpp"
 #include "log_view.hpp"
 #include "meter_view.hpp"
+#include "datetime_view.hpp"
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
@@ -471,7 +472,7 @@ void apply_styles(lv_obj_t* obj, const json& w)
 
 // ================================================================ model
 
-enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line, Meter };
+enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line, Meter, DateTime };
 enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options, Anim };
 enum class Cmp { None, Eq, Ne, Gt, Lt, Ge, Le };
 
@@ -1416,6 +1417,7 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
             case Widget::Slider: case Widget::Bar: case Widget::Arc: case Widget::Dropdown: case Widget::Roller: case Widget::Meter:
                 add_binding(obj, wk, BindKind::Value, *bind, wk != Widget::Bar && wk != Widget::Meter); break;
             case Widget::Textarea: add_binding(obj, wk, BindKind::Text, *bind, true); break;
+            case Widget::DateTime: break;                    // (the widget reads and writes its tag itself)
             case Widget::Panel: case Widget::Spinner: add_binding(obj, wk, BindKind::Visible, *bind, false); break;
             default: add_binding(tobj, wk, BindKind::Text, *bind, false); break;
         }
@@ -1426,6 +1428,7 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
         const std::string& k = it.key();
         const json& spec = it.value();
         if(iequals(k, "text")) add_binding(tobj, wk, BindKind::Text, spec, wk == Widget::Textarea && ta_two_way);
+        else if(iequals(k, "value") && wk == Widget::DateTime) continue;
         else if(iequals(k, "value")) add_binding(obj, wk, BindKind::Value, spec, wk == Widget::Slider || wk == Widget::Arc || wk == Widget::Dropdown || wk == Widget::Roller || (wk == Widget::Textarea && ta_two_way));
         else if(iequals(k, "checked") || iequals(k, "on")) add_binding(obj, wk, BindKind::Checked, spec, wk == Widget::Switch || wk == Widget::Checkbox || wk == Widget::Button);
         else if(iequals(k, "visible")) add_binding(obj, wk, BindKind::Visible, spec, false);
@@ -1964,6 +1967,10 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "log_view")) {
         obj = build_log_view(parent, w);
     }
+    else if(iequals(type, "datetime_input")) {
+        wk = Widget::DateTime;
+        obj = build_datetime_input(parent, w);
+    }
     else if(iequals(type, "meter")) {
         wk = Widget::Meter;
         obj = build_meter(parent, w);
@@ -2246,6 +2253,17 @@ int Ui::screen_level(const std::string& name) const
 {
     const Screen* s = impl_->find_screen(name);
     return s ? s->level : 0;
+}
+
+bool Ui::operable(lv_obj_t* obj, bool ask_login)
+{
+    for(lv_obj_t* o = obj; o; o = lv_obj_get_parent(o)) {
+        const AccessRule* r = impl_->rule_of(o);
+        if(!r || users().allowed(r->level)) continue;
+        if(ask_login && r->deny == AccessRule::Deny::Login) users().request_login(r->level);
+        return false;
+    }
+    return true;
 }
 
 void Ui::refresh_access()

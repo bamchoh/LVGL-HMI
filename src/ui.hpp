@@ -61,6 +61,10 @@ public:
     // Apply the "level" of the widgets (disable / hide) for the current user; users.cpp calls
     // it whenever the user changes.
     void refresh_access();
+    // May the user who is logged in operate this widget? Looks at "level" of the widget and of
+    // what it is in. For widgets made of several parts (a part asks for the whole). With
+    // ask_login a rule with "level_deny": "login" opens the login screen.
+    bool operable(lv_obj_t* obj, bool ask_login = false);
     std::optional<std::string> current_screen() const;
     // What the action "restart" does (a system page that replaced the project asks for it).
     void request_restart(RestartTarget what);
