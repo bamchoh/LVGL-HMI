@@ -170,6 +170,7 @@ TEST_CASE("mail: an alarm is mailed with its text, its value and values of tags;
     f.configure(R"~({ "host": "smtp.plant.example", "username": "hmi", "password": "s3cret-pw", "from": "hmi@plant.example", "to": ["shift@plant.example"],
         "alarms": { "subject": "[{project}] {alarm.severity}: {alarm.message}", "body": "{alarm.time} {alarm.name} is {alarm.event}, level {level} {nothing} {" } })~");
     CHECK(mail().configured());
+    CHECK(mail().config().tls.ca_file == "");                    // none named: what the system trusts
     CHECK(tags().find("sys.mail.waiting")->get_number() == 0);
     f.run(1000);
     CHECK(f.got.empty());
@@ -248,6 +249,15 @@ TEST_CASE("mail: a value that goes into the subject cannot add a header; the tex
     CHECK(head.find("\r\nBcc:") == std::string::npos);
     CHECK(head.find("\r\nTo: all@evil") == std::string::npos);
     CHECK(f.got[0].to == std::vector<std::string>{ "x@y.z" });   // the recipients are what the settings say, whatever a value holds
+    // "ca_file": a file of the project, unless it says where else it is
+    f.configure(R"~({ "host": "h", "from": "a@b.c", "to": "x@y.z", "ca_file": "certs/ca.pem" })~");
+    CHECK(mail().config().tls.ca_file == f.dir.generic_string() + "/certs/ca.pem");
+    const std::string abs = (f.dir / "elsewhere.pem").generic_string();
+    f.configure("{ \"host\": \"h\", \"from\": \"a@b.c\", \"to\": \"x@y.z\", \"ca_file\": \"" + abs + "\" }");
+    CHECK(mail().config().tls.ca_file == abs);
+    CHECK(mail().set_local(true, "x@y.z", "", "") == "");
+    CHECK(mail().config().tls.ca_file == abs);                   // (set again on the device: still the same file)
+    f.configure(R"~({ "host": "h", "from": "a@b.c", "to": "x@y.z", "alarms": { "subject": "{alarm.message} batch {batch}", "body": "batch {batch}" } })~");
     // a subject and a body of megabytes
     CHECK(mail().queue(std::string(100000, 's'), std::string(3 * 1024 * 1024, 'b')));
     f.run(500);

@@ -255,6 +255,8 @@ void Uploads::configure(const json* section, const json* local, const std::strin
         const std::string n = j.is_object() ? jstr(j, "name", "") : "";
         if(!upload_parse(j, jget(m.local, n.c_str()), t, &err)) { HML_WARN("uploads: an entry is left out: %s", err.c_str()); continue; }
         if(!names.insert(t.name).second) { HML_WARN("uploads: '%s' is defined twice: the second is left out", t.name.c_str()); continue; }
+        // "ca_file" is a file of the project unless it says where else it is
+        if(!t.tls.ca_file.empty() && !fs::u8path(t.tls.ca_file).is_absolute()) t.tls.ca_file = (fs::u8path(project_dir) / fs::u8path(t.tls.ca_file)).generic_u8string();
         if(!t.url.secure())
             HML_WARN("upload '%s': %s is not secured: the files%s can be read on the network", t.name.c_str(), t.url.shown().c_str(), t.username.empty() ? "" : ", the user name and the password");
         else if(!t.tls.verify)

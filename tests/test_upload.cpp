@@ -301,6 +301,14 @@ TEST_CASE("upload: without \"uploads\", switched off, and while a project is onl
     f.configure(many);
     REQUIRE(uploads().targets().size() == kUploadTargetsMax);
     CHECK(uploads().targets()[0].url.host == "h");
+    // "ca_file": a file of the project, unless it says where else it is
+    const std::string abs = (f.dir / "elsewhere.pem").generic_string();
+    f.configure("[ { \"name\": \"a\", \"url\": \"https://h/\", \"logs\": [\"alarms\"], \"ca_file\": \"certs/ca.pem\" }, "
+                "{ \"name\": \"b\", \"url\": \"https://h/\", \"logs\": [\"alarms\"], \"ca_file\": \"" + abs + "\" }, { \"name\": \"c\", \"url\": \"https://h/\", \"logs\": [\"alarms\"] } ]");
+    REQUIRE(uploads().targets().size() == 3);
+    CHECK(uploads().targets()[0].tls.ca_file == f.dir.generic_string() + "/certs/ca.pem");
+    CHECK(uploads().targets()[1].tls.ca_file == abs);
+    CHECK(uploads().targets()[2].tls.ca_file == "");
     // switched off on the device
     f.configure(kCfg);
     CHECK(uploads().set_local("nightly", false, "hmi", "") == "");
