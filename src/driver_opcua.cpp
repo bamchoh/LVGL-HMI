@@ -11,7 +11,8 @@
 //
 // Every tag becomes a variable node  ns=<namespace>;s=<tag name>  under Objects/<folder>:
 //   bool -> Boolean, int -> Int64, float -> Double, string -> String.
-// Reads are served live from the tag store; client writes are coerced to the tag type.
+// Reads are served live from the tag store. A client writes in the type of the node (another
+// type is refused by the server with BadTypeMismatch); the value then takes the limits of the tag.
 // The server runs on its own thread; the tag store is thread-safe, so no queueing is needed.
 #include "driver.hpp"
 #include "tag.hpp"
