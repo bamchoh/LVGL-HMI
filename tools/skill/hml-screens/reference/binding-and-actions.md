@@ -270,7 +270,7 @@
 - 中に、上の帯（レベルのドロップダウン、件数、ページ送りのボタン 2 つ。高さ約 46px）と表を持つ。
   **高さは 200 以上、幅は 440 以上**。1 行は約 32px なので、`rows` は「(高さ − 90) ÷ 32」を目安にする（長いメッセージは折り返して行が高くなる。あふれた分は表の中でスクロールする）。
 - `columns`: `system` は `time` `level` `source` `message` `count`、`operation` は `time` `user` `screen` `kind` `target` `old` `new`、
-  `data` は `time` とグループのタグ名。省くとよく使う列。幅が 560 未満の `system` は `source` を省く。
+  `data` は `time` とグループのタグ名。省くとよく使う列（幅が 560 未満なら `system` は `time` `level` `message`、`operation` は `time` `user` `target` `new`）。
 - 列の見出しは英語（`Time` `Message` …）。日本語などにするには `labels` に書く: `"labels": { "time": "時刻", "level": "種類", "message": "内容", "empty": "記録なし" }`
   （`languages` のあるプロジェクトでは `"@ID"`）。`data` の列の見出しはタグ名のまま。
 - 文字で絞り込ませたいときは、文字列タグを作り、`text_display`（`"input": true`）をそのタグに結び付け、`"filter_tag": "<タグ>"` を書く（画面に `keyboard` が要る）。

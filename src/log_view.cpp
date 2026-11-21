@@ -102,7 +102,8 @@ struct Ctx {
             else if(c == "screen") w[i] = 96;
             if(w[i] > 0) used += w[i]; else open++;
         }
-        const int32_t share = open > 0 ? std::max<int32_t>((all - used) / open, 80) : 0;
+        // (what is left is shared; below 56 px a column is of no use: then the table scrolls sideways)
+        const int32_t share = open > 0 ? std::max<int32_t>((all - used) / open, 56) : 0;
         for(size_t i = 0; i < cols.size(); i++) lv_table_set_column_width(table, static_cast<uint32_t>(i), w[i] > 0 ? w[i] : share);
     }
 
@@ -140,10 +141,10 @@ struct Ctx {
             // a narrow widget (a 480 px display): the message needs the room more than the source does
             sized = true;
             lv_obj_update_layout(obj);
-            if(!own_columns && q.source == "system" && lv_obj_get_content_width(obj) < 560) {
-                q.columns = { "time", "level", "message" };
-                cols = q.columns;
-                widths.emplace("level", 64);
+            if(!own_columns && lv_obj_get_content_width(obj) < 560) {
+                if(q.source == "system") { q.columns = { "time", "level", "message" }; widths.emplace("level", 64); }
+                else if(q.source == "operation") { q.columns = { "time", "user", "target", "new" }; widths.emplace("user", 64); }
+                if(!q.columns.empty()) cols = q.columns;
             }
         }
         if(filter_tag) {
