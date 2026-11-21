@@ -215,6 +215,7 @@ struct Checker {
             if(!S["types"].contains(type)) { add(where, "unknown widget type \"" + type + "\""); return; }
             own = str_set(S["types"][type]);
             if(type == "log_view") own.insert("widths");                         // (an object: edited as JSON)
+            if(type == "meter") own.insert("zones");
         }
         for(auto it = w.begin(); it != w.end(); ++it) {
             const std::string& k = it.key();

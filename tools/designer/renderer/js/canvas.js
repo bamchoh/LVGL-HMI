@@ -135,6 +135,7 @@ const Canvas = {
       case 'trend': return ['100%', 300];
       case 'alarm_list': return ['100%', 240];
       case 'log_view': return ['100%', 300];
+      case 'meter': return [200, 200];
       case 'alarm_banner': return ['100%', 36];
       default: return [null, null];
     }
@@ -468,6 +469,43 @@ const Canvas = {
   alarmSamples() {
     const items = ((M.st.project && M.st.project.alarms && M.st.project.alarms.items) || []).filter(a => a && a.name);
     return items.length ? items : [{ name: 'sample', message: 'Sample alarm', severity: 'warning' }];
+  },
+  // the scale, its numbers and zones as the device draws them; the needle at "value" (or a third of the way)
+  w_meter(el, w) {
+    let min = U.num(w.min, 0), max = U.num(w.max, 100);
+    if (!(max > min)) { min = 0; max = 100; }
+    const angle = Math.min(360, Math.max(90, U.num(w.angle, 270))), ticks = Math.min(101, Math.max(2, Math.round(U.num(w.ticks, 21))));
+    const major = Math.min(100, Math.max(1, Math.round(U.num(w.major_every, 5)))), dec = Math.min(3, Math.max(0, Math.round(U.num(w.decimals, 0))));
+    const value = w.value === undefined ? min + (max - min) / 3 : Math.min(max, Math.max(min, U.num(w.value, min)));
+    const NS = 'http://www.w3.org/2000/svg', R = 100, start = 90 + (360 - angle) / 2;
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    const at = (v, r) => { const a = (start + angle * (v - min) / (max - min)) * Math.PI / 180; return [R + r * Math.cos(a), R + r * Math.sin(a)]; };
+    const arc = (from, to, r) => { const [x0, y0] = at(from, r), [x1, y1] = at(to, r); return 'M' + x0 + ' ' + y0 + ' A' + r + ' ' + r + ' 0 ' + (angle * (to - from) / (max - min) > 180 ? 1 : 0) + ' 1 ' + x1 + ' ' + y1; };
+    const svg = mk('svg', { viewBox: '0 0 200 200', width: '100%', height: '100%', preserveAspectRatio: 'xMidYMid meet' });
+    svg.style.color = 'inherit';
+    svg.append(mk('path', { d: arc(min, max, 96), fill: 'none', stroke: 'currentColor', 'stroke-width': 3 }));
+    const zones = Array.isArray(w.zones) ? w.zones : [];
+    const zoneOf = v => zones.find(z => z && v >= U.num(z.from, min) && v <= U.num(z.to, max));
+    for (const z of zones) {
+      if (!z) continue;
+      const f = Math.max(min, U.num(z.from, min)), t = Math.min(max, U.num(z.to, max));
+      if (t > f) svg.append(mk('path', { d: arc(f, t, 95), fill: 'none', stroke: z.color || '#e53935', 'stroke-width': 6 }));
+    }
+    for (let i = 0; i < ticks; i++) {
+      const v = min + (max - min) * i / (ticks - 1), big = i % major === 0, z = zoneOf(v), col = z ? (z.color || '#e53935') : 'currentColor';
+      const [x0, y0] = at(v, 93), [x1, y1] = at(v, big ? 81 : 87);
+      svg.append(mk('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: col, 'stroke-width': big ? 2 : 1 }));
+      if (big) { const [tx, ty] = at(v, 68); const t = mk('text', { x: tx, y: ty, fill: col, 'font-size': 13, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }); t.textContent = v.toFixed(dec); svg.append(t); }
+    }
+    const nc = w.needle_color || '#f44336', [nx, ny] = at(value, 78);
+    svg.append(mk('line', { x1: R, y1: R, x2: nx, y2: ny, stroke: nc, 'stroke-width': 4, 'stroke-linecap': 'round' }), mk('circle', { cx: R, cy: R, r: 7, fill: nc }));
+    if (w.show_value !== false) {
+      const t = mk('text', { x: R, y: R + (angle > 300 ? 40 : angle <= 200 ? 50 : 80), fill: 'currentColor', 'font-size': 15, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+      t.textContent = value.toFixed(dec) + (w.unit ? ' ' + w.unit : '');
+      svg.append(t);
+    }
+    el.style.overflow = 'hidden';
+    el.append(svg);
   },
   // a few sample rows: what the columns will look like (the real rows come from the log on the device)
   LOG_COLUMNS: { system: ['time', 'level', 'source', 'message'], operation: ['time', 'user', 'kind', 'target', 'old', 'new'] },

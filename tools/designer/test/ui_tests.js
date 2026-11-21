@@ -372,6 +372,26 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('meter: in the palette, drawn with its scale, zones and needle; its properties', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /メーター/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('meter'); await frame();
+    const p = M.st.sel, find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    let el2 = find();
+    ok(el2 && el2.classList.contains('lv-meter') && el2.querySelector('svg'), 'drawn');
+    const texts = () => [...find().querySelectorAll('svg text')].map(t => t.textContent);
+    ok(texts().includes('0') && texts().includes('100'), 'numbers of the scale: ' + texts().join(','));
+    eq(find().querySelectorAll('svg line').length, 21 + 1, '21 ticks and the needle');
+    M.mutate(() => { Object.assign(M.get(p), { min: 0, max: 1.5, decimals: 2, unit: 'MPa', ticks: 16, major_every: 3, value: 0.75,
+                                              zones: [{ from: 1.2, to: 1.5, color: '#e53935' }] }); }); App.doRefresh(); await frame();
+    ok(texts().includes('1.50') && texts().includes('0.75 MPa'), 'decimals and the value with its unit: ' + texts().join(','));
+    eq(find().querySelectorAll('svg line').length, 16 + 1);
+    ok([...find().querySelectorAll('svg path')].some(x => x.getAttribute('stroke') === '#e53935'), 'the zone is drawn in its colour');
+    M.mutate(() => { M.get(p).show_value = false; }); App.doRefresh(); await frame();
+    ok(!texts().some(t => /MPa/.test(t)), 'no value when it is switched off');
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('log view: in the palette, drawn as a table for each source, its properties', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /ログ表示/.test(t)), 'palette: ' + pal.join(','));
