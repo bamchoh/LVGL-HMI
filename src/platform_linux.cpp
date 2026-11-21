@@ -68,7 +68,14 @@ void apply_touch_settings(lv_indev_t* indev)
         ft.log = tf.log;
         filtered_touches()[indev] = ft;
         lv_indev_set_read_cb(indev, filtered_read);
-        HML_INFO("touch: settle %d, release %d, smooth %d, jitter %d px%s", tf.settle, tf.release, tf.smooth, tf.jitter, tf.log ? ", every touch is logged" : "");
+        HML_INFO("touch: settle %d, release %d, lift %d ms, smooth %d, jitter %d px%s", tf.settle, tf.release, tf.lift_ms, tf.smooth, tf.jitter, tf.log ? ", every touch is logged" : "");
+        // with the log: what the user interface made of each touch
+        if(tf.log) lv_indev_add_event_cb(indev, [](lv_event_t* e) {
+            const lv_event_code_t code = lv_event_get_code(e);
+            lv_indev_t* in = static_cast<lv_indev_t*>(lv_event_get_target(e));
+            if(code == LV_EVENT_RELEASED) HML_INFO("touch: -> %s", lv_indev_get_scroll_obj(in) ? "a scroll" : "no scroll");
+            else if(code == LV_EVENT_CLICKED) HML_INFO("touch: -> a click");
+        }, LV_EVENT_ALL, nullptr);
     }
     if(tf.scroll_limit > 0) lv_indev_set_scroll_limit(indev, static_cast<uint8_t>(tf.scroll_limit));
     if(s_info->touch_swap_axes) lv_evdev_set_swap_axes(indev, true);
