@@ -44,7 +44,8 @@
 namespace hml {
 namespace {
 
-constexpr size_t kWriteQueueLen = 64;
+constexpr size_t kWriteQueueLen = 64;        // more than these waiting: from there on a tag has one place in the queue (its newest value)
+constexpr size_t kWriteQueueMax = 2048;      // ... and this is all there is room for (many tags written at once: data_transfer.hpp)
 constexpr int    kGapWords = 32;
 constexpr uint16_t kCmdRead = 0x0401, kCmdWrite = 0x1401;
 
@@ -106,6 +107,7 @@ private:
     void   plan_blocks();
     bool   write_allowed(const SlmpAddress& a, int words, std::string& why) const;
     void   set_online(bool on);
+    bool   link_polls_cyclically() const override { return true; }
     void   thread_main();
     void   on_tag_changed(Tag& tag, const Value& v, const void* source);
 
@@ -134,6 +136,7 @@ private:
 
 SlmpDriver::SlmpDriver(const json& cfg)
 {
+    link_set(false);
     const json* map = jget(cfg, "map");
     if(!map || !map->is_array()) { HML_WARN("slmp: \"map\" array missing"); return; }
     if(!jhas(cfg, "host")) { HML_ERROR("slmp: \"host\" is needed"); return; }
@@ -329,7 +332,7 @@ void SlmpDriver::apply(Item& it, const uint16_t* w)
     switch(it.dtype) {
         case DType::Bool:
             v = it.addr.dev->bit ? (w[0] >> (it.addr.number % 16)) & 1 : (w[0] >> it.addr.bit) & 1;
-            it.tag->set_number(v, this);
+            it.tag->set_number_from_device(v, this);
             return;
         case DType::U16: v = w[0]; break;
         case DType::S16: v = static_cast<int16_t>(w[0]); break;
@@ -343,7 +346,7 @@ void SlmpDriver::apply(Item& it, const uint16_t* w)
                 if(c == '\0') break;
                 s.push_back(c);
             }
-            it.tag->set_string(s, this);
+            it.tag->set_from_device(Value::string(s), this);
             return;
         }
     }
@@ -493,6 +496,7 @@ SlmpDriver::Result SlmpDriver::device_do(const DeviceRequest& rq, DeviceResult& 
 
 void SlmpDriver::set_online(bool on)
 {
+    link_set(on);
     if(online_ == (on ? 1 : 0)) return;
     online_ = on ? 1 : 0;
     HML_INFO("slmp %s %s", stream_->describe().c_str(), on ? "connected" : "disconnected");
@@ -546,6 +550,7 @@ void SlmpDriver::thread_main()
             if(backoff < 5000) backoff *= 2;
             continue;
         }
+        link_polled();
         const uint32_t elapsed = millis() - cycle_start;
         const uint32_t rest = elapsed < poll_ms_ ? poll_ms_ - elapsed : 0;
         for(uint32_t t = 0; t < rest && running_; t += 10) sleep_ms(rest - t < 10 ? rest - t : 10);
@@ -561,7 +566,12 @@ void SlmpDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
         Item& it = items_[i];
         if(it.tag != &tag || !it.writable) continue;
         std::lock_guard<std::mutex> lock(qlock_);
-        if(queue_.size() < kWriteQueueLen) { queue_.push_back({ i, v }); it.pending_writes++; }
+        if(queue_.size() < kWriteQueueLen) { queue_.push_back({ i, v }); it.pending_writes++; continue; }
+        // Many are waiting (no connection, or many tags written at once): the newest value of a tag
+        // replaces the one waiting; a tag that is not waiting yet gets a place while there is room.
+        auto old = std::find_if(queue_.rbegin(), queue_.rend(), [i](const Write& w) { return w.item == i; });
+        if(old != queue_.rend()) { old->value = v; continue; }
+        if(queue_.size() < kWriteQueueMax) { queue_.push_back({ i, v }); it.pending_writes++; }
         else HML_WARN("slmp: write queue full, dropping write to '%s'", tag.name().c_str());
     }
 }

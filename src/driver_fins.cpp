@@ -43,7 +43,8 @@
 namespace hml {
 namespace {
 
-constexpr size_t kWriteQueueLen = 64;
+constexpr size_t kWriteQueueLen = 64;        // more than these waiting: from there on a tag has one place in the queue (its newest value)
+constexpr size_t kWriteQueueMax = 2048;      // ... and this is all there is room for (many tags written at once: data_transfer.hpp)
 constexpr int    kGapWords = 32;
 
 enum class DType { Bool, U16, S16, U32, S32, Float, Bcd16, Bcd32, String };
@@ -104,6 +105,7 @@ private:
     bool   write_allowed(const FinsAddress& a, int words, std::string& why) const;
     std::string block_name(const Block& b) const;
     void   set_online(bool on);
+    bool   link_polls_cyclically() const override { return true; }
     void   thread_main();
     void   on_tag_changed(Tag& tag, const Value& v, const void* source);
 
@@ -134,6 +136,7 @@ private:
 
 FinsDriver::FinsDriver(const json& cfg)
 {
+    link_set(false);
     const json* map = jget(cfg, "map");
     if(!map || !map->is_array()) { HML_WARN("fins: \"map\" array missing"); return; }
     if(!jhas(cfg, "host")) { HML_ERROR("fins: \"host\" is needed"); return; }
@@ -358,7 +361,7 @@ void FinsDriver::apply(Item& it, const uint16_t* w)
     double v = 0;
     const uint32_t u32 = it.swap_words ? (static_cast<uint32_t>(w[0]) << 16) | w[1] : (static_cast<uint32_t>(w[1]) << 16) | w[0];
     switch(it.dtype) {
-        case DType::Bool: it.tag->set_number((w[0] >> it.addr.bit) & 1, this); return;
+        case DType::Bool: it.tag->set_number_from_device((w[0] >> it.addr.bit) & 1, this); return;
         case DType::U16: v = w[0]; break;
         case DType::S16: v = static_cast<int16_t>(w[0]); break;
         case DType::U32: v = u32; break;
@@ -382,7 +385,7 @@ void FinsDriver::apply(Item& it, const uint16_t* w)
                 if(c == '\0') break;
                 s.push_back(c);
             }
-            it.tag->set_string(s, this);
+            it.tag->set_from_device(Value::string(s), this);
             return;
         }
     }
@@ -538,6 +541,7 @@ FinsDriver::Result FinsDriver::device_do(const DeviceRequest& rq, DeviceResult& 
 
 void FinsDriver::set_online(bool on)
 {
+    link_set(on);
     if(online_ == (on ? 1 : 0)) return;
     online_ = on ? 1 : 0;
     HML_INFO("fins %s %s", stream_->describe().c_str(), on ? "connected" : "disconnected");
@@ -593,6 +597,7 @@ void FinsDriver::thread_main()
             if(backoff < 5000) backoff *= 2;
             continue;
         }
+        link_polled();
         const uint32_t elapsed = millis() - cycle_start;
         const uint32_t rest = elapsed < poll_ms_ ? poll_ms_ - elapsed : 0;
         for(uint32_t t = 0; t < rest && running_; t += 10) sleep_ms(rest - t < 10 ? rest - t : 10);
@@ -610,14 +615,17 @@ void FinsDriver::on_tag_changed(Tag& tag, const Value& v, const void* source)
         if(it.tag != &tag || !it.writable) continue;
         std::lock_guard<std::mutex> lock(qlock_);
         if(queue_.size() < kWriteQueueLen) { queue_.push_back({ i, v }); it.pending_writes++; continue; }
-        // Full: nothing has been sent for a while (no connection). The newest value of a tag is
-        // the one that counts: it replaces the one waiting, or the oldest write gives its place.
-        if(!queue_full_said_) {
+        // Many are waiting: nothing has been sent for a while (no connection), or many tags were
+        // written at once. The newest value of a tag is the one that counts: it replaces the one
+        // waiting. A tag that is not waiting yet gets a place while there is room; with none left
+        // the oldest write gives its place.
+        if(!queue_full_said_ && link_state() != 1) {
             queue_full_said_ = true;
             HML_WARN("fins: %zu writes are waiting (no connection?): from now on only the newest value of each tag is kept", queue_.size());
         }
         auto old = std::find_if(queue_.rbegin(), queue_.rend(), [i](const Write& w) { return w.item == i; });
         if(old != queue_.rend()) { old->value = v; continue; }
+        if(queue_.size() < kWriteQueueMax) { queue_.push_back({ i, v }); it.pending_writes++; continue; }
         items_[queue_.front().item].pending_writes--;
         queue_.pop_front();
         queue_.push_back({ i, v });

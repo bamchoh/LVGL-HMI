@@ -556,3 +556,49 @@ TEST_CASE("Value::format: one value, one conversion; whatever else a format says
     CHECK(Value::number(1e300, TagType::Float).format("%.2f").size() < 400);
     CHECK(Value::number(0, TagType::Int).format("%c").size() <= 1);
 }
+
+// reliability: a write of the HMI side is not undone by what a device reports just then
+TEST_CASE("Tag: a value read from the device does not undo a write that waits to be handed to the driver")
+{
+    hml::tags().clear();
+    hml::Value init = hml::Value::number(10, hml::TagType::Int);
+    hml::Tag* t = hml::tags().create("race", hml::TagType::Int, &init, false, 0, 0);
+    REQUIRE(t);
+    int driver = 0, other_driver = 0, button = 0;                // (only their addresses are used: who wrote)
+    std::vector<double> to_device;
+    t->subscribe(hml::SubGroup::Driver, [&](hml::Tag&, const hml::Value& v, const void* src) { if(src != &driver) to_device.push_back(v.num); });
+
+    // the operator sets 20; before the main loop hands it to the driver, the poll that was on its
+    // way comes in with the 10 the device still holds
+    CHECK(t->set_number(20, &button));
+    CHECK_FALSE(t->set_number_from_device(10, &driver));
+    CHECK(t->get_number() == 20);
+    hml::tags().dispatch(false);
+    CHECK(to_device == std::vector<double>{ 20 });               // the write reaches the driver
+    // from here on the device is believed again
+    CHECK(t->set_number_from_device(21, &driver));
+    CHECK(t->get_number() == 21);
+    hml::tags().dispatch(false);
+    CHECK(to_device.size() == 1);                                // (its own value is not written back to it)
+    // two reports of devices in a row are both taken (nothing of the HMI side is waiting)
+    CHECK(t->set_number_from_device(22, &driver));
+    CHECK(t->set_number_from_device(23, &other_driver));
+    CHECK(t->get_number() == 23);
+    hml::tags().dispatch(false);
+    // a write, a report, another write, a report - all before the dispatch: the last write counts
+    t->set_number(30, &button);
+    t->set_number_from_device(23, &driver);
+    t->set_number(31, &button);
+    t->set_number_from_device(23, &other_driver);
+    CHECK(t->get_number() == 31);
+    hml::tags().dispatch(false);
+    CHECK(to_device.back() == 31);
+    // a refresh of the screens does not hand anything to the drivers: the write still waits, the device still has to wait
+    t->set_number(40, &button);
+    hml::tags().dispatch(true);
+    CHECK_FALSE(t->set_number_from_device(31, &driver));
+    CHECK(t->get_number() == 40);
+    hml::tags().dispatch(false);
+    CHECK(to_device.back() == 40);
+    hml::tags().clear();
+}

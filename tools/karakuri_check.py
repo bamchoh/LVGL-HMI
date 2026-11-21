@@ -484,6 +484,156 @@ def check_opcua_server(api, runtime, rep):
 CHECKS['opcua-server'] = check_opcua_server
 
 
+# ---------------------------------------------------------------- transfers: one PLC to another through the runtime
+def check_transfer(api, runtime, rep):
+    import time
+    slmp = api.ensure_server('slmp')
+    fins = api.ensure_server('fins')
+    mb = api.ensure_server('modbus-tcp')
+    mb_port = mb.get('port') or mb.get('tcpPort')
+    print('transfer: slmp %s -> fins %s / modbus-tcp %s, and back' % (slmp['port'], fins['port'], mb_port))
+    S, F, M, HR = 'slmp', 'fins', 'modbus-tcp', 'holdingRegisters'
+    N = 100                                                     # the block for the timing: D1000.. -> DM1000..
+    api.put_words(S, 'D', 400, [111, 0, 21, 0, 250])           # D400 speed, D402 count, D404 too large for its destination
+    api.put_bit(S, 'M', 20, False)
+    api.put_words(S, 'D', 410, [0])
+    api.put_words(S, 'D', 1000, [0] * N)
+    api.put_words(F, 'DM', 50, [9999, 0, 77])                  # DM50 <- speed, DM52 -> D410
+    api.put_words(F, 'DM', 60, [9999])                          # <- speed, only while M20
+    api.put_words(F, 'DM', 1000, [9999] * N)
+    api.put_words(M, HR, 60, [9999, 5])                         # 60 <- count * 2, 61 <- D404 (limits 0..100)
+    tags = ([T('s_speed', 'int'), T('s_count', 'int'), T('s_big', 'int'), T('s_gate', 'bool'), T('s_back', 'int'), T('f_speed', 'int'), T('f_src', 'int'), T('f_gated', 'int'),
+             T('m_count', 'int'), dict(T('m_small', 'int'), min=0, max=100), T('on_s', 'bool'), T('on_f', 'bool'), T('on_m', 'bool')] +
+            [T('sb%d' % i, 'int') for i in range(N)] + [T('fb%d' % i, 'int') for i in range(N)])
+    project = {'title': 'karakuri transfer', 'display': {'width': 320, 'height': 240}, 'start_screen': 's', 'tags': tags,
+               'drivers': [
+                   {'type': 'slmp', 'name': 'plc_s', 'host': '127.0.0.1', 'port': slmp['port'], 'poll_ms': 100, 'timeout_ms': 1000, 'status_tag': 'on_s', 'map': [
+                       {'tag': 's_speed', 'addr': 'D400'}, {'tag': 's_count', 'addr': 'D402'}, {'tag': 's_big', 'addr': 'D404'}, {'tag': 's_gate', 'addr': 'M20'},
+                       {'tag': 's_back', 'addr': 'D410'}] + [{'tag': 'sb%d' % i, 'addr': 'D%d' % (1000 + i)} for i in range(N)]},
+                   {'type': 'fins', 'name': 'plc_f', 'host': '127.0.0.1', 'port': fins['port'], 'poll_ms': 100, 'timeout_ms': 1000, 'status_tag': 'on_f', 'map': [
+                       {'tag': 'f_speed', 'addr': 'D50'}, {'tag': 'f_src', 'addr': 'D52'}, {'tag': 'f_gated', 'addr': 'D60'}] +
+                       [{'tag': 'fb%d' % i, 'addr': 'D%d' % (1000 + i)} for i in range(N)]},
+                   {'type': 'modbus_tcp', 'name': 'plc_m', 'host': '127.0.0.1', 'port': mb_port, 'unit_id': 1, 'poll_ms': 100, 'timeout_ms': 1000, 'status_tag': 'on_m', 'map': [
+                       {'tag': 'm_count', 'area': 'holding', 'addr': 60}, {'tag': 'm_small', 'area': 'holding', 'addr': 61}]}],
+               'transfers': [
+                   {'name': 'speed', 'from': 's_speed', 'to': 'f_speed'},
+                   {'name': 'count', 'from': 's_count', 'to': 'm_count', 'scale': 2, 'trigger': 'cyclic', 'every_ms': 500},
+                   {'name': 'big', 'from': 's_big', 'to': 'm_small'},
+                   {'name': 'back', 'from': 'f_src', 'to': 's_back', 'trigger': 'cyclic', 'every_ms': 500},
+                   {'name': 'gated', 'from': 's_speed', 'to': 'f_gated', 'when': 's_gate'}] +
+                   [{'name': 'b%d' % i, 'from': 'sb%d' % i, 'to': 'fb%d' % i} for i in range(N)],
+               'screens': ['screens/s.json']}
+    d = tempfile.mkdtemp(prefix='hml_karakuri_')
+    proc = None
+
+    def wait_for(what, read, want, seconds=8.0):
+        """Asks until the answer is `want`. Returns the time it took, or None."""
+        t0 = time.time()
+        got = None
+        while time.time() - t0 < seconds:
+            got = read()
+            if got == want: return time.time() - t0
+            time.sleep(0.05)
+        rep.check(what, got, want)
+        return None
+
+    def word(proto, area, addr): return lambda: api.get_words(proto, area, addr, 1)[0]
+    def stays(what, read, want, seconds=1.5):
+        time.sleep(seconds)
+        rep.check(what, read(), want)
+
+    try:
+        os.makedirs(os.path.join(d, 'screens'))
+        with open(os.path.join(d, 'project.json'), 'w', encoding='utf-8') as f: json.dump(project, f)
+        with open(os.path.join(d, 'screens', 's.json'), 'w', encoding='utf-8') as f: json.dump({'name': 's', 'children': []}, f)
+        log = open(os.path.join(d, 'out.txt'), 'wb')
+        env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
+        proc = subprocess.Popen([runtime, os.path.join(d, 'project.json'), '--exit-after', '90000'], stdout=log, stderr=subprocess.STDOUT, env=env)
+
+        # ---- the start: every transfer carries what its source holds
+        if wait_for('D400 -> DM50', word(F, 'DM', 50), 111) is not None: rep.check('D400 -> DM50', 111, 111)
+        if wait_for('D402 * 2 -> holding 60', word(M, HR, 60), 42) is not None: rep.check('D402 * 2 -> holding 60', 42, 42)
+        if wait_for('DM52 -> D410', word(S, 'D', 410), 77) is not None: rep.check('DM52 -> D410', 77, 77)
+        if wait_for('the block of 100 at the start', lambda: api.get_words(F, 'DM', 1000, N), [0] * N) is not None: rep.check('the block of 100 at the start', 1, 1)
+        rep.check('250 is not written to a tag of 0..100', word(M, HR, 61)(), 5)
+        rep.check('the condition is false: nothing written', word(F, 'DM', 60)(), 9999)
+
+        # ---- a change, and how long it takes: one value, then 100 at once
+        api.put_words(S, 'D', 400, [222])
+        t = wait_for('D400 = 222 -> DM50', word(F, 'DM', 50), 222)
+        if t is not None:
+            rep.check('D400 = 222 -> DM50', 222, 222)
+            print('     one value: %.0f ms from the change at the source to the destination (polling 100 ms each)' % (t * 1000))
+        t0 = time.time()
+        api.put_words(S, 'D', 1000, [i + 1 for i in range(N)])
+        t_set = time.time() - t0
+        t = wait_for('100 values', lambda: api.get_words(F, 'DM', 1000, N), [i + 1 for i in range(N)], 20)
+        if t is not None:
+            rep.check('100 values arrive', 1, 1)
+            print('     100 values: all there %.0f ms after the last was set (setting them through the API took %.0f ms)' % (t * 1000, t_set * 1000))
+        # the first transfer is as quick as before, with 100 others around it
+        api.put_words(S, 'D', 400, [223])
+        t = wait_for('D400 = 223 -> DM50', word(F, 'DM', 50), 223)
+        if t is not None: rep.check('one value among 100 transfers', t < 2.0, True)
+
+        # ---- the condition
+        api.put_bit(S, 'M', 20, True)
+        if wait_for('M20 on: D400 -> DM60', word(F, 'DM', 60), 223) is not None: rep.check('M20 on: D400 -> DM60', 223, 223)
+        api.put_bit(S, 'M', 20, False)
+        time.sleep(0.5)
+        api.put_words(S, 'D', 400, [224])
+        if wait_for('D400 = 224 -> DM50', word(F, 'DM', 50), 224) is not None: stays('M20 off: DM60 keeps its value', word(F, 'DM', 60), 223, 0.5)
+
+        # ---- somebody changes the destination at the device
+        api.put_words(S, 'D', 410, [0])
+        if wait_for('cyclic: D410 set right again', word(S, 'D', 410), 77) is not None: rep.check('cyclic: D410 set right again', 77, 77)
+        api.put_words(F, 'DM', 50, [5])
+        stays('on change: DM50 left as the device has it', word(F, 'DM', 50), 5)
+
+        # ---- the destination is away: nothing is lost, the newest value arrives, once
+        api.call('POST', '/servers/fins/stop')
+        time.sleep(1.5)
+        api.put_words(S, 'D', 400, [331])
+        time.sleep(0.5)
+        api.put_words(S, 'D', 400, [332])
+        time.sleep(0.5)
+        api.put_words(S, 'D', 400, [333])
+        time.sleep(1.0)
+        api.put_words(F, 'DM', 50, [1])                         # (what the device holds when it is back)
+        api.call('POST', '/servers/fins/start')
+        if wait_for('FINS back: DM50 gets the newest value', word(F, 'DM', 50), 333, 15) is not None: rep.check('FINS back: DM50 gets the newest value', 333, 333)
+
+        # ---- the source is away: its last value is not written again
+        api.call('POST', '/servers/slmp/stop')
+        time.sleep(1.5)
+        api.put_words(M, HR, 60, [1])                           # somebody sets the destination; the cyclic transfer would put 42 back
+        stays('SLMP away: the old 42 is not written back', word(M, HR, 60), 1, 2.5)
+        api.put_words(S, 'D', 402, [30])
+        api.call('POST', '/servers/slmp/start')
+        if wait_for('SLMP back: holding 60 gets the new value', word(M, HR, 60), 60, 15) is not None: rep.check('SLMP back: holding 60 gets the new value', 60, 60)
+    finally:
+        for proto in ('fins', 'slmp'):
+            try:
+                if 'Running' not in json.dumps(api.call('GET', '/servers/%s/status' % proto)): api.call('POST', '/servers/%s/start' % proto)
+            except Exception as e:
+                print('     (could not start %s again: %s)' % (proto, e))
+        if proc:
+            proc.terminate()
+            try: proc.wait(10)
+            except Exception: proc.kill()
+        try:
+            log.close()
+            out = open(os.path.join(d, 'out.txt'), 'rb').read().decode('utf-8', 'replace')
+            for line in out.splitlines():
+                if 'transfers:' in line: print('     ' + line.strip())
+            rep.warnings(out, allow=('communication error', 'reconnecting', 'cannot connect', 'timeout'))
+        except Exception as e:
+            print('     (no output of the runtime: %s)' % e)
+        shutil.rmtree(d, ignore_errors=True)
+
+CHECKS['transfer'] = check_transfer
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--api', default='http://localhost:8765/api')
