@@ -332,3 +332,5 @@ table.cells td input { width: 100%; min-width: 90px; box-sizing: border-box; }
 .lib-use:hover { background: var(--bg3); }
 .lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-buttons { gap: 6px; margin-top: 8px; }
+.lv-template, .lv-template * { pointer-events: none !important; }
+.lv-template { opacity: 0.7; }

@@ -75,9 +75,23 @@ const Canvas = {
       (scr.children || []).forEach((c, i) => content.append(this.build(c, [i], th, scr.flex ? scr : null)));
       return;
     }
+    // a screen built on a template: the template's look and widgets come first. They are drawn
+    // as on the device, but belong to the other screen: they are not selected or moved here.
+    const chain = scr.template !== undefined ? M.templateChain(scr) : { layers: [] };
+    for (const layer of chain.layers) if (layer.style && typeof layer.style === 'object') this.applyStyle(root, layer.style, th, {});
     if (scr.style && typeof scr.style === 'object') this.applyStyle(root, scr.style, th, {});
     root.className = 'lv lv-screen' + (U.samePath(M.st.sel, []) ? ' hd-selected' : '');
     const content = this.container(root, scr, th, 0);
+    for (const layer of chain.layers) {
+      (Array.isArray(layer.children) ? layer.children : []).forEach(c => {
+        const e = this.build(M.templateFill(c, scr), ['template'], th, layer.flex ? layer : null);
+        e.classList.add('lv-template');
+        e.classList.remove('hd-selected', 'hd-also');
+        e.dataset.template = layer.name || '';
+        for (const x of [e, ...e.querySelectorAll('[data-path]')]) { delete x.dataset.path; x.classList.remove('hd-selected', 'hd-also'); }
+        content.append(e);
+      });
+    }
     (scr.children || []).forEach((c, i) => content.append(this.build(c, [i], th, scr.flex ? scr : null)));
   },
 

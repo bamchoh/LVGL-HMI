@@ -89,7 +89,11 @@ const Panels = {
         U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (App.ask('Delete screen "' + s.data.name + '"?')) M.removeScreen(i); } }, '×')));
     });
     el.append(list);
-    el.append(U.el('div', { class: 'row' }, U.el('button', { onclick: async () => { const n = await App.prompt('New screen name', 'screen' + (M.st.screens.length + 1)); if (n && !M.addScreen(n)) App.toast('name already used or invalid'); } }, '+ Add screen')));
+    // a new screen, plain or on a template (a screen that others are built on)
+    const tpl = U.el('select', { id: 'new-screen-template', title: 'The new screen is built on this one (its header, its navigation)' }, U.el('option', { value: '' }, I18N.t('(no template)')));
+    for (const s of M.st.screens) if (!s.data.popup) tpl.append(U.el('option', { value: s.data.name, selected: s.data.name === Panels.newScreenTemplate }, s.data.name));
+    tpl.onchange = () => { Panels.newScreenTemplate = tpl.value; };
+    el.append(U.el('div', { class: 'row' }, U.el('button', { id: 'add-screen', onclick: async () => { const n = await App.prompt('New screen name', 'screen' + (M.st.screens.length + 1)); if (n && !M.addScreen(n, tpl.value)) App.toast('name already used or invalid'); } }, '+ Add screen'), tpl));
     el.append(U.el('div', { class: 'hint' }, I18N.t('The radio button marks the start screen. Files are screens/<name>.json; renaming keeps the file name.')));
   },
 

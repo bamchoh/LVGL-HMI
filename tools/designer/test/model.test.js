@@ -1161,6 +1161,83 @@ test('M replace: 100 screens with 5000 widgets - the plan and the replacement ta
   assert.ok(tPlan < 2000 && tApply < 10000 && tText < 10000 && tSize < 5000);
 });
 
+// ---------------------------------------------------------------- template screens (issue #71)
+
+function templateProject() {
+  const { M } = load();
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'clock', type: 'int' }];
+  M.screen().name = 'frame';
+  M.st.project.start_screen = 'frame';
+  Object.assign(M.screen(), { style: { bg_color: '#102030' }, children: [
+    { type: 'label', x: 8, y: 4, text: 'Plant - ${title} (${screen})' },
+    { type: 'panel', x: 0, y: 400, w: 800, h: 80, children: [{ type: 'button', text: 'Home', on_click: { action: 'goto', screen: 'home' } }, { type: 'label', bind: { text: { tag: 'clock', format: '${unit} %d' } } }] }] });
+  M.addScreen('home', 'frame');
+  M.screen().template_args = { title: 'Overview', unit: 's' };
+  M.screen().children = [{ type: 'label', x: 8, y: 60, text: 'body ${title}' }];
+  return { M };
+}
+
+test('M templates: a new screen on a template; its chain, its placeholders, its texts filled', () => {
+  const { M } = templateProject();
+  const home = M.screen();
+  assert.equal(home.name, 'home');
+  assert.equal(home.template, 'frame');
+  assert.ok(!('style' in home) && !('scrollable' in home), 'what the template says about the screen itself is not said again');
+  assert.equal(M.problems().length, 0, M.problems().map(p => p.text).join(' | '));
+  const chain = M.templateChain(home);
+  assert.equal(chain.problem, '');
+  assert.deepEqual(plain(chain.layers.map(l => l.name)), ['frame']);
+  assert.deepEqual(plain(M.templatePlaceholders(home)), ['title', 'unit']);
+  const filled = M.templateFill(chain.layers[0].children, home);
+  assert.equal(filled[0].text, 'Plant - Overview (home)');
+  assert.equal(filled[1].children[1].bind.text.format, 's %d');
+  assert.equal(M.st.screens[0].data.children[0].text, 'Plant - ${title} (${screen})', 'the template itself is not changed');
+  assert.equal(M.templateFill('${title}${nope}${', home), 'Overview${');
+  assert.equal(M.templateFill('${constructor}${__proto__}${toString}', home), '', 'only what the screen gives');
+  // a plain screen: no chain; an unknown template name in addScreen: a plain screen
+  assert.deepEqual(plain(M.templateChain(M.st.screens[0].data)), { layers: [], problem: '' });
+  assert.ok(M.addScreen('plain', 'no_such_screen'));
+  assert.equal(M.screen().template, undefined);
+  assert.ok('style' in M.screen());
+  // a template on a template
+  assert.ok(M.addScreen('deep', 'home'));
+  assert.deepEqual(plain(M.templateChain(M.screen()).layers.map(l => l.name)), ['frame', 'home']);
+  assert.deepEqual(plain(M.templatePlaceholders(M.screen())), ['title', 'unit']);
+});
+
+test('M templates: renaming the template is followed; what is wrong is a problem', () => {
+  const { M } = templateProject();
+  M.renameScreen(0, 'layout');
+  assert.equal(M.st.screens[1].data.template, 'layout');
+  assert.equal(M.problems().length, 0);
+  const home = M.st.screens[1].data;
+  const has = (change, re) => {
+    const keep = JSON.stringify(home);
+    change();
+    const t = M.problems().map(p => p.text);
+    assert.ok(t.some(x => re.test(x)), String(re) + ' in: ' + t.join(' | '));
+    for (const k of Object.keys(home)) delete home[k];
+    Object.assign(home, JSON.parse(keep));
+  };
+  has(() => { home.template = 'nowhere'; }, /screen "home": unknown template "nowhere"/);
+  has(() => { home.template = 'home'; }, /not its own template/);
+  has(() => { home.template = 5; }, /the name of a screen/);
+  has(() => { M.st.screens[0].data.template = 'home'; }, /form a ring/);
+  M.st.screens[0].data.template = undefined; delete M.st.screens[0].data.template;
+  has(() => { M.st.screens[0].data.popup = true; }, /is a popup/);
+  delete M.st.screens[0].data.popup;
+  has(() => { delete home.template_args.unit; }, /the template has \$\{unit\}/);
+  has(() => { home.template_args.extra = 1; }, /"extra" is not used by the template/);
+  has(() => { home.template_args.title = ['x']; }, /"title" is a text, a number or true \/ false/);
+  has(() => { home.template_args = 'x'; }, /template_args is \{/);
+  has(() => { delete home.template; }, /template_args without a template/);
+  assert.equal(M.problems().length, 0, 'put back: ' + M.problems().map(p => p.text).join(' | '));
+  // the template is removed: the screens that used it say so
+  M.removeScreen(0);
+  assert.ok(M.problems().some(p => /unknown template "layout"/.test(p.text)));
+});
+
 // ---------------------------------------------------------------- the library of parts (issue #71)
 
 test('M library: the selection becomes a part that begins at 0,0; a part is pasted like a copy', () => {

@@ -56,6 +56,8 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 
 - ファイルは UTF-8（BOM なし）で書く。日本語を含むファイルを PowerShell で書き換えるときは、文字コードを指定する
   （`[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`）。
+- 既存の画面に `"template": "<画面名>"` があれば、ヘッダーやナビゲーションはその画面（テンプレート）の部品。新しい画面も同じ `template` を付け、
+  題名などは `template_args` で渡す（テンプレートの `${名前}` に入る）。共通部分を各画面に書き写さない。テンプレート自体を変えるのは、頼まれたときだけ。
 - `name` は英数字と `_`。`project.json` の `"screens"` にはファイルのパス（`"screens/overview.json"`）を書く。
 - 子の `x` `y` は親の内側（余白 `pad` の内側）からの位置。`align` を付けると、その基準点からのずれになる。
 - ウィジェットの種類・プロパティ・スタイル・動作の**一覧は `reference/widgets.md`**（デザイナーの定義から生成したもの）。
