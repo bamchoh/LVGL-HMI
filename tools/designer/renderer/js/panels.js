@@ -69,6 +69,7 @@ const Panels = {
       list.append(U.el('div', { class: 'item' + (i === M.st.cur ? ' sel' : ''), onclick: () => { Panels.showView('screen'); M.selectScreen(i); } },
         U.el('input', { type: 'radio', name: 'start', checked: isStart, title: 'start screen', onclick: e => { e.stopPropagation(); M.mutate(() => { M.st.project.start_screen = s.data.name; }); } }),
         U.el('span', { class: 'grow' }, s.data.name, U.el('span', { class: 'dim' }, '  ' + s.file)),
+        U.el('button', { class: 'mini', title: 'duplicate', dataset: { dup: String(i) }, onclick: e => { e.stopPropagation(); Panels.showView('screen'); M.duplicateScreen(i); App.toast('A copy of the screen was made. "Replace" changes its tags.', 3500); } }, '⧉'),
         U.el('button', { class: 'mini', title: 'rename', onclick: async e => { e.stopPropagation(); const n = await App.prompt('Screen name', s.data.name); if (n) M.renameScreen(i, n); } }, '✎'),
         U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (App.ask('Delete screen "' + s.data.name + '"?')) M.removeScreen(i); } }, '×')));
     });
@@ -443,6 +444,7 @@ const Panels = {
       U.el('option', { value: '' }, I18N.t('(choose to apply)')), ...SCHEMA.displayPresets.map((p0, i) => U.el('option', { value: i }, p0.name)));
     el.append(Props.section('Display', true,
       Props.row('display preset', preset, I18N.t('Sets the size and the touch correction for a known display.')),
+      U.el('div', { class: 'row' }, U.el('button', { dataset: { fk: fk + '.resize' }, title: 'Scale every screen for a display of another size', onclick: () => App.resizeDialog() }, 'Convert to another size…')),
       ...Props.fields(d, [{ k: 'width', t: 'number' }, { k: 'height', t: 'number' }, { k: 'zoom', t: 'number', hint: 'SDL window zoom (PC only)' },
         { k: 'rotation', t: 'select', o: ['', '0', '90', '180', '270'] }, { k: 'dpi', t: 'number', hint: 'theme scale, default 130' }], fk + '.display')));
     // touch correction: resistive panels report raw values that have to be mapped to the screen

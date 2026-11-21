@@ -359,6 +359,153 @@ const M = {
     return n;
   },
 
+  // ---- find and replace: tag names and texts, over a screen or the whole project ----
+  // opt: { what: 'tags' | 'texts', find, replace, whole, matchCase, scope: 'screen' | 'screens' | 'project',
+  //        definitions (tags, scope project: the names in the tag list too), createTags }
+  // -> the places that would change: [{ loc, what, before, after, set }]. Nothing is changed.
+  replacePlan(opt) {
+    const st = this.st, out = [];
+    const find = String(opt.find === undefined || opt.find === null ? '' : opt.find), repl = String(opt.replace === undefined || opt.replace === null ? '' : opt.replace);
+    if (!st.project || !find) return out;
+    const cs = opt.matchCase !== false, whole = !!opt.whole, scope = opt.scope || 'project';
+    const inScope = loc => scope === 'project' || (loc && loc.screen !== undefined && (scope === 'screens' || loc.screen === st.cur));
+    const lf = find.toLowerCase();
+    const change = s => {
+      if (whole) return (cs ? s === find : s.toLowerCase() === lf) ? repl : s;
+      if (cs) return s.split(find).join(repl);
+      let r = '', i = 0;
+      const ls = s.toLowerCase();
+      for (;;) { const k = ls.indexOf(lf, i); if (k < 0) { r += s.slice(i); break; } r += s.slice(i, k) + repl; i = k + find.length; }
+      return r;
+    };
+    const add = (before, set, loc, what, lua) => {
+      if (typeof before !== 'string' || !inScope(loc)) return;
+      const after = change(before);
+      if (after !== before) out.push({ loc, what, before, after, set, lua: !!lua });
+    };
+    if (opt.what === 'texts') {
+      const table = st.project.texts && typeof st.project.texts === 'object' ? st.project.texts : null;
+      // ("@id" is a name, not a text: the text itself is in the table)
+      this.eachTextRef((s, set, loc) => { if (table && s[0] === '@' && s[1] !== '@') return; add(s, set, loc, 'text'); });
+      if (table && scope === 'project')
+        for (const id of Object.keys(table)) {
+          const row = table[id];
+          if (!row || typeof row !== 'object') continue;
+          for (const lang of Object.keys(row)) add(row[lang], v => { row[lang] = v; }, { view: 'texts' }, id + ' / ' + lang);
+        }
+    } else {
+      this.eachTagRef((name, set, loc, what) => add(name, set, loc, what, what === 'lua'));
+      if (opt.definitions && scope === 'project') (st.project.tags || []).forEach((t, i) => { if (t) add(t.name, v => { t.name = v; }, { view: 'tags', index: i }, 'tag', false); });
+    }
+    return out;
+  },
+  // Do it, as one step that can be undone. -> { changed, created, skipped, newProblems }
+  replaceApply(opt) {
+    const count = list => { const m = new Map(); for (const p of list) m.set(p.text, (m.get(p.text) || 0) + 1); return m; };
+    const before = count(this.problems());
+    let changed = 0, created = 0, skipped = 0;
+    this.mutate(() => {
+      const st = this.st, tags = st.project.tags || (st.project.tags = []);
+      const plan = this.replacePlan(opt);
+      const isTags = opt.what !== 'texts';
+      // a tag definition does not take a name another tag has (or gets)
+      const taken = new Set(tags.map(t => t && t.name));
+      const todo = [];
+      for (const c of plan) {
+        if (isTags && c.loc.view === 'tags' && c.what === 'tag') {
+          if (!c.after || taken.has(c.after)) { skipped++; continue; }
+          taken.delete(c.before); taken.add(c.after);
+        }
+        if (isTags && c.lua && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.after)) { skipped++; continue; }      // (not a name Lua can write as tag.x)
+        todo.push(c);
+      }
+      // the tags the new names need: copies of the ones the old names had
+      if (isTags && opt.createTags) {
+        const byName = new Map(tags.map(t => [t && t.name, t]));
+        for (const c of todo) {
+          if (c.loc.view === 'tags' || !c.after || byName.has(c.after) || /^sys\./.test(c.after)) continue;
+          const src = byName.get(c.before);
+          if (!src) continue;
+          const copy = Object.assign(U.clone(src), { name: c.after });
+          tags.splice(tags.indexOf(src) + 1, 0, copy);
+          byName.set(c.after, copy);
+          created++;
+        }
+      }
+      // Lua code: a name is replaced wherever it stands in the code, so a name that is the result of
+      // one replacement must not be the subject of a later one (x1 -> x11 before x11 -> x111 would
+      // change both to x111): those whose new name nobody else waits for go first.
+      const rest = todo.filter(c => c.lua), plain = todo.filter(c => !c.lua);
+      for (const c of plain) { c.set(c.after); changed++; }
+      while (rest.length) {
+        let k = rest.findIndex(c => !rest.some(o => o !== c && o.before === c.after));
+        if (k < 0) k = 0;                                   // (a ring of names: no order is right)
+        const c = rest.splice(k, 1)[0];
+        c.set(c.after); changed++;
+      }
+    });
+    const fresh = [];
+    for (const p of this.problems()) { const n = before.get(p.text) || 0; if (n) before.set(p.text, n - 1); else fresh.push(p); }
+    return { changed, created, skipped, newProblems: fresh };
+  },
+
+  // ---- screens: a copy, another size ----------------------------------------
+  // A copy of a screen, placed after it and shown. -> its index, or -1
+  duplicateScreen(idx, name) {
+    const st = this.st, src = st.screens[idx];
+    if (!src) return -1;
+    const safe = s => String(s || '').trim().replace(/[^A-Za-z0-9_\-]/g, '_');
+    const base = safe(name) || safe(src.data.name + '_copy') || 'screen';
+    const names = new Set(this.screenNames()), files = new Set(st.screens.map(s => s.file));
+    let n = base;
+    for (let i = 2; names.has(n) || files.has('screens/' + n + '.json'); i++) n = base + i;
+    this.mutate(() => {
+      const data = U.clone(src.data);
+      data.name = n;
+      st.screens.splice(idx + 1, 0, { file: 'screens/' + n + '.json', data });
+      st.cur = idx + 1;
+      st.sel = [];
+    });
+    return idx + 1;
+  },
+  // Positions, sizes, fonts and spacings of one widget tree for a display sx times as wide and sy
+  // times as high. Percentages and "content" stay; a font becomes the nearest size there is.
+  scaleWidget(w, sx, sy) {
+    const s = Math.min(sx, sy), fonts = SCHEMA.fonts;
+    const px = (v, f) => (typeof v === 'number' && isFinite(v) ? Math.round(v * f) : v);
+    const visit = o => {
+      if (!o || typeof o !== 'object') return;
+      o.x = px(o.x, sx); o.y = px(o.y, sy); o.w = px(o.w, sx); o.h = px(o.h, sy);
+      for (const k of ['x', 'y', 'w', 'h']) if (o[k] === undefined) delete o[k];
+      if (Array.isArray(o.points)) o.points = o.points.map(p => (Array.isArray(p) && p.length >= 2 ? [px(p[0], sx), px(p[1], sy)].concat(p.slice(2)) : p));
+      for (const k of Object.keys(o)) {
+        if (!/^style/.test(k) || !o[k] || typeof o[k] !== 'object' || Array.isArray(o[k])) continue;
+        const st = o[k];
+        if (typeof st.font === 'number') { const want = st.font * s; st.font = fonts.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a), fonts[0]); }
+        for (const sk of Object.keys(st)) {
+          if (typeof st[sk] !== 'number') continue;
+          if (/^pad(_|$)|^margin(_|$)|^radius$/.test(sk)) st[sk] = Math.max(st[sk] > 0 ? 1 : 0, Math.round(st[sk] * (/_left$|_right$|_column$/.test(sk) ? sx : /_top$|_bottom$|_row$/.test(sk) ? sy : s)));
+        }
+      }
+      if (Array.isArray(o.children)) o.children.forEach(visit);
+    };
+    visit(w);
+    return w;
+  },
+  // The whole project for another display: every screen is scaled, the display gets the new size.
+  resizeProject(width, height) {
+    const st = this.st, d = this.display();
+    width = Math.round(Number(width)); height = Math.round(Number(height));
+    if (!st.project || !(width >= 64 && width <= 8192 && height >= 64 && height <= 8192)) return false;
+    if (width === d.w && height === d.h) return false;
+    this.mutate(() => {
+      const sx = width / d.w, sy = height / d.h;
+      for (const s of st.screens) this.scaleWidget(s.data, sx, sy);
+      st.project.display = Object.assign({}, st.project.display, { width, height });
+    });
+    return true;
+  },
+
   // ---- style: copy the look of one widget onto others ------------------------
   styleOf(w) { const o = {}; for (const k of Object.keys(w || {})) if (/^style/.test(k)) o[k] = U.clone(w[k]); return o; },
   pasteStyle(styles) {

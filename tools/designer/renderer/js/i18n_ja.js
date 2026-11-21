@@ -418,6 +418,19 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.TEXT_JA, { 'Replace': '置換', 'Find and replace tag names and texts, on this screen or in the whole project': 'タグ名と文字を、この画面またはプロジェクト全体で置換する',
+  'Find and replace': '検索と置換', 'Tag names': 'タグ名', 'Texts': '文字', 'This screen': 'この画面', 'All screens': 'すべての画面', 'The whole project': 'プロジェクト全体',
+  'Find': '検索する文字', 'Replace with': '置き換える文字', 'Only the whole name / text': '全体が一致するものだけ', 'Match case': '大文字と小文字を区別する',
+  'Make the tags the new names need (copies of the old ones)': '新しい名前のタグがなければ作る（元のタグの型と上下限をコピー）', 'Rename in the tag list too': 'タグ一覧の名前も変える',
+  'Type what to find. The places that will change are listed here first.': '検索する文字を入れると、変わる所の一覧がここに出ます。', '{0} place(s) will change': '{0} か所が変わります', '... and {0} more': '… ほか {0} か所',
+  'Nothing to replace.': '置換する所がありません。', '{0} place(s) changed': '{0} か所を変えました', '{0} tag(s) made': 'タグを {0} 個作りました', '{0} left as they were': '{0} か所はそのままです',
+  'Replaced - but there are {0} new problem(s)': '置換しましたが、問題が {0} 件増えました', 'Undo the replacement': '置換を取り消す', 'Keep it': 'このままにする', 'Undone.': '取り消しました。',
+  'duplicate': '複製', 'A copy of the screen was made. "Replace" changes its tags.': '画面を複製しました。タグは「置換」で変えられます。',
+  'Convert to another size…': '別の大きさに変換…', 'Scale every screen for a display of another size': 'すべての画面を、別の大きさの表示器に合わせて拡大・縮小する',
+  'Convert the project to another display size (now {0} \u00d7 {1})': 'プロジェクトを別の表示サイズに変換（今は {0} × {1}）', 'Convert': '変換',
+  'Every screen is scaled: positions, sizes, spacings; fonts become the nearest size there is. Sizes in % stay. Look at the screens afterwards - texts may need another font. One step that can be undone.':
+    'すべての画面の位置・大きさ・余白を拡大・縮小し、フォントはいちばん近い大きさにします。% の指定はそのままです。変換のあと、文字が収まっているか画面を見てください。元に戻す（Ctrl+Z）1 回で戻せます。',
+  'Give another size (64 to 8192).': '今と違う大きさ（64〜8192）を入れてください。', '{0} screen(s) converted': '{0} 画面を変換しました' });
 Object.assign(I18N.KEYS_JA, { transfers: 'データ転送', transfer_from: '転送元', transfer_to: '転送先', trigger: 'きっかけ', every_ms: '周期 (ms)', out_of_range: '範囲外の値', transfer_when: '条件' });
 Object.assign(I18N.TEXT_JA, { 'Transfers': 'データ転送', '(on change)': '(変化したとき)', '(not written)': '(書かない)', 'values copied from one tag to another': 'タグの値を別のタグに写す',
   'the tag the value is taken from': '値を取るタグ', 'the tag the value is written to': '値を書くタグ',

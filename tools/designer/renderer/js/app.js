@@ -72,6 +72,7 @@ const App = {
     q('t-dup').onclick = () => M.duplicateSelection();
     q('t-del').onclick = () => M.deleteSelection();
     q('status-prob').onclick = () => this.problemsDialog();
+    q('b-replace').onclick = () => this.replaceDialog();
     q('t-up').onclick = () => M.moveWidget(M.st.sel, -1);
     q('t-down').onclick = () => M.moveWidget(M.st.sel, 1);
     q('t-in').onclick = () => M.reparentWidget(M.st.sel, 'in');
@@ -329,6 +330,70 @@ const App = {
         : pr.view === 'scripts' && pr.index !== undefined ? ' › ' + ((M.st.project.scripts[pr.index] || {}).name || '') : '');
     let w = scr.data; for (const i of pr.path) w = (w.children || [])[i];
     return I18N.t('Screen') + ' "' + scr.data.name + '"' + (pr.path.length && w ? ' › ' + Tree.label(w, false) : '');
+  },
+
+  // ---- find and replace: tag names and texts ---------------------------------
+  // The list under the fields is what will change; nothing changes before "Replace".
+  replaceDialog(preset) {
+    if (!M.st.project) return;
+    const opt = Object.assign({ what: 'tags', find: '', replace: '', whole: false, matchCase: true, scope: 'screen', createTags: false, definitions: false }, preset);
+    const sel = (id, options, v) => { const s = U.el('select', { id }); for (const [val, text] of options) s.append(U.el('option', { value: val, selected: val === v }, I18N.t(text))); return s; };
+    const chk = (id, text, v) => { const box = U.el('input', { type: 'checkbox', id, checked: !!v }); const l = U.el('label', { class: 'rep-chk' }, box, ' ' + I18N.t(text)); l.box = box; return l; };
+    const what = sel('rep-what', [['tags', 'Tag names'], ['texts', 'Texts']], opt.what);
+    const scope = sel('rep-scope', [['screen', 'This screen'], ['screens', 'All screens'], ['project', 'The whole project']], opt.scope);
+    const find = U.el('input', { type: 'text', id: 'rep-find', value: opt.find, placeholder: 'Find' });
+    const repl = U.el('input', { type: 'text', id: 'rep-with', value: opt.replace, placeholder: 'Replace with' });
+    const whole = chk('rep-whole', 'Only the whole name / text', opt.whole), mcase = chk('rep-case', 'Match case', opt.matchCase);
+    const create = chk('rep-create', 'Make the tags the new names need (copies of the old ones)', opt.createTags);
+    const defs = chk('rep-defs', 'Rename in the tag list too', opt.definitions);
+    const count = U.el('div', { id: 'rep-count', class: 'rep-count' }), list = U.el('div', { id: 'rep-list', class: 'prob-list' });
+    const read = () => ({ what: what.value, find: find.value, replace: repl.value, scope: scope.value, whole: whole.box.checked, matchCase: mcase.box.checked,
+                          createTags: what.value === 'tags' && create.box.checked, definitions: what.value === 'tags' && scope.value === 'project' && defs.box.checked });
+    const show = () => {
+      const o = read();
+      create.hidden = o.what !== 'tags';
+      defs.hidden = o.what !== 'tags' || o.scope !== 'project';
+      const plan = M.replacePlan(o);
+      count.textContent = !o.find ? I18N.t('Type what to find. The places that will change are listed here first.') : I18N.f('{0} place(s) will change', plan.length);
+      list.innerHTML = '';
+      // (what the user wrote is shown as text, never as markup)
+      for (const c of plan.slice(0, 300))
+        list.append(U.el('div', { class: 'item rep-item' }, U.el('div', null, U.el('span', { class: 'rep-old' }, c.before), ' → ', U.el('span', { class: 'rep-new' }, c.after)),
+          U.el('div', { class: 'where' }, this.whereText(c.loc) + (c.what ? ' · ' + I18N.label(c.what) : ''))));
+      if (plan.length > 300) list.append(U.el('div', { class: 'rep-count' }, I18N.f('... and {0} more', plan.length - 300)));
+    };
+    for (const e of [what, scope, find, repl]) { e.oninput = show; e.onchange = show; }
+    for (const e of [whole, mcase, create, defs]) e.box.onchange = show;
+    const body = U.el('div', { class: 'replace-dlg' }, U.el('div', { class: 'rep-line' }, what, scope), U.el('div', { class: 'rep-line' }, find, U.el('span', null, '→'), repl),
+      U.el('div', { class: 'rep-line' }, whole, mcase), create, defs, count, list);
+    this.modal({ title: 'Find and replace', body, buttons: [{ label: 'Close' }, { label: 'Replace', primary: true, onclick: () => {
+      const o = read();
+      if (!M.replacePlan(o).length) { this.toast('Nothing to replace.', 2000); return false; }
+      const r = M.replaceApply(o);
+      setTimeout(() => this.replaceResult(r), 0);          // (after this dialog is closed)
+    } }] });
+    show();
+  },
+  // What a replacement did. New problems are shown at once, with the way back.
+  replaceResult(r) {
+    const msg = I18N.f('{0} place(s) changed', r.changed) + (r.created ? ' · ' + I18N.f('{0} tag(s) made', r.created) : '') + (r.skipped ? ' · ' + I18N.f('{0} left as they were', r.skipped) : '');
+    if (!r.newProblems.length) { this.toast(msg, 4000); return; }
+    const body = U.el('div', null, U.el('div', { class: 'rep-count' }, msg), U.el('div', { class: 'prob-list', id: 'rep-problems' },
+      ...r.newProblems.slice(0, 200).map(pr => U.el('div', { class: 'item' }, U.el('div', null, I18N.t(pr.text)), U.el('div', { class: 'where' }, this.whereText(pr))))));
+    this.modal({ title: I18N.f('Replaced - but there are {0} new problem(s)', r.newProblems.length), body,
+                 buttons: [{ label: 'Undo the replacement', onclick: () => { M.undo(); this.toast('Undone.', 2000); } }, { label: 'Keep it', primary: true }] });
+  },
+  // The whole project for a display of another size.
+  resizeDialog() {
+    if (!M.st.project) return;
+    const d = M.display();
+    const w = U.el('input', { type: 'number', id: 'size-w', value: d.w, min: 64, max: 8192 }), h = U.el('input', { type: 'number', id: 'size-h', value: d.h, min: 64, max: 8192 });
+    const body = U.el('div', null, U.el('div', { class: 'rep-line' }, w, U.el('span', null, '×'), h),
+      U.el('div', { class: 'hint' }, 'Every screen is scaled: positions, sizes, spacings; fonts become the nearest size there is. Sizes in % stay. Look at the screens afterwards - texts may need another font. One step that can be undone.'));
+    this.modal({ title: I18N.f('Convert the project to another display size (now {0} × {1})', d.w, d.h), body, buttons: [{ label: 'Cancel' }, { label: 'Convert', primary: true, onclick: () => {
+      if (!M.resizeProject(Number(w.value), Number(h.value))) { this.toast('Give another size (64 to 8192).', 2500); return false; }
+      this.toast(I18N.f('{0} screen(s) converted', M.st.screens.length), 3000);
+    } }] });
   },
 
   // ---- problems: what will not work on the device --------------------------

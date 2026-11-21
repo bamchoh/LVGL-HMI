@@ -697,6 +697,115 @@
     Panels.show('widgets');
   });
 
+  await test('replace: what will change is listed before anything changes; new problems come with the way back; one undo', async () => {
+    const $ = id => document.getElementById(id);
+    const set = (id, v) => { $(id).value = v; $(id).dispatchEvent(new Event('input', { bubbles: true })); $(id).dispatchEvent(new Event('change', { bubbles: true })); };
+    const check = (id, on) => { if ($(id).checked !== on) $(id).click(); };
+    const btn = label => document.querySelector('#modal-buttons [data-label="' + label + '"]');
+    const later = () => new Promise(r => setTimeout(r, 40));
+    const snap = () => JSON.stringify([M.st.project, M.st.screens]);
+    // a tag that this screen uses
+    const uses = M.tagUses();
+    const tag = [...uses.keys()].find(n => !/^sys\./.test(n) && M.tagNames().includes(n) && uses.get(n).some(u => u.loc.screen === 0));
+    ok(tag, 'the demo screen uses a tag');
+    const before = snap();
+    $('b-replace').click();
+    ok(!$('modal').hidden, 'the dialog');
+    eq($('rep-list').children.length, 0, 'nothing to find yet');
+    set('rep-find', tag);
+    set('rep-with', tag + '_x');
+    const here = M.replacePlan({ what: 'tags', find: tag, replace: tag + '_x', scope: 'screen' }).length;
+    ok(here > 0, 'places on this screen');
+    eq($('rep-list').querySelectorAll('.rep-item').length, Math.min(here, 300), 'the places are listed');
+    ok($('rep-count').textContent.includes(String(here)), 'the count: ' + $('rep-count').textContent);
+    ok($('rep-list').textContent.includes(tag + '_x'), 'old and new are shown');
+    eq(snap(), before, 'listing changes nothing');
+    ok($('rep-defs').closest('label').hidden, 'the tag list: only for the whole project');
+    set('rep-scope', 'project');
+    ok(!$('rep-defs').closest('label').hidden);
+    ok($('rep-list').querySelectorAll('.rep-item').length >= Math.min(here, 300), 'the whole project: not fewer');
+    set('rep-scope', 'screen');
+    // what is typed is shown as text, never run
+    window.__xss = 0;
+    set('rep-with', '<img src=x onerror="window.__xss=1"><b>bold</b>');
+    await later();
+    eq($('rep-list').querySelectorAll('img, b').length, 0, 'no markup from the input');
+    ok($('rep-list').textContent.includes('<img src=x'), 'shown as it was typed');
+    eq(window.__xss, 0);
+    // replaced without the tags: the new problems are shown, and can be taken back at once
+    set('rep-with', tag + '_x');
+    check('rep-create', false);
+    btn('Replace').click();
+    await later();
+    ok(snap() !== before, 'replaced');
+    ok(!$('modal').hidden && $('rep-problems'), 'the new problems');
+    ok($('rep-problems').textContent.includes(tag + '_x'), $('rep-problems').textContent.slice(0, 200));
+    btn('Undo the replacement').click();
+    await later();
+    eq(snap(), before, 'taken back');
+    // again, with the tags made: no problem, a message, one undo step
+    const base = M.problems().length, undos = M.st.undo.length;
+    $('b-replace').click();
+    set('rep-find', tag); set('rep-with', tag + '_x');
+    check('rep-create', true);
+    btn('Replace').click();
+    await later();
+    ok($('modal').hidden, 'no dialog when all is well');
+    ok(M.tagNames().includes(tag + '_x'), 'the tag was made');
+    eq(M.problems().length, base);
+    eq(M.st.undo.length, undos + 1, 'one undo step');
+    key('z', { ctrlKey: true });
+    eq(snap(), before, 'Ctrl+Z takes it back');
+    // nothing to replace: said, the dialog stays
+    $('b-replace').click();
+    set('rep-find', 'no_such_thing_anywhere');
+    btn('Replace').click();
+    await later();
+    ok(!$('modal').hidden, 'stays open');
+    // texts: the options for tags are not offered
+    set('rep-what', 'texts');
+    ok($('rep-create').closest('label').hidden && $('rep-defs').closest('label').hidden);
+    closeModal();
+  });
+
+  await test('screens: a copy with one click; the project converted to another display size and back', async () => {
+    Panels.show('screens'); App.doRefresh();
+    const n = M.st.screens.length, name = M.st.screens[0].data.name, kids = JSON.stringify(M.st.screens[0].data.children);
+    const dup = document.querySelector('#tab-screens [data-dup="0"]');
+    ok(dup, 'the duplicate button');
+    dup.click(); App.doRefresh();
+    eq(M.st.screens.length, n + 1);
+    eq(M.st.cur, 1, 'the copy is shown');
+    eq(M.st.screens[1].data.name, name + '_copy');
+    eq(JSON.stringify(M.st.screens[1].data.children), kids);
+    ok(document.querySelectorAll('#tab-screens [data-dup]').length === n + 1, 'listed');
+    eq(M.problems().filter(p => /used twice|defined twice/.test(p.text)).length, 0, 'no name used twice');
+    M.undo();
+    eq(M.st.screens.length, n);
+    // another size
+    Panels.show('project'); App.doRefresh();
+    const d = M.display(), first = M.st.screens[0].data.children.find(w => typeof w.w === 'number' && typeof w.x === 'number');
+    ok(first, 'a widget with a position and a size');
+    const was = [first.x, first.y, first.w, first.h];
+    document.querySelector('[data-fk="proj.resize"]').click();
+    ok(!document.getElementById('modal').hidden, 'the dialog');
+    eq(Number(document.getElementById('size-w').value), d.w, 'starts with the size of now');
+    document.querySelector('#modal-buttons [data-label="Convert"]').click();
+    await frame();
+    ok(!document.getElementById('modal').hidden, 'the same size: not accepted');
+    document.getElementById('size-w').value = d.w / 2; document.getElementById('size-h').value = d.h / 2;
+    document.querySelector('#modal-buttons [data-label="Convert"]').click();
+    await frame();
+    ok(document.getElementById('modal').hidden, 'converted: the dialog is closed');
+    eq([M.display().w, M.display().h], [d.w / 2, d.h / 2]);
+    const now = M.st.screens[0].data.children.find(w => typeof w.w === 'number' && typeof w.x === 'number');
+    eq([now.x, now.y, now.w, now.h], was.map(v => Math.round(v / 2)), 'half of everything');
+    await frame();
+    M.undo();
+    eq([M.display().w, M.display().h], [d.w, d.h]);
+    Panels.show('widgets');
+  });
+
   await test('transfers: added and edited on the Project tab; the tags are picked from the list; a ring is a problem', async () => {
     Panels.show('project'); App.doRefresh();
     const field = fk => document.querySelector('[data-fk="' + fk + '"]');
