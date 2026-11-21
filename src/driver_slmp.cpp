@@ -82,6 +82,8 @@ struct Range { const SlmpDevice* dev; uint32_t from, to; };
 class SlmpDriver final : public Driver {
 public:
     explicit SlmpDriver(const json& cfg);
+    bool device_access() const override { return true; }
+    std::string device_help() const override { return "D100  W1F  R0  ZR100  M10  X1F  Y20  B0  SM400  SD0  (X Y B W: hexadecimal)"; }
     ~SlmpDriver() override { stop(); }
     bool ok() const { return ok_; }
     const char* type() const override { return "slmp"; }
@@ -96,6 +98,7 @@ private:
     enum Result { kOk = 1, kEndCode = 0, kFatal = -1 };
 
     Result transact(uint16_t cmd, uint16_t sub, const std::vector<uint8_t>& data, std::vector<uint8_t>& out);
+    Result device_do(const DeviceRequest& rq, DeviceResult& rs);
     int    read_exact(uint8_t* buf, int n, std::chrono::steady_clock::time_point deadline);
     Result read_block(size_t b);
     Result write_item(const Item& it, const Value& v);
@@ -417,6 +420,77 @@ SlmpDriver::Result SlmpDriver::write_item(const Item& it, const Value& v)
     return r;
 }
 
+// An address no tag is mapped to: one read or one write, answered with text.
+SlmpDriver::Result SlmpDriver::device_do(const DeviceRequest& rq, DeviceResult& rs)
+{
+    std::string err, why;
+    const auto a = slmp_parse_address(rq.address, &err);
+    if(!a) { rs.error = err; return kOk; }
+    std::vector<uint8_t> out;
+    Result r = kOk;
+    const int count = std::clamp(rq.count, 1, kDeviceMaxCount);
+    if(a->dev->bit) {                                       // M, X, Y ...: in bit units
+        if(static_cast<uint64_t>(a->number) + static_cast<uint64_t>(rq.write ? 1 : count) - 1 > kSlmpMaxNumber) { rs.error = "this goes past the last device number"; return kOk; }
+        if(rq.write) {
+            bool on = false;
+            if(!device_parse_bit(rq.value, on)) { rs.error = "a bit is written with 0 or 1"; return kOk; }
+            if(!write_allowed(*a, 1, why)) { rs.error = "not written: " + why; return kOk; }
+            std::vector<uint8_t> data = slmp_batch_data(*a->dev, a->number, 1);
+            data.push_back(on ? 0x10 : 0x00);
+            r = transact(kCmdWrite, 0x0001, data, out);
+        }
+        else {
+            r = transact(kCmdRead, 0x0001, slmp_batch_data(*a->dev, a->number, static_cast<uint16_t>(count)), out);
+            if(r == kOk) {
+                if(static_cast<int>(out.size()) != (count + 1) / 2) { rs.error = "the answer has another length"; return kFatal; }
+                for(bool b : slmp_unpack_bits(out.data(), out.size(), static_cast<size_t>(count))) rs.values.push_back(b ? "1" : "0");
+            }
+        }
+    }
+    else if(a->bit >= 0) {                                  // D100.3: a bit of a word
+        if(rq.write) { rs.error = "a bit of a word is not written here: write the word"; return kOk; }
+        r = transact(kCmdRead, 0x0000, slmp_batch_data(*a->dev, a->number, 1), out);
+        if(r == kOk) {
+            if(out.size() != 2) { rs.error = "the answer has another length"; return kFatal; }
+            rs.values.push_back(((out[0] | (out[1] << 8)) >> a->bit) & 1 ? "1" : "0");
+        }
+    }
+    else {
+        const std::string type = rq.type.empty() ? "int16" : rq.type;
+        const int words = device_type_words(type);
+        if(words == 0) { rs.error = "unknown type '" + type + "'"; return kOk; }
+        const int total = rq.write ? words : words * count;
+        if(static_cast<uint64_t>(a->number) + static_cast<uint64_t>(total) - 1 > kSlmpMaxNumber) { rs.error = "this goes past the last device number"; return kOk; }
+        if(rq.write) {
+            uint16_t w[2] = {};
+            if(!device_parse(type, rq.value, w, &err)) { rs.error = err; return kOk; }
+            if(!write_allowed(*a, words, why)) { rs.error = "not written: " + why; return kOk; }
+            std::vector<uint8_t> data = slmp_batch_data(*a->dev, a->number, static_cast<uint16_t>(words));
+            for(int k = 0; k < words; k++) { data.push_back(static_cast<uint8_t>(w[k])); data.push_back(static_cast<uint8_t>(w[k] >> 8)); }
+            r = transact(kCmdWrite, 0x0000, data, out);
+        }
+        else {
+            r = transact(kCmdRead, 0x0000, slmp_batch_data(*a->dev, a->number, static_cast<uint16_t>(total)), out);
+            if(r == kOk) {
+                if(static_cast<int>(out.size()) != total * 2) { rs.error = "the answer has another length"; return kFatal; }
+                for(int i = 0; i < count; i++) {
+                    uint16_t w[2] = {};
+                    for(int k = 0; k < words; k++) {
+                        const size_t at = static_cast<size_t>(i * words + k) * 2;
+                        w[k] = static_cast<uint16_t>(out[at] | (out[at + 1] << 8));
+                    }
+                    rs.values.push_back(device_format(type, w));
+                }
+            }
+        }
+    }
+    if(r == kEndCode) rs.error = out.size() >= 2 ? slmp_end_code_text(static_cast<uint16_t>(out[0] | (out[1] << 8))) : "the device refused";
+    else if(r == kFatal) rs.error = "no answer";
+    else rs.ok = true;
+    if(rs.ok && rq.write) HML_INFO("slmp: %s written with %s (System > Device)", slmp_format_address(*a).c_str(), rq.value.c_str());
+    return r;
+}
+
 void SlmpDriver::set_online(bool on)
 {
     if(online_ == (on ? 1 : 0)) return;
@@ -433,6 +507,7 @@ void SlmpDriver::thread_main()
         if(!stream_->is_open()) {
             if(!stream_->open()) {
                 set_online(false);
+                device_fail_all("not connected");
                 wait(backoff);
                 if(backoff < 5000) backoff *= 2;
                 continue;
@@ -454,8 +529,16 @@ void SlmpDriver::thread_main()
             std::lock_guard<std::mutex> lock(qlock_);
             items_[w.item].pending_writes--;
         }
+        for(uint64_t id = 0; link_ok && running_;) {    // addresses without a tag (System > Device)
+            DeviceRequest rq;
+            if(!device_next(id, rq)) break;
+            DeviceResult rs;
+            if(device_do(rq, rs) == kFatal) link_ok = false;
+            device_done(id, std::move(rs));
+        }
         for(size_t b = 0; link_ok && b < blocks_.size() && running_; b++) if(read_block(b) == kFatal) link_ok = false;
         if(!link_ok) {
+            device_fail_all("not connected");
             HML_WARN("slmp %s: communication error (%s), reconnecting", stream_->describe().c_str(), stream_->last_error().empty() ? "timeout" : stream_->last_error().c_str());
             stream_->close();
             set_online(false);

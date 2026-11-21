@@ -65,6 +65,8 @@ constexpr int kNoAnswer = -3;    // timeout or a damaged frame (serial framings)
 class ModbusDriver final : public Driver {
 public:
     ModbusDriver(const json& cfg, Framing framing);
+    bool device_access() const override { return true; }
+    std::string device_help() const override { return "holding:100  input:5  coil:3  discrete:0   (another unit: holding:100@2)"; }
     ~ModbusDriver() override { stop(); }
     bool ok() const { return ok_; }
 
@@ -97,6 +99,7 @@ private:
     int  read_exact(uint8_t* buf, int n, std::chrono::steady_clock::time_point deadline);   // 1 ok, 0 timeout, -1 error
     int  read_item(Item& it);                       // 1 answered, kNoAnswer, kFatal
     int  write_item(const Item& it, double value);
+    int  device_do(const DeviceRequest& rq, DeviceResult& rs);
     static double decode(const Item& it, const uint8_t* b);
     static void   encode(const Item& it, double raw, uint8_t* b);
     void set_online(bool on);
@@ -123,6 +126,8 @@ private:
     int8_t            unit_state_[256];   // -1 unknown, 0 silent, 1 answers (serial framings: for the log)
     bool              open_failed_logged_ = false;
     bool              ok_ = false;
+    bool              quiet_exception_ = false;    // System > Device asks: the exception goes to the page, not to the log
+    uint8_t           last_exception_ = 0;
 };
 
 // ---------------------------------------------------------------- construction
@@ -234,7 +239,8 @@ int ModbusDriver::transact(uint8_t unit, const uint8_t* pdu, int pdu_len, uint8_
           : framing_ == Framing::Rtu ? transact_rtu(unit, pdu, pdu_len, resp, resp_max)
                                      : transact_ascii(unit, pdu, pdu_len, resp, resp_max);
     if(n >= 1 && (resp[0] & 0x80)) {
-        HML_WARN("%s: unit %d: exception fc=0x%02x code=%d", type(), unit, resp[0] & 0x7F, n > 1 ? resp[1] : 0);
+        last_exception_ = n > 1 ? resp[1] : 0;
+        if(!quiet_exception_) HML_WARN("%s: unit %d: exception fc=0x%02x code=%d", type(), unit, resp[0] & 0x7F, last_exception_);
         return kException;
     }
     // a serial line is shared: leave the silent time between frames before the next request
@@ -425,6 +431,101 @@ int ModbusDriver::write_item(const Item& it, double value)
     return (n == kFatal || n == kNoAnswer) ? n : 1;
 }
 
+// An address no tag is mapped to ("holding:100", "coil:3@2"): one read or one write, answered
+// with text. Returns what transact() does (1 = the unit answered, also with an exception).
+int ModbusDriver::device_do(const DeviceRequest& rq, DeviceResult& rs)
+{
+    // <area>:<number>[@<unit>]
+    std::string text = rq.address;
+    for(char& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    text.erase(std::remove(text.begin(), text.end(), ' '), text.end());
+    int unit = unit_;
+    if(const size_t at = text.find('@'); at != std::string::npos) {
+        char* end = nullptr;
+        const long u = std::strtol(text.c_str() + at + 1, &end, 10);
+        if(at + 1 >= text.size() || *end != '\0' || u < 0 || u > 255) { rs.error = "the unit after @ is 0 .. 255"; return 1; }
+        unit = static_cast<int>(u);
+        text.erase(at);
+    }
+    size_t digits = text.find_first_of("0123456789");
+    std::string area = text.substr(0, digits == std::string::npos ? text.size() : digits);
+    if(!area.empty() && area.back() == ':') area.pop_back();
+    Area ar;
+    if(area == "holding" || area == "hr") ar = Area::Holding;
+    else if(area == "input" || area == "ir") ar = Area::Input;
+    else if(area == "coil") ar = Area::Coil;
+    else if(area == "discrete" || area == "di") ar = Area::Discrete;
+    else { rs.error = "an address is holding:100, input:5, coil:3 or discrete:0"; return 1; }
+    char* end = nullptr;
+    const long number = digits == std::string::npos ? -1 : std::strtol(text.c_str() + digits, &end, 10);
+    if(number < 0 || number > 65535 || !end || *end != '\0') { rs.error = "the number of a register or coil is 0 .. 65535"; return 1; }
+
+    const int count = std::clamp(rq.count, 1, kDeviceMaxCount);
+    const bool bits = ar == Area::Coil || ar == Area::Discrete;
+    const std::string type = rq.type.empty() ? "uint16" : rq.type;
+    const int words = bits ? 1 : device_type_words(type);
+    if(words == 0) { rs.error = "unknown type '" + type + "'"; return 1; }
+    const int total = rq.write ? words : words * count;
+    if(number + total - 1 > 65535) { rs.error = "this goes past the last address"; return 1; }
+    if(rq.write && (ar == Area::Input || ar == Area::Discrete)) { rs.error = "inputs cannot be written"; return 1; }
+
+    uint8_t pdu[16], resp[260];
+    pdu[1] = static_cast<uint8_t>(number >> 8); pdu[2] = static_cast<uint8_t>(number & 0xFF);
+    int n = 0;
+    quiet_exception_ = true;
+    if(bits && rq.write) {
+        bool on = false;
+        if(!device_parse_bit(rq.value, on)) { quiet_exception_ = false; rs.error = "a coil is written with 0 or 1"; return 1; }
+        pdu[0] = 0x05; pdu[3] = on ? 0xFF : 0x00; pdu[4] = 0x00;
+        n = transact(static_cast<uint8_t>(unit), pdu, 5, resp, sizeof(resp));
+    }
+    else if(bits) {
+        pdu[0] = ar == Area::Coil ? 0x01 : 0x02; pdu[3] = 0; pdu[4] = static_cast<uint8_t>(count);
+        n = transact(static_cast<uint8_t>(unit), pdu, 5, resp, sizeof(resp));
+        if(n >= 2 + (count + 7) / 8) for(int i = 0; i < count; i++) rs.values.push_back((resp[2 + i / 8] >> (i % 8)) & 1 ? "1" : "0");
+        else if(n >= 0) n = kNoAnswer;
+    }
+    else if(rq.write) {
+        uint16_t w[2] = {};
+        std::string err;
+        if(!device_parse(type, rq.value, w, &err)) { quiet_exception_ = false; rs.error = err; return 1; }
+        if(words == 1) {
+            pdu[0] = 0x06; pdu[3] = static_cast<uint8_t>(w[0] >> 8); pdu[4] = static_cast<uint8_t>(w[0]);
+            n = transact(static_cast<uint8_t>(unit), pdu, 5, resp, sizeof(resp));
+        }
+        else {                                              // the high word in the first register (as "dtype" without swap_words)
+            pdu[0] = 0x10; pdu[3] = 0; pdu[4] = 2; pdu[5] = 4;
+            pdu[6] = static_cast<uint8_t>(w[1] >> 8); pdu[7] = static_cast<uint8_t>(w[1]);
+            pdu[8] = static_cast<uint8_t>(w[0] >> 8); pdu[9] = static_cast<uint8_t>(w[0]);
+            n = transact(static_cast<uint8_t>(unit), pdu, 10, resp, sizeof(resp));
+        }
+    }
+    else {
+        pdu[0] = ar == Area::Holding ? 0x03 : 0x04; pdu[3] = 0; pdu[4] = static_cast<uint8_t>(total);
+        n = transact(static_cast<uint8_t>(unit), pdu, 5, resp, sizeof(resp));
+        if(n >= 2 + total * 2) {
+            for(int i = 0; i < count; i++) {
+                const uint8_t* b = resp + 2 + i * words * 2;
+                uint16_t w[2] = { static_cast<uint16_t>((b[0] << 8) | b[1]), 0 };
+                if(words == 2) { w[1] = w[0]; w[0] = static_cast<uint16_t>((b[2] << 8) | b[3]); }
+                rs.values.push_back(device_format(type, w));
+            }
+        }
+        else if(n >= 0) n = kNoAnswer;
+    }
+    quiet_exception_ = false;
+    if(n == kException) {
+        const char* what = last_exception_ == 1 ? "illegal function" : last_exception_ == 2 ? "illegal data address" : last_exception_ == 3 ? "illegal data value"
+                         : last_exception_ == 4 ? "device failure" : "exception";
+        rs.error = vformat("the unit answers: %s (%d)", what, last_exception_);
+        return 1;
+    }
+    if(n == kFatal || n == kNoAnswer) { rs.values.clear(); rs.error = vformat("unit %d does not answer", unit); return n; }
+    rs.ok = true;
+    if(rq.write) HML_INFO("%s: %s written with %s (System > Device)", this->type(), rq.address.c_str(), rq.value.c_str());
+    return 1;
+}
+
 void ModbusDriver::set_online(bool on)
 {
     // online_ starts as "unknown" so that the status tag is written on the first attempt
@@ -458,6 +559,7 @@ void ModbusDriver::thread_main()
                     open_failed_logged_ = true;
                 }
                 set_online(false);
+                device_fail_all("not connected");
                 wait(backoff);
                 if(backoff < 5000) backoff *= 2;
                 continue;
@@ -493,6 +595,13 @@ void ModbusDriver::thread_main()
             std::lock_guard<std::mutex> lock(qlock_);
             items_[w.item].pending_writes--;
         }
+        for(uint64_t id = 0; link_ok && running_;) {    // addresses without a tag (System > Device)
+            DeviceRequest rq;
+            if(!device_next(id, rq)) break;
+            DeviceResult rs;
+            if(device_do(rq, rs) == kFatal) link_ok = false;
+            device_done(id, std::move(rs));
+        }
 
         for(size_t i = 0; link_ok && i < items_.size() && running_; i++) {
             Item& it = items_[i];
@@ -508,6 +617,7 @@ void ModbusDriver::thread_main()
             else HML_WARN("%s: %s", type(), stream_->last_error().empty() ? "the link was lost" : stream_->last_error().c_str());
             stream_->close();
             set_online(false);
+            device_fail_all("not connected");
             if(framing_ != Framing::Tcp) wait(500);
             continue;
         }

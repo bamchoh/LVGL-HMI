@@ -106,6 +106,10 @@ std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
 std::unique_ptr<SettingsPage> make_users_page();
 std::unique_ptr<SettingsPage> make_storage_page(Project& proj);  // System > Storage: backup, a project from a USB memory
 std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags: values of all tags, write one
+// System > Device: an address of a PLC without a tag (system_device.cpp); for projects with a
+// driver that can do it.
+std::unique_ptr<SettingsPage> make_device_page();
+bool has_device_driver(const json* drivers);
 void add_driver_pages(SystemSettings& s, Project& proj);
 void register_builtin_pages(SystemSettings& s, Project& proj);
 

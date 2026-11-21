@@ -236,6 +236,29 @@ int start(Runtime& rt, const json& cfg) { json arr = json::array({ cfg }); retur
 
 constexpr uint8_t kCIO = 0xB0, kW = 0xB1, kH = 0xB2, kA = 0xB3, kD = 0x82, kTC = 0x89;
 
+// System > Device: ask the driver for an address no tag is mapped to, wait for the answer
+DeviceResult ask(Driver* d, const char* address, const char* type = "", int count = 1)
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.count = count;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+DeviceResult put(Driver* d, const char* address, const char* value, const char* type = "")
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.write = true; q.value = value;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+using Strings = std::vector<std::string>;
+
 } // namespace
 
 // ================================================================ functional suitability: frames
@@ -620,4 +643,93 @@ TEST_CASE("fins: configuration")
     REQUIRE(start(rt, cfg) == 1);
     REQUIRE(wait_for([] { return tagv("a") == 11; }));
     CHECK(read_targets(srv).size() == 1);
+}
+
+// ================================================================ addresses without a tag (System > Device)
+
+TEST_CASE("fins: an address without a tag is read and written, the PLC's refusal is told")
+{
+    Runtime rt;
+    FakeFinsServer srv;
+    {
+        std::lock_guard<std::mutex> g(srv.mutex);
+        srv.word(kD, 100) = 0xFFFE; srv.word(kD, 101) = 0x0001; srv.word(kD, 102) = 300;
+        srv.word(kCIO, 10) = 0x000A;
+    }
+    rt.tag("online", TagType::Bool);
+    rt.tag("d0", TagType::Int);
+    json cfg = fins_cfg(srv, json::parse(R"([ { "tag": "d0", "addr": "D0" } ])"));
+    cfg["write_ranges"] = json::array({ "D0-D199", "CIO0-CIO99" });
+    REQUIRE(start(rt, cfg) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 1; }));
+    Driver* d = rt.drivers.all().at(0);
+    REQUIRE(d->device_access());
+    CHECK_FALSE(d->device_help().empty());
+
+    // words in every type (a 32-bit value has its low word first), several at once
+    DeviceResult r = ask(d, "D100");
+    CHECK(r.ok);
+    CHECK(r.values == Strings{ "-2" });
+    CHECK(ask(d, "d100", "uint16").values == Strings{ "65534" });
+    CHECK(ask(d, "D100", "hex").values == Strings{ "FFFE" });
+    CHECK(ask(d, "D100", "int32").values == Strings{ "131070" });          // 0x0001FFFE
+    CHECK(ask(d, "D100", "int16", 3).values == Strings{ "-2", "1", "300" });
+    // bits, one after the other
+    CHECK(ask(d, "CIO10.00", "", 4).values == Strings{ "0", "1", "0", "1" });
+    CHECK(ask(d, "CIO10.14", "", 8).values.size() == 2);                    // (to the end of the word)
+
+    // writes
+    CHECK(put(d, "D110", "-5").ok);
+    CHECK(put(d, "D111", "70000", "int32").ok);
+    CHECK(put(d, "D113", "1.5", "float").ok);
+    CHECK(put(d, "D115", "1a2b", "hex").ok);
+    CHECK(put(d, "CIO10.02", "1").ok);
+    CHECK(put(d, "CIO10.01", "off").ok);
+    {
+        std::lock_guard<std::mutex> g(srv.mutex);
+        CHECK(srv.word(kD, 110) == 0xFFFB);
+        CHECK(srv.word(kD, 111) == 0x1170);                                 // 70000 = 0x00011170
+        CHECK(srv.word(kD, 112) == 0x0001);
+        CHECK(srv.word(kD, 113) == 0x0000);                                 // 1.5f = 0x3FC00000
+        CHECK(srv.word(kD, 114) == 0x3FC0);
+        CHECK(srv.word(kD, 115) == 0x1A2B);
+        CHECK(srv.word(kCIO, 10) == 0x000C);
+    }
+    CHECK(ask(d, "D113", "float").values == Strings{ "1.5" });
+
+    // what is wrong with the request is said without asking the PLC
+    const int before = srv.writes;
+    r = put(d, "D110", "abc");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error.find("not a whole number") != std::string::npos);
+    CHECK(put(d, "D110", "40000").error.find("int16") != std::string::npos);
+    CHECK(put(d, "D500", "1").error.find("write_ranges") != std::string::npos);
+    CHECK(put(d, "A440", "1").error.find("Auxiliary") != std::string::npos);
+    CHECK(put(d, "CIO10.02", "2").error.find("0 or 1") != std::string::npos);
+    CHECK(ask(d, "Q5").error != "");
+    CHECK(ask(d, "D100", "double").error.find("unknown type") != std::string::npos);
+    CHECK(ask(d, "D65535", "int32").error.find("end of the area") != std::string::npos);
+    CHECK(ask(d, "T5.00").error != "");
+    CHECK(srv.writes == before);
+
+    // what the PLC refuses is told with its end code; the tags go on
+    srv.end_code = 0x1103;
+    r = ask(d, "D100");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error.find("1103") != std::string::npos);
+    srv.end_code = 0;
+    CHECK(ask(d, "D102").values == Strings{ "300" });
+    CHECK(tagv("online") == 1);
+}
+
+TEST_CASE("fins: without a connection a question about an address is answered at once")
+{
+    Runtime rt;
+    rt.tag("online", TagType::Bool);
+    json cfg = json{ { "type", "fins" }, { "host", "127.0.0.1" }, { "port", 1 }, { "timeout_ms", 200 }, { "status_tag", "online" }, { "map", json::array() } };
+    REQUIRE(start(rt, cfg) == 1);
+    Driver* d = rt.drivers.all().at(0);
+    DeviceResult r = ask(d, "D0");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error == "not connected");
 }

@@ -168,6 +168,13 @@ private:
                 w = on ? static_cast<uint16_t>(w | m) : static_cast<uint16_t>(w & ~m);
             }
         }
+        else if(end == 0 && cmd == 0x0401 && sub == 0x0001) {     // bit units: two points per byte, the first in the upper half
+            reads++;
+            for(uint32_t i = 0; i < pts; i += 2) {
+                auto bit = [&](uint32_t n) { return static_cast<uint8_t>((word(code, n / 16) >> (n % 16)) & 1); };
+                data.push_back(static_cast<uint8_t>((bit(num + i) << 4) | (i + 1 < pts ? bit(num + i + 1) : 0)));
+            }
+        }
         else if(end == 0) end = 0xC059;
         Bytes r = e4 ? Bytes{ 0xD4, 0x00, req[2], req[3], 0x00, 0x00 } : Bytes{ 0xD0, 0x00 };
         const size_t route = e4 ? 6 : 2;
@@ -222,6 +229,29 @@ json slmp_cfg(const FakeSlmpServer& srv, const json& map, const char* frame = "3
 int start(Runtime& rt, const json& cfg) { json arr = json::array({ cfg }); return rt.drivers.load(&arr); }
 
 constexpr uint8_t kD = 0xA8, kM = 0x90, kX = 0x9C, kSD = 0xA9, kW = 0xB4;
+
+// System > Device: ask the driver for an address no tag is mapped to, wait for the answer
+DeviceResult ask(Driver* d, const char* address, const char* type = "", int count = 1)
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.count = count;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+DeviceResult put(Driver* d, const char* address, const char* value, const char* type = "")
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.write = true; q.value = value;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+using Strings = std::vector<std::string>;
 
 } // namespace
 
@@ -554,4 +584,61 @@ TEST_CASE("slmp: 1000 points are read in a few requests")
     sleep_ms(500);
     MESSAGE("1000 points: " << (srv.reads - r0) << " requests (3 per cycle) in " << (millis() - t0) << " ms");
     rt.drivers.stop_all();
+}
+
+// ================================================================ addresses without a tag (System > Device)
+
+TEST_CASE("slmp: an address without a tag is read and written, the PLC's refusal is told")
+{
+    Runtime rt;
+    FakeSlmpServer srv;
+    {
+        std::lock_guard<std::mutex> g(srv.mutex);
+        srv.word(kD, 100) = 0xFFFE; srv.word(kD, 101) = 0x0001; srv.word(kD, 102) = 300;
+        srv.word(kM, 1) = 0x0005;                                          // M16 and M18
+        srv.word(kW, 0x1F) = 77;
+    }
+    rt.tag("online", TagType::Bool);
+    rt.tag("d0", TagType::Int);
+    json cfg = slmp_cfg(srv, json::parse(R"([ { "tag": "d0", "addr": "D0" } ])"));
+    cfg["write_ranges"] = json::array({ "D0-D199", "M0-M99" });
+    REQUIRE(start(rt, cfg) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 1; }));
+    Driver* d = rt.drivers.all().at(0);
+    REQUIRE(d->device_access());
+
+    CHECK(ask(d, "D100").values == Strings{ "-2" });
+    CHECK(ask(d, "D100", "uint32").values == Strings{ "131070" });
+    CHECK(ask(d, "d100", "int16", 3).values == Strings{ "-2", "1", "300" });
+    CHECK(ask(d, "W1F", "uint16").values == Strings{ "77" });             // (hexadecimal number)
+    CHECK(ask(d, "M16", "", 3).values == Strings{ "1", "0", "1" });        // bit units
+    CHECK(ask(d, "D102.2").values == Strings{ "1" });                      // 300 = 0x012C
+
+    CHECK(put(d, "D110", "-5").ok);
+    CHECK(put(d, "D111", "70000", "int32").ok);
+    CHECK(put(d, "M17", "1").ok);
+    CHECK(put(d, "M16", "0").ok);
+    {
+        std::lock_guard<std::mutex> g(srv.mutex);
+        CHECK(srv.word(kD, 110) == 0xFFFB);
+        CHECK(srv.word(kD, 111) == 0x1170);
+        CHECK(srv.word(kD, 112) == 0x0001);
+        CHECK(srv.word(kM, 1) == 0x0006);
+    }
+
+    const int before = srv.writes;
+    CHECK(put(d, "D500", "1").error.find("write_ranges") != std::string::npos);
+    CHECK(put(d, "SD0", "1").error.find("not written") != std::string::npos);
+    CHECK(put(d, "D102.2", "0").error.find("write the word") != std::string::npos);
+    CHECK(put(d, "D110", "x").error.find("not a whole number") != std::string::npos);
+    CHECK(ask(d, "Q5").error != "");
+    CHECK(srv.writes == before);
+
+    srv.end_code = 0xC051;
+    DeviceResult r = ask(d, "D100");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error.find("C051") != std::string::npos);
+    srv.end_code = 0;
+    CHECK(ask(d, "D102").values == Strings{ "300" });
+    CHECK(tagv("online") == 1);
 }

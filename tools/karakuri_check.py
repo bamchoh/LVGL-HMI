@@ -349,6 +349,52 @@ def check_opcua_secure(api, runtime, rep):
 CHECKS = {'slmp': check_slmp, 'fins': check_fins, 'modbus': check_modbus, 'opcua': check_opcua, 'opcua-secure': check_opcua_secure}
 
 
+# ---------------------------------------------------------------- addresses without a tag (System > Device)
+def check_device(api, runtime, rep):
+    tests = os.path.join(os.path.dirname(runtime), 'hml_tests.exe' if os.name == 'nt' else 'hml_tests')
+    if not os.path.exists(tests):
+        print('device: %s is not built, skipped' % tests)
+        return
+    slmp = api.ensure_server('slmp')
+    fins = api.ensure_server('fins')
+    mb = api.ensure_server('modbus-tcp')
+    mb_port = mb.get('port') or mb.get('tcpPort')
+    print('device access: slmp %s, fins %s, modbus-tcp %s' % (slmp['port'], fins['port'], mb_port))
+    api.put_words('slmp', 'D', 400, [(-1234) & 0xFFFF, 0] + u32_words(100000) + float_words(12.5))
+    api.put_words('slmp', 'D', 410, [0, 0, 0, 0])
+    for n, on in ((40, True), (41, False), (42, True), (43, False), (45, False)): api.put_bit('slmp', 'M', n, on)
+    api.put_words('fins', 'DM', 400, [(-1234) & 0xFFFF, 0] + u32_words(100000) + float_words(12.5))
+    api.put_words('fins', 'DM', 410, [0, 0, 0, 0])
+    api.put_words('fins', 'CIO', 40, [0x0005, 0])
+    api.put_words('modbus-tcp', 'holdingRegisters', 30, [1234] + u32_words(100000, low_first=False) + float_words(12.5, low_first=False))
+    api.put_words('modbus-tcp', 'holdingRegisters', 40, [0, 0, 0])
+    api.put_words('modbus-tcp', 'inputRegisters', 8, [777])
+    for n, on in ((30, True), (31, False), (32, True), (35, False)): api.put_bit('modbus-tcp', 'coils', n, on)
+    api.put_bit('modbus-tcp', 'discreteInputs', 9, True)
+    env = dict(os.environ, HML_KARAKURI_SLMP=str(slmp['port']), HML_KARAKURI_FINS=str(fins['port']), HML_KARAKURI_MODBUS=str(mb_port))
+    p = subprocess.run([tests, '-tc=karakuri*'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+    out = p.stdout.decode('utf-8', 'replace')
+    rep.check('reads and writes through the drivers (hml_tests -tc=karakuri*)', p.returncode, 0)
+    if p.returncode != 0:
+        print('\n'.join(l for l in out.splitlines() if not l.startswith('[hml')))
+    rep.check('slmp: D410 written', api.get_words('slmp', 'D', 410, 1)[0], 4321)
+    rep.check('slmp: D412 int32 written', words_i32(api.get_words('slmp', 'D', 412, 2)), -70000)
+    rep.check('slmp: M45 set', api.get_bit('slmp', 'M', 45), True)
+    rep.check('slmp: M40 reset', api.get_bit('slmp', 'M', 40), False)
+    rep.check('slmp: M42 untouched', api.get_bit('slmp', 'M', 42), True)
+    rep.check('fins: D410 written', api.get_words('fins', 'DM', 410, 1)[0], 4321)
+    rep.check('fins: D412 int32 written', words_i32(api.get_words('fins', 'DM', 412, 2)), -70000)
+    rep.check('fins: CIO41.02 set, the rest of the word untouched', api.get_words('fins', 'CIO', 41, 1)[0], 4)
+    rep.check('modbus: holding 40 written', api.get_words('modbus-tcp', 'holdingRegisters', 40, 1)[0], 4321)
+    rep.check('modbus: holding 41 int32 written', words_i32(api.get_words('modbus-tcp', 'holdingRegisters', 41, 2), low_first=False), -70000)
+    rep.check('modbus: coil 35 set', api.get_bit('modbus-tcp', 'coils', 35), True)
+    rep.check('modbus: coil 30 reset', api.get_bit('modbus-tcp', 'coils', 30), False)
+    rep.check('modbus: coil 32 untouched', api.get_bit('modbus-tcp', 'coils', 32), True)
+
+
+CHECKS['device'] = check_device
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--api', default='http://localhost:8765/api')
