@@ -40,6 +40,8 @@ add_executable(hml_tests
   test_smtp.cpp
   test_smtp_socket.cpp
   test_mail.cpp
+  test_net_upload.cpp
+  test_upload.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp

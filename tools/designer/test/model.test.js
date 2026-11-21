@@ -1360,6 +1360,37 @@ test('M library: from outside nothing but data gets in - no prototypes, no paths
   for (const bad of [null, 5, 'x', [], { widgets: [{ type: 'label' }] }]) assert.equal(M.libraryClean(bad).part, null);
 });
 
+test('M uploads: a URL we can send to and logs there are; a password in the project file is a problem', () => {
+  const { M, p } = tagProject();
+  p.data_log = { groups: [{ name: 'line1', tags: ['temp'] }] };
+  p.alarms = { items: [{ name: 'a', tag: 'run' }] };
+  p.operation_log = {};
+  p.system_log = {};
+  const base = M.problems().length;
+  for (const ok of [[{ name: 'nightly', url: 'https://files.example.com/hml/', logs: ['data:line1', 'alarms', 'operation', 'system'] }],
+                    [{ name: 'api', url: 'https://10.0.0.5:8443/api/upload', method: 'post', logs: ['alarms'], username: 'u', enabled: false }, { name: 'b-2', url: 'https://[::1]/x/', logs: ['system'] }]]) {
+    p.uploads = ok;
+    assert.equal(M.problems().length, base, JSON.stringify(ok) + ': ' + M.problems().map(x => x.text).join(' | '));
+  }
+  const good = { name: 'n', url: 'https://h/dir/', logs: ['alarms'] };
+  const bad = [[5, /a list is needed/], [[5], /not an upload/], [[Object.assign({}, good, { name: 'a b' })], /the name: letters/], [[good, good], /used twice/],
+               [[Object.assign({}, good, { url: 'files.example.com' })], /"url" is/], [[Object.assign({}, good, { url: 'https://user:pw@h/' })], /"url" is/],
+               [[Object.assign({}, good, { url: 'https://h/a/../b/' })], /"url" is/], [[Object.assign({}, good, { url: 'https://h/x?token=1' })], /"url" is/],
+               [[Object.assign({}, good, { url: 'sftp://h/' })], /"url" is/], [[Object.assign({}, good, { url: 'http://h/dir/' })], /http:\/\/ is not secured/],
+               [[Object.assign({}, good, { url: 'ftp://h/dir/' })], /ftp:\/\/ is not secured/], [[Object.assign({}, good, { url: 'ftp://h/dir/', method: 'post' })], /no meaning for ftp/],
+               [[Object.assign({}, good, { method: 'delete' })], /"method" is/], [[Object.assign({}, good, { logs: [] })], /"logs" names/], [[Object.assign({}, good, { logs: ['everything'] })], /is not data:/],
+               [[Object.assign({}, good, { logs: ['data:nope'] })], /no group "nope"/], [[Object.assign({}, good, { password: 'secret' })], /password is in the project file/],
+               [[Object.assign({}, good, { verify: false })], /certificate of the server is not checked/]];
+  for (const [up, re] of bad) {
+    p.uploads = up;
+    assert.ok(M.problems().some(x => re.test(x.text)), JSON.stringify(up).slice(0, 80) + ' -> ' + M.problems().map(x => x.text).join(' | '));
+  }
+  delete p.alarms;
+  p.uploads = [good];
+  assert.ok(M.problems().some(x => /the project has no alarms/.test(x.text)));
+  delete p.uploads;
+});
+
 test('M mail: a server and addresses that are addresses; a password in the project file is a problem', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;
