@@ -3,7 +3,7 @@ For the mail check only: a mail server that is not written by us."""
 import json, os, urllib.request, zipfile, io, sys
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)) if len(sys.argv) < 2 else sys.argv[1], 'pkgs')
 os.makedirs(out, exist_ok=True)
-for name in ['aiosmtpd', 'atpublic', 'attrs']:
+for name in (sys.argv[2:] or ['aiosmtpd', 'atpublic', 'attrs']):
     meta = json.load(urllib.request.urlopen('https://pypi.org/pypi/%s/json' % name, timeout=30))
     wheels = [u for u in meta['urls'] if u['packagetype'] == 'bdist_wheel' and u['filename'].endswith('none-any.whl')]
     if not wheels:

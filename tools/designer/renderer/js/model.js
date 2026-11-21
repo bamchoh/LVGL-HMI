@@ -1104,6 +1104,36 @@ const M = {
         if (m.verify === false) say('"verify": false: the certificate of the server is not checked');
       }
     }
+    // uploads: a name, a URL we can send to, logs there are; no password in the project file
+    if (p.uploads !== undefined) {
+      const loc0 = { view: 'project' }, seen = new Set();
+      const groups = new Set((((p.data_log || {}).groups) || []).map(g => g && g.name));
+      if (!Array.isArray(p.uploads)) out.push(Object.assign({ text: 'uploads: a list is needed' }, loc0));
+      else p.uploads.forEach((u, i) => {
+        const loc = { view: 'project', index: i }, n = u && u.name ? '"' + u.name + '"' : '#' + (i + 1), say = text => out.push(Object.assign({ text: 'upload ' + n + ': ' + text }, loc));
+        if (!u || typeof u !== 'object' || Array.isArray(u)) { say('not an upload'); return; }
+        if (typeof u.name !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/.test(u.name)) say('the name: letters, digits, _ and - (32 at most)');
+        else if (seen.has(u.name)) say('the name is used twice');
+        seen.add(u.name);
+        const m = typeof u.url === 'string' ? /^(https?|ftp):\/\/(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+)(:\d{1,5})?(\/[\x21-\x7e]*)?$/i.exec(u.url) : null;
+        if (!m || /[?#@]/.test(u.url) || /\/\.\.(\/|$)/.test(u.url)) say('"url" is https://server/dir/, http://... or ftp://server/dir/ (no user name, no "?", no "..")');
+        else {
+          if (!/^https:/i.test(u.url)) say(m[1].toLowerCase() + ':// is not secured: the files can be read on the network (https:// secures them)');
+          if (/^ftp:/i.test(u.url) && u.method !== undefined) say('"method" has no meaning for ftp://');
+        }
+        if (u.method !== undefined && u.method !== 'put' && u.method !== 'post') say('"method" is put or post');
+        const logs = Array.isArray(u.logs) ? u.logs : null;
+        if (!logs || !logs.length) say('"logs" names what is sent: data:<group>, alarms, operation, system');
+        else for (const l of logs) {
+          if (typeof l !== 'string' || !(/^data:.+/.test(l) || ['alarms', 'operation', 'system'].includes(l))) say('logs: "' + l + '" is not data:<group>, alarms, operation or system');
+          else if (/^data:/.test(l) && !groups.has(l.slice(5))) say('logs: the data log has no group "' + l.slice(5) + '"');
+          else if (l === 'alarms' && !(p.alarms && p.alarms.items)) say('logs: the project has no alarms');
+          else if ((l === 'operation' || l === 'system') && !(p[l + '_log'] && p[l + '_log'].enabled !== false)) say('logs: the project has no ' + l + ' log');
+        }
+        if (typeof u.password === 'string' && u.password) say('the password is in the project file: everybody who gets the project can read it. Set it on the device instead (System > Upload)');
+        if (u.verify === false) say('"verify": false: the certificate of the server is not checked');
+      });
+    }
     // transfers: tags, a trigger that is one, no rings
     const xfers = Array.isArray(p.transfers) ? p.transfers : [], xferNames = new Set(), xferNext = new Map();
     for (const t of xfers) if (t && typeof t === 'object' && typeof t.from === 'string' && typeof t.to === 'string') { if (!xferNext.has(t.from)) xferNext.set(t.from, []); xferNext.get(t.from).push(t.to); }

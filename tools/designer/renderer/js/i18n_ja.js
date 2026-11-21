@@ -418,6 +418,15 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.KEYS_JA, { uploads: 'ログの送信', upload_url: '送り先 (URL)', upload_logs: '送るログ', method: '方式' });
+Object.assign(I18N.TEXT_JA, { 'Uploads': 'ログの送信', 'the logs as CSV files, sent to a server': 'ログを CSV ファイルにしてサーバーへ送る',
+  'https://server/dir/ (PUT of each file), or a URL to POST to; http:// and ftp://server/dir/ are not secured': 'https://サーバー/フォルダー/（ファイルごとに PUT）、または POST 先の URL。http:// と ftp://サーバー/フォルダー/ は暗号化されません',
+  'put: each file is stored under the URL + its name. post: the file is sent to the URL as it is': 'put: URL + ファイル名に保存する。post: URL にそのまま送る',
+  'what is sent: data:<group>, alarms, operation, system': '送るもの: data:<グループ名>、alarms、operation、system',
+  'the user name for the server (empty: no login). The password is set on the device: System > Upload': 'サーバーのユーザー名（空ならログインしない）。パスワードは装置の System > Upload で設定します',
+  'off: kept, not sent': 'オフ: 残すが送らない',
+  'Nothing is sent by itself: the action { "action": "call", "fn": "upload.run", "arg": "<name>" } does it - put it into a schedule (every night) or on a button. Each log is written to a CSV file and sent; a file that could not be sent is kept and tried again, also after a restart. The password belongs on the device (System > Upload), not into the project file.':
+    '自動では送りません。アクション { "action": "call", "fn": "upload.run", "arg": "<名前>" } で送ります。スケジュール（毎晩など）やボタンに入れてください。ログごとに CSV ファイルを作って送り、送れなかったファイルは残して送り直します（再起動のあとも）。パスワードはプロジェクトのファイルではなく、装置（System > Upload）で設定してください。' });
 Object.assign(I18N.KEYS_JA, { mail: 'メールを使う', mail_host: 'メールサーバー', mail_from: '差出人', mail_to: '宛先', security: '暗号化', ca_file: 'CA 証明書のファイル' });
 Object.assign(I18N.TEXT_JA, { 'Mail': 'メール', 'alarms are sent by e-mail': 'アラームをメールで知らせる', 'the mail server (SMTP)': 'メールサーバー（SMTP）',
   'starttls: secured before anything is sent (port 587). tls: TLS from the first byte (port 465). none: nothing is secured - a relay of your own only': 'starttls: 何かを送る前に暗号化する（ポート 587）。tls: 最初から TLS（ポート 465）。none: 暗号化しない（自社内の中継サーバーだけ）',

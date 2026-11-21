@@ -931,6 +931,30 @@
     Panels.show('widgets');
   });
 
+  await test('uploads: added and edited on the Project tab; what is not secured is said; no field for the password', async () => {
+    Panels.show('project'); App.doRefresh();
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const had = M.st.project.uploads;
+    M.mutate(() => { delete M.st.project.uploads; }); App.doRefresh();
+    ok(field('proj.upl.uploads.add'), 'the add button');
+    field('proj.upl.uploads.add').click(); App.doRefresh();
+    eq(M.st.project.uploads.length, 1);
+    ok(M.problems().some(p => /upload "upload1": "url" is/.test(p.text)), 'a URL is wanted');
+    type('proj.upl.uploads.0.name', 'nightly');
+    type('proj.upl.uploads.0.url', 'https://files.example.com/hml/');
+    ok(!M.problems().some(p => /upload "nightly": "url"/.test(p.text)), 'a URL that is one');
+    type('proj.upl.uploads.0.logs', 'system, nonsense');
+    ok(M.problems().some(p => /"nonsense" is not data:/.test(p.text)), 'a log that is none is a problem');
+    type('proj.upl.uploads.0.url', 'ftp://nas.local/in/');
+    ok(M.problems().some(p => /ftp:\/\/ is not secured/.test(p.text)), 'not secured: said');
+    ok(!field('proj.upl.uploads.0.password'), 'the password is set on the device, not here');
+    field('proj.upl.uploads.0.del').click(); App.doRefresh();
+    eq(M.st.project.uploads, undefined, 'the last one removed: no key left');
+    if (had) M.mutate(() => { M.st.project.uploads = had; });
+    Panels.show('widgets');
+  });
+
   await test('mail: switched on and set on the Project tab; there is no field for the password', async () => {
     Panels.show('project'); App.doRefresh();
     const field = fk => document.querySelector('[data-fk="' + fk + '"]');

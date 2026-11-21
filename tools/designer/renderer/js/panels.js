@@ -538,6 +538,16 @@ const Panels = {
         { k: 'verify', t: 'bool', hint: 'check the certificate of the server (leave this on)' },
         { k: 'ca_file', t: 'text', hint: 'a file with the certificate of the CA of the server (empty: the certificates the system trusts)' }]), fk + '.mail'),
       U.el('div', { class: 'hint' }, 'A new alarm is sent as a mail to the recipients. A mail that cannot be delivered waits and is tried again; the screen never waits for the mail server. Which alarms, the subject and the text: "alarms" under "mail" in project.json (see the README). The password belongs on the device (System > Mail), not into the project file. A button can send a mail: { "action": "call", "fn": "mail.send", "arg": "Subject\\nText with {tag}" }.')));
+    // uploads: the logs as CSV files, handed to a server (src/upload.hpp)
+    el.append(Props.section('Uploads', Array.isArray(p.uploads) && p.uploads.length > 0,
+      Props.listEditor(p, { k: 'uploads', t: 'list', max: 10, hint: 'the logs as CSV files, sent to a server',
+        fields: [{ k: 'name', t: 'text' }, { k: 'url', t: 'text', label: 'upload_url', placeholder: 'https://files.example.com/hml/', hint: 'https://server/dir/ (PUT of each file), or a URL to POST to; http:// and ftp://server/dir/ are not secured' },
+                 { k: 'method', t: 'select', o: ['', 'post'], empty: 'put', hint: 'put: each file is stored under the URL + its name. post: the file is sent to the URL as it is' },
+                 { k: 'logs', t: 'csv', label: 'upload_logs', hint: 'what is sent: data:<group>, alarms, operation, system' },
+                 { k: 'username', t: 'text', hint: 'the user name for the server (empty: no login). The password is set on the device: System > Upload' },
+                 { k: 'enabled', t: 'bool', hint: 'off: kept, not sent' }],
+        item: () => ({ name: 'upload' + ((p.uploads || []).length + 1), url: 'https://', logs: ['alarms'] }) }, fk + '.upl'),
+      U.el('div', { class: 'hint' }, 'Nothing is sent by itself: the action { "action": "call", "fn": "upload.run", "arg": "<name>" } does it - put it into a schedule (every night) or on a button. Each log is written to a CSV file and sent; a file that could not be sent is kept and tried again, also after a restart. The password belongs on the device (System > Upload), not into the project file.')));
     // transfers: values of one device copied to another (src/data_transfer.hpp)
     el.append(Props.section('Transfers', Array.isArray(p.transfers) && p.transfers.length > 0,
       Props.listEditor(p, { k: 'transfers', t: 'list', max: 500, hint: 'values copied from one tag to another',
