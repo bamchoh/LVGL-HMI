@@ -34,6 +34,7 @@ add_executable(hml_tests
   test_touch_filter.cpp
   test_alarm_stats.cpp
   test_schedule.cpp
+  test_sound.cpp
   test_driver_slmp.cpp
   test_driver_mqtt.cpp
   test_driver_modbus_serial.cpp
@@ -71,7 +72,7 @@ if(HML_OPCUA)
   target_compile_definitions(hml_tests PRIVATE HML_WITH_OPCUA=1)
 endif()
 if(WIN32)
-  target_link_libraries(hml_tests PRIVATE ws2_32 setupapi)
+  target_link_libraries(hml_tests PRIVATE ws2_32 setupapi winmm)
 endif()
 if(MSVC)
   target_compile_definitions(hml_tests PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
@@ -80,7 +81,7 @@ if(MSVC)
 else()
   target_compile_options(hml_tests PRIVATE -Wall -Wextra)
   find_package(Threads REQUIRED)
-  target_link_libraries(hml_tests PRIVATE m Threads::Threads)
+  target_link_libraries(hml_tests PRIVATE m Threads::Threads ${CMAKE_DL_LIBS})
 endif()
 
 add_test(NAME hml_tests COMMAND hml_tests)

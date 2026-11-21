@@ -80,6 +80,7 @@ const M = {
   tagChoices() {
     const out = ((this.st.project && this.st.project.tags) || []).filter(t => t && t.name).map(t => ({ name: t.name, note: t.type || '' }));
     out.push({ name: 'sys.screen.off', note: 'bool (system)' }, { name: 'sys.lang', note: 'string (system)' });
+    if (this.st.project && this.st.project.sound) out.push({ name: 'sys.sound.mute', note: 'bool (system)' }, { name: 'sys.sound.volume', note: 'int (system)' }, { name: 'sys.sound.alarm', note: 'bool (system)' });
     if (this.usersOn()) for (const [n, ty] of [['sys.user.name', 'string'], ['sys.user.level', 'int'], ['sys.user.level_name', 'string'], ['sys.user.logged_in', 'bool']]) out.push({ name: n, note: ty + ' (system)' });
     for (const [n, ty] of [['sys.alarm.active', 'int'], ['sys.alarm.unacked', 'int'], ['sys.alarm.latest', 'string'], ['sys.alarm.latest_severity', 'string']]) out.push({ name: n, note: ty + ' (system)' });
     return out;
@@ -780,6 +781,25 @@ const M = {
       seenTag.add(t.name);
     });
     this.eachTagRef((name, set, loc, what, soft) => { if (!soft && !okTag(name)) out.push(Object.assign({ text: 'unknown tag "' + name + '" (' + what + ')' }, loc)); });
+    // sound: an output that exists, sounds that can be played
+    if (p.sound !== undefined) {
+      const loc = { view: 'project' }, so = p.sound;
+      if (!so || typeof so !== 'object' || Array.isArray(so)) out.push(Object.assign({ text: 'sound: an object is needed' }, loc));
+      else {
+        if (so.output !== undefined && !['auto', 'audio', 'gpio', 'none'].includes(so.output)) out.push(Object.assign({ text: 'sound: output "' + so.output + '" is not auto, audio, gpio or none' }, loc));
+        if (so.output === 'gpio' && so.gpio === undefined) out.push(Object.assign({ text: 'sound: output "gpio" needs the GPIO line of the buzzer' }, loc));
+        if (so.gpio !== undefined && !(Number.isInteger(so.gpio) && so.gpio >= 0 && so.gpio <= 511)) out.push(Object.assign({ text: 'sound: gpio is the number of a GPIO line (0..511)' }, loc));
+        if (so.volume !== undefined && !(typeof so.volume === 'number' && so.volume >= 0 && so.volume <= 100)) out.push(Object.assign({ text: 'sound: volume is 0 to 100' }, loc));
+        if (so.alarm_every_s !== undefined && !(typeof so.alarm_every_s === 'number' && so.alarm_every_s >= 0)) out.push(Object.assign({ text: 'sound: alarm_every_s is a number of seconds (0 = once)' }, loc));
+        for (const k of ['touch', 'alarm']) {
+          const v = so[k];
+          if (v === undefined || typeof v === 'boolean' || v === '' || ['click', 'beep', 'alarm'].includes(v)) continue;
+          const n = typeof v === 'string' ? v.replace(/\\/g, '/') : '';
+          if (!n || n.length > 200 || /^\/|:|[\x00-\x1f]/.test(n) || n.split('/').some(part => part === '..' || part === '.') || !/.\.wav$/i.test(n))
+            out.push(Object.assign({ text: 'sound: ' + k + ' "' + v + '" is no built-in sound (click, beep, alarm) and no .wav file inside the project folder' }, loc));
+        }
+      }
+    }
     // schedules: a name, a time that is one, days that are days, something to do
     const schedNames = new Set(), dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'daily', 'weekdays', 'weekend', 'all'];
     (Array.isArray(p.schedules) ? p.schedules : []).forEach((sc, i) => {

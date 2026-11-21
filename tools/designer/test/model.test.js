@@ -904,6 +904,26 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+test('M sound: a wrong output, volume, line or sound is a problem; the sys.sound tags are offered', () => {
+  const { M, p } = tagProject();
+  const base = M.problems().length;
+  assert.ok(!M.tagChoices().some(t => t.name === 'sys.sound.mute'));
+  for (const ok of [{}, { output: 'gpio', gpio: 18, gpio_active_low: true }, { output: 'none', volume: 0 }, { touch: false, alarm: 'beep', alarm_every_s: 0 },
+                    { touch: 'assets/tap.wav', alarm: 'assets\\sub\\a.WAV', volume: 100, device: 'plughw:1,0' }, { touch: '', alarm: true }]) {
+    p.sound = ok;
+    assert.equal(M.problems().length, base, JSON.stringify(ok) + ': ' + M.problems().map(x => x.text).join(' | '));
+  }
+  assert.ok(M.tagChoices().some(t => t.name === 'sys.sound.mute'));
+  const bad = [[5, /an object/], [[], /an object/], [{ output: 'speaker' }, /output "speaker"/], [{ output: 'gpio' }, /needs the GPIO line/], [{ gpio: 1.5 }, /gpio is the number/], [{ gpio: -1 }, /gpio is the number/],
+               [{ volume: 101 }, /volume is 0 to 100/], [{ volume: '80' }, /volume is 0 to 100/], [{ alarm_every_s: -1 }, /alarm_every_s/], [{ touch: 'ding' }, /touch "ding" is no built-in/],
+               [{ alarm: '../a.wav' }, /alarm "..\/a.wav"/], [{ touch: '/etc/a.wav' }, /touch/], [{ touch: 'C:/a.wav' }, /touch/], [{ alarm: 'a.mp3' }, /alarm/], [{ touch: 5 }, /touch/]];
+  for (const [snd, re] of bad) {
+    p.sound = snd;
+    assert.ok(M.problems().some(x => re.test(x.text)), JSON.stringify(snd) + ' -> ' + M.problems().map(x => x.text).join(' | '));
+  }
+  delete p.sound;
+});
+
 test('M schedules: the tag of an action follows a rename; what is no schedule is a problem', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;

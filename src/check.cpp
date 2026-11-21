@@ -1,5 +1,6 @@
 #include "check.hpp"
 #include "schedule.hpp"
+#include "sound.hpp"
 #include <cctype>
 #include <filesystem>
 #include <map>
@@ -439,6 +440,34 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     const std::string start = jstr(root, "start_screen", "");
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
+
+    // ---- sound: an output that exists, sounds that can be played
+    if(const json* so = jget(root, "sound")) {
+        if(!so->is_object()) c.add("sound", "an object is needed");
+        else {
+            static const std::set<std::string> known{ "output", "device", "gpio", "gpio_active_low", "gpio_chip", "volume", "mute", "touch", "alarm", "alarm_every_s" };
+            for(auto k = so->begin(); k != so->end(); ++k)
+                if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add("sound", "unknown key \"" + k.key() + "\"");
+            const std::string out = jstr(*so, "output", "auto");
+            if(out != "auto" && out != "audio" && out != "gpio" && out != "none") c.add("sound", "output: \"" + out + "\" is not auto, audio, gpio or none");
+            if(const json* g = jget(*so, "gpio"); g && (!g->is_number_integer() || g->get<double>() < 0 || g->get<double>() > 511)) c.add("sound", "gpio: the number of a GPIO line (0..511)");
+            if(out == "gpio" && !jhas(*so, "gpio")) c.add("sound", "output \"gpio\" needs \"gpio\" (the line of the buzzer)");
+            if(const json* v = jget(*so, "volume"); v && (!v->is_number() || v->get<double>() < 0 || v->get<double>() > 100)) c.add("sound", "volume: 0 to 100");
+            if(const json* v = jget(*so, "alarm_every_s"); v && (!v->is_number() || v->get<double>() < 0)) c.add("sound", "alarm_every_s: seconds (0 = once)");
+            for(const char* key : { "touch", "alarm" }) {
+                const json* v = jget(*so, key);
+                if(!v || v->is_boolean()) continue;
+                if(!v->is_string()) { c.add("sound", std::string(key) + ": the name of a sound, or false"); continue; }
+                const std::string n = v->get<std::string>();
+                Pcm pcm;
+                std::string err;
+                if(n.empty() || sound_builtin(n, pcm)) continue;
+                if(!sound_file_name_ok(n)) c.add("sound", std::string(key) + ": \"" + n + "\" is no built-in sound (click, beep, alarm) and no .wav file inside the project folder");
+                else if(const auto bytes = read_file((c.dir / fs::u8path(n)).generic_u8string(), kSoundFileMax, &err); !bytes) c.add("sound", std::string(key) + ": no file \"" + n + "\" (or larger than 4 MB)");
+                else if(!wav_parse(*bytes, pcm, &err)) c.add("sound", std::string(key) + ": \"" + n + "\": " + err);
+            }
+        }
+    }
 
     // ---- schedules: when, and what they do (the actions of a screen)
     if(const json* sc = jget(root, "schedules")) {

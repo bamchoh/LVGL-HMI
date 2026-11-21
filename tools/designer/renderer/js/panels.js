@@ -476,6 +476,29 @@ const Panels = {
         { k: 'wake_on_alarm', t: 'bool', hint: 'a new alarm wakes the screen' },
         { k: 'logout', t: 'bool', hint: 'log the user out when the screen goes dark' }], fk + '.ss'),
       U.el('div', { class: 'hint' }, 'Raspberry Pi: the backlight is switched off where the display allows it (/sys/class/backlight), else the screen is only made black. Tag sys.screen.off: 1 while dark; write 1 to make it dark now.')));
+    // "sound": there at all = sounds are on (src/sound.hpp). "touch" / "alarm": a name, or false ("off" here)
+    const sndOff = k => k === 'touch' || k === 'alarm';
+    const sndHolder = new Proxy({}, {
+      get: (t, k) => (k === 'on' ? !!p.sound : p.sound && sndOff(k) && p.sound[k] === false ? 'off' : (p.sound || {})[k]),
+      set: (t, k, v) => {
+        if (k === 'on') { if (v) p.sound = p.sound || {}; else delete p.sound; return true; }
+        p.sound = Object.assign({}, p.sound, { [k]: sndOff(k) && String(v).trim().toLowerCase() === 'off' ? false : v });
+        return true;
+      },
+      deleteProperty: (t, k) => { if (k === 'on') delete p.sound; else if (p.sound) delete p.sound[k]; return true; },
+      has: (t, k) => (k === 'on' ? !!p.sound : !!p.sound && k in p.sound),
+    });
+    el.append(Props.section('Sound', !!p.sound,
+      ...Props.fields(sndHolder, [{ k: 'on', t: 'bool', label: 'sound', hint: 'a sound for a touch and for a new alarm' }].concat(!p.sound ? [] : [
+        { k: 'output', t: 'select', o: ['', 'audio', 'gpio', 'none'], empty: '(auto)', hint: 'audio: the sound device (Windows, ALSA). gpio: a buzzer on a GPIO line (Raspberry Pi). auto: gpio when a line is given, else audio' },
+        { k: 'volume', t: 'number', hint: '0 to 100 (default 80; a buzzer has no volume). Can be changed on the device: System > Sound' },
+        { k: 'touch', t: 'text', placeholder: 'click', hint: 'the sound of a touch: click, beep, alarm, a WAV file of the project (assets/tap.wav), or off' },
+        { k: 'alarm', t: 'text', label: 'alarm_sound', placeholder: 'alarm', hint: 'the sound of a new alarm: click, beep, alarm, a WAV file of the project, or off' },
+        { k: 'alarm_every_s', t: 'number', hint: 'the alarm sound starts again every N seconds until the alarms are acknowledged (default 3; 0 = once)' },
+        { k: 'gpio', t: 'number', hint: 'the GPIO line of the buzzer (Raspberry Pi: the GPIO number, e.g. 18)' },
+        { k: 'gpio_active_low', t: 'bool', hint: 'the buzzer sounds while the line is low' },
+        { k: 'device', t: 'text', placeholder: 'default', hint: 'Linux: the ALSA device (default, plughw:1,0 ...)' }]), fk + '.snd'),
+      U.el('div', { class: 'hint' }, 'A sound file is a WAV (PCM, 8 or 16 bit) inside the project folder. Tags: sys.sound.mute, sys.sound.volume, sys.sound.alarm (1 while the alarm sound is on; a button that writes 0 silences it until the next alarm). A button can play a sound: { "action": "call", "fn": "sound.play", "arg": "beep" }. A device without a sound output stays silent and works as before.')));
     // schedules: actions that run by the clock (src/schedule.hpp)
     el.append(Props.section('Schedules', Array.isArray(p.schedules) && p.schedules.length > 0,
       Props.listEditor(p, { k: 'schedules', t: 'list', max: 200, hint: 'actions that run by the clock',

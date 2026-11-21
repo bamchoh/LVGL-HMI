@@ -697,6 +697,39 @@
     Panels.show('widgets');
   });
 
+  await test('sound: switched on and set on the Project tab; "off" is false; switched off leaves nothing', async () => {
+    Panels.show('project'); App.doRefresh();
+    const field = fk => document.querySelector('[data-fk="' + fk + '"]');
+    const type = (fk, value) => { const f = field(fk); if (!f) throw new Error('no field ' + fk); f.value = value; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh(); };
+    const had = M.st.project.sound, base0 = M.problems().length;
+    M.mutate(() => { delete M.st.project.sound; }); App.doRefresh();
+    const base = M.problems().length;
+    ok(field('proj.snd.on') && !field('proj.snd.on').checked, 'the switch, off');
+    ok(!field('proj.snd.volume'), 'nothing else while it is off');
+    field('proj.snd.on').click(); App.doRefresh();
+    eq(M.st.project.sound, {}, 'on: an empty section is all that is needed');
+    ok(field('proj.snd.on').checked && field('proj.snd.volume'), 'the settings appear');
+    type('proj.snd.volume', '60');
+    type('proj.snd.touch', 'off');
+    type('proj.snd.alarm', 'assets/alarm.wav');
+    eq(M.st.project.sound, { volume: 60, touch: false, alarm: 'assets/alarm.wav' });
+    eq(field('proj.snd.touch').value, 'off');
+    eq(M.problems().length, base);
+    type('proj.snd.alarm', 'ding');
+    ok(M.problems().some(x => /alarm "ding" is no built-in/.test(x.text)), 'a sound that is none is a problem');
+    type('proj.snd.alarm', '');
+    eq(M.st.project.sound.alarm, undefined);
+    field('proj.snd.output').value = 'gpio'; field('proj.snd.output').dispatchEvent(new Event('change', { bubbles: true })); App.doRefresh();
+    ok(M.problems().some(x => /needs the GPIO line/.test(x.text)), 'a buzzer needs its line');
+    type('proj.snd.gpio', '18');
+    eq(M.problems().length, base);
+    field('proj.snd.on').click(); App.doRefresh();
+    eq(M.st.project.sound, undefined, 'off: no key left');
+    if (had) M.mutate(() => { M.st.project.sound = had; });
+    eq(M.problems().length, base0);
+    Panels.show('widgets');
+  });
+
   await test('schedules: added and edited on the Project tab; a wrong time is a problem', async () => {
     Panels.show('project'); App.doRefresh();
     const field = fk => document.querySelector('[data-fk="' + fk + '"]');

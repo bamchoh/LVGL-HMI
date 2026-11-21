@@ -418,6 +418,17 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.KEYS_JA, { sound: '音を使う', output: '出力先', volume: '音量', touch: 'タッチ音', alarm_sound: 'アラーム音', alarm_every_s: 'アラーム音の間隔 (秒)', gpio: 'ブザーの GPIO', gpio_active_low: 'Low で鳴る', device: 'ALSA デバイス' });
+Object.assign(I18N.TEXT_JA, { 'Sound': '音', '(auto)': '(自動)', 'a sound for a touch and for a new alarm': 'タッチしたときと、新しいアラームのときに音を出す',
+  'audio: the sound device (Windows, ALSA). gpio: a buzzer on a GPIO line (Raspberry Pi). auto: gpio when a line is given, else audio': 'audio: 音声デバイス（Windows、ALSA）。gpio: GPIO につないだブザー（Raspberry Pi）。自動: GPIO の番号があれば gpio、なければ audio',
+  '0 to 100 (default 80; a buzzer has no volume). Can be changed on the device: System > Sound': '0〜100（既定 80。ブザーに音量はありません）。装置の System > Sound で変えられます',
+  'the sound of a touch: click, beep, alarm, a WAV file of the project (assets/tap.wav), or off': 'タッチ音: click、beep、alarm、プロジェクトの WAV ファイル（assets/tap.wav）、または off',
+  'the sound of a new alarm: click, beep, alarm, a WAV file of the project, or off': '新しいアラームの音: click、beep、alarm、プロジェクトの WAV ファイル、または off',
+  'the alarm sound starts again every N seconds until the alarms are acknowledged (default 3; 0 = once)': 'アラームが確認されるまで、N 秒ごとに鳴らし直す（既定 3。0 = 1 回だけ）',
+  'the GPIO line of the buzzer (Raspberry Pi: the GPIO number, e.g. 18)': 'ブザーをつないだ GPIO（Raspberry Pi: GPIO 番号。例 18）', 'the buzzer sounds while the line is low': 'Low のときに鳴るブザー',
+  'Linux: the ALSA device (default, plughw:1,0 ...)': 'Linux: ALSA のデバイス（default、plughw:1,0 など）',
+  'A sound file is a WAV (PCM, 8 or 16 bit) inside the project folder. Tags: sys.sound.mute, sys.sound.volume, sys.sound.alarm (1 while the alarm sound is on; a button that writes 0 silences it until the next alarm). A button can play a sound: { "action": "call", "fn": "sound.play", "arg": "beep" }. A device without a sound output stays silent and works as before.':
+    '音のファイルは、プロジェクトのフォルダーの中の WAV（PCM、8 / 16 ビット）です。タグ: sys.sound.mute、sys.sound.volume、sys.sound.alarm（アラーム音が鳴っている間 1。0 を書くボタンで、次のアラームまで止まります）。ボタンから鳴らす: { "action": "call", "fn": "sound.play", "arg": "beep" }。音の出口がない装置では鳴らないだけで、ほかは今までどおり動きます。' });
 Object.assign(I18N.TEXT_JA, { 'Schedules': 'スケジュール', 'actions that run by the clock': '時刻で実行する動作', 'HH:MM, or YYYY-MM-DD HH:MM for once': 'HH:MM。1 回だけなら YYYY-MM-DD HH:MM',
   'mon, tue, wed, thu, fri, sat, sun (empty = every day)': 'mon, tue, wed, thu, fri, sat, sun（空なら毎日）', 'off: kept, not run': 'オフ: 残すが実行しない',
   'what it does: an action of a screen, or a list of them. { "action": "set", "tag": "run", "value": true }': '実行する内容: 画面のボタンと同じ動作 1 つ、またはその配列。{ "action": "set", "tag": "run", "value": true }',
