@@ -122,7 +122,8 @@ public:
         }
         else HML_WARN("system: schedule: unknown command '%s'", cmd.c_str());
         status_ = msg;
-        if(Tag* t = tags().find(SystemSettings::tag_name(id(), "status"))) t->set_string(msg, nullptr);
+        // (shown in the line above the list; the status line of the page is below it, out of sight on a small display)
+        if(Tag* t = tags().find(SystemSettings::tag_name(id(), "status"))) t->set_string("", nullptr);
     }
 
     // the "next run" column moves on while the page is looked at
