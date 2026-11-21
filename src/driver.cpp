@@ -56,6 +56,64 @@ void DriverRegistry::stop_all()
     drivers_.clear();
 }
 
+std::vector<Driver*> DriverRegistry::all() const
+{
+    std::vector<Driver*> out;
+    for(const auto& d : drivers_) out.push_back(d.get());
+    return out;
+}
+
+// ---------------------------------------------------------------- addresses without a tag
+
+uint64_t Driver::device_post(const DeviceRequest& r)
+{
+    std::lock_guard<std::mutex> lock(device_lock_);
+    if(device_in_.size() >= 16) return 0;
+    device_in_.emplace_back(++device_id_, r);
+    return device_id_;
+}
+
+bool Driver::device_take(uint64_t id, DeviceResult& out)
+{
+    std::lock_guard<std::mutex> lock(device_lock_);
+    for(auto it = device_out_.begin(); it != device_out_.end(); ++it) {
+        if(it->first != id) continue;
+        out = std::move(it->second);
+        device_out_.erase(it);
+        return true;
+    }
+    return false;
+}
+
+bool Driver::device_next(uint64_t& id, DeviceRequest& r)
+{
+    std::lock_guard<std::mutex> lock(device_lock_);
+    if(device_in_.empty()) return false;
+    id = device_in_.front().first;
+    r = std::move(device_in_.front().second);
+    device_in_.pop_front();
+    return true;
+}
+
+void Driver::device_done(uint64_t id, DeviceResult r)
+{
+    std::lock_guard<std::mutex> lock(device_lock_);
+    device_out_.emplace_back(id, std::move(r));
+    while(device_out_.size() > 32) device_out_.pop_front();       // (answers nobody came for)
+}
+
+void Driver::device_fail_all(const std::string& why)
+{
+    std::lock_guard<std::mutex> lock(device_lock_);
+    for(auto& q : device_in_) {
+        DeviceResult r;
+        r.error = why;
+        device_out_.emplace_back(q.first, std::move(r));
+    }
+    device_in_.clear();
+    while(device_out_.size() > 32) device_out_.pop_front();
+}
+
 DriverRegistry& drivers()
 {
     static DriverRegistry registry;

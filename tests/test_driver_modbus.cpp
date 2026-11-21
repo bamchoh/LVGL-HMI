@@ -228,6 +228,89 @@ double tagv(const char* name) { return tags().find(name)->get_number(); }
 
 // ---------------------------------------------------------------- tests
 
+
+namespace {
+// System > Device: ask the driver for an address no tag is mapped to, wait for the answer
+DeviceResult ask(Driver* d, const char* address, const char* type = "", int count = 1)
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.count = count;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+DeviceResult put(Driver* d, const char* address, const char* value, const char* type = "")
+{
+    DeviceRequest q;
+    q.address = address; q.type = type; q.write = true; q.value = value;
+    const uint64_t id = d->device_post(q);
+    REQUIRE(id != 0);
+    DeviceResult r;
+    REQUIRE(wait_for([&] { return d->device_take(id, r); }));
+    return r;
+}
+using Strings = std::vector<std::string>;
+} // namespace
+
+TEST_CASE("modbus: an address without a tag is read and written, an exception is told")
+{
+    Runtime rt;
+    FakeModbusServer srv;
+    srv.holding[10] = 0xFFFE; srv.holding[11] = 0x0001; srv.holding[12] = 300;
+    srv.input[5] = 1234;
+    srv.coils[3] = true; srv.coils[5] = true;
+    srv.discrete[0] = true;
+    rt.tag("online", TagType::Bool);
+    rt.tag("h0", TagType::Int);
+    REQUIRE(start_modbus(rt, modbus_cfg(srv, json::parse(R"([ { "tag": "h0", "area": "holding", "addr": 0 } ])"))) == 1);
+    REQUIRE(wait_for([] { return tagv("online") == 1; }));
+    Driver* d = rt.drivers.all().at(0);
+    REQUIRE(d->device_access());
+
+    // registers: unsigned unless asked otherwise, a 32-bit value has its high word first
+    CHECK(ask(d, "holding:10").values == Strings{ "65534" });
+    CHECK(ask(d, "HR 10", "int16").values == Strings{ "-2" });
+    CHECK(ask(d, "holding:10", "uint32").values == Strings{ "4294836225" });   // 0xFFFE0001
+    CHECK(ask(d, "holding:10", "uint16", 3).values == Strings{ "65534", "1", "300" });
+    CHECK(ask(d, "input:5").values == Strings{ "1234" });
+    CHECK(ask(d, "coil:3", "", 3).values == Strings{ "1", "0", "1" });
+    CHECK(ask(d, "discrete:0").values == Strings{ "1" });
+    CHECK(ask(d, "holding:12@1").values == Strings{ "300" });
+
+    CHECK(put(d, "holding:20", "777").ok);
+    CHECK(put(d, "holding:21", "-2", "int16").ok);
+    CHECK(put(d, "holding:22", "70000", "int32").ok);
+    CHECK(put(d, "coil:7", "1").ok);
+    CHECK(put(d, "coil:3", "0").ok);
+    {
+        auto g = srv.lock();
+        CHECK(srv.holding[20] == 777);
+        CHECK(srv.holding[21] == 0xFFFE);
+        CHECK(srv.holding[22] == 0x0001);
+        CHECK(srv.holding[23] == 0x1170);
+        CHECK(srv.coils[7]);
+        CHECK_FALSE(srv.coils[3]);
+    }
+
+    CHECK(put(d, "input:5", "1").error.find("cannot be written") != std::string::npos);
+    CHECK(put(d, "holding:20", "70000").error.find("uint16") != std::string::npos);
+    CHECK(put(d, "coil:7", "yes").error.find("0 or 1") != std::string::npos);
+    CHECK(ask(d, "D100").error.find("holding:100") != std::string::npos);
+    CHECK(ask(d, "holding:70000").error != "");
+    CHECK(ask(d, "holding:1@300").error.find("unit") != std::string::npos);
+
+    // an exception is told on the page; the connection and the tags go on
+    srv.exception_fc = 4;
+    DeviceResult r = ask(d, "input:5");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error.find("illegal data address") != std::string::npos);
+    srv.exception_fc = 0;
+    CHECK(ask(d, "input:5").values == Strings{ "1234" });
+    CHECK(tagv("online") == 1);
+}
+
 TEST_CASE("modbus: connects, reports status and polls every area and data type")
 {
     Runtime rt;

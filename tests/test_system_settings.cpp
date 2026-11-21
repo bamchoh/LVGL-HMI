@@ -1,5 +1,7 @@
 // System settings: pages -> tags -> generated screens -> apply.
 #include <doctest.h>
+#include "driver.hpp"
+#include "operation_log.hpp"
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
 #include "serial_ports.hpp"
@@ -255,7 +257,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
         ]
     })json")));
     SystemSettings& sys = system_settings();
-    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "display", "driver_sim", "driver_plc", "driver_sim_2", "monitor", "storage" });
+    CHECK(sys.page_ids() == std::vector<std::string>{ "about", "network", "display", "driver_sim", "driver_plc", "driver_sim_2", "monitor", "device", "storage" });
     json arr = json::parse(R"([{"type":"sim"},{"type":"modbus_tcp","name":"PLC"},{"type":"sim"}])");
     CHECK(driver_keys(&arr) == std::vector<std::string>{ "sim", "PLC", "sim#2" });
     CHECK(driver_keys(nullptr).empty());
@@ -274,7 +276,7 @@ TEST_CASE("Project::load registers About, Network and one page per driver")
 
     // screens are generated alongside the project's own
     REQUIRE(p.build_screens() == 0);                           // no project screens -> fallback label, but...
-    CHECK(ui().screen_count() == 9);                           // ...menu + 8 pages exist
+    CHECK(ui().screen_count() == 10);                           // ...menu + 9 pages exist
     CHECK(ui().show_screen("__system_driver_plc", "none"));
 
     SUBCASE("applying a driver page writes project.local.json and restarts the drivers") {
@@ -449,6 +451,204 @@ TEST_CASE("driver page: the MQTT user name and password are entered on the devic
     CHECK(overlay["drivers"]["mqtt"]["password"] == "pw-123");
     CHECK(jstr(*p.driver_config("mqtt"), "password", "") == "pw-123");
     drivers().stop_all();
+}
+
+namespace {
+// a driver whose device is a map of words, answered when the test says so
+class FakeDeviceDriver final : public Driver {
+public:
+    const char* type() const override { return "fake"; }
+    bool start() override { return true; }
+    void stop() override {}
+    bool device_access() const override { return true; }
+    std::string device_help() const override { return "W0 .. W9"; }
+    std::map<std::string, std::string> mem;
+    std::vector<DeviceRequest> seen;
+    int serve()
+    {
+        int n = 0;
+        uint64_t id = 0;
+        DeviceRequest q;
+        while(device_next(id, q)) {
+            seen.push_back(q);
+            DeviceResult r;
+            if(!mem.count(q.address)) r.error = "no such address";
+            else if(q.write) { mem[q.address] = q.value; r.ok = true; }
+            else { r.ok = true; for(int i = 0; i < q.count; i++) r.values.push_back(i == 0 ? mem[q.address] : std::to_string(i)); }
+            device_done(id, std::move(r));
+            n++;
+        }
+        return n;
+    }
+};
+} // namespace
+
+TEST_CASE("System > Device: an address without a tag is read while the page is shown, and written")
+{
+    CHECK_FALSE(has_device_driver(nullptr));
+    json arr = json::parse(R"([{"type":"sim"},{"type":"mqtt"}])");
+    CHECK_FALSE(has_device_driver(&arr));
+    arr = json::parse(R"([{"type":"sim"},{"type":"modbus_rtu","enabled":false}])");
+    CHECK(has_device_driver(&arr));
+    arr = json::parse(R"([{"type":"fins"}])");
+    CHECK(has_device_driver(&arr));
+
+    Runtime rt;
+    auto owned = std::make_unique<FakeDeviceDriver>();
+    FakeDeviceDriver* drv = owned.get();
+    drv->set_name("PLC");
+    drv->mem = { { "W1", "11" }, { "W2", "22" } };
+    drivers().add(std::move(owned));
+    SystemSettings& sys = system_settings();
+    sys.add_page(make_device_page());
+    sys.create_tags();
+    for(const json& scr : sys.screens(800, 480)) REQUIRE(ui().build_screen(scr, ""));
+    auto text = [](const char* key) { return tags().find(std::string("sys.device.") + key)->get().format(); };
+    auto on = [](const char* key) { return tags().find(std::string("sys.device.") + key)->get_number() != 0; };
+    auto type = [](const char* key, const char* value) { tags().find(std::string("sys.device.") + key)->set_string(value, nullptr); };
+    auto turn = [&](int polls = 4) { for(int i = 0; i < polls; i++) { sys.poll(); drv->serve(); rt.advance(20); } };
+
+    CHECK(on("has_driver"));
+    CHECK(text("driver__options") == "PLC");
+    CHECK(text("help") == "W0 .. W9");
+    CHECK(text("type__options").find("int16") == 0);
+
+    // not on the screen: nothing is asked
+    type("address", "W1");
+    turn();
+    CHECK(drv->seen.empty());
+
+    // on the screen: read again and again
+    REQUIRE(ui().show_screen(SystemSettings::page_screen("device"), "none"));
+    turn();
+    REQUIRE(!drv->seen.empty());
+    CHECK(drv->seen[0].address == "W1");
+    CHECK(drv->seen[0].type == "int16");
+    CHECK(drv->seen[0].count == 1);
+    CHECK_FALSE(drv->seen[0].write);
+    CHECK(text("values") == "11");
+    CHECK_FALSE(on("has_error"));
+    drv->mem["W1"] = "12";                                     // the device changes: the page follows
+    turn();
+    CHECK(text("values") == "12");
+    const size_t asked = drv->seen.size();
+    CHECK(asked >= 2);
+
+    // another address: what was shown goes, the PLC's refusal is shown
+    type("address", "W7");
+    sys.command("device", "read");
+    CHECK(text("values") == "");
+    turn();
+    CHECK(text("values") == "");
+    CHECK(on("has_error"));
+    CHECK(text("error") == "no such address");
+
+    // several values
+    type("address", "W2");
+    tags().find("sys.device.count")->set_number(1, nullptr);    // "8"
+    sys.command("device", "read");
+    turn();
+    CHECK(drv->seen.back().count == 8);
+    CHECK(text("values").find("+0:   22\n+1:   1\n") == 0);
+    CHECK_FALSE(on("has_error"));
+
+    // a write: sent once, told, recorded, and the new value is read
+    sys.command("device", "write");
+    CHECK(text("status") == "Type a value first.");
+    type("value", "99");
+    sys.command("device", "write");
+    CHECK(text("status") == "Writing ...");
+    turn();
+    CHECK(drv->mem["W2"] == "99");
+    CHECK(text("status") == "PLC: W2 = 99 written");
+    CHECK(text("values").find("+0:   99") == 0);
+    int writes = 0;
+    for(const DeviceRequest& q : drv->seen) if(q.write) { writes++; CHECK(q.address == "W2"); CHECK(q.value == "99"); }
+    CHECK(writes == 1);
+
+    // a write the device refuses
+    type("address", "W7");
+    sys.command("device", "write");
+    turn();
+    CHECK(text("status") == "Not written: no such address");
+
+    // away from the page: quiet again
+    REQUIRE(ui().show_screen(SystemSettings::page_screen("monitor").empty() ? "__system" : "__system", "none"));
+    turn();
+    const size_t n = drv->seen.size();
+    turn(6);
+    CHECK(drv->seen.size() == n);
+
+    ui().unload_all();
+    drivers().stop_all();
+}
+
+TEST_CASE("System > Device: no driver that reads addresses")
+{
+    Runtime rt;
+    SystemSettings& sys = system_settings();
+    sys.add_page(make_device_page());
+    sys.create_tags();
+    auto text = [](const char* key) { return tags().find(std::string("sys.device.") + key)->get().format(); };
+    CHECK(tags().find("sys.device.has_driver")->get_number() == 0);
+    CHECK(text("driver__options") == "(none)");
+    CHECK(text("help").find("No driver") == 0);
+    sys.command("device", "write");
+    CHECK(text("status") == "There is no driver to write with.");
+}
+
+TEST_CASE("device access: words as text and back")
+{
+    CHECK(device_type_words("int16") == 1);
+    CHECK(device_type_words("hex") == 1);
+    CHECK(device_type_words("float") == 2);
+    CHECK(device_type_words("double") == 0);
+    uint16_t w[2] = { 0xFFFE, 0x0001 };
+    CHECK(device_format("int16", w) == "-2");
+    CHECK(device_format("uint16", w) == "65534");
+    CHECK(device_format("hex", w) == "FFFE");
+    CHECK(device_format("int32", w) == "131070");
+    w[1] = 0xFFFF;
+    CHECK(device_format("int32", w) == "-2");
+    CHECK(device_format("uint32", w) == "4294967294");
+    w[0] = 0x0000; w[1] = 0x3FC0;
+    CHECK(device_format("float", w) == "1.5");
+
+    std::string err;
+    REQUIRE(device_parse("int16", " -32768 ", w));
+    CHECK(w[0] == 0x8000);
+    CHECK_FALSE(device_parse("int16", "32768", w, &err));
+    CHECK(err.find("-32768 .. 32767") != std::string::npos);
+    CHECK_FALSE(device_parse("uint16", "-1", w));
+    REQUIRE(device_parse("uint32", "4294967295", w));
+    CHECK(w[0] == 0xFFFF);
+    CHECK(w[1] == 0xFFFF);
+    CHECK_FALSE(device_parse("uint32", "4294967296", w));
+    REQUIRE(device_parse("int32", "-2", w));
+    CHECK(w[0] == 0xFFFE);
+    CHECK(w[1] == 0xFFFF);
+    REQUIRE(device_parse("hex", "0x1a2B", w));
+    CHECK(w[0] == 0x1A2B);
+    CHECK_FALSE(device_parse("hex", "10000", w));
+    CHECK_FALSE(device_parse("hex", "xyz", w));
+    REQUIRE(device_parse("float", "1.5", w));
+    CHECK(w[1] == 0x3FC0);
+    CHECK_FALSE(device_parse("float", "1e99", w));
+    CHECK_FALSE(device_parse("float", "nan", w));
+    CHECK_FALSE(device_parse("int16", "", w));
+    CHECK_FALSE(device_parse("int16", "12x", w));
+    CHECK_FALSE(device_parse("int16", "1.5", w));
+    CHECK_FALSE(device_parse("word", "1", w, &err));
+    CHECK(err.find("unknown type") != std::string::npos);
+
+    bool on = false;
+    CHECK(device_parse_bit("1", on));
+    CHECK(on);
+    CHECK(device_parse_bit(" OFF ", on));
+    CHECK_FALSE(on);
+    CHECK(device_parse_bit("True", on));
+    CHECK_FALSE(device_parse_bit("2", on));
+    CHECK_FALSE(device_parse_bit("", on));
 }
 
 TEST_CASE("System > Tags: lists the tags, filters, pages, writes a value")

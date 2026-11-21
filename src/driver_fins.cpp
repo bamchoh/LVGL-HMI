@@ -86,11 +86,14 @@ public:
     const char* type() const override { return "fins"; }
     bool start() override;
     void stop() override;
+    bool device_access() const override { return true; }
+    std::string device_help() const override { return "D100  CIO10  W5  H3  A440  E0_100  T5  C5,  a bit: CIO10.03"; }
 
 private:
     struct Write { size_t item; Value value; };
     enum Result { kOk = 1, kEndCode = 0, kFatal = -1 };
 
+    Result device_do(const DeviceRequest& rq, DeviceResult& rs);
     bool   handshake();
     Result transact(uint8_t mrc, uint8_t src, const std::vector<uint8_t>& data, std::vector<uint8_t>& out, uint16_t* end_code);
     int    read_exact(uint8_t* buf, int n, std::chrono::steady_clock::time_point deadline);
@@ -467,6 +470,72 @@ FinsDriver::Result FinsDriver::write_item(const Item& it, const Value& v)
     return r;
 }
 
+// An address no tag is mapped to: one read or one write, answered with text.
+FinsDriver::Result FinsDriver::device_do(const DeviceRequest& rq, DeviceResult& rs)
+{
+    std::string err, why;
+    const auto a = fins_parse_address(rq.address, &err);
+    if(!a) { rs.error = err; return kOk; }
+    std::vector<uint8_t> out;
+    uint16_t code = 0;
+    Result r = kOk;
+    const int count = std::clamp(rq.count, 1, kDeviceMaxCount);
+    if(a->bit >= 0) {
+        if(a->bit_code == 0) { rs.error = "this area has no bits"; return kOk; }
+        if(rq.write) {
+            bool on = false;
+            if(!device_parse_bit(rq.value, on)) { rs.error = "a bit is written with 0 or 1"; return kOk; }
+            if(!write_allowed(*a, 1, why)) { rs.error = "not written: " + why; return kOk; }
+            std::vector<uint8_t> data = fins_area_data(a->bit_code, a->number, static_cast<uint8_t>(a->bit), 1);
+            data.push_back(on ? 0x01 : 0x00);
+            r = transact(0x01, 0x02, data, out, &code);
+        }
+        else {
+            const int n = std::min(count, 16 - a->bit);
+            r = transact(0x01, 0x01, fins_area_data(a->bit_code, a->number, static_cast<uint8_t>(a->bit), static_cast<uint16_t>(n)), out, &code);
+            if(r == kOk) {
+                if(static_cast<int>(out.size()) != n) { rs.error = "the answer has another length"; return kFatal; }
+                for(int i = 0; i < n; i++) rs.values.push_back((out[static_cast<size_t>(i)] & 1) ? "1" : "0");
+            }
+        }
+    }
+    else {
+        const std::string type = rq.type.empty() ? "int16" : rq.type;
+        const int words = device_type_words(type);
+        if(words == 0) { rs.error = "unknown type '" + type + "'"; return kOk; }
+        const int total = rq.write ? words : words * count;
+        const uint32_t area_end = a->area == "T" ? 0x7FFF : 0xFFFF;
+        if(static_cast<uint32_t>(a->number) + static_cast<uint32_t>(total) - 1 > area_end) { rs.error = "this goes past the end of the area"; return kOk; }
+        if(rq.write) {
+            uint16_t w[2] = {};
+            if(!device_parse(type, rq.value, w, &err)) { rs.error = err; return kOk; }
+            if(!write_allowed(*a, words, why)) { rs.error = "not written: " + why; return kOk; }
+            std::vector<uint8_t> data = fins_area_data(a->word_code, a->number, 0, static_cast<uint16_t>(words));
+            for(int k = 0; k < words; k++) { data.push_back(static_cast<uint8_t>(w[k] >> 8)); data.push_back(static_cast<uint8_t>(w[k])); }
+            r = transact(0x01, 0x02, data, out, &code);
+        }
+        else {
+            r = transact(0x01, 0x01, fins_area_data(a->word_code, a->number, 0, static_cast<uint16_t>(total)), out, &code);
+            if(r == kOk) {
+                if(static_cast<int>(out.size()) != total * 2) { rs.error = "the answer has another length"; return kFatal; }
+                for(int i = 0; i < count; i++) {
+                    uint16_t w[2] = {};
+                    for(int k = 0; k < words; k++) {
+                        const size_t at = static_cast<size_t>(i * words + k) * 2;
+                        w[k] = static_cast<uint16_t>((out[at] << 8) | out[at + 1]);
+                    }
+                    rs.values.push_back(device_format(type, w));
+                }
+            }
+        }
+    }
+    if(r == kEndCode) rs.error = fins_end_code_text(code);
+    else if(r == kFatal) rs.error = "no answer";
+    else rs.ok = true;
+    if(rs.ok && rq.write) HML_INFO("fins: %s written with %s (System > Device)", fins_format_address(*a).c_str(), rq.value.c_str());
+    return r;
+}
+
 void FinsDriver::set_online(bool on)
 {
     if(online_ == (on ? 1 : 0)) return;
@@ -484,6 +553,7 @@ void FinsDriver::thread_main()
             if(!stream_->open() || !handshake()) {
                 stream_->close();
                 set_online(false);
+                device_fail_all("not connected");
                 wait(backoff);
                 if(backoff < 5000) backoff *= 2;
                 continue;
@@ -506,8 +576,16 @@ void FinsDriver::thread_main()
             std::lock_guard<std::mutex> lock(qlock_);
             items_[w.item].pending_writes--;
         }
+        for(uint64_t id = 0; link_ok && running_;) {    // addresses without a tag (System > Device)
+            DeviceRequest rq;
+            if(!device_next(id, rq)) break;
+            DeviceResult rs;
+            if(device_do(rq, rs) == kFatal) link_ok = false;
+            device_done(id, std::move(rs));
+        }
         for(size_t b = 0; link_ok && b < blocks_.size() && running_; b++) if(read_block(b) == kFatal) link_ok = false;
         if(!link_ok) {
+            device_fail_all("not connected");
             if(running_) HML_WARN("fins %s: communication error (%s), reconnecting", stream_->describe().c_str(), stream_->last_error().empty() ? "timeout" : stream_->last_error().c_str());
             stream_->close();
             set_online(false);
