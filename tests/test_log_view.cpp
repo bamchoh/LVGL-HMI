@@ -457,7 +457,8 @@ TEST_CASE("log_view widget: unknown columns are left out, a narrow widget keeps 
     logs.op(LogDb::now_ms(), "op", "write", "setpoint", "1", "2");
     lv_obj_t* s = ui().build_screen(json::parse(R"({ "name": "two", "children": [
         { "type": "log_view", "x": 0, "y": 0, "w": 300, "h": 110, "source": "system", "filter": false },
-        { "type": "log_view", "x": 0, "y": 120, "w": 300, "h": 110, "source": "operation", "columns": "target, nope, new", "rows": 500 } ] })"), "");
+        { "type": "log_view", "x": 0, "y": 120, "w": 300, "h": 110, "source": "operation", "columns": "target, nope, new", "rows": 500 },
+        { "type": "log_view", "x": 0, "y": 0, "w": 472, "h": 100, "source": "operation" } ] })"), "");
     REQUIRE(s);
     REQUIRE(ui().show_screen("two", "none"));
     settle(rt);
@@ -471,6 +472,16 @@ TEST_CASE("log_view widget: unknown columns are left out, a narrow widget keeps 
     CHECK(cell(op, 0, 0) == "Target");
     CHECK(cell(op, 1, 0) == "setpoint");
     CHECK(cell(op, 1, 1) == "2");
+    // the operation log on a 480 px display: who, what and the new value, and all of it fits (found on the device)
+    lv_obj_t* narrow = lv_obj_get_child(s, 2);
+    REQUIRE(lv_table_get_column_count(table_of(narrow)) == 4);
+    CHECK(cell(narrow, 0, 1) == "User");
+    CHECK(cell(narrow, 0, 3) == "New");
+    CHECK(cell(narrow, 1, 2) == "setpoint");
+    int32_t sum = 0;
+    for(uint32_t i = 0; i < 4; i++) sum += lv_table_get_column_width(table_of(narrow), i);
+    CHECK(sum <= lv_obj_get_content_width(table_of(narrow)));
+    CHECK(lv_table_get_column_width(table_of(narrow), 2) >= 100);
     ui().unload_all();
 }
 
