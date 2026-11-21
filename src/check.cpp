@@ -35,6 +35,7 @@ struct Checker {
     std::set<std::string> tags, screens, popups, scripts, texts, languages, books;
     std::map<std::string, std::set<std::string>> groups;      // data log group -> its tags (empty = all)
     bool has_texts = false, has_alarms = false;
+    std::set<std::string> log_sections;                       // "system" / "operation": the project records that log
     std::string file;                                          // the file being read
 
     void add(const std::string& where, const std::string& text) { out.push_back({ file, where, text }); }
@@ -213,6 +214,7 @@ struct Checker {
             if(type.empty()) { add(where, "no \"type\""); return; }
             if(!S["types"].contains(type)) { add(where, "unknown widget type \"" + type + "\""); return; }
             own = str_set(S["types"][type]);
+            if(type == "log_view") own.insert("widths");                         // (an object: edited as JSON)
         }
         for(auto it = w.begin(); it != w.end(); ++it) {
             const std::string& k = it.key();
@@ -270,6 +272,30 @@ struct Checker {
             if(!books.count(b) && !(b.empty() && books.size() == 1)) add(where, b.empty() ? "no \"book\" (a recipe book)" : "unknown recipe book \"" + b + "\"");
         }
         if((type == "alarm_list" || type == "alarm_banner") && !has_alarms) add(where, "the project has no \"alarms\"");
+        if(type == "log_view") {
+            const std::string src = jstr(w, "source", "system");
+            if(src == "data") {
+                const std::string g = jstr(w, "group", "");
+                auto it = groups.find(g);
+                if(it == groups.end()) add(where, g.empty() ? "no \"group\" (a data log group)" : "unknown data log group \"" + g + "\"");
+                else if(const json* cl = jget(w, "columns"); cl && cl->is_array() && !it->second.empty())
+                    for(const json& c : *cl) {
+                        const std::string n = c.is_string() ? c.get<std::string>() : "";
+                        if(n != "time" && !it->second.count(n)) add(where, "data log group \"" + g + "\" does not record \"" + n + "\"");
+                    }
+            }
+            else if(src == "system" || src == "operation") {
+                if(!log_sections.count(src)) add(where, "the project has no \"" + src + "_log\" (nothing is recorded to show)");
+                static const std::set<std::string> sys{ "time", "level", "source", "message", "count" }, op{ "time", "user", "screen", "kind", "target", "old", "new" };
+                if(const json* cl = jget(w, "columns"); cl && cl->is_array())
+                    for(const json& c : *cl) {
+                        const std::string n = c.is_string() ? c.get<std::string>() : "";
+                        if(!(src == "system" ? sys : op).count(n)) add(where, "the " + src + " log has no column \"" + n + "\"");
+                    }
+            }
+            else add(where, "source: \"" + src + "\" is not system, operation or data");
+            if(w.contains("filter_tag")) need_tag(where, "filter_tag", w["filter_tag"]);
+        }
     }
 
     void walk(const json& w, const std::string& path, bool screen)
@@ -315,6 +341,8 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(const json* rc = jget(root, "recipes")) if(const json* bs = jget(*rc, "books"); bs && bs->is_array())
         for(const json& b : *bs) c.books.insert(jstr(b, "name", ""));
     if(const json* al = jget(root, "alarms")) c.has_alarms = al->is_object() && jget(*al, "items");
+    for(const char* n : { "system", "operation" })
+        if(const json* sec = jget(root, (std::string(n) + "_log").c_str()); sec && sec->is_object() && jbool(*sec, "enabled", true)) c.log_sections.insert(n);
     if(const json* f = jget(root, "font")) {
         const std::string ff = jstr(*f, "file", "");
         std::error_code ec;

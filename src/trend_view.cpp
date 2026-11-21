@@ -27,6 +27,7 @@
 #include <functional>
 #include <mutex>
 #include <thread>
+#include "background_worker.hpp"
 #include "data_log.hpp"
 #include "texts.hpp"
 #include "ui.hpp"
@@ -34,54 +35,6 @@
 
 namespace hml {
 namespace {
-
-// one worker for every trend widget; joined when the program ends
-class TrendWorker {
-public:
-    static TrendWorker& get() { static TrendWorker w; return w; }
-    void post(std::function<void()> job)
-    {
-        { std::lock_guard<std::mutex> l(mu_); jobs_.push_back(std::move(job)); }
-        cv_.notify_one();
-    }
-    void wait_idle()                                       // (tests)
-    {
-        for(;;) {
-            { std::lock_guard<std::mutex> l(mu_); if(jobs_.empty() && !busy_) return; }
-            sleep_ms(2);
-        }
-    }
-    ~TrendWorker()
-    {
-        { std::lock_guard<std::mutex> l(mu_); stop_ = true; jobs_.clear(); }
-        cv_.notify_one();
-        if(th_.joinable()) th_.join();
-    }
-private:
-    TrendWorker() : th_([this] { run(); }) {}
-    void run()
-    {
-        for(;;) {
-            std::function<void()> job;
-            {
-                std::unique_lock<std::mutex> l(mu_);
-                cv_.wait(l, [this] { return stop_ || !jobs_.empty(); });
-                if(stop_) return;
-                job = std::move(jobs_.front());
-                jobs_.pop_front();
-                busy_ = true;
-            }
-            job();
-            std::lock_guard<std::mutex> l(mu_);
-            busy_ = false;
-        }
-    }
-    std::mutex mu_;
-    std::condition_variable cv_;
-    std::deque<std::function<void()>> jobs_;
-    bool stop_ = false, busy_ = false;
-    std::thread th_;
-};
 
 struct Shared {                       // between the widget (UI thread) and the worker
     std::mutex mu;
@@ -151,7 +104,7 @@ struct TrendCtx {
         const std::vector<std::string> t = tags;
         const int n = buckets;
         const TrendFill fl = fill;
-        TrendWorker::get().post([sh, g, t, from, to, n, fl] {
+        BackgroundWorker::get().post([sh, g, t, from, to, n, fl] {
             auto data = data_log().trend(g, t, from, to, n);
             trend_fill_gaps(data, from, to, fl, LogDb::now_ms());
             std::lock_guard<std::mutex> l(sh->mu);
@@ -402,6 +355,6 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     return obj;
 }
 
-void trend_wait_idle() { TrendWorker::get().wait_idle(); }
+void trend_wait_idle() { BackgroundWorker::get().wait_idle(); }
 
 } // namespace hml

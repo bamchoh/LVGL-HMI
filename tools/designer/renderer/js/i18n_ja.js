@@ -413,6 +413,8 @@ Object.assign(I18N.TEXT_JA, {
 // ---- trend
 Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表示する期間 (秒)', buckets: '横の点数', refresh_ms: '更新周期 (ms)' });
 Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
+Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示' });
+Object.assign(I18N.KEYS_JA, { source: 'ログの種類', min_level: '出すレベル', filter: 'レベルの選択を出す', filter_tag: '絞り込みのタグ' });
 I18N.PATTERNS_JA.push(
   [/^trend: no data log group "(.*)"$/, 'トレンド: ロギンググループ「$1」がありません'],
   [/^trend: data log group "(.*)" does not record "(.*)"$/, 'トレンド: ロギンググループ「$1」は「$2」を記録していません'],

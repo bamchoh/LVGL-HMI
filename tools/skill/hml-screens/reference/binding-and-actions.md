@@ -232,6 +232,7 @@
 | --- | --- | --- |
 | `alarm_banner` | `project.json` の `alarms` | `{ "type": "alarm_banner", "align": "top_mid", "w": "100%", "h": 36 }`（いちばん新しい未確認のアラームを帯で出す） |
 | `alarm_list` | `alarms` | `{ "type": "alarm_list", "w": "100%", "h": 300, "mode": "current" }`（`history` で履歴） |
+| `log_view` | 出すログの設定（`system_log` / `operation_log` / `data_log`） | `{ "type": "log_view", "w": "100%", "h": 300, "source": "system" }`（`operation`、`data` + `group`） |
 | `trend` | `data_log` のグループ | `{ "type": "trend", "w": "100%", "h": 300, "group": "process", "tags": ["temp", "level"], "range_s": 3600 }` |
 | `chart` | なし（表示している間の値だけ） | `{ "type": "chart", "w": 300, "h": 160, "series": [ { "tag": "temp", "color": "#ff9800" } ], "min": 0, "max": 100 }` |
 | `recipe_table` | `recipes` のブック | `{ "type": "recipe_table", "w": "100%", "h": 300, "book": "products" }` |
@@ -261,6 +262,20 @@
   （温度 20〜30 と液面 0〜100）は同じ軸だと片方が平らになるので、頼まれた見え方に合わせて部品を分けるか、そのことを伝える。
 - 凡例にはタグ名がそのまま出る（訳せない）。何の線かは、上に `label` で題を付けて伝える。
 - `labels`: `now`（「今に戻る」ボタンの文字。省くと `Now`）。
+
+### `log_view`
+
+- ログを表で見る部品（読むだけ）。`source`: `system`（ランタイムのメッセージ）/ `operation`（操作の記録）/ `data`（変数ロギング。`group` が要る）。
+  **`project.json` にそのログの設定がないと何も出ない**（`--check` が指摘する）。ログの設定を足すのは頼まれたときだけ。
+- 中に、上の帯（レベルのドロップダウン、件数、ページ送りのボタン 2 つ。高さ約 46px）と表を持つ。
+  **高さは 200 以上、幅は 440 以上**。1 行は約 32px なので、`rows` は「(高さ − 90) ÷ 32」を目安にする（長いメッセージは折り返して行が高くなる。あふれた分は表の中でスクロールする）。
+- `columns`: `system` は `time` `level` `source` `message` `count`、`operation` は `time` `user` `screen` `kind` `target` `old` `new`、
+  `data` は `time` とグループのタグ名。省くとよく使う列。幅が 560 未満の `system` は `source` を省く。
+- 列の見出しは英語（`Time` `Message` …）。日本語などにするには `labels` に書く: `"labels": { "time": "時刻", "level": "種類", "message": "内容", "empty": "記録なし" }`
+  （`languages` のあるプロジェクトでは `"@ID"`）。`data` の列の見出しはタグ名のまま。
+- 文字で絞り込ませたいときは、文字列タグを作り、`text_display`（`"input": true`）をそのタグに結び付け、`"filter_tag": "<タグ>"` を書く（画面に `keyboard` が要る）。
+- 操作ログは「誰が何をしたか」の記録。見せる相手を限るなら、その画面か部品に `level` を付ける（既存の画面の `level` に合わせる）。
+- `--check --render` の画像では、表は見出しだけで行は出ない（ログを読まないため）。行の見え方は、コピーを動かす手順で確かめる。
 
 ### `recipe_table`
 

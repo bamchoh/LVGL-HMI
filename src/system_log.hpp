@@ -41,6 +41,7 @@ struct SystemLogQuery {
     std::string text;                       // substring of the message, empty = any
     int64_t     since_ms = 0, until_ms = 0; // Unix ms, 0 = open
     int         limit = 0;                  // 0 = all
+    int         offset = 0;                 // rows to skip (paging)
     bool        newest_first = false;
 };
 
@@ -66,6 +67,8 @@ public:
     void flush();                                                                      // write pending rows now
 
     std::vector<SystemLogEntry> query(const SystemLogQuery& q = {});
+    // How many rows match (limit and offset do not count).
+    int64_t count(const SystemLogQuery& q = {});
     // CSV (UTF-8 with BOM, CRLF): time,level,source,message,count,last_time. Returns the number
     // of rows written, -1 on failure.
     int64_t export_csv(const std::string& csv_path, const SystemLogQuery& q = {});

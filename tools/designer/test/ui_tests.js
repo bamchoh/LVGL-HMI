@@ -372,6 +372,32 @@
     M.mutate(() => { M.st.project.drivers.splice(i, 1); }); App.doRefresh();
   });
 
+  await test('log view: in the palette, drawn as a table for each source, its properties', async () => {
+    const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
+    ok(pal.some(t => /ログ表示/.test(t)), 'palette: ' + pal.join(','));
+    App.addWidget('log_view'); await frame();
+    const p = M.st.sel, find = () => Canvas.root.querySelector('[data-path="' + U.pathStr(p) + '"]');
+    let el2 = find();
+    ok(el2 && el2.classList.contains('lv-log_view'), 'drawn');
+    eq(M.get(p).source, 'system');
+    ok([...el2.querySelectorAll('th')].map(t => t.textContent).join(',') === 'Time,Level,Source,Message', 'system columns: ' + el2.textContent.slice(0, 80));
+    ok(/ERROR/.test(el2.textContent) && /INFO ▾/.test(el2.textContent), 'sample rows and the level dropdown');
+    const props = [...document.querySelectorAll('#props select')];
+    ok(props.some(s => [...s.options].some(o => o.value === 'operation')), 'source is a select');
+    M.mutate(() => { const n = M.get(p); n.source = 'operation'; n.columns = ['time', 'target', 'new']; n.labels = { target: 'What' }; }); App.doRefresh(); await frame();
+    el2 = find();
+    eq([...el2.querySelectorAll('th')].map(t => t.textContent).join(','), 'Time,What,New');
+    ok(!/▾/.test(el2.textContent), 'no level dropdown for the operation log');
+    const g = ((M.st.project.data_log || {}).groups || [])[0];
+    if (g) {
+      M.mutate(() => { const n = M.get(p); n.source = 'data'; n.group = g.name; delete n.columns; delete n.labels; }); App.doRefresh(); await frame();
+      el2 = find();
+      const want = ['Time'].concat(g.tags.map(t => typeof t === 'string' ? t : t.tag)).join(',');
+      eq([...el2.querySelectorAll('th')].map(t => t.textContent).join(','), want);
+    }
+    M.deleteWidget(p); App.doRefresh();
+  });
+
   await test('alarm widgets: in the palette, drawn with the alarms of the project, settings on the Logs page', async () => {
     const pal = [...document.querySelectorAll('#tab-widgets button.pal')].map(b => b.textContent);
     ok(pal.some(t => /アラーム一覧/.test(t)) && pal.some(t => /アラームバナー/.test(t)), 'palette: ' + pal.join(','));

@@ -29,6 +29,7 @@ const jsonValue = v => code(JSON.stringify(v));
 // keys the runtime takes that the designer edits elsewhere (or only as JSON)
 const EXTRA = {
   trend: '`tags` items may be `{ "tag", "color" }`; `labels` (`{ "now" }`)',
+  log_view: '`labels` (object of texts: `empty` and the titles of the columns), `widths` (`{ "time": 150 }`, pixels)',
   alarm_list: '`labels` (object of texts)', alarm_banner: '`labels` (object of texts)', recipe_table: '`labels` (object of texts)',
 };
 

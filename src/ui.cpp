@@ -5,6 +5,7 @@
 #include "trend_view.hpp"
 #include "recipe.hpp"
 #include "alarm_view.hpp"
+#include "log_view.hpp"
 #include "operation_log.hpp"
 #include "script.hpp"
 #include "tag.hpp"
@@ -1957,6 +1958,9 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     }
     else if(iequals(type, "alarm_list")) {
         obj = build_alarm_list(parent, w);
+    }
+    else if(iequals(type, "log_view")) {
+        obj = build_log_view(parent, w);
     }
     else if(iequals(type, "alarm_banner")) {
         obj = build_alarm_banner(parent, w);

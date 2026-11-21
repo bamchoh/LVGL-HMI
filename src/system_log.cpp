@@ -360,7 +360,7 @@ std::vector<SystemLogEntry> SystemLog::query(const SystemLogQuery& q)
                       " AND (?2 = '' OR source = ?2) AND (?3 = '' OR instr(message, ?3) > 0)"
                       " AND (?4 = 0 OR last_ts >= ?4) AND (?5 = 0 OR ts <= ?5)";
     sql += q.newest_first ? " ORDER BY id DESC" : " ORDER BY id ASC";
-    sql += " LIMIT ?6";
+    sql += " LIMIT ?6 OFFSET ?7";
     sqlite3_stmt* st = nullptr;
     if(sqlite3_prepare_v2(m.db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         HML_ERROR("system log: query failed: %s", sqlite3_errmsg(m.db));
@@ -373,6 +373,7 @@ std::vector<SystemLogEntry> SystemLog::query(const SystemLogQuery& q)
     sqlite3_bind_int64(st, 4, q.since_ms);
     sqlite3_bind_int64(st, 5, q.until_ms);
     sqlite3_bind_int(st, 6, q.limit > 0 ? q.limit : -1);
+    sqlite3_bind_int(st, 7, q.offset > 0 ? q.offset : 0);
     auto text = [st](int col) { const unsigned char* s = sqlite3_column_text(st, col); return std::string(s ? reinterpret_cast<const char*>(s) : ""); };
     while(sqlite3_step(st) == SQLITE_ROW) {
         SystemLogEntry e;
@@ -388,6 +389,30 @@ std::vector<SystemLogEntry> SystemLog::query(const SystemLogQuery& q)
     }
     sqlite3_finalize(st);
     return out;
+}
+
+int64_t SystemLog::count(const SystemLogQuery& q)
+{
+    Impl& m = *impl_;
+    flush();
+    std::lock_guard<std::mutex> dl(m.dbmu);
+    if(!m.db) return 0;
+    const char* sql = "SELECT COUNT(*) FROM log WHERE level >= ?1 AND (?2 = '' OR source = ?2) AND (?3 = '' OR instr(message, ?3) > 0)"
+                      " AND (?4 = 0 OR last_ts >= ?4) AND (?5 = 0 OR ts <= ?5)";
+    sqlite3_stmt* st = nullptr;
+    if(sqlite3_prepare_v2(m.db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        HML_ERROR("system log: query failed: %s", sqlite3_errmsg(m.db));
+        sqlite3_finalize(st);
+        return 0;
+    }
+    sqlite3_bind_int(st, 1, static_cast<int>(q.min_level));
+    sqlite3_bind_text(st, 2, q.source.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 3, q.text.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 4, q.since_ms);
+    sqlite3_bind_int64(st, 5, q.until_ms);
+    const int64_t n = sqlite3_step(st) == SQLITE_ROW ? sqlite3_column_int64(st, 0) : 0;
+    sqlite3_finalize(st);
+    return n;
 }
 
 int64_t SystemLog::export_csv(const std::string& csv_path, const SystemLogQuery& q)
