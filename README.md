@@ -86,7 +86,7 @@ Karakuri を起動しておく必要があります）。
 
 ```
 python -I tools/karakuri_check.py --api http://localhost:8765/api          # すべて
-python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slmp / fins / modbus / opcua / opcua-secure / device
+python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slmp / fins / modbus / opcua / opcua-secure / device / opcua-server
 ```
 
 プロトコルごとに、Karakuri のサーバーを起動し、REST API でメモリに値を入れ、ランタイムを数秒動かしてタグの値を
@@ -99,6 +99,8 @@ python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slm
 | `modbus`      | Modbus TCP。保持・入力レジスタ、コイル、ディスクリート入力、u16 / s16 / u32 / s32 / float         |
 | `opcua`       | OPC UA クライアント（暗号なし）。INT / DINT / UINT / REAL / LREAL / BOOL / STRING の購読と書き込み |
 | `opcua-secure`| 同じ内容を Basic256Sha256 の Sign & Encrypt で（Karakuri の OPC UA サーバーにエンドポイントを足します） |
+| `device`      | デバイスモニター（タグのないアドレスの読み書き）を SLMP / FINS / Modbus TCP で |
+| `opcua-server`| 逆向き: ランタイムの OPC UA サーバー（暗号なし）に Karakuri の OPC UA クライアントをつなぎ、ノードの一覧と型、読み出し、書き込み、読み取り専用・型違い・存在しないノードの拒否を確かめる |
 
 ## ビルド（Raspberry Pi / Linux）
 
@@ -908,6 +910,8 @@ OPC UA クライアントから読み書きでき、クライアントからの�
 | `tags`      | 公開するタグ。省略時は全タグを読み書き可で公開。要素は文字列か `{ "tag", "access": "rw" / "ro" }` |
 
 - ノード ID は `ns=<index>;s=<タグ名>`、型は bool → Boolean、int → Int64、float → Double、string → String です。
+  クライアントは、この型で書き込んでください。別の型（Int64 のノードに Int16 など）の書き込みは、サーバーが
+  `BadTypeMismatch` で断ります（一般のクライアントはノードの型を読んでから書くので、そのまま使えます）。
 - 読み出しはタグストアから都度取得するので、Subscription / MonitoredItem でも最新値が届きます。
 - セキュリティポリシーは `None`（暗号化・認証なし）のみです。閉じたネットワークでの利用を想定しています。
 - 動作確認用のクライアントを同梱しています（`pip install asyncua` が必要）。

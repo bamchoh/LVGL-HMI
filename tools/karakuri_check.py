@@ -395,6 +395,95 @@ def check_device(api, runtime, rep):
 CHECKS['device'] = check_device
 
 
+# ---------------------------------------------------------------- HML's OPC UA server, asked by Karakuri's OPC UA client
+def check_opcua_server(api, runtime, rep):
+    import socket, time
+    port = 48555
+    print('opcua-server: the runtime serves on port %d, Karakuri is the client' % port)
+    d = tempfile.mkdtemp(prefix='hml_karakuri_')
+    cid = None
+    proc = None
+    try:
+        os.makedirs(os.path.join(d, 'screens'))
+        names = ['b', 'i', 'f', 's', 'ro']
+        lua = ['n = (n or 0) + 1', 'if n == 24 then'] + ['  print("CHK %s=" .. tostring(tag["%s"]))' % (n, n) for n in names] + ['end']
+        project = {'title': 'karakuri check', 'display': {'width': 320, 'height': 240}, 'start_screen': 's',
+                   'tags': [{'name': 'b', 'type': 'bool', 'init': True}, {'name': 'i', 'type': 'int', 'init': -1234},
+                            {'name': 'f', 'type': 'float', 'init': 12.5}, {'name': 's', 'type': 'string', 'init': 'HML'},
+                            {'name': 'ro', 'type': 'int', 'init': 7}],
+                   'drivers': [{'type': 'opcua_server', 'port': port, 'tags': ['b', 'i', 'f', 's', {'tag': 'ro', 'access': 'ro'}]}],
+                   'scripts': [{'name': 'chk', 'trigger': 'interval', 'interval_ms': 500, 'code': lua}],
+                   'screens': ['screens/s.json']}
+        with open(os.path.join(d, 'project.json'), 'w', encoding='utf-8') as f:
+            json.dump(project, f)
+        with open(os.path.join(d, 'screens', 's.json'), 'w', encoding='utf-8') as f:
+            json.dump({'name': 's', 'children': []}, f)
+        env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
+        proc = subprocess.Popen([runtime, os.path.join(d, 'project.json'), '--exit-after', '14000'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+        for _ in range(50):                                   # until the server listens
+            try:
+                socket.create_connection(('127.0.0.1', port), timeout=0.2).close()
+                break
+            except OSError:
+                time.sleep(0.1)
+        c = api.call('POST', '/clients', {'protocolType': 'opcua', 'name': 'hml_server_check',
+                                         'settings': {'endpointUrl': 'opc.tcp://127.0.0.1:%d' % port, 'securityPolicy': 'None', 'timeoutMs': 3000}})
+        cid = c['id']
+
+        def send(command, **params):
+            return api.call('POST', '/clients/%s/send' % cid, {'commandId': command, 'params': params})
+        def values(r):
+            return [v['value'] for v in (r.get('values') or [])]
+        def node(n): return 'ns=2;s=' + n
+
+        # the address space: the folder, the variables and their types
+        top = api.call('GET', '/clients/%s/browse?parent=i%%3D85' % cid)
+        rep.check('Objects has the folder HML', any(e['address'] == 'ns=2;s=HML' for e in top), True)
+        kids = api.call('GET', '/clients/%s/browse?parent=ns%%3D2%%3Bs%%3DHML' % cid)
+        rep.check('the variables and their types', sorted((e['address'], e['detail']) for e in kids),
+                  sorted([(node('b'), 'Boolean'), (node('i'), 'Int64'), (node('f'), 'Double'), (node('s'), 'String'), (node('ro'), 'Int64')]))
+        # reads
+        r = send('read', nodeId='\n'.join(node(n) for n in names), attribute='Value')
+        rep.check('read b i f s ro', (r['status'], values(r)), ('ok', ['true', '-1234', '12.5', 'HML', '7']))
+        r = send('read', nodeId=node('nope'), attribute='Value')
+        rep.check('an unknown node is refused', 'BadNodeIdUnknown' in json.dumps(r), True)
+        # writes: the type of the node, a read-only node, another type
+        rep.check('write i (Int64)', send('write', nodeId=node('i'), dataType='Int64', rank='scalar', value='4321')['status'], 'ok')
+        rep.check('write f (Double)', send('write', nodeId=node('f'), dataType='Double', rank='scalar', value='1.5')['status'], 'ok')
+        rep.check('write b (Boolean)', send('write', nodeId=node('b'), dataType='Boolean', rank='scalar', value='false')['status'], 'ok')
+        rep.check('write s (String)', send('write', nodeId=node('s'), dataType='String', rank='scalar', value='hello')['status'], 'ok')
+        r = send('write', nodeId=node('ro'), dataType='Int64', rank='scalar', value='1')
+        rep.check('a read-only tag is not written', 'BadNotWritable' in json.dumps(r), True)
+        r = send('write', nodeId=node('i'), dataType='String', rank='scalar', value='text')
+        rep.check('a text into a number is refused', r['status'] != 'ok', True)
+        r = send('read', nodeId='\n'.join(node(n) for n in names), attribute='Value')
+        rep.check('read back', values(r), ['false', '4321', '1.5', 'hello', '7'])
+        out = proc.communicate(timeout=40)[0].decode('utf-8', 'replace')
+        proc = None
+        got = {}
+        for line in out.splitlines():
+            if 'CHK ' in line:
+                k, _, v = line.split('CHK ', 1)[1].partition('=')
+                got[k] = v.strip()
+        # what the client wrote arrived in the tags of the runtime
+        rep.check('tag i', got.get('i'), '4321')
+        rep.check('tag f', got.get('f'), 1.5, 1e-9)
+        rep.check('tag b', got.get('b'), 'false')
+        rep.check('tag s', got.get('s'), 'hello')
+        rep.check('tag ro', got.get('ro'), '7')
+        rep.warnings(out, allow=('AccessControl', 'x509', 'SecurityPolicy', 'warn/'))
+    finally:
+        if cid:
+            try: api.call('DELETE', '/clients/%s' % cid)
+            except Exception: pass
+        if proc:
+            proc.kill()
+        shutil.rmtree(d, ignore_errors=True)
+
+
+CHECKS['opcua-server'] = check_opcua_server
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--api', default='http://localhost:8765/api')
