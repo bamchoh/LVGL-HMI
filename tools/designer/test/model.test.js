@@ -904,6 +904,263 @@ test('M renameTag: the conditions of "animate" and script code written as lines 
   assert.equal(M.problems().length, 0);
 });
 
+// ---------------------------------------------------------------- find and replace, copies of screens, another size (issue #71)
+
+function lineProject() {
+  const { M, U, SCHEMA } = load();
+  M.newProject('T', 800, 480);
+  const p = M.st.project;
+  p.tags = [{ name: 'line1_speed', type: 'int', min: 0, max: 100 }, { name: 'line1_run', type: 'bool' }, { name: 'line2_speed', type: 'int' }, { name: 'total', type: 'int' }];
+  M.screen().name = 'line1';
+  M.screen().children = [
+    { type: 'label', x: 10, y: 20, text: 'Line 1 speed', bind: { text: { tag: 'line1_speed', format: '%d' }, visible: { tag: 'line1_run', eq: 1 } } },
+    { type: 'button', x: 10, y: 60, w: 120, h: 48, text: 'Start line 1', bind: 'line1_run',
+      on_click: [{ action: 'set', tag: 'line1_run', value: true }, { action: 'script', code: 'tag.total = tag.line1_speed + tag.line2_speed' }] },
+    { type: 'dropdown', x: 10, y: 120, options: ['Line 1', 'Line 2', 'line 1 (slow)'], bind: 'total' },
+    { type: 'panel', x: 200, y: 20, w: 300, h: 200, style: { pad: 8, radius: 6, font: 24 }, children: [
+      { type: 'label', x: 0, y: 0, w: '50%', h: 'content', text: 'Line 1', style: { font: 16 } },
+      { type: 'line', points: [[0, 0], [100, 50]] }] },
+  ];
+  M.addScreen('other');
+  M.screen().children = [{ type: 'label', text: 'Line 1 again', bind: { text: 'line1_speed' } }];
+  M.st.cur = 0;
+  p.alarms = { items: [{ name: 'fast', tag: 'line1_speed', condition: 'gt', value: 90, message: 'Line 1 is too fast' }] };
+  p.drivers = [{ type: 'sim', name: 'sim', items: [{ tag: 'line1_speed', wave: 'sine' }] }];
+  return { M, U, SCHEMA, p };
+}
+
+test('M replace: the plan lists what would change and changes nothing; applying is one step that can be undone', () => {
+  const { M, p } = lineProject();
+  const snap = JSON.stringify([p, M.st.screens]);
+  const plan = M.replacePlan({ what: 'tags', find: 'line1_', replace: 'line3_', scope: 'project' });
+  assert.equal(JSON.stringify([p, M.st.screens]), snap, 'a plan changes nothing');
+  assert.ok(plan.length >= 8, plan.map(c => c.what + ':' + c.before).join(' '));
+  assert.ok(plan.every(c => /^line1_/.test(c.before) && /^line3_/.test(c.after)));
+  assert.ok(plan.some(c => c.loc.screen === 1), 'the other screen');
+  assert.ok(plan.some(c => c.loc.view === 'logs'), 'the alarm');
+  assert.ok(plan.some(c => c.loc.view === 'drivers'), 'the driver');
+  assert.ok(plan.some(c => c.what === 'lua'));
+  const undoBefore = M.st.undo.length;
+  const r = M.replaceApply({ what: 'tags', find: 'line1_', replace: 'line3_', scope: 'project' });
+  assert.equal(r.changed, plan.length);
+  assert.equal(M.st.undo.length, undoBefore + 1, 'one undo step');
+  const w = M.screen().children;
+  assert.equal(w[0].bind.text.tag, 'line3_speed');
+  assert.equal(w[0].bind.visible.tag, 'line3_run');
+  assert.equal(w[1].bind, 'line3_run');
+  assert.equal(w[1].on_click[0].tag, 'line3_run');
+  assert.equal(w[1].on_click[1].code, 'tag.total = tag.line3_speed + tag.line2_speed');
+  assert.equal(M.st.project.alarms.items[0].tag, 'line3_speed');
+  assert.equal(M.st.project.drivers[0].items[0].tag, 'line3_speed');
+  assert.equal(M.st.screens[1].data.children[0].bind.text, 'line3_speed');
+  // the tags line3_* do not exist: that is said
+  assert.ok(r.newProblems.length >= 2, 'new problems: ' + r.newProblems.map(x => x.text).join(' | '));
+  assert.ok(r.newProblems.every(x => /line3_/.test(x.text)), r.newProblems.map(x => x.text).join(' | '));
+  M.undo();
+  assert.equal(JSON.stringify([M.st.project, M.st.screens]), snap, 'undone');
+});
+
+test('M replace: this screen / all screens / the project; the whole name or a part; with or without case', () => {
+  const n = opt => { const { M } = lineProject(); return M.replacePlan(Object.assign({ what: 'tags', find: 'line1_speed', replace: 'x' }, opt)).length; };
+  const all = n({ scope: 'project' }), screens = n({ scope: 'screens' }), one = n({ scope: 'screen' });
+  assert.equal(one, 2);                               // the label and the Lua code of the button
+  assert.equal(screens, 3);                           // ... and the other screen
+  assert.equal(all, 5);                               // ... the alarm and the driver
+  assert.equal(n({}), all);
+  assert.equal(n({ find: 'speed', whole: true }), 0);
+  assert.equal(n({ find: 'speed' }), all + 1);        // line2_speed in the code too
+  assert.equal(n({ find: 'LINE1_SPEED' }), 0);
+  assert.equal(n({ find: 'LINE1_SPEED', matchCase: false }), all);
+  assert.equal(n({ find: 'LINE1_SPEED', matchCase: false, whole: true }), all);
+  assert.equal(n({ find: '' }), 0);
+  assert.equal(n({ find: 'line1_speed', replace: 'line1_speed' }), 0);
+  // what looks like a pattern is text; what looks like a replacement pattern is text
+  const { M } = lineProject();
+  M.st.project.tags.push({ name: 'a.b', type: 'int' }, { name: 'aXb', type: 'int' });
+  M.screen().children.push({ type: 'label', bind: { text: 'a.b' } }, { type: 'label', bind: { text: 'aXb' } });
+  const plan = M.replacePlan({ what: 'tags', find: 'a.b', replace: '$&$1\\n', scope: 'screen' });
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].after, '$&$1\\n');
+  assert.equal(M.replacePlan({ what: 'tags', find: '.*', replace: 'x' }).length, 0);
+  assert.equal(M.replacePlan({ what: 'tags', find: '(', replace: 'x' }).length, 0);
+});
+
+test('M replace: the tags the new names need are made as copies', () => {
+  const { M, p } = lineProject();
+  const base = M.problems().length;
+  let r = M.replaceApply({ what: 'tags', find: 'line1_', replace: 'line4_', scope: 'screen', createTags: true });
+  assert.equal(r.created, 2);
+  assert.equal(r.newProblems.length, 0, r.newProblems.map(x => x.text).join(' | '));
+  assert.equal(M.problems().length, base);
+  assert.deepEqual(plain(p.tags.map(t => t.name)), ['line1_speed', 'line4_speed', 'line1_run', 'line4_run', 'line2_speed', 'total']);
+  assert.deepEqual(plain(p.tags[1]), { name: 'line4_speed', type: 'int', min: 0, max: 100 }, 'a copy: type and limits');
+  assert.equal(M.st.screens[1].data.children[0].bind.text, 'line1_speed', 'the other screen is left alone');
+  // to names of which one exists: only the missing one is made
+  r = M.replaceApply({ what: 'tags', find: 'line4_', replace: 'line2_', scope: 'screen', createTags: true });
+  assert.equal(r.created, 1);
+  assert.ok(p.tags.some(t => t.name === 'line2_run' && t.type === 'bool'));
+  assert.equal(p.tags.filter(t => t.name === 'line2_speed').length, 1);
+  // without the option nothing is made, and the missing tags are named
+  r = M.replaceApply({ what: 'tags', find: 'line2_', replace: 'line8_', scope: 'screen' });
+  assert.equal(r.created, 0);
+  assert.ok(r.newProblems.some(x => /line8_run/.test(x.text)));
+  // the runtime's own tags are never made
+  M.replaceApply({ what: 'tags', find: 'line8_run', replace: 'sys.user.level', whole: true, scope: 'screen', createTags: true });
+  assert.ok(!p.tags.some(t => /^sys\./.test(t.name)));
+});
+
+test('M replace: names in the tag list change only when asked, and only where no other tag has the name', () => {
+  const { M, p } = lineProject();
+  const base = M.problems().length;
+  const plan = M.replacePlan({ what: 'tags', find: 'line1_', replace: 'press_', scope: 'project', definitions: true });
+  let r = M.replaceApply({ what: 'tags', find: 'line1_', replace: 'press_', scope: 'project', definitions: true });
+  assert.equal(r.changed, plan.length);
+  assert.equal(r.skipped, 0);
+  assert.equal(M.problems().length, base, 'everything follows: no new problem');
+  assert.deepEqual(plain(p.tags.map(t => t.name)), ['press_speed', 'press_run', 'line2_speed', 'total']);
+  // onto a name that is taken: the definition stays, and that is counted
+  r = M.replaceApply({ what: 'tags', find: 'press_speed', replace: 'line2_speed', whole: true, scope: 'project', definitions: true });
+  assert.equal(r.skipped, 1);
+  assert.deepEqual(plain(p.tags.map(t => t.name)), ['press_speed', 'press_run', 'line2_speed', 'total']);
+  // not asked for, or not the whole project: the list is not touched
+  assert.ok(!M.replacePlan({ what: 'tags', find: 'press_', replace: 'x_', scope: 'project' }).some(c => c.loc.view === 'tags'));
+  assert.ok(!M.replacePlan({ what: 'tags', find: 'press_', replace: 'x_', scope: 'screens', definitions: true }).some(c => c.loc.view === 'tags'));
+});
+
+test('M replace: Lua code - a new name that is another old name, and names Lua cannot write', () => {
+  const { M, p } = lineProject();
+  p.tags.push({ name: 'x1', type: 'int' }, { name: 'x11', type: 'int' });
+  M.screen().children = [{ type: 'button', on_click: { action: 'script', code: 'tag.x1 = tag.x11 + tag.x1' } }];
+  let r = M.replaceApply({ what: 'tags', find: 'x1', replace: 'x11', scope: 'screen' });
+  assert.equal(M.screen().children[0].on_click.code, 'tag.x11 = tag.x111 + tag.x11', 'each name once');
+  assert.equal(r.changed, 2);
+  M.undo();
+  r = M.replaceApply({ what: 'tags', find: 'x1', replace: 'a-b', whole: true, scope: 'screen' });
+  assert.equal(r.skipped, 1);
+  assert.equal(M.screen().children[0].on_click.code, 'tag.x1 = tag.x11 + tag.x1', 'left as it was');
+  // code as a list of lines
+  M.st.project.scripts = [{ name: 's', trigger: 'interval', interval_ms: 1000, code: ['tag.x1 = 1', '-- tag.x1 in a comment', 'tag.x11 = tag.x1'] }];
+  r = M.replaceApply({ what: 'tags', find: 'x1', replace: 'y', whole: true, scope: 'project' });
+  assert.deepEqual(plain(M.st.project.scripts[0].code), ['tag.y = 1', '-- tag.y in a comment', 'tag.x11 = tag.y']);
+});
+
+test('M replace: texts - labels, options, alarm messages and the text table; "@id" is a name and stays', () => {
+  const { M, p } = lineProject();
+  let plan = M.replacePlan({ what: 'texts', find: 'Line 1', replace: 'Press', scope: 'project' });
+  assert.deepEqual(plain(plan.map(c => c.after).sort()), ['Press', 'Press', 'Press again', 'Press is too fast', 'Press speed'].sort());
+  assert.equal(M.replacePlan({ what: 'texts', find: 'line 1', replace: 'Press', scope: 'project', matchCase: false }).length, 7);
+  assert.equal(M.replacePlan({ what: 'texts', find: 'Line 1', replace: 'Press', scope: 'project', whole: true }).length, 2);
+  assert.equal(M.replacePlan({ what: 'texts', find: 'Line 1', replace: 'Press', scope: 'screen' }).length, 3);
+  let r = M.replaceApply({ what: 'texts', find: 'Line 1', replace: 'Press <b>1</b>', scope: 'project' });
+  assert.equal(r.changed, 5);
+  assert.equal(M.screen().children[0].text, 'Press <b>1</b> speed');
+  assert.deepEqual(plain(M.screen().children[2].options), ['Press <b>1</b>', 'Line 2', 'line 1 (slow)']);
+  assert.equal(p.alarms.items[0].message, 'Press <b>1</b> is too fast');
+  assert.equal(M.screen().children[0].bind.text.tag, 'line1_speed', 'tags are not texts');
+  // several languages: the texts are in the table
+  p.languages = ['en', 'ja'];
+  p.texts = { start: { en: 'Start line', ja: 'ライン開始' }, line: { en: 'line', ja: 'ライン' } };
+  M.screen().children.push({ type: 'label', text: '@line' }, { type: 'label', text: 'a line here' }, { type: 'label', text: '@@line' });
+  plan = M.replacePlan({ what: 'texts', find: 'line', replace: 'row', scope: 'project' });
+  assert.ok(!plan.some(c => c.before === '@line'), '"@line" names a text');
+  assert.ok(plan.some(c => c.before === 'Start line' && c.loc.view === 'texts'));
+  assert.ok(plan.some(c => c.before === 'line' && c.what === 'line / en'));
+  assert.ok(plan.some(c => c.before === 'a line here'));
+  assert.ok(plan.some(c => c.before === '@@line'), '"@@..." is a text that begins with @');
+  r = M.replaceApply({ what: 'texts', find: 'ライン', replace: 'プレス', scope: 'project' });
+  assert.equal(p.texts.start.ja, 'プレス開始');
+  assert.equal(p.texts.line.ja, 'プレス');
+  assert.equal(M.replacePlan({ what: 'texts', find: 'Start', replace: 'x', scope: 'screens' }).some(c => c.loc.view === 'texts'), false, 'the table belongs to the project');
+});
+
+test('M duplicateScreen: a copy after the original, with a name and a file of its own', () => {
+  const { M } = lineProject();
+  const before = JSON.stringify(M.st.screens[0].data.children);
+  assert.equal(M.duplicateScreen(0), 1);
+  assert.deepEqual(plain(M.screenNames()), ['line1', 'line1_copy', 'other']);
+  assert.equal(M.st.cur, 1);
+  assert.equal(M.st.screens[1].file, 'screens/line1_copy.json');
+  assert.equal(JSON.stringify(M.st.screens[1].data.children), before);
+  M.screen().children[0].text = 'changed in the copy';
+  assert.equal(JSON.stringify(M.st.screens[0].data.children), before, 'a copy, not the same object');
+  assert.equal(M.duplicateScreen(0), 1);
+  assert.equal(M.st.screens[1].data.name, 'line1_copy2');
+  assert.equal(M.duplicateScreen(0, 'other'), 1);
+  assert.equal(M.st.screens[1].data.name, 'other2', 'a name that is taken gets a number');
+  assert.equal(M.duplicateScreen(0, '../../x <y>'), 1);
+  assert.ok(/^[A-Za-z0-9_-]+$/.test(M.st.screens[1].data.name), M.st.screens[1].data.name);
+  assert.equal(M.st.screens[1].file, 'screens/' + M.st.screens[1].data.name + '.json');
+  assert.equal(M.duplicateScreen(99), -1);
+  assert.equal(new Set(M.screenNames()).size, M.st.screens.length);
+  assert.equal(new Set(M.st.screens.map(s => s.file)).size, M.st.screens.length);
+  M.undo();
+  assert.equal(M.st.screens.length, 5);
+  // the usual use: a copy for the next line, its tags replaced and made
+  const { M: M2, p } = lineProject();
+  M2.duplicateScreen(0, 'line5');
+  const r = M2.replaceApply({ what: 'tags', find: 'line1_', replace: 'line5_', scope: 'screen', createTags: true });
+  assert.equal(r.newProblems.length, 0);
+  assert.equal(M2.st.screens[0].data.children[0].bind.text.tag, 'line1_speed');
+  assert.equal(M2.st.screens[1].data.children[0].bind.text.tag, 'line5_speed');
+  assert.ok(p.tags.some(t => t.name === 'line5_run'));
+});
+
+test('M resizeProject: positions, sizes, fonts and spacings for another display; percentages stay', () => {
+  const { M, p, SCHEMA } = lineProject();
+  assert.equal(M.resizeProject(800, 480), false, 'the same size: nothing to do');
+  assert.equal(M.resizeProject(10, 10), false);
+  assert.equal(M.resizeProject('x', 320), false);
+  assert.equal(M.resizeProject(400, 240), true);
+  assert.equal(p.display.width, 400);
+  assert.equal(p.display.height, 240);
+  const w = M.st.screens[0].data.children;
+  assert.deepEqual([w[0].x, w[0].y], [5, 10]);
+  assert.deepEqual([w[1].x, w[1].y, w[1].w, w[1].h], [5, 30, 60, 24]);
+  assert.deepEqual([w[3].x, w[3].y, w[3].w, w[3].h], [100, 10, 150, 100]);
+  assert.deepEqual(plain(w[3].style), { pad: 4, radius: 3, font: 12 });
+  assert.equal(w[3].children[0].w, '50%');
+  assert.equal(w[3].children[0].h, 'content');
+  assert.ok(SCHEMA.fonts.includes(w[3].children[0].style.font), 'a font size there is');
+  assert.deepEqual(plain(w[3].children[1].points), [[0, 0], [50, 25]]);
+  assert.ok(!('w' in w[0]) && !('h' in w[0]), 'no size where there was none');
+  M.undo();
+  assert.equal(M.st.project.display.width, 800);
+  assert.equal(M.st.screens[0].data.children[1].w, 120);
+  // 800x480 -> 480x320: not the same ratio; a pad of 1 does not become 0
+  M.screen().children.push({ type: 'panel', x: 100, y: 100, w: 100, h: 100, style: { pad: 1, pad_left: 10, pad_top: 10, font: 48, border_width: 2 } });
+  M.resizeProject(480, 320);
+  const q = M.st.screens[0].data.children.at(-1);
+  assert.deepEqual([q.x, q.y, q.w, q.h], [60, 67, 60, 67]);
+  assert.deepEqual(plain(q.style), { pad: 1, pad_left: 6, pad_top: 7, font: 28, border_width: 2 });
+});
+
+test('M replace: 100 screens with 5000 widgets - the plan and the replacement take a moment, not minutes', () => {
+  const { M } = lineProject();
+  for (let s = 0; s < 100; s++) {
+    if (s) M.addScreen('s' + s);
+    M.st.cur = M.st.screens.length - 1;
+    M.screen().children = Array.from({ length: 50 }, (_, i) => ({ type: 'label', x: i, y: i, text: 'Line 1 value ' + i, bind: { text: { tag: i % 2 ? 'line1_speed' : 'total' }, visible: 'line1_run' } }));
+  }
+  let t0 = Date.now();
+  const plan = M.replacePlan({ what: 'tags', find: 'line1_', replace: 'line9_', scope: 'project' });
+  const tPlan = Date.now() - t0;
+  assert.ok(plan.length >= 7500, String(plan.length));
+  t0 = Date.now();
+  const r = M.replaceApply({ what: 'tags', find: 'line1_', replace: 'line9_', scope: 'project', createTags: true });
+  const tApply = Date.now() - t0;
+  assert.equal(r.changed, plan.length);
+  assert.equal(r.newProblems.length, 0);
+  t0 = Date.now();
+  const rt = M.replaceApply({ what: 'texts', find: 'Line 1', replace: 'Press', scope: 'project' });
+  const tText = Date.now() - t0;
+  assert.ok(rt.changed >= 5000);
+  t0 = Date.now();
+  M.resizeProject(480, 320);
+  const tSize = Date.now() - t0;
+  console.log('    5000 widgets on 101 screens: plan ' + tPlan + ' ms, replace tags ' + tApply + ' ms, replace texts ' + tText + ' ms, another size ' + tSize + ' ms');
+  assert.ok(tPlan < 2000 && tApply < 10000 && tText < 10000 && tSize < 5000);
+});
+
 test('M transfers: the tags follow a rename; a ring, a wrong trigger and a destination of the runtime are problems', () => {
   const { M, p } = tagProject();
   const base = M.problems().length;

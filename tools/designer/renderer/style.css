@@ -315,3 +315,13 @@ table.cells td input { width: 100%; min-width: 90px; box-sizing: border-box; }
 .cells-tools { display: flex; gap: 6px; margin: 8px 0; }
 .list-below > textarea { flex: 1; min-width: 0; }
 .list-below { margin-bottom: 6px; }
+.replace-dlg { min-width: 560px; }
+.rep-line { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.rep-line > input[type=text] { flex: 1; min-width: 0; }
+.rep-line > input[type=number] { width: 110px; }
+.rep-chk { display: block; margin-bottom: 6px; white-space: nowrap; }
+.rep-line > .rep-chk { margin-bottom: 0; }
+.rep-count { color: var(--dim); margin: 8px 0 4px; }
+.rep-item { cursor: default; }
+.rep-old { text-decoration: line-through; color: var(--dim); }
+.rep-new { font-weight: 600; }
