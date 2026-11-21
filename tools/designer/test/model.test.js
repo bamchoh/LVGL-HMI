@@ -665,7 +665,7 @@ test('M display presets and touch calibration', () => {
   M.newProject('t', 800, 480);
   const lcd = SCHEMA.displayPresets.find(p => p.touch);
   M.applyDisplayPreset(lcd);
-  deq(M.st.project.display, { width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220], jitter: 12, smooth: 3, settle: 1, release: 1, scroll_limit: 16 } });
+  deq(M.st.project.display, { width: 480, height: 320, touch: { swap_axes: true, calibration: [150, 3850, 3850, 220], jitter: 12, smooth: 3, settle: 1, release: 1, lift_ms: 60, scroll_limit: 8 } });
   M.st.project.display.touch.calibration[0] = 1;                 // the preset itself is not what the project holds
   assert.equal(lcd.touch.calibration[0], 150);
   M.setTouchCalibration(2, 3900);

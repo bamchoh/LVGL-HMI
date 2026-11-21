@@ -16,7 +16,8 @@
       "smooth": 3,
       "settle": 1,
       "release": 1,
-      "scroll_limit": 16
+      "lift_ms": 60,
+      "scroll_limit": 8
     }
   },
   "theme": {
