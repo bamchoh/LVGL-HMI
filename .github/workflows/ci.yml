@@ -58,10 +58,12 @@ jobs:
           path: |
             build/_deps/*-src
             build/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt', 'tools/designer/CMakeLists.txt') }}
-          # an older cache is still useful: FetchContent only re-downloads what changed
+          key: deps-${{ runner.os }}-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt', 'tools/designer/CMakeLists.txt') }}
+          # an older cache is still useful: FetchContent only re-downloads what changed.
+          # The name of the repository is in the key because the cached sub-builds hold absolute
+          # paths (/home/runner/work/<repository>/...): a renamed repository must not restore them.
           restore-keys: |
-            deps-${{ runner.os }}-
+            deps-${{ runner.os }}-${{ github.event.repository.name }}-
 
       # Most of a build is the libraries (LVGL, open62541, mbedTLS, SQLite, Lua, SDL2), which change
       # only when their version does: what the compiler made of them is kept between runs. Our own
