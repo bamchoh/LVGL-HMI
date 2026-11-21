@@ -1152,9 +1152,17 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 - `--check` の間は、メールを送らず、ファイルも書きません。
 - 対応していないもの: 添付ファイル、HTML メール、OAuth2（Gmail / Microsoft 365 の「アプリ パスワード」でないログイン）、
   差出人の表示名。ログ（CSV）を外に出す機能は別です。
-- 確かめた範囲: Windows と Raspberry Pi 4 から、公開のメールサーバー（smtp.gmail.com:587）に対して、STARTTLS・OS の証明書での検証・
-  ログインなしの送信をサーバーが断るところまで。**実際にメールが届くところ（ログインして送信）は、実サーバーでは確かめていません**
-  （テスト内の模擬サーバーでは、STARTTLS / TLS / 平文の 3 通りとも最後まで通しています）。
+- 確かめた範囲:
+  - 自作でないメールサーバー（aiosmtpd 1.4.6、WSL で起動）を相手に、Windows のランタイムから: STARTTLS + ログイン、最初から TLS、平文の 3 通りで
+    **メールが届くこと**、日本語の件名と本文・タグの値・1 行だけの `.` がサーバー側で元どおり読めること、アラームからの送信、
+    パスワード違い・ログインなし・信頼できない証明書・STARTTLS のないポートでは何も届かず理由が出ること、宛先の一部だけ断られたとき、
+    サーバーがいないときに待ち行列に残ること（`tools/mail_check/check.py`）。
+  - Windows と Raspberry Pi 4 から、公開のメールサーバー（smtp.gmail.com:587）に対して、STARTTLS と OS の証明書での検証まで
+    （ログインなしなので、送信はサーバーに断られます）。
+  - **確かめていないこと**: 各社のメールサービスにログインしての送信（Gmail、Microsoft 365 など）、Raspberry Pi からの実際の送信。
+- 上の確認をもう一度するには: WSL のフォルダーに `tools/mail_check/get.py`（aiosmtpd を取得する）と `smtpd.py` を置き、`localhost` 用のサーバー証明書
+  （`server.crt` / `server.key` と、それを署名した `ca.crt`）を作って `python3 smtpd.py` を起動し、Windows で
+  `python -I tools/mail_check/check.py <WSL のフォルダー> <ca.crt>` を実行します。サーバーは受け取ったメールをファイルに書くだけで、外へは送りません。
 
 ## 機器間のデータ転送
 
