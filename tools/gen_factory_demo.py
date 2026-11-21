@@ -540,7 +540,7 @@ def build(small=False):
     }
     shutil.copyfile(os.path.join(ROOT, 'projects', 'factory', 'scripts', 'line.lua'), os.path.join(OUT, 'scripts', 'line.lua')) if small else None
     if small:      # the LCD of the Raspberry Pi: its framebuffer and its touch panel (as in projects/lcd35)
-        project['display'] = {'width': SW, 'height': SH, 'fbdev': '/dev/fb0', 'touch': {'swap_axes': True, 'calibration': [150, 3850, 3850, 220]}}
+        project['display'] = {'width': SW, 'height': SH, 'fbdev': '/dev/fb0', 'touch': {'swap_axes': True, 'calibration': [150, 3850, 3850, 220], 'jitter': 8, 'smooth': 3, 'settle': 1, 'scroll_limit': 16}}
     for path, obj in (('project.json', project), ('screens/line.json', screen), ('screens/machine.json', popup)):
         with open(os.path.join(OUT, path), 'w', encoding='utf-8', newline='\n') as f:
             json.dump(obj, f, ensure_ascii=False, indent=2)

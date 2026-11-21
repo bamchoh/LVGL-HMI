@@ -452,6 +452,10 @@ const Panels = {
         onchange: e => M.setTouchCalibration(i, e.target.value === '' ? '' : Number(e.target.value)) }))));
     el.append(Props.section('Touch panel', !!(d.touch && Object.keys(d.touch).length),
       Props.row('swap_axes', Props.editor(touch, 'swap_axes', { t: 'bool' }, fk + '.touch'), 'the panel reports X where the screen has Y'),
+      // steadying a resistive panel whose readings wander under a finger (src/touch_filter.hpp)
+      ...Props.fields(touch, [{ k: 'jitter', t: 'number', hint: 'pixels a finger may wander without anything moving (0 = off; 8 for a resistive panel)' },
+        { k: 'smooth', t: 'number', hint: 'readings averaged (1 = as they come; 3)' }, { k: 'settle', t: 'number', hint: 'first readings of a touch left out (0; 1)' },
+        { k: 'scroll_limit', t: 'number', hint: 'pixels before a list scrolls (10; 16)' }, { k: 'log', t: 'bool', hint: 'one line per touch in the system log: how far the readings wandered' }], fk + '.touch'),
       Props.row('touch calibration', calib, I18N.t('Raw values the touch panel reports at the edges of the screen (after the axis swap). Take them from a preset, or measure with tools/rpi/touch_raw.py.'))));
     el.append(Props.section('Raspberry Pi (fbdev / drm / evdev)', false,
       ...Props.fields(d, [{ k: 'fbdev', t: 'text', hint: '/dev/fb0' }, { k: 'drm', t: 'text', hint: '/dev/dri/card0' }, { k: 'input', t: 'text', hint: 'empty = auto detect' }], fk + '.display')));

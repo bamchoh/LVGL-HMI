@@ -11,7 +11,11 @@
         3850,
         3850,
         220
-      ]
+      ],
+      "jitter": 8,
+      "smooth": 3,
+      "settle": 1,
+      "scroll_limit": 16
     }
   },
   "theme": {

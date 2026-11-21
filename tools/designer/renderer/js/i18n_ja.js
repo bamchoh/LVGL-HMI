@@ -416,6 +416,7 @@ Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド' });
 Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター', 'Date and time input': '日付・時刻の入力', 'Table': '表' });
 Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ' });
+Object.assign(I18N.KEYS_JA, { jitter: 'ブレの許容 (px)', smooth: '平均する回数', settle: '押し始めに捨てる回数', scroll_limit: 'スクロール開始の距離 (px)', log: 'タッチをログに残す' });
 Object.assign(I18N.KEYS_JA, { x_tag: '横軸のタグ', x_min: '横軸の最小', x_max: '横軸の最大', y_tag: '縦軸のタグ', y_min: '縦軸の最小', y_max: '縦軸の最大', clear_tag: '消去のタグ' });
 Object.assign(I18N.KEYS_JA, { seconds: '秒も入力する', year_min: '年の下限', year_max: '年の上限' });
 Object.assign(I18N.KEYS_JA, { ticks: '目盛りの数', major_every: '数字を付ける間隔', show_value: '値を数字で出す', needle_color: '針の色' });
