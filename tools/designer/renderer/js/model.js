@@ -506,6 +506,92 @@ const M = {
     return true;
   },
 
+  // ---- the library: groups of widgets kept for use in any project ---------------
+  // A part is { name, widgets: [...] }: plain data, kept in the settings of the designer (not in
+  // the project: the runtime and older designers never see it). What comes from outside - a file
+  // somebody sent - goes through libraryClean(): nothing but data gets in.
+  LIBRARY_MAX: 200, LIBRARY_WIDGETS_MAX: 2000,
+  // true for a path that leaves the project folder (absolute, a drive, "..", a share)
+  pathLeavesProject(p) {
+    const s = String(p).replace(/\\/g, '/');
+    return /^\//.test(s) || /^[A-Za-z]:/.test(s) || /^[a-z][a-z0-9+.-]*:/i.test(s) || s.split('/').some(part => part === '..');
+  },
+  // -> { part, dropped: [what was left out] }, or { part: null, error }
+  libraryClean(raw) {
+    const dropped = [];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { part: null, error: 'a part is { "name": ..., "widgets": [...] }' };
+    const name = String(raw.name === undefined || raw.name === null ? '' : raw.name).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 64);
+    if (!name) return { part: null, error: 'a part has no name' };
+    if (!Array.isArray(raw.widgets) || !raw.widgets.length) return { part: null, error: 'part "' + name + '" has no widgets' };
+    let count = 0, tooMany = false;
+    const value = (v, depth) => {
+      if (v === null || typeof v === 'boolean') return v;
+      if (typeof v === 'number') return isFinite(v) ? v : undefined;
+      if (typeof v === 'string') return v.length > 20000 ? v.slice(0, 20000) : v;
+      if (typeof v !== 'object' || depth > 24) return undefined;          // (functions, symbols, what is nested too deep)
+      if (Array.isArray(v)) return v.slice(0, 5000).map(x => value(x, depth + 1)).filter(x => x !== undefined);
+      const out = {};
+      for (const k of Object.keys(v)) {
+        if (k === '__proto__' || k === 'constructor' || k === 'prototype') { dropped.push('key ' + k); continue; }
+        if (k === 'src' && typeof v[k] === 'string' && this.pathLeavesProject(v[k])) { dropped.push('image ' + v[k].slice(0, 80)); continue; }
+        const x = value(v[k], depth + 1);
+        if (x !== undefined) out[k] = x;
+      }
+      return out;
+    };
+    const widget = (w, depth) => {
+      if (!w || typeof w !== 'object' || Array.isArray(w) || typeof w.type !== 'string' || !w.type || depth > 20) { dropped.push('something that is no widget'); return undefined; }
+      if (++count > this.LIBRARY_WIDGETS_MAX) { tooMany = true; return undefined; }
+      const kids = Array.isArray(w.children) ? w.children.map(c => widget(c, depth + 1)).filter(Boolean) : undefined;
+      const out = value(Object.assign({}, w, { children: undefined }), 0) || {};
+      delete out.children;
+      if (kids && kids.length) out.children = kids;
+      return out;
+    };
+    const widgets = raw.widgets.map(w => widget(w, 0)).filter(Boolean);
+    if (tooMany) return { part: null, error: 'part "' + name + '" has more than ' + this.LIBRARY_WIDGETS_MAX + ' widgets' };
+    if (!widgets.length) return { part: null, error: 'part "' + name + '" has no widgets' };
+    return { part: { name, widgets }, dropped };
+  },
+  // The selected widgets as a part: copies, moved so that the group begins at 0, 0.
+  libraryPartFromSelection(name) {
+    const ws = this.copySelection();
+    if (!ws.length) return null;
+    const free = ws.filter(w => !w.align || w.align === 'top_left');
+    if (free.length === ws.length) {
+      const x0 = Math.min(...ws.map(w => U.num(w.x, 0))), y0 = Math.min(...ws.map(w => U.num(w.y, 0)));
+      for (const w of ws) { w.x = U.num(w.x, 0) - x0; w.y = U.num(w.y, 0) - y0; }
+    }
+    return this.libraryClean({ name, widgets: ws }).part;
+  },
+  libraryExport(parts) { return U.toJson({ hml_library: 1, parts: parts || [] }); },
+  // The text of a library file into a list of parts. A part with a name that is there already
+  // takes its place. Read as JSON and nothing else. -> { parts, added, replaced, errors, dropped }
+  libraryImport(text, existing) {
+    const parts = (existing || []).slice(), errors = [], dropped = [];
+    let added = 0, replaced = 0, data;
+    try { data = JSON.parse(String(text).replace(/^﻿/, '')); } catch (e) { return { parts, added, replaced, dropped, errors: ['not a library file: ' + e.message] }; }
+    const list = Array.isArray(data) ? data : data && Array.isArray(data.parts) ? data.parts : null;
+    if (!list) return { parts, added, replaced, dropped, errors: ['not a library file: no "parts"'] };
+    for (const raw of list) {
+      const r = this.libraryClean(raw);
+      if (!r.part) { errors.push(r.error); continue; }
+      for (const d of r.dropped) dropped.push(r.part.name + ': ' + d);
+      const i = parts.findIndex(p => p.name === r.part.name);
+      if (i >= 0) { parts[i] = r.part; replaced++; }
+      else if (parts.length >= this.LIBRARY_MAX) errors.push('the library is full (' + this.LIBRARY_MAX + ' parts): "' + r.part.name + '" is left out');
+      else { parts.push(r.part); added++; }
+    }
+    return { parts, added, replaced, errors, dropped };
+  },
+  // Put a part where a paste would go. -> the number of widgets
+  pastePart(part) {
+    const r = this.libraryClean(part);
+    if (!r.part || !this.screen()) return 0;
+    this.paste(r.part.widgets);
+    return r.part.widgets.length;
+  },
+
   // ---- style: copy the look of one widget onto others ------------------------
   styleOf(w) { const o = {}; for (const k of Object.keys(w || {})) if (/^style/.test(k)) o[k] = U.clone(w[k]); return o; },
   pasteStyle(styles) {

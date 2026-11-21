@@ -418,6 +418,17 @@ Object.assign(I18N.KEYS_JA, { header: '見出しの行を出す' });
 Object.assign(I18N.TEXT_JA, { 'XY chart': 'XY グラフ', 'Alarm summary': 'アラーム集計', 'the texts of the widget': '部品の中の文字' });
 Object.assign(I18N.KEYS_JA, { sort: '並べ方', bars: '棒を出す' });
 Object.assign(I18N.KEYS_JA, { schedules: 'スケジュール', at: '時刻', weekdays: '曜日', do: '動作' });
+Object.assign(I18N.TEXT_JA, { 'Library': 'ライブラリ', '+ Keep selection': '+ 選択を登録', 'Import / export': '取込 / 書出',
+  'Add this part to the selected panel (or the screen)': 'この部品を、選択中のパネル（または画面）に追加', 'Keep the selected widgets as a part, for this and any other project': '選択中の部品を登録する（このプロジェクトでも、ほかのプロジェクトでも使えます）',
+  'The library as text: to pass it on, or to take the parts of another library': 'ライブラリを文字として取り出す（人に渡す、ほかのライブラリの部品を取り込む）',
+  'No parts yet. Select widgets on the screen and press the button below to keep them for later.': 'まだ部品がありません。画面で部品を選んで、下のボタンで登録すると、あとで使い回せます。',
+  'Select the widgets to keep first.': '登録する部品を先に選んでください。', 'Name of the part': '部品の名前', 'This cannot be kept as a part.': 'この選択は部品として登録できません。',
+  'The library has a part "{0}". Replace it?': 'ライブラリに「{0}」があります。置き換えますか？', 'The library is full.': 'ライブラリがいっぱいです。',
+  'Part "{0}" kept in the library ({1} widget(s))': '「{0}」をライブラリに登録しました（部品 {1} 個）', '{0} widget(s) added from "{1}"': '「{1}」から部品を {0} 個追加しました',
+  'Remove the part "{0}" from the library?': '「{0}」をライブラリから削除しますか？', 'Library: import / export': 'ライブラリ: 取り込み / 書き出し',
+  'The library as text. Copy it into a file to pass it on; paste the text of a library here and press Import to add its parts (a part with the same name is replaced). It is read as data only.':
+    'ライブラリの内容です。人に渡すときは、これをファイルにコピーしてください。受け取ったライブラリの文字をここに貼って「取り込み」を押すと、部品が加わります（同じ名前の部品は置き換え）。データとして読むだけで、実行されるものは入りません。',
+  '{0} part(s) added, {1} replaced': '部品を {0} 個追加、{1} 個置き換えました', '{0} part(s) added, {1} replaced. Not everything was taken:': '部品を {0} 個追加、{1} 個置き換えました。取り込まなかったものがあります:' });
 Object.assign(I18N.TEXT_JA, { 'Replace': '置換', 'Find and replace tag names and texts, on this screen or in the whole project': 'タグ名と文字を、この画面またはプロジェクト全体で置換する',
   'Find and replace': '検索と置換', 'Tag names': 'タグ名', 'Texts': '文字', 'This screen': 'この画面', 'All screens': 'すべての画面', 'The whole project': 'プロジェクト全体',
   'Find': '検索する文字', 'Replace with': '置き換える文字', 'Only the whole name / text': '全体が一致するものだけ', 'Match case': '大文字と小文字を区別する',

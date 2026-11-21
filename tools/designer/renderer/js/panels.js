@@ -58,6 +58,21 @@ const Panels = {
         ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
     }
     el.append(grid);
+    // the library: parts the user kept, for any project
+    const lib = U.el('div', { class: 'library', id: 'library' }, U.el('h4', null, 'Library'));
+    const list = U.el('div', { class: 'lib-list' });
+    App.library.forEach((part, i) => {
+      // (the name is what somebody typed: shown as text in an element that is never translated)
+      list.append(U.el('div', { class: 'lib-item' },
+        U.el('div', { class: 'lib-use', role: 'button', tabIndex: 0, dataset: { lib: String(i) }, title: 'Add this part to the selected panel (or the screen)', onclick: () => App.useLibraryPart(i) },
+          U.el('span', { class: 'tr-icon' }, Tree.icon(part.widgets[0] || {})), U.el('span', { class: 'lib-name' }, part.name), U.el('span', { class: 'dim lib-n' }, String(part.widgets.length))),
+        U.el('button', { class: 'mini danger', title: 'Remove', dataset: { libDel: String(i) }, onclick: () => App.removeLibraryPart(i) }, '×')));
+    });
+    if (!App.library.length) list.append(U.el('div', { class: 'hint' }, 'No parts yet. Select widgets on the screen and press the button below to keep them for later.'));
+    lib.append(list, U.el('div', { class: 'row lib-buttons' },
+      U.el('button', { id: 'lib-add', disabled: !M.screen(), title: 'Keep the selected widgets as a part, for this and any other project', onclick: () => App.addToLibrary() }, '+ Keep selection'),
+      U.el('button', { id: 'lib-io', title: 'The library as text: to pass it on, or to take the parts of another library', onclick: () => App.libraryDialog() }, 'Import / export')));
+    el.append(lib);
   },
 
   renderScreens() {

@@ -325,3 +325,10 @@ table.cells td input { width: 100%; min-width: 90px; box-sizing: border-box; }
 .rep-item { cursor: default; }
 .rep-old { text-decoration: line-through; color: var(--dim); }
 .rep-new { font-weight: 600; }
+.library { margin-top: 14px; }
+.library h4 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
+.lib-item { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.lib-use { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.lib-use:hover { background: var(--bg3); }
+.lib-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-buttons { gap: 6px; margin-top: 8px; }

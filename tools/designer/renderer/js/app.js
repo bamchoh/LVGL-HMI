@@ -85,6 +85,8 @@ const App = {
     const saved = (await host.settings()) || {};
     I18N.init(saved.lang);
     this.recent = Array.isArray(saved.recent) ? saved.recent.filter(p => typeof p === 'string') : [];
+    // (what the settings file holds is cleaned like a library from outside: somebody may have edited it)
+    this.library = M.libraryImport(JSON.stringify(Array.isArray(saved.library) ? saved.library : []), []).parts;
     const langSel = q('sel-lang');
     for (const [code, name] of Object.entries(I18N.LANGS)) langSel.append(U.el('option', { value: code, selected: code === I18N.lang }, name));
     langSel.onchange = () => { I18N.set(langSel.value); host.settings({ lang: I18N.lang }); this.staticTexts(); this.doRefresh(); };
@@ -330,6 +332,60 @@ const App = {
         : pr.view === 'scripts' && pr.index !== undefined ? ' › ' + ((M.st.project.scripts[pr.index] || {}).name || '') : '');
     let w = scr.data; for (const i of pr.path) w = (w.children || [])[i];
     return I18N.t('Screen') + ' "' + scr.data.name + '"' + (pr.path.length && w ? ' › ' + Tree.label(w, false) : '');
+  },
+
+  // ---- the library of parts (kept in the settings of the designer) --------------
+  library: [],
+  async saveLibrary() { await host.settings({ library: this.library }); },
+  async addToLibrary() {
+    if (!M.selection().length) { this.toast('Select the widgets to keep first.', 2500); return; }
+    const first = M.selected() || {};
+    const name = await this.prompt('Name of the part', U.safeName(first.id || first.text || first.type || 'part', 'part'));
+    if (!name) return;
+    const part = M.libraryPartFromSelection(name);
+    if (!part) { this.toast('This cannot be kept as a part.', 2500); return; }
+    const i = this.library.findIndex(p => p.name === part.name);
+    if (i >= 0) { if (!this.ask(I18N.f('The library has a part "{0}". Replace it?', part.name))) return; this.library[i] = part; }
+    else if (this.library.length >= M.LIBRARY_MAX) { this.toast('The library is full.', 2500); return; }
+    else this.library.push(part);
+    await this.saveLibrary();
+    this.toast(I18N.f('Part "{0}" kept in the library ({1} widget(s))', part.name, part.widgets.length), 2500);
+    this.doRefresh();
+  },
+  useLibraryPart(i) {
+    const part = this.library[i];
+    if (!part || !M.screen()) return;
+    Panels.showView('screen');
+    const n = M.pastePart(part);
+    if (n) this.toast(I18N.f('{0} widget(s) added from "{1}"', n, part.name), 1500);
+  },
+  async removeLibraryPart(i) {
+    const part = this.library[i];
+    if (!part || !this.ask(I18N.f('Remove the part "{0}" from the library?', part.name))) return;
+    this.library.splice(i, 1);
+    await this.saveLibrary();
+    this.doRefresh();
+  },
+  libraryDialog() {
+    const ta = U.el('textarea', { id: 'lib-text', rows: 16, spellcheck: false, style: { width: '640px', maxWidth: '80vw' }, value: M.libraryExport(this.library) });
+    const out = U.el('div', { id: 'lib-out' });
+    const body = U.el('div', null,
+      U.el('div', { class: 'hint' }, 'The library as text. Copy it into a file to pass it on; paste the text of a library here and press Import to add its parts (a part with the same name is replaced). It is read as data only.'),
+      ta, out);
+    this.modal({ title: 'Library: import / export', body, buttons: [
+      { label: 'Copy', onclick: () => { ta.select(); try { document.execCommand('copy'); } catch (_) {} return false; } },
+      { label: 'Close' },
+      { label: 'Import', primary: true, onclick: async () => {
+        const r = M.libraryImport(ta.value, this.library);
+        out.innerHTML = '';
+        if (!r.added && !r.replaced) { out.append(U.el('div', { class: 'warn' }, I18N.t('Nothing was imported:')), U.el('pre', null, (r.errors.length ? r.errors : ['no parts']).join('\n'))); return false; }
+        this.library = r.parts;
+        await this.saveLibrary();
+        this.doRefresh();
+        const more = r.errors.concat(r.dropped.map(d => 'left out - ' + d));
+        if (more.length) { out.append(U.el('div', { class: 'warn' }, I18N.f('{0} part(s) added, {1} replaced. Not everything was taken:', r.added, r.replaced)), U.el('pre', null, more.slice(0, 50).join('\n'))); return false; }
+        this.toast(I18N.f('{0} part(s) added, {1} replaced', r.added, r.replaced), 2500);
+      } }] });
   },
 
   // ---- find and replace: tag names and texts ---------------------------------
