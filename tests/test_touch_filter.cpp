@@ -221,3 +221,72 @@ TEST_CASE("touch filter: the finger lifting is left out too; the log tells the s
     j = json::parse(R"({ "release": 99 })");
     CHECK(parse_touch_filter(&j).release == 3);
 }
+
+TEST_CASE("touch filter: a finger that loses contact for a moment in a drag is still one touch")
+{
+    // a drag over a resistive panel: pressed, a lift of 30 ms in the middle, pressed again, released
+    auto drag = [](TouchFilter& f, int& touches, int& max_x) {
+        bool was = false;
+        touches = 0; max_x = 0;
+        uint32_t t = 0;
+        auto step = [&](int x, bool pressed) {
+            const auto p = f.feed(x, 100, pressed, t);
+            if(p.pressed && !was) touches++;
+            if(p.pressed) max_x = std::max(max_x, p.x);
+            was = p.pressed;
+            t += 10;
+            return p;
+        };
+        for(int i = 0; i < 10; i++) step(100 + i * 5, true);            // 100 .. 145
+        for(int i = 0; i < 3; i++) step(0, false);                      // 30 ms without contact
+        for(int i = 0; i < 10; i++) step(150 + i * 5, true);            // 150 .. 195
+        for(int i = 0; i < 20; i++) step(0, false);                     // the real release
+        return was;
+    };
+    int touches = 0, max_x = 0;
+    TouchFilter plain;
+    CHECK_FALSE(drag(plain, touches, max_x));
+    CHECK(touches == 2);                                         // without it: two touches (the first one a tap on what was under it)
+
+    TouchFilterConfig c;
+    c.lift_ms = 60;
+    TouchFilter f(c);
+    CHECK(c.active());
+    CHECK_FALSE(drag(f, touches, max_x));
+    CHECK(touches == 1);                                         // with it: one
+    CHECK(max_x == 195);
+    REQUIRE(f.last().lifts == 1);
+    CHECK(f.last().longest_lift_ms == 30);
+    CHECK(f.describe().find("1 short lift(s) bridged (longest 30 ms)") != std::string::npos);
+
+    // a real release is passed on, lift_ms later, where the finger was
+    TouchFilter g(c);
+    CHECK(g.feed(50, 60, true, 0).pressed);
+    CHECK(g.feed(50, 60, false, 10).pressed);                    // not yet
+    CHECK(g.feed(50, 60, false, 40).pressed);
+    const auto up = g.feed(999, 999, false, 75);
+    CHECK_FALSE(up.pressed);
+    CHECK(up.x == 50);
+    CHECK(g.finished());
+    CHECK(g.last().lifts == 0);
+    CHECK(g.last().ms == 0);                                     // (the touch itself was one reading long)
+    // a second touch after a longer pause is a second touch, and the log says how soon it came
+    CHECK(g.feed(70, 60, true, 200).pressed);
+    g.feed(70, 60, false, 210);
+    CHECK_FALSE(g.feed(70, 60, false, 300).pressed);
+    CHECK(g.last().since_last_ms == 190);                        // from the end at 10 ms to the start at 200 ms
+    CHECK(g.describe().find("190 ms after the touch before") != std::string::npos);
+    // the landing after a short lift is left out like the first landing
+    TouchFilterConfig d;
+    d.lift_ms = 60; d.settle = 1;
+    TouchFilter h(d);
+    h.feed(10, 10, true, 0);                                     // landing (left out)
+    CHECK(h.feed(100, 100, true, 10).x == 100);
+    h.feed(0, 0, false, 20);
+    const auto back = h.feed(300, 300, true, 30);                // landing again: a wild reading
+    CHECK(back.pressed);
+    CHECK(back.x == 100);                                        // ... is not passed on
+    CHECK(h.feed(110, 100, true, 40).x == 110);
+    json j = json::parse(R"({ "lift_ms": 5000 })");
+    CHECK(parse_touch_filter(&j).lift_ms == 300);
+}
