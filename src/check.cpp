@@ -1,6 +1,7 @@
 #include "check.hpp"
 #include "data_transfer.hpp"
 #include "mail.hpp"
+#include "upload.hpp"
 #include "schedule.hpp"
 #include "sound.hpp"
 #include <functional>
@@ -463,6 +464,39 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
                 static const std::set<std::string> ak{ "events", "severities", "min_interval_s", "subject", "body" };
                 for(auto k = al->begin(); k != al->end(); ++k) if(!k.key().empty() && k.key()[0] != '_' && !ak.count(k.key())) c.add("mail", "alarms: unknown key \"" + k.key() + "\"");
                 if(!c.has_alarms && !(al->contains("events") && (*al)["events"].is_array() && (*al)["events"].empty())) c.add("mail", "alarms are to be mailed, but the project has no \"alarms\"");
+            }
+        }
+    }
+
+    // ---- uploads: where to, which logs; what should not be in a project file
+    if(const json* up = jget(root, "uploads")) {
+        if(!up->is_array()) c.add("uploads", "a list is needed");
+        else {
+            std::set<std::string> names, groups;
+            if(const json* dl = jget(root, "data_log"); dl && dl->is_object()) if(const json* gs = jget(*dl, "groups"); gs && gs->is_array())
+                for(const json& g : *gs) groups.insert(jstr(g, "name", ""));
+            if(up->size() > kUploadTargetsMax) c.add("uploads", "more than " + std::to_string(kUploadTargetsMax) + " uploads (the rest is not used)");
+            for(size_t i = 0; i < up->size(); i++) {
+                const json& u = (*up)[i];
+                const std::string where = "uploads[" + std::to_string(i) + "]" + (u.is_object() && u.contains("name") && u["name"].is_string() ? " (" + u["name"].get<std::string>() + ")" : "");
+                UploadTarget t;
+                std::string err;
+                if(!upload_parse(u, nullptr, t, &err)) { c.add(where, err); continue; }
+                if(!names.insert(t.name).second) c.add(where, "the name is used twice");
+                static const std::set<std::string> known{ "name", "url", "method", "username", "password", "logs", "verify", "ca_file", "timeout_ms", "retry_s", "retries", "keep", "enabled" };
+                for(auto k = u.begin(); k != u.end(); ++k) if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add(where, "unknown key \"" + k.key() + "\"");
+                if(!t.password.empty()) c.add(where, "the password is in the project file: everybody who gets the project can read it. Better: leave it out and set it on the device (System > Upload; kept in project.local.json)");
+                if(!t.url.secure()) c.add(where, t.url.scheme + ":// is not secured: the files" + std::string(t.username.empty() ? "" : ", the user name and the password") + " can be read on the network (https:// secures them)");
+                else if(!t.tls.verify) c.add(where, "\"verify\": false: the certificate of the server is not checked (anybody can pose as the server)");
+                if(!t.tls.ca_file.empty()) {
+                    std::error_code ec;
+                    if(!fs::is_regular_file(fs::u8path(t.tls.ca_file).is_absolute() ? fs::u8path(t.tls.ca_file) : c.dir / fs::u8path(t.tls.ca_file), ec)) c.add(where, "ca_file: no file \"" + t.tls.ca_file + "\"");
+                }
+                for(const std::string& l : t.logs) {
+                    if(l.rfind("data:", 0) == 0) { if(!groups.count(l.substr(5))) c.add(where, "logs: the data log has no group \"" + l.substr(5) + "\""); }
+                    else if(l == "alarms") { if(!c.has_alarms) c.add(where, "logs: the project has no \"alarms\""); }
+                    else if(!c.log_sections.count(l)) c.add(where, "logs: the project has no \"" + l + "_log\" (nothing is recorded to send)");
+                }
             }
         }
     }

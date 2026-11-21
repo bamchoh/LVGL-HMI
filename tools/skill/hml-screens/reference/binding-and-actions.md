@@ -343,6 +343,15 @@
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
 
+## ログを外に出す（`project.json` の `uploads`）
+
+ログ（CSV）をサーバーへ送る設定はプロジェクトにある（`uploads`）。送り先に関わるので、頼まれずに足したり変えたりしない。
+**パスワードを project.json に書かない**（装置の System > Upload で設定する）。画面から使えるもの:
+
+- 今すぐ送るボタン: `{ "action": "call", "fn": "upload.run", "arg": "<uploads の name>" }`（`arg` を省くとすべて）。
+- 送信の状態: `sys.upload.waiting`（送信待ちのファイル数）、`sys.upload.error`（最後のファイルが失敗している間 1）。
+- 定期的に送るのは `schedules` に同じアクションを書く（画面ではない）。
+
 ## メール（`project.json` の `mail`）
 
 アラームをメールで送る設定はプロジェクトにある（`mail`）。サーバーや宛先に関わるので、頼まれずに足したり変えたりしない。

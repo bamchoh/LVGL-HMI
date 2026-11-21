@@ -162,6 +162,12 @@ struct Mail::Impl {
     std::map<std::string, int64_t> last_alarm;          // "name/event" -> when it was mailed last
 
     int64_t now() const { return clock ? clock() : std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count(); }
+    // "ca_file" is a file of the project unless it says where else it is
+    void resolve_ca()
+    {
+        if(cfg.tls.ca_file.empty() || dir.empty() || std::filesystem::u8path(cfg.tls.ca_file).is_absolute()) return;
+        cfg.tls.ca_file = (std::filesystem::u8path(dir) / std::filesystem::u8path(cfg.tls.ca_file)).generic_u8string();
+    }
     std::string queue_file() const { return dir.empty() ? "" : dir + "/logs/mail_queue.json"; }
 
     void tags_update()
@@ -278,6 +284,7 @@ void Mail::configure(const json* section, const json* local, const std::string& 
     m.store = store;
     m.title = title;
     m.problems = mail_parse(m.section, &m.local, m.cfg);
+    m.resolve_ca();
     for(const std::string& p : m.problems) HML_WARN("mail: %s", p.c_str());
     if(!m.problems.empty()) m.status = "not set up: " + m.problems.front();
     else {
@@ -430,6 +437,7 @@ std::string Mail::set_local(bool enabled, const std::string& to, const std::stri
     if(!password.empty() && password != m.cfg.account.password) operation_log().record("mail", "password", "", "(changed)");
     m.local = mine;
     m.problems = mail_parse(m.section, &m.local, m.cfg);
+    m.resolve_ca();
     if(!m.problems.empty()) m.status = "not set up: " + m.problems.front();
     return "";
 }
