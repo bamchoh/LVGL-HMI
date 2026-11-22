@@ -129,7 +129,8 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
               const std::vector<std::pair<std::string, std::string>>& sets, uint32_t render_at_ms)
 {
     std::vector<std::string> screen_names;
-    std::vector<hml::CheckProblem> problems = hml::check_project(project_path, &screen_names);
+    std::vector<hml::SysTagUse> sys_uses;
+    std::vector<hml::CheckProblem> problems = hml::check_project(project_path, &screen_names, &sys_uses);
     hml::set_log_quiet(true);
     hml::set_log_sink(check_log_sink);
     bool loaded = hml::project().load(project_path);
@@ -163,6 +164,9 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
         hml::project().start_logs(false, scratch.generic_u8string());
         hml::project().build_screens();
         hml::users().preview_as_highest();
+        // the runtime's tags of this project exist now: a "sys." name that is not one of them is a mistake
+        for(hml::CheckProblem& p : hml::unknown_sys_tags(sys_uses, [](const std::string& t) { return hml::tags().find(t) != nullptr; }))
+            problems.push_back(std::move(p));
         auto settle = [&](int passes) {
             for(int i = 0; i < passes; i++) { hml::tags().dispatch(false); lv_timer_handler(); hml::sleep_ms(5); }
         };

@@ -244,3 +244,28 @@ TEST_CASE("check: characters the font has no glyph for are named")
     CHECK(has_line("\"停止\": no glyph for: 停 止"));
     CHECK_FALSE(has_line("隠"));                                // what is hidden is not drawn
 }
+
+TEST_CASE("check: the runtime's tags (sys.) are noted with their place and looked up later")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "tags": [ { "name": "temp", "type": "float" } ],
+        "screens": [ "screens/a.json" ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [
+        { "type": "label", "bind": { "text": "sys.datetime" } },
+        { "type": "label", "bind": { "text": "sys.tme" } },
+        { "type": "button", "on_click": { "action": "set", "tag": "sys.sound.mute", "value": true } } ] })json");
+    std::vector<SysTagUse> uses;
+    const auto problems = check_project((p.dir / "project.json").generic_string(), nullptr, &uses);
+    CHECK(problems.empty());                                    // (not reported by the file check itself)
+    REQUIRE(uses.size() == 3);
+    CHECK(uses[1].tag == "sys.tme");
+    CHECK(uses[1].file == "screens/a.json");
+    CHECK(uses[1].where.find("children[1]") != std::string::npos);
+
+    // what exists depends on the project: here no sound
+    const auto unknown = unknown_sys_tags(uses, [](const std::string& t) { return t == "sys.datetime"; });
+    REQUIRE(unknown.size() == 2);
+    CHECK(unknown[0].line().find("unknown tag \"sys.tme\"") != std::string::npos);
+    CHECK(unknown[0].line().rfind("screens/a.json: children[1]", 0) == 0);
+    CHECK(unknown[1].line().find("sys.sound.mute") != std::string::npos);
+}

@@ -61,13 +61,22 @@ struct Checker {
         }
     }
 
-    bool tag_ok(const std::string& t) const { return tags.count(t) || t.rfind("sys.", 0) == 0; }
+    // The runtime's own tags ("sys.") depend on what the project sets up: they are noted here and
+    // looked up once the project is loaded (run_check), where they all exist.
+    std::vector<SysTagUse> sys_uses;
+    bool tag_ok(const std::string& t, const std::string& where, const std::string& what)
+    {
+        if(tags.count(t)) return true;
+        if(t.rfind("sys.", 0) != 0) return false;
+        sys_uses.push_back({ file, where, what, t });
+        return true;
+    }
     void need_tag(const std::string& where, const std::string& what, const json& v)
     {
         if(!v.is_string()) return;
         const std::string t = v.get<std::string>();
         if(t.empty()) add(where, what + ": no tag");
-        else if(!tag_ok(t)) add(where, what + ": unknown tag \"" + t + "\"");
+        else if(!tag_ok(t, where, what)) add(where, what + ": unknown tag \"" + t + "\"");
     }
     // "@id" must be an id of "texts" (when the project has texts)
     void text_id(const std::string& where, const std::string& key, const json& v)
@@ -148,7 +157,7 @@ struct Checker {
                 else if(name == "popup" && !popups.count(s)) add(where, what + ": screen \"" + s + "\" is not a popup (\"popup\": true)");
             }
             if(name == "popup") if(const json* set = jget(a, "set"); set && set->is_object())
-                for(auto k = set->begin(); k != set->end(); ++k) if(!tag_ok(k.key())) add(where, what + ": set: unknown tag \"" + k.key() + "\"");
+                for(auto k = set->begin(); k != set->end(); ++k) if(!tag_ok(k.key(), where, what + ": set")) add(where, what + ": set: unknown tag \"" + k.key() + "\"");
             if(const json* an = jget(a, "anim"); an && an->is_string() && !an->get<std::string>().empty() && !anims.count(an->get<std::string>()))
                 add(where, what + ": unknown anim \"" + an->get<std::string>() + "\"");
             if(name == "script") {
@@ -367,7 +376,7 @@ struct Checker {
 
 } // namespace
 
-std::vector<CheckProblem> check_project(const std::string& path, std::vector<std::string>* screen_names)
+std::vector<CheckProblem> check_project(const std::string& path, std::vector<std::string>* screen_names, std::vector<SysTagUse>* sys_uses)
 {
     Checker c;
     const fs::path file = fs::u8path(path);
@@ -648,7 +657,18 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         c.file = s.file;
         c.walk(s.def, s.file == pj ? "screen \"" + jstr(s.def, "name", "") + "\"" : "", true);
     }
+    if(sys_uses) *sys_uses = std::move(c.sys_uses);
     return c.out;
+}
+
+std::vector<CheckProblem> unknown_sys_tags(const std::vector<SysTagUse>& uses, const std::function<bool(const std::string&)>& exists)
+{
+    std::vector<CheckProblem> out;
+    for(const SysTagUse& u : uses) {
+        if(exists(u.tag)) continue;
+        out.push_back({ u.file, u.where, u.what + ": unknown tag \"" + u.tag + "\" (the runtime has no such sys. tag; or the feature it belongs to is not set up in project.json)" });
+    }
+    return out;
 }
 
 std::string missing_glyphs(const lv_font_t* font, const std::string& text)
