@@ -74,7 +74,7 @@ struct LogCapture {
 };
 
 // ---------------------------------------------------------------- the server
-uint16_t s_port = static_cast<uint16_t>(48600 + (millis() % 300));
+uint16_t s_port = static_cast<uint16_t>(25600 + (millis() % 300));     // (below the ports Linux gives to clients, 32768 ..)
 
 struct ServerOptions {
     const char* cert = "server";       // nullptr: no security at all (None only)

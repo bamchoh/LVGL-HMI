@@ -24,6 +24,11 @@
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
+#ifdef _WIN32
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#endif
+#include <mbedtls/net_sockets.h>
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
 #include <open62541/plugin/log_stdout.h>
@@ -204,6 +209,35 @@ bool OpcUaServerDriver::add_nodes()
     return true;
 }
 
+// The port must be free on IPv4: not held by another server, nor by a client that got it as its own
+// port. (open62541 starts when it can bind any address of the host, e.g. only IPv6.)
+static bool port_free_v4(uint16_t port)
+{
+#ifdef _WIN32
+    // SO_REUSEADDR on Windows would take a port over from its holder: ask with SO_EXCLUSIVEADDRUSE
+    mbedtls_net_context init;                                  // (mbedTLS starts Winsock)
+    mbedtls_net_init(&init);
+    mbedtls_net_free(&init);
+    SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(s == INVALID_SOCKET) return true;                       // (cannot ask: let open62541 try)
+    BOOL one = TRUE;
+    ::setsockopt(s, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&one), sizeof(one));
+    sockaddr_in a{};
+    a.sin_family = AF_INET;
+    a.sin_port = htons(port);
+    a.sin_addr.s_addr = htonl(INADDR_ANY);
+    const bool ok = ::bind(s, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0;
+    ::closesocket(s);
+    return ok;
+#else
+    mbedtls_net_context probe;                                 // SO_REUSEADDR, as open62541 binds
+    mbedtls_net_init(&probe);
+    const int r = mbedtls_net_bind(&probe, "0.0.0.0", std::to_string(port).c_str(), MBEDTLS_NET_PROTO_TCP);
+    mbedtls_net_free(&probe);
+    return r == 0;
+#endif
+}
+
 bool OpcUaServerDriver::start()
 {
     UA_ServerConfig config;
@@ -214,6 +248,7 @@ bool OpcUaServerDriver::start()
     UA_LocalizedText_clear(&config.applicationDescription.applicationName);
     config.applicationDescription.applicationName = UA_LOCALIZEDTEXT_ALLOC("en-US", "Tsukuraku Runtime");
 
+    if(!port_free_v4(port_)) { HML_ERROR("opcua: port %u is in use: not started", port_); UA_ServerConfig_clean(&config); return false; }
     server_ = UA_Server_newWithConfig(&config);
     if(!server_) { HML_ERROR("opcua: cannot create server"); return false; }
     if(!add_nodes()) { UA_Server_delete(server_); server_ = nullptr; return false; }
@@ -224,6 +259,22 @@ bool OpcUaServerDriver::start()
         UA_Server_delete(server_);
         server_ = nullptr;
         return false;
+    }
+    // open62541 counts the start as good when it could bind any of the addresses of the host; when
+    // another program holds the port on one of them (often IPv4), clients there are refused. Ask
+    // the port ourselves: a listening socket answers a TCP connect at once, before the server runs.
+    {
+        mbedtls_net_context probe;
+        mbedtls_net_init(&probe);
+        const int r = mbedtls_net_connect(&probe, "127.0.0.1", std::to_string(port_).c_str(), MBEDTLS_NET_PROTO_TCP);
+        mbedtls_net_free(&probe);
+        if(r != 0) {
+            HML_ERROR("opcua: port %u cannot be reached on 127.0.0.1 (another program holds it?): not started", port_);
+            UA_Server_run_shutdown(server_);
+            UA_Server_delete(server_);
+            server_ = nullptr;
+            return false;
+        }
     }
     running_ = true;
     thread_ = std::thread([this] { thread_main(); });
