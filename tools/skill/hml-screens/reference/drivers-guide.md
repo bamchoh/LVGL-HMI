@@ -70,6 +70,10 @@ SLMP / FINS の `"dtype": "string"` は 1 文字 1 バイト（ASCII。1 ワー�
   32 ビットは 2 つ続けて使う（`addr` と `addr + 1`）。語の順が逆なら `swap_words`。
 - **SLMP（三菱 MELSEC）**: GX Works の書き方そのまま `D100` `M0` `X1F` `Y20` `W1A` `ZR100`（X Y B W SB SW DX DY ZR は 16 進）。`D10.3` はワードのビット（読むだけ）。
 - **FINS（オムロン）**: `D100` `CIO10` `W0.00` `H5` `A0` `E0_100` `T1` `C1`（`.00`〜`.15` はビット）。BCD の値は `bcd16` / `bcd32`。
+- **OPC UA サーバー**（`opcua_server`: SCADA などにタグを見せる）: 既定で署名と暗号化。受け入れるクライアントの証明書を `client_certs` に
+  （ユーザーから受け取ったファイルをプロジェクトに入れる。なければ聞く。1 つもないと、どのクライアントも入れない）。`"security": "none"` は
+  頼まれたときだけ（報告に書く）。ログインが要るなら `username` だけ書き、パスワードは装置で設定してもらう。見せるタグは `tags` に絞り、
+  書かせないタグは `"access": "ro"`。
 - **OPC UA クライアント**: `map` の各行に `node`（`ns=2;s=Line1.Temp` のようなノード ID）。サーバーの証明書を `server_cert` に。
 - **MQTT**: `publish`（タグ → ブローカー）と `subscribe`（ブローカー → タグ。外から書かれるのはここに書いたタグだけ）。トピックは `topic_prefix` + `topic`。
   - 1 トピックに 1 つの値: `{ "tag": "temp", "topic": "oven/temp" }`（値はそのまま文字列。`"payload": "json"` なら `{"v": 21.5, "ts": ...}`）。

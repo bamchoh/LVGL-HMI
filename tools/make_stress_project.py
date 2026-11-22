@@ -73,7 +73,7 @@ def main():
         } for k in range(v["scripts"])],
     }
     if a.opcua:
-        project["drivers"].append({"type": "opcua_server", "port": a.opcua})
+        project["drivers"].append({"type": "opcua_server", "port": a.opcua, "security": "none"})
     if not a.no_logs:
         project["data_log"] = {"groups": [
             {"name": "fast", "trigger": "interval", "interval_ms": 1000, "tags": [tag(i) for i in range(v["log_tags"])]},

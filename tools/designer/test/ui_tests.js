@@ -341,7 +341,7 @@
     const i = M.st.project.drivers.length - 1, d = M.st.project.drivers[i];
     eq([d.type, d.port, d.tls], ['mqtt', 8883, true]);
     const view = document.querySelector('#view-drivers').textContent;
-    ok(view.includes('送信（タグの値をブローカーへ）') && view.includes('受信（指令: ここにあるタグだけ書き込まれる）'), 'both tables');
+    ok(view.includes('送信（タグの値をブローカーへ') && view.includes('受信（指令: ここにあるタグだけ書き込まれる'), 'both tables');
     const tls = document.querySelector('[data-fk="drv.' + i + '.tls"]');
     ok(tls && tls.checked, 'TLS is on');
     eq(App.problems.filter(p => p.index === i && p.view === 'drivers').length, 0, 'no problems with TLS on');

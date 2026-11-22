@@ -18,7 +18,15 @@
 #  pragma GCC diagnostic pop
 #endif
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include "project.hpp"
+#include <cstring>
+#include <mutex>
 #include <string>
+#include <vector>
 #include <mbedtls/net_sockets.h>
 
 using namespace hml;
@@ -36,6 +44,7 @@ uint16_t start_opcua(Runtime& rt, json cfg)
     for(int attempt = 0; attempt < 5; attempt++) {
         uint16_t port = s_next_port++;
         cfg["type"] = "opcua_server";
+        if(!cfg.contains("security") && !cfg.contains("cert_file")) cfg["security"] = "none";   // (a plain client; the secure ones: below)
         cfg["port"] = port;
         json arr = json::array({ cfg });
         if(rt.drivers.load(&arr) == 1) return port;
@@ -294,7 +303,7 @@ TEST_CASE("opcua: the server stops cleanly and the port can be reused")
     CHECK(UA_Client_connect(c, url.c_str()) != UA_STATUSCODE_GOOD);
     UA_Client_delete(c);
 
-    json cfg = json{ { "type", "opcua_server" }, { "port", port } };
+    json cfg = json{ { "type", "opcua_server" }, { "port", port }, { "security", "none" } };
     json arr = json::array({ cfg });
     CHECK(rt.drivers.load(&arr) == 1);
     { Client cl(port); UA_Variant v; CHECK(cl.read("x", &v) == UA_STATUSCODE_GOOD); UA_Variant_clear(&v); }
@@ -313,7 +322,7 @@ TEST_CASE("opcua: a port that another program holds is not taken (the server doe
         if(mbedtls_net_bind(&other, "127.0.0.1", std::to_string(p).c_str(), MBEDTLS_NET_PROTO_TCP) == 0) port = p;
     }
     REQUIRE(port != 0);
-    json arr = json::array({ json{ { "type", "opcua_server" }, { "port", port } } });
+    json arr = json::array({ json{ { "type", "opcua_server" }, { "port", port }, { "security", "none" } } });
     CHECK(rt.drivers.load(&arr) == 0);
     mbedtls_net_free(&other);
     // free again: it starts
@@ -325,9 +334,203 @@ TEST_CASE("the 'opcua' alias creates the same driver")
 {
     Runtime rt;
     rt.tag("x", TagType::Int, 1);
-    json cfg = json{ { "type", "opcua" }, { "port", s_next_port++ } };
+    json cfg = json{ { "type", "opcua" }, { "port", s_next_port++ }, { "security", "none" } };
     json arr = json::array({ cfg });
     CHECK(rt.drivers.load(&arr) == 1);
+}
+
+namespace {
+std::mutex g_sec_mu;
+std::vector<std::string> g_sec_log;
+void sec_capture(LogLevel, const std::string& m) { std::lock_guard<std::mutex> l(g_sec_mu); g_sec_log.push_back(m); }
+struct LogCapture {
+    LogCapture() { { std::lock_guard<std::mutex> l(g_sec_mu); g_sec_log.clear(); } set_log_sink(sec_capture); }
+    ~LogCapture() { set_log_sink(nullptr); }
+    bool has(const std::string& part) const
+    {
+        std::lock_guard<std::mutex> l(g_sec_mu);
+        for(const auto& m : g_sec_log) if(m.find(part) != std::string::npos) return true;
+        return false;
+    }
+};
+} // namespace
+
+// ---------------------------------------------------------------- security (Sign & Encrypt, trusted clients, login)
+
+namespace {
+
+std::string ua_asset(const char* name)
+{
+    const char* env = std::getenv("HML_TEST_SOURCE_DIR");
+    return std::string(env && *env ? env : HML_TEST_SOURCE_DIR) + "/tests/assets/opcua/" + name;
+}
+
+UA_ByteString ua_load(const std::string& path)
+{
+    UA_ByteString b = UA_BYTESTRING_NULL;
+    auto data = read_file(path, 1 << 20);
+    REQUIRE(data);
+    UA_ByteString_allocBuffer(&b, data->size());
+    std::memcpy(b.data, data->data(), data->size());
+    return b;
+}
+
+// the secure server of these tests: the test certificates, the test client trusted
+json secure_cfg(const char* security = "sign_encrypt")
+{
+    return json{ { "security", security }, { "cert_file", ua_asset("server.der") }, { "key_file", ua_asset("server.key") },
+                 { "application_uri", "urn:hml:test:server" }, { "client_certs", json::array({ ua_asset("client.der") }) } };
+}
+
+// A client: mode None / Sign / SignAndEncrypt (with the test client's certificate), maybe a login.
+// Returns the status of the connection; reads x when connected.
+UA_StatusCode connect_as(uint16_t port, UA_MessageSecurityMode mode, const char* user = nullptr, const char* pass = nullptr, bool* read_ok = nullptr,
+                         const std::string& server_cert = "")
+{
+    UA_ClientConfig cfg;
+    std::memset(&cfg, 0, sizeof(cfg));
+    cfg.logging = UA_Log_Stdout_new(UA_LOGLEVEL_FATAL);
+    if(mode == UA_MESSAGESECURITYMODE_NONE) {
+        UA_ClientConfig_setDefault(&cfg);
+        cfg.securityMode = UA_MESSAGESECURITYMODE_NONE;
+        cfg.securityPolicyUri = UA_STRING_ALLOC("http://opcfoundation.org/UA/SecurityPolicy#None");
+    }
+    else {
+        UA_ByteString cert = ua_load(ua_asset("client.der")), key = ua_load(ua_asset("client.key")), server = ua_load(server_cert.empty() ? ua_asset("server.der") : server_cert);
+        UA_ClientConfig_setDefaultEncryption(&cfg, cert, key, &server, 1, nullptr, 0);
+        UA_ByteString_clear(&cert); UA_ByteString_clear(&key); UA_ByteString_clear(&server);
+        cfg.securityMode = mode;
+        UA_String_clear(&cfg.clientDescription.applicationUri);
+        cfg.clientDescription.applicationUri = UA_STRING_ALLOC("urn:hml:test:client");
+    }
+    if(user) UA_ClientConfig_setAuthenticationUsername(&cfg, user, pass);
+    cfg.timeout = 3000;
+    UA_Client* c = UA_Client_newWithConfig(&cfg);
+    const std::string url = "opc.tcp://localhost:" + std::to_string(port);
+    UA_StatusCode rc = UA_Client_connect(c, url.c_str());
+    if(rc == UA_STATUSCODE_GOOD && read_ok) {
+        UA_UInt16 ns = 0;
+        UA_String uri = UA_STRING_STATIC("urn:hml:runtime");
+        UA_Variant v;
+        UA_Variant_init(&v);
+        *read_ok = UA_Client_NamespaceGetIndex(c, &uri, &ns) == UA_STATUSCODE_GOOD
+                && UA_Client_readValueAttribute(c, UA_NODEID_STRING(ns, const_cast<char*>("x")), &v) == UA_STATUSCODE_GOOD;
+        UA_Variant_clear(&v);
+    }
+    UA_Client_disconnect(c);
+    UA_Client_delete(c);
+    return rc;
+}
+
+} // namespace
+
+TEST_SUITE("security") {
+TEST_CASE("opcua server: Sign & Encrypt by default; None only finds the endpoints; signed-only refused")
+{
+    Runtime rt;
+    rt.tag("x", TagType::Int, 7);
+    json cfg = secure_cfg();
+    cfg.erase("security");                                       // (the default)
+    const uint16_t port = start_opcua(rt, cfg);
+    REQUIRE(port != 0);
+    bool read = false;
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT, nullptr, nullptr, &read) == UA_STATUSCODE_GOOD);
+    CHECK(read);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_NONE) != UA_STATUSCODE_GOOD);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGN) != UA_STATUSCODE_GOOD);
+}
+
+TEST_CASE("opcua server: \"sign\" takes signed-only clients too")
+{
+    Runtime rt;
+    rt.tag("x", TagType::Int, 7);
+    const uint16_t port = start_opcua(rt, secure_cfg("sign"));
+    REQUIRE(port != 0);
+    bool read = false;
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGN, nullptr, nullptr, &read) == UA_STATUSCODE_GOOD);
+    CHECK(read);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_NONE) != UA_STATUSCODE_GOOD);
+}
+
+TEST_CASE("opcua server: a client that is not trusted is refused; with nobody trusted, everybody is")
+{
+    Runtime rt;
+    rt.tag("x", TagType::Int, 7);
+    json other = secure_cfg();
+    other["client_certs"] = json::array({ ua_asset("other_server.der") });   // somebody else
+    uint16_t port = start_opcua(rt, other);
+    REQUIRE(port != 0);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT) != UA_STATUSCODE_GOOD);
+    rt.drivers.stop_all();
+
+    json nobody = secure_cfg();
+    nobody.erase("client_certs");
+    port = start_opcua(rt, nobody);
+    REQUIRE(port != 0);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT) != UA_STATUSCODE_GOOD);
+}
+
+TEST_CASE("opcua server: a login instead of anonymous; the password is not logged; none without a password")
+{
+    LogCapture log;
+    Runtime rt;
+    rt.tag("x", TagType::Int, 7);
+    json cfg = secure_cfg();
+    cfg["username"] = "op";
+    cfg["password"] = "pw-secret-123";                           // (from project.local.json on a device)
+    const uint16_t port = start_opcua(rt, cfg);
+    REQUIRE(port != 0);
+    bool read = false;
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT, "op", "pw-secret-123", &read) == UA_STATUSCODE_GOOD);
+    CHECK(read);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT, "op", "wrong") != UA_STATUSCODE_GOOD);
+    CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT) != UA_STATUSCODE_GOOD);       // anonymous
+    CHECK_FALSE(log.has("pw-secret-123"));
+    rt.drivers.stop_all();
+
+    json nopass = secure_cfg();
+    nopass["username"] = "op";
+    nopass["type"] = "opcua_server";
+    nopass["port"] = s_next_port++;
+    json arr = json::array({ nopass });
+    CHECK(rt.drivers.load(&arr) == 0);
+    CHECK(log.has("has no password yet"));
+}
+}
+
+TEST_SUITE("security") {
+TEST_CASE("opcua server: without cert_file the device makes its certificate once, in pki/own; a client that trusts it gets in")
+{
+    Runtime rt;
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / ("hml_opcua_server_" + std::to_string(millis()));
+    fs::create_directories(dir);
+    const uint16_t port = s_next_port++;
+    json pj = { { "tags", json::array({ json{ { "name", "x" }, { "type", "int" }, { "init", 7 } } }) },
+                { "key_management", json{ { "enabled", false } } },
+                { "drivers", json::array({ json{ { "type", "opcua_server" }, { "port", port }, { "client_certs", json::array({ ua_asset("client.der") }) } } }) } };
+    { std::ofstream f(dir / "project.json"); f << pj.dump(); }
+    static const bool registered = [] { drivers().register_builtins(); return true; }();
+    (void)registered;
+    std::optional<std::string> first;
+    for(int run = 0; run < 2; run++) {
+        Project& p = project();                                  // (the driver finds pki/ through project())
+        REQUIRE(p.load((dir / "project.json").generic_string()));
+        REQUIRE(p.start_drivers() == 1);
+        const std::string cert = (dir / "pki" / "own" / "opcua_server.der").generic_string();
+        REQUIRE(fs::exists(cert));
+        CHECK(fs::exists(dir / "pki" / "own" / "opcua_server.key"));
+        bool read = false;
+        CHECK(connect_as(port, UA_MESSAGESECURITYMODE_SIGNANDENCRYPT, nullptr, nullptr, &read, cert) == UA_STATUSCODE_GOOD);
+        CHECK(read);
+        if(run == 0) first = read_file(cert, 1 << 20);
+        else CHECK(read_file(cert, 1 << 20) == first);           // the same one again
+        drivers().stop_all();
+        p.unload();
+    }
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+}
 }
 
 #else

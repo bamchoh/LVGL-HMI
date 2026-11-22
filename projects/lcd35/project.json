@@ -188,6 +188,7 @@
     },
     {
       "type": "opcua_server",
+      "security": "none",
       "port": 4840,
       "namespace": "urn:hml:runtime",
       "folder": "HML"

@@ -582,7 +582,7 @@ private:
 std::vector<const char*> device_only_keys(const json& cfg)
 {
     const std::string type = jstr(cfg, "type", "");
-    if(iequals(type, "mqtt") || iequals(type, "opcua_client")) return { "username", "password" };
+    if(iequals(type, "mqtt") || iequals(type, "opcua_client") || iequals(type, "opcua_server") || iequals(type, "opcua")) return { "username", "password" };
     return {};
 }
 
