@@ -1020,6 +1020,14 @@ struct Ui::Impl {
     std::vector<json> template_layers(const Screen& scr, const json& def);   // build the widgets of a screen registered with add_screen()
     // The screen at `idx` becomes the one on the display: bring its widgets up to date with the
     // tags that changed while it was not shown.
+    // sys.screen: the name of the screen shown (not the popups). Made before any screen is built,
+    // so that bindings find it (a template's menu marks the screen it is on).
+    static Tag* screen_tag()
+    {
+        Tag* t = tags().find("sys.screen");
+        if(!t) { Value v = Value::string(""); t = tags().create("sys.screen", TagType::String, &v, false, 0, 0); }
+        return t;
+    }
     void set_shown(int idx)
     {
         for(auto& sc : screens) if(!sc->popup) sc->shown = false;     // (open popups stay shown)
@@ -1027,6 +1035,13 @@ struct Ui::Impl {
         Screen& scr = *screens[static_cast<size_t>(idx)];
         scr.shown = true;
         s_some_screen_shown = true;
+        if(!scr.popup) {
+            if(Tag* t = screen_tag(); t && t->get().format() != scr.name) {
+                t->set_string(scr.name, nullptr);
+                // the new screen shows its own name at once (not one frame later, at the dispatch)
+                for(Binding* b : scr.bindings) if(b->tag == t) b->on_tag_changed(t->get(), nullptr);
+            }
+        }
         bring_up_to_date(scr);
         update_anims();                                               // (those of the screen that was left stop)
     }
@@ -2158,6 +2173,7 @@ bool Ui::add_screen(const json& screen, const std::string& base_dir)
 {
     Impl& m = *impl_;
     if(!screen.is_object()) return false;
+    Impl::screen_tag();
     auto name = jstr_opt(screen, "name");
     if(!name) { HML_WARN("screen without \"name\" skipped"); return false; }
     if(m.find_screen(*name)) { HML_WARN("screen '%s' defined twice", name->c_str()); return false; }
