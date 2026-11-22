@@ -1119,6 +1119,38 @@
     Panels.show('widgets');
   });
 
+  await test('icons: the preset icons that come with the designer are put into the project', async () => {
+    ok(App.info.iconsDir, 'the host found the icons');
+    Panels.show('project'); App.doRefresh();
+    const btn = document.querySelector('[data-fk$=".icons.add"]');
+    ok(btn && !btn.disabled, 'the button');
+    ok(await App.addBundledIcons(), 'copied');
+    const files = ['assets/icons/48/motor.png', 'assets/icons/24/home.png', 'assets/icons/icons.txt', 'assets/icons/README.txt'];
+    const s = await host.projectStamp(M.st.dir, files);
+    for (const f of files) ok(!new RegExp(f.replace(/[./]/g, '\\$&') + ':-;').test(s.stamp), f + ' is in the project: ' + s.stamp);
+    // an image of the project that uses one: no problem
+    M.mutate(() => { M.st.screens[0].data.children.push({ type: 'image', x: 0, y: 0, src: 'assets/icons/48/motor.png', style: { image_recolor: '#36c98f' } }); });
+    App.doRefresh();
+    ok(!App.problems.some(p => /motor\.png/.test(p.text)), 'the icon is found');
+    Panels.show('widgets');
+  });
+
+  await test('simulation: the Drivers tab edits "simulation" apart from the drivers', async () => {
+    Panels.showView('drivers');
+    const item = [...document.querySelectorAll('#view-drivers .drv-side .item')].find(e => /simulation/.test(e.textContent));
+    ok(item, 'the Simulation entry');
+    const drivers = JSON.stringify(M.st.project.drivers);
+    item.click();
+    ok(/sys\.sim\.active/.test(document.getElementById('view-drivers').textContent), 'the hint names sys.sim.active');
+    ok(M.st.project.simulation && Array.isArray(M.st.project.simulation.items), 'a simulation section to fill');
+    eq(JSON.stringify(M.st.project.drivers), drivers, 'the drivers are not touched');
+    const box = item.querySelector('input[type=checkbox]');
+    box.checked = false; box.dispatchEvent(new Event('change'));
+    eq(M.st.project.simulation.enabled, false, 'switched off');
+    Panels.driverSel = 0;
+    Panels.showView('screen');
+  });
+
   await test('AI: the dialog gives the skill, the project folder and the runtime', async () => {
     document.getElementById('b-ai').click();
     const t = document.querySelector('[data-fk="ai.prompt"]');

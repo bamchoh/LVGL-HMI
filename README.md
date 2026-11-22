@@ -1826,6 +1826,10 @@ The short form `"bind": "tag"` binds to `value` for `numeric_display` and to `te
 - **Only files inside the project folder can be shown** (absolute paths and `..` are not shown. The same holds when the file is given by a tag).
   A broken file, or an image of more than about 4 million pixels, is not shown and a warning is written (a PNG is expanded in memory to width × height × 4 bytes).
 - In the designer, choosing a file with "…" in the image's properties copies it to `assets/`.
+- **Preset icons**: the designer comes with 41 white pictograms (equipment: motor, pump, fan, heater, valve, tank, conveyor, mixer, oven ...;
+  menus: home, trend, report, alarm, settings, user ...) in 24, 32, 48 and 64 px. Project tab > Icons > "Add the preset icons" copies them to
+  `assets/icons/<size>/<name>.png` (list: `icons.txt`, a picture of all: `preview.png`). Color them with `"style": { "image_recolor": "#36c98f" }`.
+  They are drawn by `tools/icons/gen_icons.py` and free to use (CC0).
 
 ### Common properties
 

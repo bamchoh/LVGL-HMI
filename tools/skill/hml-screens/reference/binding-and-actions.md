@@ -81,6 +81,18 @@
 **画像は AI が作らない。** `assets/` にあるものを使い（中身と大きさは画像として開いて確かめる）、合うものがなければ、
 要る画像（何の絵か、幅 × 高さ、背景を透かすか）を伝えてユーザーに用意してもらう。それまでは `panel` と `label` で場所を取っておく。
 
+**プリセットのアイコン**: デザイナーに付いている白い絵記号（`<デザイナーのフォルダー>\icons\`）。プロジェクトに `assets/icons/` が
+なければ、フォルダーごと `assets\icons\` にコピーする（デザイナーの プロジェクト > アイコン のボタンと同じ）。
+
+- ファイル: `assets/icons/<大きさ>/<名前>.png`。大きさは `24` `32` `48` `64`（拡大しない。出す大きさのファイルを選ぶ）。
+- 名前の一覧は `assets/icons/icons.txt`、全部の絵は `assets/icons/preview.png`（開いて見て選ぶ）。
+  設備: `motor` `pump` `fan` `heater` `flame` `valve` `tank` `conveyor` `mixer` `oven` `cooling` `slicer` `package`
+  `thermometer` `humidity` `gauge` `factory`。メニュー・操作: `home` `trend` `report` `alarm` `warning` `info` `check` `error`
+  `play` `stop` `pause` `reset` `power` `settings` `user` `lock` `recipe` `io` `back` `forward` `menu` `list` `clock` `process`。
+- 色は `"style": { "image_recolor": "#36c98f" }`（白い絵なのでそのまま色になる）。状態で色を変えるときは、色違いの `image` を
+  重ねて `visible` で出し分ける（`bind` の色は `image` には使えない）。
+- ボタンに載せるなら、`button` の中に `image` を置く（`"align": "center"` か、文字と並べるなら `flex`）。押せる大きさは `button` で取る。
+
 ```json
 { "type": "image", "x": 16, "y": 16, "src": "assets/logo.png" },
 { "type": "image", "w": 200, "h": 120, "src": "assets/pump.png", "fit": "contain" },

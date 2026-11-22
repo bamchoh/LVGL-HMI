@@ -14,6 +14,7 @@ const host = {
   openFolder: dir => host.call('hml_openFolder', dir || ''),
   installSkill: () => host.call('hml_installSkill'),
   addFont: dir => host.call('hml_addFont', dir || ''),
+  addIcons: dir => host.call('hml_addIcons', dir || ''),
   writeFiles: (dir, files) => host.call('hml_writeFiles', dir, files),
   openDialog: (kind, dir) => host.call('hml_openDialog', kind, dir || ''),
   saveDialog: (name, dir) => host.call('hml_saveDialog', name, dir || ''),
@@ -650,6 +651,17 @@ const App = {
     return true;
   },
 
+  // Put the preset icons that come with the designer into the project (assets/icons/<size>/<name>.png).
+  async addBundledIcons() {
+    const st = M.st;
+    if (!st.project) return false;
+    if (!st.path && !(await this.save(false))) return false;
+    const r = await host.addIcons(st.dir);
+    if (!r || !r.ok) { this.toast('failed: ' + (r && r.error), 6000); return false; }
+    this.toast(I18N.f('icons added: {0}', r.rel + '/<size>/<name>.png'), 4000);
+    return true;
+  },
+
   // ---- "AI": what an AI assistant needs to make screens for this project ---------------
   aiPrompt() {
     const st = M.st, i = this.info || {};
@@ -661,6 +673,7 @@ const App = {
       'プロジェクトのフォルダー: ' + (st.dir || '（プロジェクトを保存してから、もう一度このダイアログを開いてください）'),
       'ランタイム: ' + (i.runtime || '(hml_runtime が見つかりません)'),
       '日本語フォント（プロジェクトにないときに入れるもの）: ' + (i.fontsDir || '(見つかりません)'),
+      'アイコン（プロジェクトにないときに入れるもの）: ' + (i.iconsDir || '(見つかりません)'),
       '',
       '作りたい画面: （ここに書く。例: 上に今のアラーム、下に温度のトレンド、右に今の値を大きく。メイン画面から行けるように）',
     ] : [
@@ -669,6 +682,7 @@ const App = {
       'Project folder: ' + (st.dir || '(save the project first, then open this dialog again)'),
       'Runtime: ' + (i.runtime || '(hml_runtime not found)'),
       'Japanese font (to put into the project when it has none): ' + (i.fontsDir || '(not found)'),
+      'Icons (to put into the project when it has none): ' + (i.iconsDir || '(not found)'),
       '',
       'The screen I want: (write it here, e.g. current alarms on top, a temperature trend below, large values on the right; reachable from the main screen)',
     ];

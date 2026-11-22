@@ -568,6 +568,18 @@ Object.assign(I18N.TEXT_JA, {
   'copies it into assets/fonts/ of the project, with its license, and sets it here': 'プロジェクトの assets/fonts/ にライセンス文と一緒にコピーし、ここに設定します',
   'font added: {0}': 'フォントを入れました: {0}',
 });
+// ---- the icons that come with the designer, the simulation
+Object.assign(I18N.TEXT_JA, {
+  'Icons': 'アイコン',
+  'Add the preset icons': 'プリセットのアイコンを入れる',
+  'copies them into assets/icons/ of the project': 'プロジェクトの assets/icons/ にコピーします',
+  'White pictograms (equipment: motor, pump, fan, oven, conveyor ... and for menus: home, trend, alarm, settings ...) in 24, 32, 48 and 64 px: assets/icons/48/motor.png. Give them a color with the style "image_recolor" (green running, red fault). The list is assets/icons/icons.txt, a picture of all of them assets/icons/preview.png.':
+    '白い絵記号（設備: モーター、ポンプ、ファン、オーブン、コンベア…、メニュー用: ホーム、トレンド、アラーム、設定…）。大きさは 24・32・48・64 px（assets/icons/48/motor.png）。スタイルの image_recolor で色を付けます（運転は緑、異常は赤）。一覧は assets/icons/icons.txt、全部の絵は assets/icons/preview.png。',
+  'icons added: {0}': 'アイコンを入れました: {0}',
+  'Simulation': 'シミュレーション',
+  'Values for a demo or for trying screens without a device, kept apart from the drivers: changing them never touches the connection to the PLC. Same items as the simulator driver; "when" (a tag) makes an item run only while it is true, mode "follow" moves towards "target" (a tag or a number) at "rate" a second and to "idle" while "when" is false, "noise" adds a little randomness. The tag sys.sim.active is 1 while values are simulated: show it on the screens ("SIMULATION").':
+    'デモや、機器なしで画面を試すための値です。ドライバとは別なので、変えても PLC との接続には触れません。項目はシミュレーターのドライバと同じです。「when」（タグ）はそれが真の間だけ動かし、mode「follow」は「target」（タグか数値）へ 1 秒に「rate」ずつ近づき、when が偽の間は「idle」へ戻ります。「noise」は少し揺らします。タグ sys.sim.active はシミュレーション中 1 です。画面に出してください（「SIMULATION」）。',
+});
 I18N.PATTERNS_JA.push([/^Japanese text is used \((.*)\), but the project has no font for it: it is shown as empty boxes\. Project tab > Font$/,
   '日本語の文字が使われていますが、プロジェクトにフォントがありません（□ で表示されます）。プロジェクト タブ > フォント']);
 // ---- animation

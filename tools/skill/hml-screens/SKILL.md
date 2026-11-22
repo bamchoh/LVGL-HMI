@@ -111,7 +111,9 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 - 状態は `led` や `bind` の `bg_color` + `map`、言葉は `bind` の `text` + `map`（`{ "0": "@stopped", "1": "@running" }`）。値によって出し分けるものは `visible` と条件（`eq` `gt` …）。
 - 点滅・回転・移動などの動きは `animate`（資料の「アニメーション」）。気づいてほしい状態だけに、タグの条件（`when`）を付けて使う。
 - 画像（ロゴ、機器の絵、アイコン、背景）は `image` と `style` の `bg_image`。使い方と形式ごとの制限は資料の「画像」。
-  **画像ファイルは作らない**: `assets/` にあるものを使い、なければ要るものを伝える。
+  **画像ファイルは作らない**: `assets/` にあるものを使う。設備やメニューの**アイコン**は、デザイナーに付いているプリセット
+  （`<デザイナーのフォルダー>\icons\`。依頼の文に「アイコン」の場所があればそれ）を、なければプロジェクトの `assets\icons\` に
+  フォルダーごとコピーして使う（入れたことを報告する）。それ以外の絵（写真、ロゴ、装置の図）は、要るものを伝える。
 - アラーム、トレンド、レシピは専用の部品（`alarm_list` / `alarm_banner`、`trend`、`recipe_table`）を使う。
   それぞれ `project.json` 側の設定（`alarms`、`data_log` のグループ、`recipes`）が要る（書き方は `reference/project-features.md`）。
 - 日付と時刻は `sys.date` / `sys.time` / `sys.datetime`（文字列のタグ）を `label` に `bind` する。
