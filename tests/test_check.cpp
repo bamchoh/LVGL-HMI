@@ -282,3 +282,46 @@ TEST_CASE("check: a checkable button bound to a tag that also toggles it does no
     REQUIRE(lines.size() == 1);
     CHECK(has(lines, "children[0] (button): on_click: toggles \"f\""));
 }
+
+TEST_CASE("check: driver maps: a tag twice, an address twice, a text on a number, a bit for a number, a Modbus address out of range")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ],
+      "tags": [ { "name": "temp", "type": "float" }, { "name": "run", "type": "bool" }, { "name": "name", "type": "string" }, { "name": "cnt", "type": "int" } ],
+      "drivers": [
+        { "type": "slmp", "host": "10.0.0.1", "map": [ { "tag": "temp", "addr": "D100", "dtype": "float" }, { "tag": "cnt", "addr": "d100" },
+            { "tag": "name", "addr": "D200" }, { "tag": "temp", "addr": "D300" }, { "tag": "run", "addr": "M0", "dtype": "string" } ] },
+        { "type": "modbus_tcp", "host": "10.0.0.2", "map": [ { "tag": "cnt", "area": "coil", "addr": 3 }, { "tag": "run", "area": "holding", "addr": 70000 },
+            { "tag": "temp", "area": "holding", "addr": 65535, "dtype": "float" }, { "tag": "name", "area": "holding", "addr": "5" } ] } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK(has(lines, "drivers[0] (slmp): map[1]: address D100 is already in map[0]"));
+    CHECK(has(lines, "map[2]: tag \"name\" is a string, the address holds a number"));
+    CHECK(has(lines, "map[3]: tag \"temp\" is already in map[0]"));
+    CHECK(has(lines, "map[4]: tag \"run\" is bool, the address holds a text"));
+    CHECK(has(lines, "drivers[1] (modbus_tcp): map[0]: tag \"cnt\" is int, a coil is one bit"));
+    CHECK(has(lines, "map[1]: addr 70000: a Modbus address"));
+    CHECK(has(lines, "map[2]: addr 65535: a Modbus address"));                  // a float takes 65535 and 65536
+    CHECK(has(lines, "map[3]: addr \"5\": a Modbus address"));
+}
+
+TEST_CASE("check: values read from the PLC are not simulated or written by a script; a real number does not go into an int tag")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ],
+      "tags": [ { "name": "temp", "type": "float" }, { "name": "count", "type": "int" }, { "name": "sp", "type": "int" }, { "name": "hum", "type": "int" }, { "name": "local", "type": "int" } ],
+      "drivers": [ { "type": "slmp", "host": "10.0.0.1", "map": [
+          { "tag": "temp", "addr": "D100", "dtype": "float", "access": "ro" }, { "tag": "count", "addr": "D200", "dtype": "int32", "access": "ro" },
+          { "tag": "sp", "addr": "D102", "dtype": "float", "access": "rw" }, { "tag": "hum", "addr": "D111", "scale": 0.1, "access": "ro" } ] } ],
+      "simulation": { "items": [ { "tag": "temp", "mode": "follow", "target": 200, "when": "x_off" }, { "tag": "local", "mode": "counter" } ] },
+      "scripts": [ { "name": "calc", "trigger": "interval", "code": ["tag.count = tag.local + 1", "if tag.temp == 3 then tag.sp = 5 end", "tag.local = tag.count"] } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK(has(lines, "simulation: items[0]: \"temp\" is read from the device (drivers[0] (slmp): map[0])"));
+    CHECK_FALSE(has(lines, "items[1]: \"local\""));
+    CHECK(has(lines, "scripts[0] (calc): writes \"count\", which is read from the device"));
+    CHECK_FALSE(has(lines, "writes \"temp\""));                   // (temp == 3 is a comparison)
+    CHECK_FALSE(has(lines, "writes \"sp\""));                     // a setpoint (rw) may be written
+    CHECK(has(lines, "map[2]: tag \"sp\" is int, the address holds a real number"));
+    CHECK(has(lines, "map[3]: tag \"hum\" is int, \"scale\" / \"offset\" make a fraction"));
+}

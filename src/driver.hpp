@@ -70,6 +70,9 @@ public:
 
     // Create and start every driver of the JSON array. Returns the number started.
     int  load(const json* array);
+    // Only read the settings of every driver of the array (nothing is started, nothing connects):
+    // what is wrong goes to the log, as at a real start (--check). "sim" is left out (check.cpp).
+    void check(const json* array);
     void stop_all();
     // The drivers that run, in the order of the project.
     std::vector<Driver*> all() const;

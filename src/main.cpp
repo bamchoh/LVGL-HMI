@@ -165,6 +165,11 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
         const std::filesystem::path scratch = std::filesystem::temp_directory_path(ec) / ("hml-check-" + std::to_string(hml::LogDb::now_ms()));
         std::filesystem::create_directories(scratch, ec);
         hml::project().start_logs(false, scratch.generic_u8string());
+        {   // the settings of the drivers, read by the drivers themselves (addresses ...); nothing connects
+            hml::DriverRegistry reg;
+            reg.register_builtins();
+            reg.check(hml::project().section("drivers"));
+        }
         hml::project().build_screens();
         hml::users().preview_as_highest();
         // the runtime's tags of this project exist now: a "sys." name that is not one of them is a mistake

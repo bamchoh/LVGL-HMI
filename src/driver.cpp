@@ -49,6 +49,21 @@ int DriverRegistry::load(const json* array)
     return started;
 }
 
+void DriverRegistry::check(const json* array)
+{
+    if(!array || !array->is_array()) return;
+    for(const json& cfg : *array) {
+        auto type = jstr_opt(cfg, "type");
+        if(!type || iequals(*type, "sim") || !jbool(cfg, "enabled", true)) continue;
+        for(const auto& f : factories_) {
+            if(!iequals(f.first, *type)) continue;
+            if(!f.second(cfg)) HML_WARN("driver '%s' cannot be used with these settings", jstr(cfg, "name", *type).c_str());
+            break;
+        }
+    }
+    tags().unsubscribe_group(SubGroup::Driver);           // (what the drivers subscribed to is gone with them)
+}
+
 void DriverRegistry::stop_all()
 {
     for(auto it = drivers_.rbegin(); it != drivers_.rend(); ++it) (*it)->stop();
