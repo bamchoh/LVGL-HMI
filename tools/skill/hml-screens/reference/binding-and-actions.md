@@ -254,6 +254,7 @@
 | `alarm_list` | `alarms` | `{ "type": "alarm_list", "w": "100%", "h": 300, "mode": "current" }`（`history` で履歴） |
 | `log_view` | 出すログの設定（`system_log` / `operation_log` / `data_log`） | `{ "type": "log_view", "w": "100%", "h": 300, "source": "system" }`（`operation`、`data` + `group`） |
 | `trend` | `data_log` のグループ | `{ "type": "trend", "w": "100%", "h": 300, "group": "process", "tags": ["temp", "level"], "range_s": 3600 }` |
+| `bar_chart` | `data_log` のグループ | `{ "type": "bar_chart", "w": 600, "h": 260, "group": "production", "tag": "production_count", "bars": 12 }`（時間ごとの生産数など） |
 | `chart` | なし（表示している間の値だけ） | `{ "type": "chart", "w": 300, "h": 160, "series": [ { "tag": "temp", "color": "#ff9800" } ], "min": 0, "max": 100 }` |
 | `recipe_table` | `recipes` のブック | `{ "type": "recipe_table", "w": "100%", "h": 300, "book": "products" }` |
 | `keyboard` | なし | `{ "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "45%" }`（入力欄がある画面に 1 つ。ふだんは隠れている） |
@@ -296,6 +297,18 @@
   （温度 20〜30 と液面 0〜100）は同じ軸だと片方が平らになるので、頼まれた見え方に合わせて部品を分けるか、そのことを伝える。
 - 凡例にはタグ名がそのまま出る（訳せない）。何の線かは、上に `label` で題を付けて伝える。
 - `labels`: `now`（「今に戻る」ボタンの文字。省くと `Now`）。
+
+### `bar_chart`
+
+- 変数ロギングの 1 つのタグを、時計に合わせた区切り（既定 1 時間）ごとに棒で出す。**時間別の生産数**は、生産数のカウンター
+  （増えていくタグ）を `data_log` のグループに入れ（`"trigger": "interval"`, `"interval_ms": 60000` で十分）、`"mode": "increase"`（既定）にする。
+  区切りごとの最後の値（温度、在庫）は `"mode": "value"`。
+- `bucket_s`（1 本の秒数、既定 3600）、`bars`（本数 1〜48、既定 12）、`start`: `now`（今までの最後の何本）/ `day`（0 時から。24 本で今日）。
+- `target`（数値）で目標の線、`color` / `target_color`、`decimals`、`show_values`（棒の上の数値）、`label`（棒の下の時刻、strftime。既定は `%H`）。
+- 中に、上の数値・棒・下の時刻を持つ。**高さは 160 以上、1 本あたり幅 24 以上**（12 本なら幅 360 以上。数値が入らなければ `show_values: false`）。
+  文字の大きさと色は部品の `style`（`font`、`text_color`）。
+- `--check --render` ではログを読まないので、棒は空（時刻だけ出る）。棒の見え方は、コピーを動かす手順で、記録がたまってから確かめる。
+  グループとタグの名前の間違いは `--check` が見つける。
 
 ### `xy_chart`
 
