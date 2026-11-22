@@ -269,3 +269,16 @@ TEST_CASE("check: the runtime's tags (sys.) are noted with their place and looke
     CHECK(unknown[0].line().rfind("screens/a.json: children[1]", 0) == 0);
     CHECK(unknown[1].line().find("sys.sound.mute") != std::string::npos);
 }
+
+TEST_CASE("check: a checkable button bound to a tag that also toggles it does nothing: reported")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "tags": [ { "name": "f", "type": "bool" } ], "screens": [ "screens/a.json" ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [
+        { "type": "button", "checkable": true, "bind": { "checked": "f" }, "on_click": { "action": "toggle", "tag": "f" } },
+        { "type": "button", "checkable": true, "bind": { "checked": "f" } },
+        { "type": "button", "on_click": { "action": "toggle", "tag": "f" } } ] })json");
+    const auto lines = p.check();
+    REQUIRE(lines.size() == 1);
+    CHECK(has(lines, "children[0] (button): on_click: toggles \"f\""));
+}

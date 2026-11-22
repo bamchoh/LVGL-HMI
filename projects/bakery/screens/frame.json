@@ -231,7 +231,7 @@
    "children": [
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -241,8 +241,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -277,7 +277,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -287,8 +287,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -323,7 +323,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -333,8 +333,54 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "live": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "live"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/factory.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Live",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 118,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -366,7 +412,7 @@
       },
       {
        "type": "label",
-       "text": "Equipment",
+       "text": "Machines",
        "style": {
         "font": 16,
         "text_color": "#e5edf5"
@@ -376,7 +422,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -386,8 +432,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -422,7 +468,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -432,8 +478,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -468,7 +514,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -478,8 +524,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -514,7 +560,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -524,8 +570,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -560,7 +606,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -570,8 +616,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {
@@ -606,7 +652,7 @@
     },
     {
      "type": "button",
-     "w": 130,
+     "w": 118,
      "h": 64,
      "flex": "row",
      "flex_main": "center",
@@ -616,8 +662,8 @@
       "bg_color": "#192538",
       "radius": 10,
       "shadow_width": 0,
-      "pad_gap": 6,
-      "pad": 2
+      "pad_gap": 4,
+      "pad": 0
      },
      "bind": {
       "bg_color": {

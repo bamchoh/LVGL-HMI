@@ -22,7 +22,7 @@ Modbus、SLMP（MELSEC）、FINS（オムロン）、OPC UA、MQTT で PLC に�
 
 デモのこの 3 画面と、スケジュール・音・データ転送の設定は、**Skill だけを渡した AI が作ったもの**です（説明書もソースも見せていません）。
 
-![BAKERY LINE: タッチで操作しながら動いているところ](projects/bakery/renders/demo.gif)
+![BAKERY LINE: ラインのライブビュー。故障を起こし、リセットし、ラインを止めるところ](projects/bakery/renders/live.gif)
 
 パン工場の HMI 一式 **BAKERY LINE**（`projects/bakery`）も同じやり方で作りました。AI に Skill と空の 1280x720 のプロジェクトとお客様の依頼文だけを渡し、
 21 画面と、アラーム・トレンド・レシピ・変数ロギング、値を動かすシミュレーションまでを書かせています。
@@ -382,6 +382,8 @@ python tools\modbus_server.py --port 5020
 単純な立体で（Pillow が要ります）、画面ファイルも同じスクリプトが書きます。走行の模擬は `scripts/line.lua` です。
 `projects/factory35` は同じ画面の 480x320 版（絵を 0.6 倍にしたもの。Raspberry Pi の 3.5 インチ LCD 用）です。
 
+![projects/factory: ラインが動き、加工機に故障を起こして復旧するところ](projects/factory/renders/demo.gif)
+
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json
 ```
@@ -391,6 +393,11 @@ python tools\modbus_server.py --port 5020
 時間別の棒グラフのある生産実績、I/O モニタを、ヘッダーとナビゲーションを持つ 1 つのテンプレートの上に作っています。PLC はなく、
 `simulation` の設定が値を動かします（画面に SIMULATION と出ます）。手動操作の画面でラインを止めたり動かしたりすると値が変わります。
 `renders/` に全画面の画像、`renders/demo.gif` に動いているところの録画があります。
+**Live** の画面は、`projects/factory` のようにラインを斜め上から見たものです。パンが工程ごとに形を変え（生地、分割、発酵、焼成、スライス）、
+ミキサーが回り、冷却機のファンが回り、ヒーターが入っている間はオーブンが光り、設備ごとのランプと名札が状態に合わせて変わります
+（触れると詳細が開きます）。絵と画面は `tools/gen_bakery_line.py`（Pillow）が描いています（factory の `tools/gen_factory_demo.py` と同じやり方）。
+
+![BAKERY LINE: 画面を操作しているところ](projects/bakery/renders/demo.gif)
 
 ```bash
 ./build/bin/hml_runtime projects/bakery/project.json
