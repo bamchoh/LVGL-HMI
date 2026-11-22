@@ -303,10 +303,10 @@ const SCHEMA = {
                { k: 'keepalive_s', t: 'number' }, { k: 'timeout_ms', t: 'number', hint: 'connect / handshake (default 5000)' },
                { k: 'reconnect_ms', t: 'number', hint: 'first wait before connecting again; doubles up to 30 s (default 1000)' }],
       tables: [
-        { key: 'publish', label: 'Publish (tag values to the broker)', columns: [
+        { key: 'publish', label: 'Publish (tag values to the broker; a JSON message of several tags: a row with "fields", edit it in raw JSON)', columns: [
           { k: 'tag', t: 'tag' }, { k: 'topic', t: 'text', placeholder: '(the tag name)' }, { k: 'mode', t: 'select', o: ['', 'change', 'interval'] },
           { k: 'interval_ms', t: 'number' }, { k: 'qos', t: 'select', o: ['', '0', '1'] }, { k: 'retain', t: 'bool', opt: true }], stringItems: true },
-        { key: 'subscribe', label: 'Subscribe (commands: only these tags can be written)', columns: [
+        { key: 'subscribe', label: 'Subscribe (commands: only these tags can be written; fields of a JSON message: a row with "fields", in raw JSON)', columns: [
           { k: 'tag', t: 'tag' }, { k: 'topic', t: 'text', placeholder: '(the tag name)' }], stringItems: true },
       ],
     },

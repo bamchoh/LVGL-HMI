@@ -472,6 +472,36 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         }
     }
 
+    // ---- MQTT JSON messages: "fields": { "<JSON pointer>": "<tag>" }, an exact topic
+    if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
+        for(size_t i = 0; i < dl->size(); i++) {
+            const json& d = (*dl)[i];
+            if(!d.is_object() || jstr(d, "type", "") != "mqtt") continue;
+            for(const char* key : { "publish", "subscribe" }) {
+                const json* rows = jget(d, key);
+                if(!rows || !rows->is_array()) continue;
+                for(size_t r = 0; r < rows->size(); r++) {
+                    const json& row = (*rows)[r];
+                    const json* f = row.is_object() ? jget(row, "fields") : nullptr;
+                    if(!f) continue;
+                    const std::string w = "drivers[" + std::to_string(i) + "] (" + jstr(d, "name", "mqtt") + "): " + key + "[" + std::to_string(r) + "]";
+                    if(row.contains("tag")) c.add(w, "a message has \"fields\", not \"tag\"");
+                    const std::string topic = jstr(row, "topic", "");
+                    if(topic.empty()) c.add(w, "a message needs a \"topic\"");
+                    else if(topic.find_first_of("+#") != std::string::npos) c.add(w, "\"" + topic + "\": wildcards (+ #) are not allowed");
+                    if(!f->is_object() || f->empty()) { c.add(w, "\"fields\" is { \"/place/in/the/message\": \"tag\", ... }"); continue; }
+                    for(auto it = f->begin(); it != f->end(); ++it) {
+                        const std::string& ptr = it.key();
+                        if(ptr.empty() || ptr[0] != '/') c.add(w, "fields: \"" + ptr + "\" is not a JSON pointer (it starts with /: \"/oven/temp\", \"/list/0\")");
+                        c.need_tag(w, "fields \"" + ptr + "\"", it.value());
+                    }
+                    for(const char* pk : { "ts" })
+                        if(const std::string v = jstr(row, pk, ""); !v.empty() && v[0] != '/') c.add(w, std::string(pk) + ": \"" + v + "\" is not a JSON pointer");
+                }
+            }
+        }
+    }
+
     // ---- the maps of device drivers: a tag twice, an address twice, a type that cannot fit
     // (the form of each address is checked by the driver itself, when the project is loaded: run_check)
     struct FromDevice { std::string where, access; };

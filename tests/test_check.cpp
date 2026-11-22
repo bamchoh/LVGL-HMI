@@ -325,3 +325,25 @@ TEST_CASE("check: values read from the PLC are not simulated or written by a scr
     CHECK(has(lines, "map[2]: tag \"sp\" is int, the address holds a real number"));
     CHECK(has(lines, "map[3]: tag \"hum\" is int, \"scale\" / \"offset\" make a fraction"));
 }
+
+TEST_CASE("check: MQTT JSON messages: pointers, tags, topics")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ],
+      "tags": [ { "name": "temp", "type": "float" }, { "name": "sp", "type": "int" } ],
+      "drivers": [ { "type": "mqtt", "host": "b", "publish": [
+          { "topic": "line/status", "fields": { "/oven/temp": "temp" }, "ts": "/ts" },
+          { "topic": "x", "fields": { "oven/temp": "temp", "/y": "ghost" }, "ts": "ts" },
+          { "fields": { "/a": "temp" } } ],
+        "subscribe": [ { "topic": "cmd/#", "tag": "sp", "fields": { "/sp": "sp" } }, { "topic": "c", "fields": {} } ] } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK_FALSE(has(lines, "publish[0]"));
+    CHECK(has(lines, "publish[1]: fields: \"oven/temp\" is not a JSON pointer"));
+    CHECK(has(lines, "publish[1]: fields \"/y\": unknown tag \"ghost\""));
+    CHECK(has(lines, "publish[1]: ts: \"ts\" is not a JSON pointer"));
+    CHECK(has(lines, "publish[2]: a message needs a \"topic\""));
+    CHECK(has(lines, "subscribe[0]: a message has \"fields\", not \"tag\""));
+    CHECK(has(lines, "subscribe[0]: \"cmd/#\": wildcards"));
+    CHECK(has(lines, "subscribe[1]: \"fields\" is {"));
+}

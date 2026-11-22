@@ -1037,6 +1037,24 @@ The driver connects to a broker with MQTT 3.1.1, sends tag values (publish), and
   A QoS 1 message that has not been acknowledged (PUBACK) is sent again with DUP after the reconnect (up to 100 messages).
 - The password is not written to the log. It is in `project.local.json` in plain text, so anybody who can read the files of the device can read it.
 
+#### JSON messages of several tags
+
+The other side (a cloud service, an MES, a gateway) often sends and expects one JSON message with many values. A row with `fields` maps the places
+in such a message to tags; the keys are JSON pointers (RFC 6901: `/oven/temp`, `/list/0`), the values tag names.
+
+```json
+"publish": [ { "topic": "line1/status", "fields": { "/oven/temp": "oven_temperature", "/count": "production_count", "/run": "line_running" },
+               "const": { "/device": "line1" }, "ts": "/ts", "mode": "change" } ],
+"subscribe": [ { "topic": "line1/cmd", "fields": { "/oven/setpoint": "oven_target_temperature", "/mixer/rpm": "mixer_rpm_sp" } } ]
+```
+
+- publish: `{"device":"line1","oven":{"temp":211.5},"count":3420,"run":true,"ts":1763800000000}` (numbers as numbers, bools as `true` / `false`,
+  an int tag as an integer). `const` puts fixed values in, `ts` the time in milliseconds. With `change` the message goes out again when any of its tags
+  changes; `interval` sends it every `interval_ms`. `qos` and `retain` as for one tag.
+- subscribe: each field that is in a message goes to its tag with the checks above (type, `min` / `max`); a field that is missing or `null` leaves its tag as it is,
+  an object or an array where a value is expected is refused. Only the tags named in `fields` can be written from outside. Not JSON: the message is refused.
+- `--check` reports a pointer that does not start with `/`, a tag that does not exist, a message without a topic and a wildcard.
+
 ### Driver: opcua_client (OPC UA client)
 
 The driver makes nodes of another OPC UA server (a PLC, a SCADA system and so on) into tags. **By default it uses signing and encryption (Sign & Encrypt) and

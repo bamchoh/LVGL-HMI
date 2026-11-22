@@ -16,6 +16,14 @@
 //                { "tag": "state", "qos": 1, "retain": true } ],           // topic default: the tag name
 //   "subscribe": [ { "tag": "speed_sp", "topic": "cmd/speed_sp" } ]          // only these tags can be written
 // }
+// JSON messages of several tags (the format of the other side: a cloud, an MES ...):
+//   publish:   { "topic": "line1/status", "fields": { "/oven/temp": "oven_temperature", "/count": "production_count" },
+//                "const": { "/device": "line1" }, "ts": "/ts", "mode": "change" | "interval", "interval_ms": 1000 }
+//              -> {"device":"line1","oven":{"temp":211.5},"count":3420,"ts":1763800000000}; sent again when any of
+//              its tags changes (or at the interval)
+//   subscribe: { "topic": "line1/cmd", "fields": { "/oven/setpoint": "oven_sp", "/mixer/rpm": "mixer_rpm_sp" } }
+//              -> each field that is in a message goes to its tag, with the checks below; missing or null: unchanged
+// The keys of "fields" are JSON pointers (RFC 6901: "/a/b", "/list/0"), the values tag names.
 //
 // A value that arrives for a subscribed tag is checked (a number for numeric tags, true / false /
 // 1 / 0 for bools, at most 256 bytes of text, the tag's min / max) and written; anything else is
@@ -40,15 +48,27 @@
 namespace hml {
 namespace {
 
+// a place in a JSON message and the tag it belongs to ("fields": { "/oven/temp": "oven_temperature" })
+struct Field { json::json_pointer at; std::string path; Tag* tag = nullptr; };
+
 struct Pub {
-    Tag* tag = nullptr;
+    Tag* tag = nullptr;                 // one tag per topic, or (message) several in one JSON:
+    bool message = false;
+    std::vector<Field> fields;
+    json constants;                     // "const": { "/device": "line1" }, put into every message
+    std::string ts;                     // "ts": "/ts": the time (ms since 1970) at this place
     std::string topic;
     bool interval = false;
     uint32_t interval_ms = 1000, last_ms = 0;
     uint8_t qos = 0;
     bool retain = false;
 };
-struct Sub { Tag* tag = nullptr; std::string topic; };
+struct Sub {
+    Tag* tag = nullptr;                 // one tag per topic, or (message) the fields of a JSON message
+    bool message = false;
+    std::vector<Field> fields;
+    std::string topic;
+};
 
 class MqttDriver final : public Driver {
 public:
@@ -61,7 +81,10 @@ public:
 
 private:
     std::string payload_of(const Value& v) const;
+    std::string message_of(const Pub& p) const;
     bool apply_command(const Sub& s, const std::string& payload);
+    bool apply_text(Tag* t, const std::string& from, const std::string& payload);
+    void apply_message(const Sub& s, const std::string& payload);
     bool session();                 // one connection, until it breaks or stop()
     bool send(const MqttBytes& b) { return link_.write(b); }
     void set_online(bool on);
@@ -141,9 +164,45 @@ MqttDriver::MqttDriver(const json& cfg)
     }
     const uint8_t qos = static_cast<uint8_t>(std::clamp(jnum(cfg, "qos", 0), 0.0, 1.0));
     const bool retain = jbool(cfg, "retain", false);
+    // "fields": { "<JSON pointer>": "<tag>" } of a message (a pointer that is wrong, a tag that does not exist: left out)
+    auto fields_of = [](const json& f, const char* what, std::vector<Field>& out) {
+        for(auto it = f.begin(); it != f.end(); ++it) {
+            if(!it.value().is_string()) { HML_WARN("mqtt: %s: field '%s': the value is a tag name", what, it.key().c_str()); continue; }
+            Field fd;
+            fd.path = it.key();
+            fd.tag = tags().find(it.value().get<std::string>());
+            if(!fd.tag) { HML_WARN("mqtt: %s: field '%s': unknown tag '%s'", what, it.key().c_str(), it.value().get<std::string>().c_str()); continue; }
+            try { fd.at = json::json_pointer(fd.path); }
+            catch(const json::exception&) { HML_WARN("mqtt: %s: '%s' is not a JSON pointer (\"/a/b\", \"/list/0\")", what, fd.path.c_str()); continue; }
+            if(fd.path.empty()) { HML_WARN("mqtt: %s: a field needs a place (\"/name\"), not the whole message", what); continue; }
+            out.push_back(std::move(fd));
+        }
+    };
     if(const json* pl = jget(cfg, "publish"); pl && pl->is_array()) {
         for(const json& p : *pl) {
             Pub pub;
+            if(const json* f = p.is_object() ? jget(p, "fields") : nullptr) {
+                // one JSON message of several tags
+                pub.message = true;
+                if(f->is_object()) fields_of(*f, "publish", pub.fields);
+                pub.topic = prefix_ + jstr(p, "topic", "");
+                if(jstr(p, "topic", "").empty() || !mqtt::valid_topic(pub.topic)) { HML_WARN("mqtt: publish: a message needs a \"topic\" (no + #)"); continue; }
+                if(pub.fields.empty()) { HML_WARN("mqtt: publish '%s': no fields", pub.topic.c_str()); continue; }
+                if(const json* c = jget(p, "const"); c && c->is_object()) {
+                    for(auto it = c->begin(); it != c->end(); ++it) {
+                        try { pub.constants[json::json_pointer(it.key())] = it.value(); }
+                        catch(const json::exception&) { HML_WARN("mqtt: publish '%s': const '%s' is not a JSON pointer", pub.topic.c_str(), it.key().c_str()); }
+                    }
+                }
+                pub.ts = jstr(p, "ts", "");
+                if(!pub.ts.empty()) { try { (void)json::json_pointer(pub.ts); } catch(const json::exception&) { HML_WARN("mqtt: publish '%s': ts '%s' is not a JSON pointer", pub.topic.c_str(), pub.ts.c_str()); pub.ts.clear(); } }
+                pub.interval = iequals(jstr(p, "mode", "change"), "interval");
+                pub.interval_ms = static_cast<uint32_t>(std::clamp(jnum(p, "interval_ms", 1000), 100.0, 86400000.0));
+                pub.qos = static_cast<uint8_t>(std::clamp(jnum(p, "qos", qos), 0.0, 1.0));
+                pub.retain = jbool(p, "retain", retain);
+                pubs_.push_back(std::move(pub));
+                continue;
+            }
             std::string tn = p.is_string() ? p.get<std::string>() : jstr(p, "tag", "");
             pub.tag = tags().find(tn);
             if(!pub.tag) { HML_WARN("mqtt: publish: unknown tag '%s'", tn.c_str()); continue; }
@@ -159,6 +218,16 @@ MqttDriver::MqttDriver(const json& cfg)
     if(const json* sl = jget(cfg, "subscribe"); sl && sl->is_array()) {
         for(const json& sj : *sl) {
             Sub s;
+            if(const json* f = sj.is_object() ? jget(sj, "fields") : nullptr) {
+                // values taken out of a JSON message: only the tags named here can be written
+                s.message = true;
+                if(f->is_object()) fields_of(*f, "subscribe", s.fields);
+                s.topic = prefix_ + jstr(sj, "topic", "");
+                if(jstr(sj, "topic", "").empty() || !mqtt::valid_topic(s.topic)) { HML_WARN("mqtt: subscribe: a message needs an exact \"topic\" (wildcards are not allowed)"); continue; }
+                if(s.fields.empty()) { HML_WARN("mqtt: subscribe '%s': no fields", s.topic.c_str()); continue; }
+                subs_.push_back(std::move(s));
+                continue;
+            }
             std::string tn = sj.is_string() ? sj.get<std::string>() : jstr(sj, "tag", "");
             s.tag = tags().find(tn);
             if(!s.tag) { HML_WARN("mqtt: subscribe: unknown tag '%s'", tn.c_str()); continue; }
@@ -175,6 +244,18 @@ bool MqttDriver::start()
 {
     for(size_t i = 0; i < pubs_.size(); i++) {
         if(pubs_[i].interval) continue;
+        if(pubs_[i].message) {
+            // any of its tags changes: the message goes out again (built from all of them when sent)
+            for(const Field& f : pubs_[i].fields)
+                f.tag->subscribe(SubGroup::Driver, [this, i](Tag&, const Value&, const void* src) {
+                    if(src == this) return;
+                    std::lock_guard<std::mutex> l(mu_);
+                    pending_[i] = Value();
+                });
+            std::lock_guard<std::mutex> l(mu_);
+            pending_[i] = Value();
+            continue;
+        }
         pubs_[i].tag->subscribe(SubGroup::Driver, [this, i](Tag&, const Value& v, const void* src) {
             if(src == this) return;                      // (a command we wrote: not sent back)
             std::lock_guard<std::mutex> l(mu_);
@@ -207,6 +288,35 @@ std::string MqttDriver::payload_of(const Value& v) const
     return o.dump();
 }
 
+std::string MqttDriver::message_of(const Pub& p) const
+{
+    json o = p.constants.is_null() ? json::object() : p.constants;
+    for(const Field& f : p.fields) {
+        const Value v = f.tag->get();
+        if(v.is_string()) o[f.at] = v.str;
+        else if(v.type == TagType::Bool) o[f.at] = v.num != 0;
+        else if(v.type == TagType::Int) o[f.at] = static_cast<long long>(std::llround(v.num));
+        else o[f.at] = v.num;
+    }
+    if(!p.ts.empty()) o[json::json_pointer(p.ts)] = LogDb::now_ms();
+    return o.dump();
+}
+
+// A JSON message: each field that is in it goes to its tag (with the checks of a command); the
+// fields that are not in it, or null, leave their tags as they are.
+void MqttDriver::apply_message(const Sub& s, const std::string& payload)
+{
+    json j = json::parse(payload, nullptr, false);
+    if(j.is_discarded() || !(j.is_object() || j.is_array())) { HML_WARN("mqtt: '%s' refused: not a JSON object", s.topic.c_str()); return; }
+    for(const Field& f : s.fields) {
+        if(!j.contains(f.at)) continue;
+        const json& v = j.at(f.at);
+        if(v.is_null()) continue;
+        if(v.is_object() || v.is_array()) { HML_WARN("mqtt: '%s' %s -> %s refused: not a value", s.topic.c_str(), f.path.c_str(), f.tag->name().c_str()); continue; }
+        apply_text(f.tag, s.topic + " " + f.path, v.is_string() ? v.get<std::string>() : v.dump());
+    }
+}
+
 bool MqttDriver::apply_command(const Sub& s, const std::string& raw)
 {
     std::string payload = raw;
@@ -215,7 +325,11 @@ bool MqttDriver::apply_command(const Sub& s, const std::string& raw)
         json j = json::parse(payload, nullptr, false);
         if(j.is_object() && j.contains("v")) payload = j["v"].is_string() ? j["v"].get<std::string>() : j["v"].dump();
     }
-    Tag* t = s.tag;
+    return apply_text(s.tag, s.topic, payload);
+}
+
+bool MqttDriver::apply_text(Tag* t, const std::string& from, const std::string& payload)
+{
     std::string why;
     if(payload.size() > 256) why = "longer than 256 bytes";
     else if(!mqtt::valid_utf8(payload)) why = "not UTF-8 text";
@@ -231,8 +345,8 @@ bool MqttDriver::apply_command(const Sub& s, const std::string& raw)
         else if(t->limits(mn, mx) && (v->num < mn || v->num > mx)) why = v->format() + " is outside " + Value::number(mn).format() + ".." + Value::number(mx).format();
         else t->set(*v, this);
     }
-    if(!why.empty()) { HML_WARN("mqtt: '%s' -> %s refused: %s", s.topic.c_str(), t->name().c_str(), why.c_str()); return false; }
-    HML_INFO("mqtt: %s = %s (from '%s')", t->name().c_str(), t->get().format().c_str(), s.topic.c_str());
+    if(!why.empty()) { HML_WARN("mqtt: '%s' -> %s refused: %s", from.c_str(), t->name().c_str(), why.c_str()); return false; }
+    HML_INFO("mqtt: %s = %s (from '%s')", t->name().c_str(), t->get().format().c_str(), from.c_str());
     return true;
 }
 
@@ -301,12 +415,13 @@ bool MqttDriver::session()
         std::map<size_t, Value> todo;
         { std::lock_guard<std::mutex> l(mu_); todo.swap(pending_); }
         const uint32_t now_ms = millis();
-        for(size_t i = 0; i < pubs_.size(); i++) if(pubs_[i].interval && now_ms - pubs_[i].last_ms >= pubs_[i].interval_ms) { pubs_[i].last_ms = now_ms; todo[i] = pubs_[i].tag->get(); }
+        for(size_t i = 0; i < pubs_.size(); i++)
+            if(pubs_[i].interval && now_ms - pubs_[i].last_ms >= pubs_[i].interval_ms) { pubs_[i].last_ms = now_ms; todo[i] = pubs_[i].message ? Value() : pubs_[i].tag->get(); }
         for(auto& [i, v] : todo) {
             const Pub& pb = pubs_[i];
             uint16_t id = 0;
             if(pb.qos) { id = next_id_++; if(!next_id_) next_id_ = 1; }
-            MqttBytes b = mqtt::publish(pb.topic, payload_of(v), pb.qos, pb.retain, id);
+            MqttBytes b = mqtt::publish(pb.topic, pb.message ? message_of(pb) : payload_of(v), pb.qos, pb.retain, id);
             if(pb.qos) {
                 if(inflight_.size() >= 100) inflight_.erase(inflight_.begin());   // (bounded: the oldest goes)
                 inflight_[id] = b;
@@ -326,7 +441,7 @@ bool MqttDriver::session()
         if(r > 0) {
             last_in = t;
             if(p->type == mqtt::PUBLISH) {
-                for(const Sub& s : subs_) if(s.topic == p->topic) apply_command(s, p->payload);
+                for(const Sub& s : subs_) if(s.topic == p->topic) { if(s.message) apply_message(s, p->payload); else apply_command(s, p->payload); }
                 if(p->qos == 1 && !send(mqtt::puback(p->packet_id))) return false;
             }
             else if(p->type == mqtt::PUBACK) inflight_.erase(p->packet_id);

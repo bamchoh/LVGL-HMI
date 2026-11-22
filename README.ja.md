@@ -1039,6 +1039,24 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
   確認（PUBACK）が来ていない QoS 1 のメッセージは、つなぎ直したあと DUP を付けて送り直します（100 件まで）。
 - パスワードはログに出しません。`project.local.json` には平文で入るので、装置のファイルを読める人は読めます。
 
+#### 複数のタグを 1 つの JSON メッセージで
+
+相手（クラウド、MES、ゲートウェイ）は、たくさんの値を 1 つの JSON で送り、受け取ることがよくあります。`fields` を書いた行は、
+そのメッセージの中の場所とタグを対応させます。キーは JSON Pointer（RFC 6901: `/oven/temp`、`/list/0`）、値はタグ名です。
+
+```json
+"publish": [ { "topic": "line1/status", "fields": { "/oven/temp": "oven_temperature", "/count": "production_count", "/run": "line_running" },
+               "const": { "/device": "line1" }, "ts": "/ts", "mode": "change" } ],
+"subscribe": [ { "topic": "line1/cmd", "fields": { "/oven/setpoint": "oven_target_temperature", "/mixer/rpm": "mixer_rpm_sp" } } ]
+```
+
+- publish: `{"device":"line1","oven":{"temp":211.5},"count":3420,"run":true,"ts":1763800000000}`（数値は数値、bool は `true` / `false`、
+  int のタグは整数）。`const` は決まった値、`ts` はミリ秒の時刻を入れます。`change` なら、どれかのタグが変わるたびに送り直し、
+  `interval` なら `interval_ms` ごとに送ります。`qos`、`retain` は 1 タグのときと同じです。
+- subscribe: メッセージにあるフィールドは、上と同じ確かめ（型、`min` / `max`）をしてタグに書きます。ないフィールドや `null` はタグを変えず、
+  値の場所にオブジェクトや配列があれば書きません。外から書けるのは `fields` に書いたタグだけです。JSON でないメッセージは捨てます。
+- `--check` は、`/` で始まらないポインタ、ないタグ、トピックのないメッセージ、ワイルドカードを知らせます。
+
 ### ドライバ: opcua_client（OPC UA クライアント）
 
 ほかの OPC UA サーバー（PLC、SCADA など）のノードをタグにします。**既定で署名と暗号化（Sign & Encrypt）を使い、
