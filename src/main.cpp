@@ -42,6 +42,7 @@
 #include "splash.hpp"
 #include "system_settings.hpp"
 #include "recipe.hpp"
+#include "clock_tags.hpp"
 #include "screen_saver.hpp"
 #include "tag.hpp"
 #include "active_project.hpp"
@@ -197,7 +198,7 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
         }
         for(const Render& r : renders) {
             while(hml::ui().close_popup()) {}
-            hml::ui().show_screen(hml::project().info().start_screen, "none");
+            if(!hml::project().info().start_screen.empty()) hml::ui().show_screen(hml::project().info().start_screen, "none");
             if(!hml::ui().show_screen(r.screen, "none")) { notes.push_back("--render: unknown screen \"" + r.screen + "\""); continue; }
             if(!r.popup.empty() && !hml::ui().open_popup(r.popup)) { notes.push_back("--render: \"" + r.popup + "\" is not a popup"); continue; }
             settle(std::max(1, static_cast<int>(render_at_ms / 5)));     // (animations: the picture after that time)
@@ -432,7 +433,7 @@ int main(int argc, char** argv)
     hml::uploads().start();
     hml::transfers().start();
     // pages that follow outside events; auto logout
-    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); hml::screen_saver().poll(); hml::sound().poll(); hml::mail().poll(); hml::uploads().poll(); }, 250, nullptr);
+    lv_timer_create([](lv_timer_t*) { hml::system_settings().poll(); hml::users().poll(); hml::recipes().poll(); hml::screen_saver().poll(); hml::sound().poll(); hml::mail().poll(); hml::uploads().poll(); hml::poll_clock_tags(); }, 250, nullptr);
     // { "action": "call", "fn": "system_log.export", "arg": "<file.csv>" } / Lua: call("system_log.export", path)
     hml::ui().register_action("system_log.export", [](const std::string& arg) {
         std::string path = arg.empty() ? hml::system_log().default_export_path() : arg;

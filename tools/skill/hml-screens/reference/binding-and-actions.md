@@ -12,7 +12,8 @@
 ```
 
 - `min` / `max` を付けると、画面からの書き込みがその範囲に丸められる。操作できる数値のタグには付ける。
-- `sys.` で始まるタグはランタイムが持つ（`sys.lang`、`sys.user.name`、`sys.user.level`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.screen.off` など）。作らない。
+- `sys.` で始まるタグはランタイムが持つ（`sys.date`、`sys.time`、`sys.datetime`、`sys.lang`、`sys.user.name`、`sys.user.level`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.screen.off` など）。作らない。
+  ここと `project-features.md` にない `sys.` の名前は書かない（`--check` は `sys.` の名前のつづりを確かめない）。
 
 ## bind
 
@@ -349,8 +350,8 @@
 - 中に、レシピの一覧と書き込み・保存などのボタンを持つ。高さ 300 以上、幅は画面いっぱいが基本。
 - `labels`: `write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`。
 
-`alarms`、`data_log`、`recipes` がプロジェクトにないのにこれらの部品を頼まれたら、その設定が要ることを伝え、
-デザイナーの「ログ」「レシピ」タブで作ってもらう（頼まれれば `project.json` に足す。既存の設定の書き方に合わせる）。
+これらの部品が要る設定（`alarms`、`data_log` のグループ、`recipes`）の書き方は `project-features.md`。
+プロジェクトにないのにこれらの部品を頼まれたら、設定も足してよい（既存の設定があればその書き方に合わせる。足したことを報告する）。
 
 ## ユーザーのレベル
 
