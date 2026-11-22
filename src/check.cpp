@@ -440,6 +440,18 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         if(!ff.empty() && !fs::is_regular_file(c.dir / fs::u8path(ff), ec)) c.add("font", "no file \"" + ff + "\"");
     }
 
+    // ---- recipe books: the tags of the items, the "@ID" of their labels
+    if(const json* rc = jget(root, "recipes")) if(const json* bs = jget(*rc, "books"); bs && bs->is_array())
+        for(size_t i = 0; i < bs->size(); i++) {
+            const json* items = jget((*bs)[i], "items");
+            if(!items || !items->is_array()) continue;
+            const std::string where = "recipes.books[" + std::to_string(i) + "] (" + jstr((*bs)[i], "name", "?") + ")";
+            for(const json& it : *items) {
+                c.need_tag(where, "items", it.is_object() ? it.value("tag", json("")) : it);
+                if(it.is_object()) if(const json* l = jget(it, "label")) c.text_id(where, "items.label", *l);
+            }
+        }
+
     // ---- drivers: the tags of their tables ("map", "items", "publish" ...) and the status tag
     if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
         for(size_t i = 0; i < dl->size(); i++) {

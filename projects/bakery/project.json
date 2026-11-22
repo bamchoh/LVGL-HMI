@@ -1108,14 +1108,46 @@
       {
         "name": "products",
         "items": [
-          "mixer_rpm_sp",
-          "mixer_time_sp",
-          "proofing_temp_sp",
-          "proofing_humidity_sp",
-          "proofing_time_sp",
-          "oven_target_temperature",
-          "oven_baking_time_sp",
-          "conveyor_speed_sp"
+          {
+            "tag": "mixer_rpm_sp",
+            "label": "Mixer speed",
+            "unit": "rpm"
+          },
+          {
+            "tag": "mixer_time_sp",
+            "label": "Mixing time",
+            "unit": "min"
+          },
+          {
+            "tag": "proofing_temp_sp",
+            "label": "Proofing temperature",
+            "unit": "°C"
+          },
+          {
+            "tag": "proofing_humidity_sp",
+            "label": "Proofing humidity",
+            "unit": "%RH"
+          },
+          {
+            "tag": "proofing_time_sp",
+            "label": "Proofing time",
+            "unit": "min"
+          },
+          {
+            "tag": "oven_target_temperature",
+            "label": "Baking temperature",
+            "unit": "°C"
+          },
+          {
+            "tag": "oven_baking_time_sp",
+            "label": "Baking time",
+            "unit": "min"
+          },
+          {
+            "tag": "conveyor_speed_sp",
+            "label": "Conveyor speed",
+            "unit": "m/min"
+          }
         ],
         "recipes": [
           {

@@ -84,7 +84,7 @@
     },
     {
      "type": "label",
-     "text": "Selected recipe",
+     "text": "Recipe in use",
      "x": 0,
      "y": 36,
      "style": {
@@ -101,8 +101,10 @@
      },
      "bind": {
       "text": {
-       "tag": "sys.recipe.products.selected",
-       "format": "%s"
+       "tag": "sys.recipe.products.written",
+       "map": {
+        "": "not written yet"
+       }
       }
      },
      "align": "top_right"

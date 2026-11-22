@@ -109,7 +109,8 @@
   "level": 2,
   "books": [
     { "name": "bread",
-      "items": ["mixer_rpm_sp", "mix_time_sp", "proofing_temp_sp", "oven_temp_sp"],
+      "items": [ { "tag": "mixer_rpm_sp", "label": "Mixer speed", "unit": "rpm" }, { "tag": "mix_time_sp", "label": "Mixing time", "unit": "min" },
+                 "proofing_temp_sp", "oven_temp_sp" ],
       "recipes": [
         { "name": "Shokupan", "values": { "mixer_rpm_sp": 120, "mix_time_sp": 600, "proofing_temp_sp": 38, "oven_temp_sp": 210 } },
         { "name": "Baguette", "values": { "mixer_rpm_sp": 90,  "mix_time_sp": 480, "proofing_temp_sp": 26, "oven_temp_sp": 240 } }
@@ -121,17 +122,15 @@
 | キー | 内容 |
 | --- | --- |
 | `books[].name` | ブックの名前（必須、1〜32 文字、`/ \ : * ? " < > | .` は使えない。`recipe_table` の `book`） |
-| `books[].items` | レシピが持つタグ（必須。タグ名の配列。設定値のタグにする: 書き込むと機器へ送られる） |
+| `books[].items` | レシピが持つタグ（必須。設定値のタグにする: 書き込むと機器へ送られる）。タグ名か `{ "tag", "label", "unit" }`: `recipe_table` には「label (unit)」と出る（`label` は `"@ID"` も可。省くとタグ名）。**読みやすい名前と単位を必ず付ける** |
 | `books[].recipes` | 最初から入っているレシピ: `{ "name", "values": { タグ名: 値 } }`（名前は重複不可） |
 | `level` | 書き込み・保存・削除ができるユーザーのレベル（`users` があるとき。0 = だれでも） |
 | `verify_ms` | 書き込んだあと、機器の値が同じになったか確かめる時間（既定 2000、0 = 確かめない） |
 | `path` | 装置で変えたレシピを置くフォルダー（既定 `recipes`。そこにファイルがあれば、プロジェクトの `recipes` より優先） |
 
 - レシピの名前は表示にそのまま出る（`"@ID"` は使えない）。日本語の名前にするならフォントが要る。
-- `sys.recipe.<ブック名>.selected` は**一覧で選んでいる**レシピの名前（書き込んだレシピではない）。最後の操作の結果は `sys.recipe.status`。
-  「今使っているレシピ」を出すなら文字列のタグを作り、`sys.recipe.status` の変化を受けるスクリプト（`trigger: "tag"`）で入れる。
-- `recipe_table` の行の見出しはタグ名のまま（読みやすい名前は付けられない）。名前と単位は隣に `label` や `table` で並べる。
-  書き込みの確認の文は英語で固定（「… to the PLC?」）。
+- `sys.recipe.<ブック名>.selected` は**一覧で選んでいる**レシピ、`sys.recipe.<ブック名>.written` は**最後に書き込んだ（今使っている）**レシピ
+  （書き込むまでは空）。「今のレシピ」をヘッダーなどに出すなら `written`。最後の操作の結果は `sys.recipe.status`。
 
 ## スクリプト (`scripts`)
 

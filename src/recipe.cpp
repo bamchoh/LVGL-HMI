@@ -110,6 +110,10 @@ int Recipes::load(const json* section, const std::string& base_dir)
                 if(!tags().find(tn)) { HML_WARN("recipes: book '%s': unknown tag '%s'", b.name.c_str(), tn.c_str()); continue; }
                 if(std::find(b.items.begin(), b.items.end(), tn) != b.items.end() || b.items.size() >= kMaxItems) continue;
                 b.items.push_back(tn);
+                if(it.is_object()) {
+                    if(auto l = jstr_opt(it, "label"); l && !l->empty()) b.labels[tn] = *l;
+                    if(auto u = jstr_opt(it, "unit"); u && !u->empty()) b.units[tn] = *u;
+                }
             }
         }
         b.file = dir_ + "/" + b.name + ".json";
@@ -179,7 +183,11 @@ bool Recipes::valid_name(const std::string& name)
 uint32_t Recipes::now() const { return now_fn_ ? now_fn_() : millis(); }
 std::string Recipes::fail(const std::string& msg) { set_sys_tag("sys.recipe.status", msg); HML_WARN("recipes: %s", msg.c_str()); return msg; }
 std::string Recipes::ok(const std::string& msg) { set_sys_tag("sys.recipe.status", msg); gen_++; return ""; }
-void Recipes::update_tags(const RecipeBook& b) { set_sys_tag("sys.recipe." + b.name + ".selected", b.selected); }
+void Recipes::update_tags(const RecipeBook& b)
+{
+    set_sys_tag("sys.recipe." + b.name + ".selected", b.selected);
+    set_sys_tag("sys.recipe." + b.name + ".written", b.written);
+}
 
 bool Recipes::persist(RecipeBook& b, std::string* err)
 {
@@ -240,6 +248,7 @@ std::string Recipes::write(const std::string& bk, const std::string& name0)
         verify_.expected[item] = t->get();
     }
     b->selected = name;
+    b->written = name;
     update_tags(*b);
     operation_log().record("recipe", bk, "", "write " + name);
     if(verify_ms_ > 0) { verify_.active = true; verify_.due = now() + verify_ms_; verify_.book = bk; verify_.name = name; }
