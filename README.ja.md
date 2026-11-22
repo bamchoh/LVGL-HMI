@@ -22,6 +22,11 @@ Modbus、SLMP（MELSEC）、FINS（オムロン）、OPC UA、MQTT で PLC に�
 
 デモのこの 3 画面と、スケジュール・音・データ転送の設定は、**Skill だけを渡した AI が作ったもの**です（説明書もソースも見せていません）。
 
+![BAKERY LINE: タッチで操作しながら動いているところ](projects/bakery/renders/demo.gif)
+
+パン工場の HMI 一式 **BAKERY LINE**（`projects/bakery`）も同じやり方で作りました。AI に Skill と空の 1280x720 のプロジェクトとお客様の依頼文だけを渡し、
+21 画面と、アラーム・トレンド・レシピ・変数ロギング、値を動かすシミュレーションまでを書かせています。
+
 ### AI が画面を描ける仕組み
 
 1. **画面はテキストです。** プロジェクトは `project.json` と、画面ごとの JSON ファイルです（HML: ランタイムが読む HMI の記述形式）。AI はふつうのファイルとして書けます。
@@ -379,6 +384,16 @@ python tools\modbus_server.py --port 5020
 
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json
+```
+
+`projects/bakery`（**BAKERY LINE**、1280x720）は自動化されたパン工場の HMI で、Skill とお客様の依頼文だけを渡した AI が作りました。
+ダッシュボード、原料投入から包装までのライン、8 台の設備ごとの詳細画面、確認つきの手動操作、レシピ、トレンド、アラーム、
+時間別の棒グラフのある生産実績、I/O モニタを、ヘッダーとナビゲーションを持つ 1 つのテンプレートの上に作っています。PLC はなく、
+`simulation` の設定が値を動かします（画面に SIMULATION と出ます）。手動操作の画面でラインを止めたり動かしたりすると値が変わります。
+`renders/` に全画面の画像、`renders/demo.gif` に動いているところの録画があります。
+
+```bash
+./build/bin/hml_runtime projects/bakery/project.json
 ```
 
 デモ（`projects/demo`）は、下のナビゲーションで切り替える 9 画面で、できることを一通り動かせます。
