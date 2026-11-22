@@ -2303,7 +2303,7 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `level`      | 装置でレシピを書き込む・保存する・削除するのに必要なユーザーレベル（既定 0 = 誰でも。選ぶだけなら不要） |
 | `verify_ms`  | 書き込んでからこの時間（ms）後に、タグの値と書いた値を比べる（既定 2000、0 = 比べない）                |
-| `books`      | レシピブック: `name`（1〜32 文字、`/ \ : * ? " < > | .` は不可）、`items`（タグ）、`recipes`（初期のレシピ） |
+| `books`      | レシピブック: `name`（1〜32 文字、`/ \ : * ? " < > | .` は不可）、`items`（タグ。`{ "tag": "temp_sp", "label": "温度", "unit": "°C" }` と書くと、レシピ表に「温度 (°C)」と出ます。`label` は `@ID` も可）、`recipes`（初期のレシピ） |
 
 - **書き込み**: 先にすべての値を、型とタグの `min` / `max` で確かめます。1 つでも外れていれば何も書きません。
   書いたあと `verify_ms` 経ったら値を比べ、PLC が受け付けなかった値があれば `sys.recipe.status` に出します。
@@ -2314,7 +2314,8 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
   で始まる文字）は先頭に `'` を付けて書き出します（CSV インジェクション対策）。取り込みは、列がブックの項目か、
   名前と値が正しいか、大きさ（4 MB まで）を確かめ、1 つでも問題があれば何も変えません。
 - 書き込み・保存・削除・取り込み・書き出しは操作ログに記録します（種別 `recipe`）。
-- タグ: `sys.recipe.status`（最後の操作の結果）、`sys.recipe.<ブック名>.selected`（選んでいるレシピ）。
+- タグ: `sys.recipe.status`（最後の操作の結果）、`sys.recipe.<ブック名>.selected`（一覧で選んでいるレシピ）、
+  `sys.recipe.<ブック名>.written`（最後に書き込んだ、今使っているレシピ。書き込むまでは空）。
 - 動作（`call`）: `recipe.select`（`"ブック,名前"`）、`recipe.write`（`"ブック[,名前]"`、省略時は選んでいるもの）、
   `recipe.save`（`"ブック,名前"`: 今のタグの値で保存）、`recipe.delete`、`recipe.export`（`"ブック[,ファイル]"`）、`recipe.import`（`"ブック,ファイル"`）。
 
@@ -2328,7 +2329,7 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 ボタンが出ます。レシピの値と現在値が違うところは色と `*` で示します（書き込むと変わる値）。値をタップすると
 その値を変えられます。書き込み・読み込み・削除は確認してから行い、`level` が足りなければログイン画面が出ます。
 `labels` で表示文字を置き換えられます（`write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`
-`confirm_write` `confirm_read` `confirm_delete`。`%s` はレシピ名）。
+`confirm_write` `confirm_read` `confirm_delete`。`%s` はレシピ名。書き込みの前の確認は「Write '%s'?」）。
 
 デザイナーでは「レシピ」タブ（Ctrl+7）でブックとレシピを表の形で編集でき、表計算ソフトとの取り込み / 書き出しもできます。
 範囲外の値や存在しないブックは問題一覧に出ます。

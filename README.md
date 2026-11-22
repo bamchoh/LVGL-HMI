@@ -2301,7 +2301,7 @@ A set of tag values, such as the setpoints of a product type, is given a name an
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `level`      | The user level needed to write, save and delete recipes on the device (default 0 = anybody. Not needed just to select) |
 | `verify_ms`  | This time (ms) after the write, the tag values are compared with the written values (default 2000, 0 = no comparison) |
-| `books`      | Recipe books: `name` (1 to 32 characters, `/ \ : * ? " < > | .` not allowed), `items` (tags), `recipes` (the initial recipes) |
+| `books`      | Recipe books: `name` (1 to 32 characters, `/ \ : * ? " < > | .` not allowed), `items` (tags; an item can be `{ "tag": "temp_sp", "label": "Temperature", "unit": "°C" }`: the recipe table shows "Temperature (°C)", `label` can be `@ID`), `recipes` (the initial recipes) |
 
 - **Writing**: first all values are checked against the type and the `min` / `max` of the tags. If even one is out of range, nothing is written.
   When `verify_ms` has passed after the write, the values are compared, and any value the PLC did not accept is reported in `sys.recipe.status`.
@@ -2312,7 +2312,8 @@ A set of tag values, such as the setpoints of a product type, is given a name an
   are written with a `'` in front (against CSV injection). An import checks that the columns are the items of the book, that
   the names and values are valid, and the size (up to 4 MB); if there is even one problem, nothing is changed.
 - Write, save, delete, import and export are recorded in the operation log (kind `recipe`).
-- Tags: `sys.recipe.status` (the result of the last operation), `sys.recipe.<book name>.selected` (the selected recipe).
+- Tags: `sys.recipe.status` (the result of the last operation), `sys.recipe.<book name>.selected` (the recipe picked in the list),
+  `sys.recipe.<book name>.written` (the recipe written last, the one in use; empty until one is written).
 - Actions (`call`): `recipe.select` (`"book,name"`), `recipe.write` (`"book[,name]"`, the selected one when omitted),
   `recipe.save` (`"book,name"`: saves the current tag values), `recipe.delete`, `recipe.export` (`"book[,file]"`), `recipe.import` (`"book,file"`).
 
@@ -2326,7 +2327,7 @@ On the left is the list of recipes; on the right are a table of "item, recipe va
 Where the recipe value and the current value differ, it is shown by a color and `*` (the values that a write would change). A tap on a value
 lets you change it. Write, read and delete ask for confirmation first, and if `level` is not enough the login screen appears.
 `labels` replaces the displayed texts (`write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`
-`confirm_write` `confirm_read` `confirm_delete`. `%s` is the recipe name).
+`confirm_write` `confirm_read` `confirm_delete`. `%s` is the recipe name; the question before a write is "Write '%s'?").
 
 In the designer, the "Recipes" tab (Ctrl+7) edits the books and recipes as a table, and can also import from / export to a spreadsheet program.
 Values out of range and books that do not exist appear in the list of problems.

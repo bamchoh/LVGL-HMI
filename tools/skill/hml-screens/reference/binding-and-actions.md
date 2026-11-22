@@ -388,7 +388,8 @@
 ### `recipe_table`
 
 - 中に、レシピの一覧と書き込み・保存などのボタンを持つ。高さ 300 以上、幅は画面いっぱいが基本。
-- `labels`: `write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`。
+- `labels`: `write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`、確認の文 `confirm_write` `confirm_read`
+  `confirm_delete`（`%s` がレシピ名。書き込みの確認は省くと「Write '%s'?」）。項目の名前と単位は `recipes` の `items` に書く（`project-features.md`）。
 
 これらの部品が要る設定（`alarms`、`data_log` のグループ、`recipes`）の書き方は `project-features.md`。
 プロジェクトにないのにこれらの部品を頼まれたら、設定も足してよい（既存の設定があればその書き方に合わせる。足したことを報告する）。

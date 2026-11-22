@@ -5,7 +5,8 @@
 //     "verify_ms": 2000,                  // after a write: compare the tags with what was written
 //     "books": [
 //       { "name": "product",
-//         "items": ["temp_sp", "speed_sp", "time_s"],      // the tags of this kind of recipe
+//         "items": ["temp_sp", "speed_sp", "time_s"],      // the tags of this kind of recipe; an item can be
+//                                                          // { "tag": "temp_sp", "label": "Temperature", "unit": "°C" }
 //         "recipes": [ { "name": "A", "values": { "temp_sp": 80, "speed_sp": 1200, "time_s": 30 } },
 //                      { "name": "B", "values": { "temp_sp": 95, "speed_sp": 900, "time_s": 45 } } ] } ] }
 //
@@ -18,7 +19,8 @@
 // writes them to the PLC and reads them back); differences are reported in sys.recipe.status.
 // Every write / save / delete / import is recorded in the operation log.
 //
-// Tags: sys.recipe.status (text of the last action), sys.recipe.<book>.selected (name).
+// Tags: sys.recipe.status (text of the last action), sys.recipe.<book>.selected (the recipe picked
+// in the list), sys.recipe.<book>.written (the recipe written last; "" until one is written).
 // Actions (call fn, arg): recipe.select "book,name" | recipe.write "book[,name]" |
 // recipe.save "book,name" (the tags' current values) | recipe.delete "book[,name]" |
 // recipe.export "book[,file.csv]" | recipe.import "book,file.csv". See README.md ("レシピ").
@@ -43,6 +45,8 @@ struct Recipe {
 struct RecipeBook {
     std::string name;
     std::vector<std::string> items;
+    std::map<std::string, std::string> labels, units;   // item -> what the table shows ("@ID" kept), its unit
+    std::string written;                          // the recipe written last (sys.recipe.<book>.written)
     std::vector<Recipe> recipes;
     std::string file;                             // the device's copy
     std::string selected;

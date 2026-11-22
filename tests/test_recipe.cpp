@@ -332,3 +332,47 @@ TEST_CASE("recipes: changing needs the level; the widget shows and writes")
     ui().unload_all();
     f.rt.advance(400);
 }
+
+TEST_CASE("recipes: items with a label and a unit; the recipe written last; the question names no PLC")
+{
+    Fixture f;
+    REQUIRE(f.load(R"~({ "books": [ { "name": "bread", "items": [
+        { "tag": "temp_sp", "label": "Baking temperature", "unit": "°C" }, { "tag": "speed_sp", "unit": "rpm" }, "mode" ],
+        "recipes": [ { "name": "Baguette", "values": { "temp_sp": 120, "speed_sp": 90 } }, { "name": "Roll", "values": { "temp_sp": 100 } } ] } ] })~") == 1);
+    const RecipeBook* b = recipes().book("bread");
+    REQUIRE(b);
+    CHECK(b->items == std::vector<std::string>{ "temp_sp", "speed_sp", "mode" });
+    Tag* written = tags().find("sys.recipe.bread.written");
+    REQUIRE(written);
+    CHECK(written->get().format() == "");                                                   // nothing written yet
+    CHECK(recipes().select("bread", "Roll") == "");
+    CHECK(written->get().format() == "");                                                   // picking is not writing
+    CHECK(recipes().write("bread", "Baguette") == "");
+    CHECK(written->get().format() == "Baguette");
+    CHECK(tags().find("sys.recipe.bread.selected")->get().format() == "Baguette");
+
+    json scr = { { "name", "rec2" }, { "children", J(R"~([ { "type": "recipe_table", "book": "bread", "w": 600, "h": 300 } ])~") } };
+    lv_obj_t* s = ui().build_screen(scr, "/base");
+    REQUIRE(s);
+    REQUIRE(ui().show_screen("rec2", "none"));
+    f.rt.advance(400);
+    lv_obj_update_layout(s);
+    lv_obj_t* table = lv_obj_get_child(s, 0);
+    lv_obj_t* rows = lv_obj_get_child(lv_obj_get_child(table, 1), 1);
+    auto item = [&](int r) { return std::string(lv_label_get_text(lv_obj_get_child(lv_obj_get_child(rows, r), 0))); };
+    CHECK(item(1) == "Baking temperature (°C)");
+    CHECK(item(2) == "speed_sp (rpm)");                                                     // no label: the tag's name
+    CHECK(item(3) == "mode");
+    lv_obj_t* foot = lv_obj_get_child(lv_obj_get_child(table, 1), 2);
+    lv_obj_send_event(lv_obj_get_child(foot, 0), LV_EVENT_CLICKED, nullptr);               // Write: the question
+    lv_obj_t* dlg = lv_obj_get_child(lv_layer_top(), -1);
+    REQUIRE(dlg);
+    const std::string q = lv_label_get_text(lv_obj_get_child(lv_obj_get_child(dlg, 0), 0));
+    CHECK(q == "Write 'Baguette'?");
+    lv_obj_t* cancel = lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(dlg, 0), 1), 0);
+    lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);                                  // (the dialog must not stay for later tests)
+    f.rt.advance(400);
+    CHECK(lv_obj_get_child_count(lv_layer_top()) == 0);
+    ui().unload_all();
+    f.rt.advance(400);
+}

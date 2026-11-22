@@ -3,7 +3,7 @@
 //   { "type": "recipe_table", "book": "product", "w": "100%", "h": 300,
 //     "row_height": 40, "labels": { "write": "Write", "read": "Read current", "save_as": "Save as",
 //     "delete": "Delete", "item": "Item", "recipe": "Recipe", "current": "Current", "ok": "OK",
-//     "cancel": "Cancel", "name": "Recipe name", "confirm_write": "Write '%s' to the PLC?",
+//     "cancel": "Cancel", "name": "Recipe name", "confirm_write": "Write '%s'?",
 //     "confirm_delete": "Delete '%s'?", "confirm_read": "Put the current values into '%s'?" } }
 //
 // Left: the recipes (tap = select). Right: item | value of the selected recipe | current value;
@@ -32,6 +32,16 @@ std::string one_line(const std::string& s, size_t max = 64)
     std::string out;
     for(unsigned char c : s) out.push_back(c < 0x20 || c == 0x7f ? ' ' : static_cast<char>(c));
     if(out.size() > max) { size_t cut = max; while(cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) cut--; out = out.substr(0, cut) + "..."; }
+    return out;
+}
+
+// What the table calls an item: its "label" ("@ID" in the language of the screens) and its
+// "unit", or else the tag's name.
+std::string item_name(const RecipeBook& b, const std::string& item)
+{
+    auto l = b.labels.find(item);
+    std::string out = l == b.labels.end() ? item : texts().resolve(l->second);
+    if(auto u = b.units.find(item); u != b.units.end()) out += " (" + u->second + ")";
     return out;
 }
 
@@ -215,7 +225,7 @@ struct TableCtx {
             lv_obj_set_style_border_width(row, 1, 0);
             lv_obj_set_style_border_color(row, dim, 0);
             lv_obj_set_style_border_opa(row, LV_OPA_30, 0);
-            cell(row, one_line(item, 40), 36, fg);
+            cell(row, one_line(item_name(b, item), 40), 36, fg);
             // a value that will change when the recipe is written: colour and a sign (not only colour;
             // "*" because the built-in fonts have no "≠")
             lv_obj_t* v = cell(row, (differs ? std::string("* ") : std::string()) + one_line(val), 32, differs ? lv_palette_main(LV_PALETTE_ORANGE) : fg);
@@ -251,7 +261,7 @@ struct TableCtx {
         Tag* t = tags().find(item);
         const bool number = t && t->type() != TagType::String;
         std::string book = c->book;
-        dialog(one_line(name, 32) + ": " + one_line(item, 40), &start, number, c->labels,
+        dialog(one_line(name, 32) + ": " + one_line(item_name(*b, item), 40), &start, number, c->labels,
                [book, name, item](const std::string& text) { recipes().set_value(book, name, item, text); });
     }
     static void on_write(lv_event_t* e)
@@ -260,7 +270,7 @@ struct TableCtx {
         const RecipeBook* b = recipes().book(c->book);
         if(!b || b->selected.empty() || !recipe_allowed()) return;
         std::string book = c->book, name = b->selected;
-        dialog(with_name(c->lab("confirm_write", "Write '%s' to the PLC?"), one_line(name, 32)), nullptr, false, c->labels,
+        dialog(with_name(c->lab("confirm_write", "Write '%s'?"), one_line(name, 32)), nullptr, false, c->labels,
                [book, name](const std::string&) { recipes().write(book, name); });
     }
     static void on_read(lv_event_t* e)
