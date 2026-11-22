@@ -16,6 +16,7 @@
 #include "tag.hpp"
 #include "users.hpp"
 #include "util.hpp"
+#include "value_map.hpp"
 #include "src/misc/cache/instance/lv_image_cache.h"
 #include <algorithm>
 #include <set>
@@ -579,11 +580,11 @@ struct Binding {
     bool        cmp_is_str = false;
     Tag*        cmp_tag = nullptr;    // compare against another tag's live value instead of a constant
     double      scale = 1, offset = 0;    // widget = tag * scale + offset (Value)
-    std::vector<std::pair<double, lv_color_t>> color_map;
+    ValueMap<lv_color_t> color_map;      // bind.bg_color / text_color "map": value -> color
+    ValueMap<std::string> text_map;      // bind.text "map": value -> text ("@ID" resolved)
     std::vector<std::pair<double, std::string>> src_map;   // bind.src "map": value -> image file
     std::string default_src, base_dir;
     bool        has_src_map = false;
-    std::optional<lv_color_t> default_color;
     AnimSpec*   anim = nullptr;       // BindKind::Anim: the animation whose "when" this is
     lv_style_selector_t part = LV_PART_MAIN;
     bool        two_way = false;
@@ -636,9 +637,8 @@ bool Binding::condition(const Value& v) const
 
 std::optional<lv_color_t> Binding::map_color(const Value& v) const
 {
-    double n = v.as_number();
-    for(const auto& m : color_map) if(m.first == n) return m.second;
-    return default_color;
+    if(const lv_color_t* c = color_map.find(v)) return *c;
+    return std::nullopt;
 }
 
 void Binding::apply_value(double n)
@@ -668,6 +668,9 @@ void Binding::on_tag_changed(const Value& v, const void* source)
     switch(kind) {
         case BindKind::Text: {
             std::string text = v.format(format);
+            if(!text_map.empty() && wk != Widget::Image && wk != Widget::Textarea) {
+                if(const std::string* t = text_map.find(v)) text = *t;
+            }
             if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
             else if(wk == Widget::Image) {
@@ -1347,7 +1350,9 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
         if(iequals(part, "indicator")) b->part = LV_PART_INDICATOR;
         else if(iequals(part, "knob")) b->part = LV_PART_KNOB;
         parse_cmp(*b, spec);
-        if(const json* map = jget(spec, "map"); map && map->is_object() && wk == Widget::Image) {
+        const json* map = jget(spec, "map");
+        if(map && !map->is_object()) map = nullptr;
+        if(map && wk == Widget::Image) {
             b->has_src_map = true;
             for(auto it = map->begin(); it != map->end(); ++it) {
                 if(!it.value().is_string()) continue;
@@ -1355,15 +1360,21 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
                 else b->src_map.emplace_back(iequals(it.key(), "true") ? 1 : iequals(it.key(), "false") ? 0 : std::atof(it.key().c_str()), it.value().get<std::string>());
             }
         }
-        else if(const json* map = jget(spec, "map"); map && map->is_object()) {
+        else if(map && kind == BindKind::Text) {
+            // value -> text ("@ID" in the language of the screens: they are rebuilt on a switch)
+            for(auto it = map->begin(); it != map->end(); ++it) {
+                std::string t;
+                if(it.value().is_string()) t = texts().resolve(it.value().get<std::string>());
+                else if(it.value().is_number() || it.value().is_boolean()) t = it.value().dump();
+                else continue;
+                b->text_map.add(iequals(it.key(), "default") ? "default" : it.key(), std::move(t));
+            }
+        }
+        else if(map) {
             for(auto it = map->begin(); it != map->end(); ++it) {
                 if(!it.value().is_string()) continue;
                 lv_color_t c = parse_color(it.value().get<std::string>(), lv_color_black());
-                if(iequals(it.key(), "default")) b->default_color = c;
-                else {
-                    double key = iequals(it.key(), "true") ? 1 : iequals(it.key(), "false") ? 0 : std::atof(it.key().c_str());
-                    b->color_map.emplace_back(key, c);
-                }
+                b->color_map.add(iequals(it.key(), "default") ? "default" : it.key(), c);
             }
         }
         two_way = jbool(spec, "two_way", two_way);

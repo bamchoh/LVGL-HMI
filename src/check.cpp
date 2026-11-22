@@ -241,6 +241,11 @@ struct Checker {
         for(const char* k : { "text", "placeholder" }) if(const json* v = jget(w, k)) text_id(where, k, *v);
         if(const json* o = jget(w, "options"); o && o->is_array()) for(const json& v : *o) text_id(where, "options", v);
         if(const json* l = jget(w, "labels"); l && l->is_object()) for(auto it = l->begin(); it != l->end(); ++it) text_id(where, "labels." + it.key(), it.value());
+        // texts by value: "bind": { "text": { "tag": ..., "map": { "1": "@running", "default": "@stopped" } } }
+        if(const json* b = jget(w, "bind"); b && b->is_object())
+            if(const json* tb = jget(*b, "text"); tb && tb->is_object())
+                if(const json* map = jget(*tb, "map"); map && map->is_object())
+                    for(auto it = map->begin(); it != map->end(); ++it) text_id(where, "bind.text.map." + it.key(), it.value());
         if(type == "image") {
             need_image(where, "src", jstr(w, "src", ""));
             // JPEG / BMP: their own size only

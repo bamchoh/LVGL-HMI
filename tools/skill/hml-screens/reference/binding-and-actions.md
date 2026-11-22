@@ -22,6 +22,7 @@
 ```json
 "bind": {
   "text":       { "tag": "temp", "format": "%.1f °C" },
+  "text":       { "tag": "state", "map": { "0": "@stopped", "1": "@running", "2": "@fault", "default": "---" } },
   "value":      { "tag": "pressure", "scale": 10 },
   "checked":    "run",
   "on":         "run",
@@ -38,7 +39,7 @@
 | `scale` / `offset` | 部品の値 = タグの値 × scale + offset（書き込みは逆算） |
 | `invert` | 真偽を反転 |
 | `eq` `ne` `gt` `lt` `ge` `le` | 条件。`visible` `hidden` `enabled` `disabled` `checked` `on` で使う。比べる相手は定数か `{ "tag": "temp_hi" }` |
-| `map` | 値 → 色。`default` がその他。bool は `"true"` / `"false"` |
+| `map` | 値 → 色（`bg_color` `text_color`）、値 → 文字（`text`。`"@ID"` が使える）。`default` がその他。bool は `"true"` / `"false"`。文字列のタグには、その文字のキーが当たる（`{ "main": "#26c6da" }`） |
 | `part` | `bg_color` を付ける場所: `main`（既定）/ `indicator` / `knob` |
 
 - 短い形と一緒にほかの種類も付けたいときは、長い形で書く:
@@ -48,8 +49,9 @@
 - 条件は 1 つのタグだけ（「A かつ B」は書けない）。要るときは、条件をまとめた bool のタグを作り、スクリプトで
   計算する。`project.json` の `scripts` に
   `{ "name": "can_run", "trigger": "tag", "tags": ["auto_mode", "run"], "code": "tag.can_run = not tag.auto_mode and not tag.run" }`。
-- 文字列のタグの値を訳して出す仕組みはない。値ごとの `label` を重ねて `visible` と `eq` で出し分ける
-  （`{ "type": "label", "text": "@running", "bind": { "visible": { "tag": "state", "eq": 2 } } }`）。
+- 状態の番号や文字列のタグを言葉で出すときは、`text` の `map`（上の例。値ごとに `label` を重ねなくてよい）。
+  当たるキーも `default` もない値は、そのまま（`format` で）出る。言葉と一緒に色も変えるなら、同じタグで `text_color` か `bg_color` の `map` を並べて書く。
+  言葉はすべての値の分を書き、いちばん長い言葉で `--set` して入るか確かめる。
 - `checked` に `eq` を付けたボタン（`"checkable": true`）は、押すとその値をタグに書く。同じタグで値を変えて並べると
   択一（ラジオボタン）になる。
 - 同じ場所に条件違いの `panel` を重ねて `visible` で切り替えると、状態ごとの表示になる。

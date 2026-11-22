@@ -66,6 +66,7 @@ add_executable(hml_tests
   test_texts.cpp
   test_screen_saver.cpp
   test_clock_tags.cpp
+  test_value_map.cpp
   test_popup.cpp
   test_project_archive.cpp
   test_transfer.cpp
