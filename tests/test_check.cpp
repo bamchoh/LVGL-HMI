@@ -347,3 +347,19 @@ TEST_CASE("check: MQTT JSON messages: pointers, tags, topics")
     CHECK(has(lines, "subscribe[0]: \"cmd/#\": wildcards"));
     CHECK(has(lines, "subscribe[1]: \"fields\" is {"));
 }
+
+TEST_CASE("check: OPC UA server: security, certificate files, no password in the project")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ], "tags": [],
+      "drivers": [ { "type": "opcua_server", "security": "maybe", "cert_file": "certs/s.der", "client_certs": ["certs/scada.der"], "password": "x" },
+                   { "type": "opcua_server", "security": "none" } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK(has(lines, "drivers[0] (opcua_server): security: \"maybe\""));
+    CHECK(has(lines, "cert_file and key_file go together"));
+    CHECK(has(lines, "cert_file: no file \"certs/s.der\""));
+    CHECK(has(lines, "client_certs: no file \"certs/scada.der\""));
+    CHECK(has(lines, "the password is in the project file"));
+    CHECK_FALSE(has(lines, "drivers[1]"));                     // "none" is said at run time and in the designer
+}

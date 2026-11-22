@@ -472,6 +472,27 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         }
     }
 
+    // ---- the OPC UA server: security, its certificate, the clients it trusts, no password in the file
+    if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
+        for(size_t i = 0; i < dl->size(); i++) {
+            const json& d = (*dl)[i];
+            const std::string type = jstr(d, "type", "");
+            if(!d.is_object() || (type != "opcua_server" && type != "opcua")) continue;
+            const std::string w = "drivers[" + std::to_string(i) + "] (" + jstr(d, "name", type) + ")";
+            const std::string sec = jstr(d, "security", "sign_encrypt");
+            if(sec != "sign_encrypt" && sec != "sign" && sec != "none") c.add(w, "security: \"" + sec + "\" (sign_encrypt, sign, none)");
+            if(jstr(d, "cert_file", "").empty() != jstr(d, "key_file", "").empty()) c.add(w, "cert_file and key_file go together");
+            auto need_file = [&](const std::string& what, const std::string& f) {
+                std::error_code ec;
+                if(!f.empty() && !fs::is_regular_file(c.dir / fs::u8path(f), ec) && !fs::is_regular_file(fs::u8path(f), ec)) c.add(w, what + ": no file \"" + f + "\"");
+            };
+            need_file("cert_file", jstr(d, "cert_file", ""));
+            need_file("key_file", jstr(d, "key_file", ""));
+            if(const json* cc = jget(d, "client_certs"); cc && cc->is_array()) for(const json& f : *cc) if(f.is_string()) need_file("client_certs", f.get<std::string>());
+            if(!jstr(d, "password", "").empty()) c.add(w, "the password is in the project file: everybody who gets the project can read it. Better: leave it out and set it on the device (System > Driver; kept in project.local.json)");
+        }
+    }
+
     // ---- MQTT JSON messages: "fields": { "<JSON pointer>": "<tag>" }, an exact topic
     if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
         for(size_t i = 0; i < dl->size(); i++) {

@@ -851,7 +851,7 @@ function tagProject() {
     { type: 'chart', series: [{ tag: 'temp' }] },
     { type: 'panel', children: [{ type: 'label', text: 'a' }, { type: 'label', text: 'b' }] },
   ];
-  p.drivers = [{ type: 'modbus_tcp', status_tag: 'run', map: [{ tag: 'temp', addr: 0 }] }, { type: 'opcua_server', tags: ['temp'] }];
+  p.drivers = [{ type: 'modbus_tcp', status_tag: 'run', map: [{ tag: 'temp', addr: 0 }] }, { type: 'opcua_server', client_certs: ['certs/scada.der'], tags: ['temp'] }];
   p.scripts = [{ name: 's', trigger: 'tag', tags: ['run'], code: 'if tag.run then tag.temp = 0 end' }];
   p.data_log = { groups: [{ name: 'g', tags: ['temp', 'run'], trigger_tag: 'run' }] };
   p.alarms = { items: [{ name: 'a', tag: 'temp', value_tag: 'temp' }] };

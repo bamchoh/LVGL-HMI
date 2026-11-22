@@ -237,6 +237,12 @@ Only what is listed here exists. **How to add or change a driver safely: drivers
 | `port` | number |  |
 | `namespace` | text |  |
 | `folder` | text |  |
+| `security` | `sign_encrypt` / `sign` / `none` | sign_encrypt: only signed and encrypted sessions; sign: signed too; none: anybody on the network can read and change the values |
+| `client_certs` | array of texts | the certificates (DER) of the clients it lets in, relative to project.json; more can be put in pki/trusted/ on the device. Nobody else gets in |
+| `cert_file` | text | the certificate of this server (DER). Empty: the device makes one at the first start (pki/own/opcua_server.der); the clients have to trust it |
+| `key_file` | text | its private key |
+| `application_uri` | text | must be the URI in the server certificate |
+| `username` | text | a login instead of anonymous; the password is set on the device (System > Driver) |
 
 `tags` (Published tags (empty = all tags, read/write)): an array of rows (a row may also be just the tag name). Columns:
 

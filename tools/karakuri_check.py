@@ -411,7 +411,7 @@ def check_opcua_server(api, runtime, rep):
                    'tags': [{'name': 'b', 'type': 'bool', 'init': True}, {'name': 'i', 'type': 'int', 'init': -1234},
                             {'name': 'f', 'type': 'float', 'init': 12.5}, {'name': 's', 'type': 'string', 'init': 'HML'},
                             {'name': 'ro', 'type': 'int', 'init': 7}],
-                   'drivers': [{'type': 'opcua_server', 'port': port, 'tags': ['b', 'i', 'f', 's', {'tag': 'ro', 'access': 'ro'}]}],
+                   'drivers': [{'type': 'opcua_server', 'port': port, 'security': 'none', 'tags': ['b', 'i', 'f', 's', {'tag': 'ro', 'access': 'ro'}]}],
                    'scripts': [{'name': 'chk', 'trigger': 'interval', 'interval_ms': 500, 'code': lua}],
                    'screens': ['screens/s.json']}
         with open(os.path.join(d, 'project.json'), 'w', encoding='utf-8') as f:

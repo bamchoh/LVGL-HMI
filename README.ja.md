@@ -1136,12 +1136,21 @@ OPC UA クライアントから読み書きでき、クライアントからの�
 | `namespace` | タグノードの名前空間 URI。インデックスは起動時に割り当てられます（通常 2）                        |
 | `folder`    | `Objects/` 直下に作るフォルダ名（既定 `HML`）                                                     |
 | `tags`      | 公開するタグ。省略時は全タグを読み書き可で公開。要素は文字列か `{ "tag", "access": "rw" / "ro" }` |
+| `security` | `sign_encrypt`（**既定**: 署名と暗号化のセッションだけ）、`sign`（署名だけのものも）、`none`（セキュリティなし。警告を出します） |
+| `client_certs` | 受け入れるクライアントの証明書（DER。project.json からの相対）。装置の `pki/trusted/` に置いたものも加わります。**それ以外は入れません**（1 つもなければ、どのクライアントも断ります） |
+| `cert_file` / `key_file` | サーバーの証明書と鍵。空なら、装置が最初の起動で `pki/own/opcua_server.der` を作ります（名前: アプリケーション URI、ホスト名、localhost、127.0.0.1）。クライアント側でこれを信頼します |
+| `application_uri` | 既定 `urn:hml:runtime:server`（証明書の URI と同じにします） |
+| `username` | 匿名の代わりにログインを求めます。パスワードは装置（System > Driver。`project.local.json` に入ります）で設定し、project.json には書きません |
 
 - ノード ID は `ns=<index>;s=<タグ名>`、型は bool → Boolean、int → Int64、float → Double、string → String です。
   クライアントは、この型で書き込んでください。別の型（Int64 のノードに Int16 など）の書き込みは、サーバーが
   `BadTypeMismatch` で断ります（一般のクライアントはノードの型を読んでから書くので、そのまま使えます）。
 - 読み出しはタグストアから都度取得するので、Subscription / MonitoredItem でも最新値が届きます。
-- セキュリティポリシーは `None`（暗号化・認証なし）のみです。閉じたネットワークでの利用を想定しています。
+- セキュリティがあるとき、`None` のエンドポイントはエンドポイントを探すため（GetEndpoints）だけにあり、セッションには安全な通信路が要ります。
+  セキュリティポリシーは mbedTLS 版の open62541 のもの（Basic256Sha256、Aes128_Sha256_RsaOaep、Aes256_Sha256_RsaPss など）です。
+- SCADA や UaExpert をつなぐには、その証明書（DER）をプロジェクトに入れて `client_certs` に書き（または装置の `pki/trusted/` にコピーし）、
+  クライアント側で装置の `pki/own/opcua_server.der` を信頼します。
+- ポートをほかのプログラムが使っているとき（IPv4 / IPv6 の片方だけでも）は起動しません（「port N is in use: not started」）。
 - 動作確認用のクライアントを同梱しています（`pip install asyncua` が必要）。
 
 ```

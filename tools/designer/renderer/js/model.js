@@ -1244,6 +1244,13 @@ const M = {
     });
     (p.drivers || []).forEach((d, i) => {
       if ((d.type === 'modbus_rtu' || d.type === 'modbus_ascii') && !d.device && !d.host) out.push({ text: (d.name || d.type) + ': no serial port (device) is set', view: 'drivers', index: i });
+      if (d.type === 'opcua_server' || d.type === 'opcua') {
+        const n = d.name || d.type, at = { view: 'drivers', index: i };
+        // ("none" is a choice the field's hint explains, and the runtime warns about: e.g. the demo, tried with UaExpert)
+        if (d.security !== 'none' && !(Array.isArray(d.client_certs) && d.client_certs.length)) out.push(Object.assign({ text: n + ': no client is trusted yet (client_certs, or pki/trusted/ on the device): every client is refused' }, at));
+        if (d.password) out.push(Object.assign({ text: n + ': the password is in project.json; better enter it on the device (System > Driver)' }, at));
+        if (!!d.cert_file !== !!d.key_file) out.push(Object.assign({ text: n + ': cert_file and key_file go together' }, at));
+      }
       if (d.type === 'opcua_client') {
         const n = d.name || d.type, at = { view: 'drivers', index: i };
         if (!/^opc\.tcp:\/\//.test(d.endpoint || '')) out.push(Object.assign({ text: n + ': the endpoint is not opc.tcp://host:port' }, at));

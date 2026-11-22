@@ -330,7 +330,13 @@ const SCHEMA = {
     },
     opcua_server: {
       label: 'OPC UA server',
-      fields: [{ k: 'port', t: 'number' }, { k: 'namespace', t: 'text' }, { k: 'folder', t: 'text' }],
+      fields: [{ k: 'port', t: 'number' }, { k: 'namespace', t: 'text' }, { k: 'folder', t: 'text' },
+               { k: 'security', t: 'select', o: ['', 'sign_encrypt', 'sign', 'none'], empty: 'sign_encrypt (default)', hint: 'sign_encrypt: only signed and encrypted sessions; sign: signed too; none: anybody on the network can read and change the values' },
+               { k: 'client_certs', t: 'csv', hint: 'the certificates (DER) of the clients it lets in, relative to project.json; more can be put in pki/trusted/ on the device. Nobody else gets in' },
+               { k: 'cert_file', t: 'text', hint: 'the certificate of this server (DER). Empty: the device makes one at the first start (pki/own/opcua_server.der); the clients have to trust it' },
+               { k: 'key_file', t: 'text', hint: 'its private key' },
+               { k: 'application_uri', t: 'text', placeholder: 'urn:hml:runtime:server', hint: 'must be the URI in the server certificate' },
+               { k: 'username', t: 'text', hint: 'a login instead of anonymous; the password is set on the device (System > Driver)' }],
       table: { key: 'tags', label: 'Published tags (empty = all tags, read/write)', columns: [
         { k: 'tag', t: 'tag' }, { k: 'access', t: 'select', o: ['rw', 'ro'] }], stringItems: true },
     },

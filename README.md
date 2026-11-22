@@ -1134,12 +1134,21 @@ reaches the screens and the other drivers (Modbus and so on). The implementation
 | `namespace` | The namespace URI of the tag nodes. The index is assigned at startup (normally 2) |
 | `folder` | The name of the folder created directly under `Objects/` (default `HML`) |
 | `tags` | The tags to expose. When omitted, all tags are exposed as readable and writable. An element is a string or `{ "tag", "access": "rw" / "ro" }` |
+| `security` | `sign_encrypt` (**default**: only signed and encrypted sessions), `sign` (signed-only ones too), `none` (no security: a warning) |
+| `client_certs` | The certificates (DER) of the clients it lets in, relative to project.json. More can be put in `pki/trusted/` on the device. **Nobody else gets in**; with none, every client is refused |
+| `cert_file` / `key_file` | The server's certificate and key. Empty: the device makes one at the first start, `pki/own/opcua_server.der` (names: the application URI, the host, localhost, 127.0.0.1); the clients have to trust it |
+| `application_uri` | Default `urn:hml:runtime:server` (must be the URI in the certificate) |
+| `username` | A login instead of anonymous. The password is set on the device (System > Driver, kept in `project.local.json`), never in project.json |
 
 - The node ID is `ns=<index>;s=<tag name>`, and the types are bool → Boolean, int → Int64, float → Double, string → String.
   A client must write with this type. A write with another type (Int16 to an Int64 node and so on) is refused by the server
   with `BadTypeMismatch` (ordinary clients read the type of the node before they write, so they work as they are).
 - A read fetches the value from the tag store each time, so Subscription / MonitoredItem also get the latest value.
-- The only security policy is `None` (no encryption, no authentication). It is meant for use on a closed network.
+- With security, the `None` endpoint is only there for finding the endpoints (GetEndpoints): a session needs a secure channel.
+  Security policies are those of open62541 with mbedTLS (Basic256Sha256, Aes128_Sha256_RsaOaep, Aes256_Sha256_RsaPss ...).
+- Connecting a SCADA or UaExpert: put its certificate (DER) into the project and list it in `client_certs` (or copy it to `pki/trusted/` on the device),
+  and let the client trust `pki/own/opcua_server.der` of the device.
+- The server does not start when its port is held by another program (also on only one of IPv4 / IPv6): "port N is in use: not started".
 - A client for checking the operation is included (it needs `pip install asyncua`).
 
 ```
