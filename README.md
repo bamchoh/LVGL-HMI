@@ -32,7 +32,11 @@ request, and wrote 21 screens with the alarms, trends, recipes, data log and the
    with the rules for layout and touch and working examples. It ships with the designer.
 3. **The runtime checks the work.** `hml_runtime --check --render` opens no window and connects to no device; it prints the mistakes
    (an unknown key, a tag that does not exist, a text without a translation) and writes an image of each screen. The AI reads both and corrects itself.
-4. **The designer follows.** It reloads the files the AI changed, shows its own list of problems, and you move, restyle or rewrite anything.
+4. **Connections too, when asked.** Given an address list (CSV, a spreadsheet, the PLC's labels), the AI writes the tags and the driver's map
+   (`tools/skill/hml-screens/reference/drivers-guide.md`): read-only first, writes only where you allow them, no passwords in the files.
+   `--check` lets each driver read its own addresses and reports a wrong device, a tag or an address used twice, a text on a number register.
+   The connection itself is yours to try: the AI never connects to a device.
+5. **The designer follows.** It reloads the files the AI changed, shows its own list of problems, and you move, restyle or rewrite anything.
 
 What it does not do: an AI does not set up the connection to your PLC (drivers, users and the settings of the device stay with you), and what a screen
 *means* (the right tag, the right unit) still needs a person's eye. The trial behind the demo was one run with one model. → "Having an AI make screens (the skill)"

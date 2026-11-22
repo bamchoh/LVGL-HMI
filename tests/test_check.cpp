@@ -282,3 +282,25 @@ TEST_CASE("check: a checkable button bound to a tag that also toggles it does no
     REQUIRE(lines.size() == 1);
     CHECK(has(lines, "children[0] (button): on_click: toggles \"f\""));
 }
+
+TEST_CASE("check: driver maps: a tag twice, an address twice, a text on a number, a bit for a number, a Modbus address out of range")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ],
+      "tags": [ { "name": "temp", "type": "float" }, { "name": "run", "type": "bool" }, { "name": "name", "type": "string" }, { "name": "cnt", "type": "int" } ],
+      "drivers": [
+        { "type": "slmp", "host": "10.0.0.1", "map": [ { "tag": "temp", "addr": "D100", "dtype": "float" }, { "tag": "cnt", "addr": "d100" },
+            { "tag": "name", "addr": "D200" }, { "tag": "temp", "addr": "D300" }, { "tag": "run", "addr": "M0", "dtype": "string" } ] },
+        { "type": "modbus_tcp", "host": "10.0.0.2", "map": [ { "tag": "cnt", "area": "coil", "addr": 3 }, { "tag": "run", "area": "holding", "addr": 70000 },
+            { "tag": "temp", "area": "holding", "addr": 65535, "dtype": "float" }, { "tag": "name", "area": "holding", "addr": "5" } ] } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK(has(lines, "drivers[0] (slmp): map[1]: address D100 is already in map[0]"));
+    CHECK(has(lines, "map[2]: tag \"name\" is a string, the address holds a number"));
+    CHECK(has(lines, "map[3]: tag \"temp\" is already in map[0]"));
+    CHECK(has(lines, "map[4]: tag \"run\" is bool, the address holds a text"));
+    CHECK(has(lines, "drivers[1] (modbus_tcp): map[0]: tag \"cnt\" is int, a coil is one bit"));
+    CHECK(has(lines, "map[1]: addr 70000: a Modbus address"));
+    CHECK(has(lines, "map[2]: addr 65535: a Modbus address"));                  // a float takes 65535 and 65536
+    CHECK(has(lines, "map[3]: addr \"5\": a Modbus address"));
+}

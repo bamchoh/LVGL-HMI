@@ -39,6 +39,7 @@ struct Checker {
     std::vector<CheckProblem> out;
     fs::path dir;
     std::set<std::string> tags, screens, popups, scripts, texts, languages, books;
+    std::map<std::string, std::string> tag_types;                 // name -> "bool" / "int" / "float" / "string"
     std::map<std::string, std::set<std::string>> groups;      // data log group -> its tags (empty = all)
     bool has_texts = false, has_alarms = false;
     std::set<std::string> log_sections;                       // "system" / "operation": the project records that log
@@ -419,6 +420,7 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
             const std::string n = t.is_string() ? t.get<std::string>() : jstr(t, "name", "");
             if(n.empty()) c.add("tags", "a tag without a name");
             else if(!c.tags.insert(n).second) c.add("tags", "tag \"" + n + "\" is defined twice");
+            else c.tag_types[n] = t.is_object() ? jstr(t, "type", "float") : "float";
         }
     }
     c.languages = str_set(root.value("languages", json::array()));
@@ -464,6 +466,51 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
                 for(const json& row : it.value()) {
                     if(row.is_object() && row.contains("tag")) c.need_tag(where, it.key(), row["tag"]);
                     else if(row.is_string() && (it.key() == "tags" || it.key() == "publish" || it.key() == "subscribe")) c.need_tag(where, it.key(), row);
+                }
+            }
+        }
+    }
+
+    // ---- the maps of device drivers: a tag twice, an address twice, a type that cannot fit
+    // (the form of each address is checked by the driver itself, when the project is loaded: run_check)
+    if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
+        for(size_t i = 0; i < dl->size(); i++) {
+            const json& d = (*dl)[i];
+            const json* map = jget(d, "map");
+            if(!d.is_object() || !map || !map->is_array()) continue;
+            const std::string type = jstr(d, "type", "");
+            const std::string where = "drivers[" + std::to_string(i) + "] (" + jstr(d, "name", type.empty() ? "?" : type) + ")";
+            std::map<std::string, size_t> by_tag, by_addr;
+            for(size_t r = 0; r < map->size(); r++) {
+                const json& row = (*map)[r];
+                if(!row.is_object()) continue;
+                const std::string w = where + ": map[" + std::to_string(r) + "]";
+                const std::string tag = jstr(row, "tag", "");
+                if(!tag.empty() && !by_tag.emplace(tag, r).second)
+                    c.add(w, "tag \"" + tag + "\" is already in map[" + std::to_string(by_tag[tag]) + "] (one tag, one address)");
+                std::string addr = row.contains("addr") ? (row["addr"].is_string() ? row["addr"].get<std::string>() : row["addr"].dump()) : "";
+                for(char& ch : addr) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+                if(!addr.empty()) {
+                    const std::string key = jstr(row, "area", "") + "/" + addr + "/" + (row.contains("unit_id") ? row["unit_id"].dump() : "");
+                    if(!by_addr.emplace(key, r).second)
+                        c.add(w, "address " + jstr(row, "area", "") + (row.contains("area") ? " " : "") + addr + " is already in map[" + std::to_string(by_addr[key]) + "] (two tags on one address: a write of one changes the other)");
+                }
+                if(type.rfind("modbus", 0) == 0 && row.contains("addr")) {
+                    const json& a = row["addr"];
+                    static const std::set<std::string> wide_types{ "int32", "uint32", "s32", "u32", "float" };
+                    const bool wide = wide_types.count(jstr(row, "dtype", "")) > 0;
+                    if(!a.is_number_integer() || a.get<long long>() < 0 || a.get<long long>() > (wide ? 65534 : 65535))
+                        c.add(w, "addr " + a.dump() + ": a Modbus address is a number 0 .. 65535 (a 32-bit value takes two)");
+                }
+                auto tt = c.tag_types.find(tag);
+                const std::string dtype = jstr(row, "dtype", "");
+                if(tt != c.tag_types.end() && !addr.empty()) {
+                    const bool text_tag = tt->second == "string", text_dt = dtype == "string";
+                    if(text_dt && !text_tag) c.add(w, "tag \"" + tag + "\" is " + tt->second + ", the address holds a text (\"dtype\": \"string\" needs a string tag)");
+                    if(text_tag && !text_dt) c.add(w, "tag \"" + tag + "\" is a string, the address holds a number (a text needs \"dtype\": \"string\" and a \"length\")");
+                    const std::string area = jstr(row, "area", "");
+                    if((area == "coil" || area == "discrete") && tt->second != "bool")
+                        c.add(w, "tag \"" + tag + "\" is " + tt->second + ", a " + area + " is one bit (use a bool tag)");
                 }
             }
         }
