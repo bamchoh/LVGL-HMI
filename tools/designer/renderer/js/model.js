@@ -79,6 +79,7 @@ const M = {
   // The tags a tag field offers: the project's (with their type), then those the runtime makes.
   tagChoices() {
     const out = ((this.st.project && this.st.project.tags) || []).filter(t => t && t.name).map(t => ({ name: t.name, note: t.type || '' }));
+    out.push({ name: 'sys.datetime', note: 'string (system) 2026-11-22 13:05:07' }, { name: 'sys.date', note: 'string (system) 2026-11-22' }, { name: 'sys.time', note: 'string (system) 13:05:07' });
     out.push({ name: 'sys.screen.off', note: 'bool (system)' }, { name: 'sys.lang', note: 'string (system)' });
     if (this.st.project && this.st.project.sound) out.push({ name: 'sys.sound.mute', note: 'bool (system)' }, { name: 'sys.sound.volume', note: 'int (system)' }, { name: 'sys.sound.alarm', note: 'bool (system)' });
     if (this.usersOn()) for (const [n, ty] of [['sys.user.name', 'string'], ['sys.user.level', 'int'], ['sys.user.level_name', 'string'], ['sys.user.logged_in', 'bool']]) out.push({ name: n, note: ty + ' (system)' });

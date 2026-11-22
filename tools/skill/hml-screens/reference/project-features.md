@@ -4,8 +4,13 @@
 書いたら `--check` を通す（キーの書き間違い、ないタグ・画面・ログ、暗号化なしなどを見つける）。
 **パスワードは `project.json` に書かない**（装置の System 画面で設定する。`--check` が指摘する）。
 
-目次: [テンプレート画面](#テンプレート画面) / [スケジュール](#スケジュール-schedules) / [音](#音-sound) /
+目次: [テンプレート画面](#テンプレート画面) / [アラーム](#アラーム-alarms) / [データのログとトレンド](#データのログとトレンド-data_log) /
+[レシピ](#レシピ-recipes) / [スクリプト](#スクリプト-scripts) / [日付と時刻](#日付と時刻) / [機器なしで値を動かす](#機器なしで値を動かす) /
+[スケジュール](#スケジュール-schedules) / [音](#音-sound) /
 [機器間のデータ転送](#機器間のデータ転送-transfers) / [メール](#メール-mail) / [ログの送信](#ログの送信-uploads)
+
+アラーム・トレンド・レシピの画面を頼まれたら、その部品が要る設定（`alarms`、`data_log` のグループ、`recipes`）も頼まれたものとして足してよい。
+プロジェクトにもう設定があれば、**その書き方に合わせて足す**（既存の項目は消さない・名前を変えない）。足したことを報告する。
 
 ## テンプレート画面
 
@@ -30,6 +35,143 @@
 - 土台もふつうの画面なので、`project.json` の `"screens"` に入れる。土台にポップアップは使えない。8 段まで重ねられる。
 - 画面自身の部品は、土台の部品（ヘッダー、ナビゲーション）に重ならない位置に置く。`--render` の画像には土台も描かれる。
 - 既存の画面がテンプレートを使っているプロジェクトでは、新しい画面も同じ `template` を付ける（共通部分を書き写さない）。
+
+## アラーム (`alarms`)
+
+タグの値が条件を満たす間、アラームが出る（`alarm_list` / `alarm_banner` / `alarm_summary` に出る。記録は `logs/alarm.db`）。
+
+```json
+"alarms": {
+  "items": [
+    { "name": "oven_temp_high", "tag": "oven_temperature", "condition": "gt", "value_tag": "oven_temp_hi", "severity": "critical", "message": "@alarm_oven_temp_high" },
+    { "name": "film_low", "tag": "packaging_film_remaining", "condition": "lt", "value": 10, "severity": "warning", "message": "@alarm_film_low" },
+    { "name": "plc_comm", "tag": "plc_online", "condition": "false", "severity": "critical", "message": "@alarm_plc_comm" },
+    { "name": "door_open", "tag": "door_open", "severity": "info", "ack": false, "message": "@alarm_door_open" }
+  ]
+}
+```
+
+| キー | 内容 |
+| --- | --- |
+| `items[].name` | 名前（必須、重複不可。記録と CSV に出る） |
+| `items[].tag` | 見るタグ（必須） |
+| `items[].condition` | `"true"`（既定。タグが真の間）/ `"false"` / `"eq"` `"ne"` `"gt"` `"lt"` `"ge"` `"le"`（`value` か `value_tag` と比べる） |
+| `items[].value`、`items[].value_tag` | 比べる値（定数）、または比べる相手のタグ（設定値を画面で変えられるようにするなら `value_tag`） |
+| `items[].severity` | 重要度の語（既定 `"warning"`。ふつう `"info"` `"warning"` `"critical"`）。`alarm_list` の列にそのまま出る（訳せない） |
+| `items[].message` | 出す文字（`"@ID"` が使える。省くと `name`） |
+| `items[].ack` | `false`: 確認しなくても、条件が消えれば一覧から消える（既定 true: 確認されるまで残る） |
+| `items[].enabled` | `false` で使わない |
+| `ack_level` | 確認できるユーザーのレベル（`users` があるとき） |
+| `enabled`、`path`、`retention_days`、`max_rows`、`max_size_mb` | 記録の設定（省いてよい。既定 `logs/alarm.db`、30 日、10 万行） |
+
+- タグ: `sys.alarm.active`（出ている数）、`sys.alarm.unacked`（未確認の数）、`sys.alarm.latest`（いちばん新しいものの文字）。
+- 確認の動作: `{ "action": "call", "fn": "alarm.ack_all" }`（`alarm_list` の行を押しても確認できる）。
+- 「A かつ B のとき」は 1 つのアラームでは書けない。bool のタグをスクリプトで計算し、そのタグを `tag` にする。
+- `--check --render` では、条件が成り立つ値を `--set` すると出る（`--set oven_temperature=260`）。
+
+## データのログとトレンド (`data_log`)
+
+タグの値を記録する（`logs/data.db`）。`trend` 部品はここの**グループ**を描く。
+
+```json
+"data_log": {
+  "groups": [
+    { "name": "process", "trigger": "interval", "interval_ms": 1000, "tags": ["oven_temperature", "proofing_temperature", "proofing_humidity"] },
+    { "name": "state", "trigger": "change", "tags": ["mixer_running", "oven_heater_on"] },
+    { "name": "batch", "trigger": "tag", "trigger_tag": "batch_done", "tags": ["production_count", "defect_count"] }
+  ]
+}
+```
+
+| キー | 内容 |
+| --- | --- |
+| `groups[].name` | グループの名前（必須、重複不可。`trend` の `group`、`log_view` の `group`、`uploads` の `"data:<名前>"`） |
+| `groups[].tags` | 記録するタグ名の配列（必須。数値のタグ。`trend` に出せるのはここにあるタグだけ） |
+| `groups[].trigger` | `"interval"`（既定。`interval_ms` ごと、100 以上、既定 1000）/ `"change"`（どれかが変わったとき）/ `"tag"`（`trigger_tag` が偽から真になったとき）/ `"manual"`（`data_log.sample` の動作のときだけ） |
+| `groups[].enabled` | `false` で記録しない |
+| `enabled`、`path`、`retention_days`、`max_rows`、`max_size_mb` | 記録の設定（省いてよい。既定 `logs/data.db`、30 日、100 万行） |
+
+- トレンドを描くなら `trigger` は `interval`（1000〜5000 ms）。範囲の大きく違う値（温度 200 °C と湿度 80 %）は、
+  グループは同じでもよいが、`trend` 部品を分ける（縦軸は 1 本）。
+- 記録は装置の SD カードに書かれる。速い周期（100 ms）にたくさんのタグを入れない。
+
+## レシピ (`recipes`)
+
+タグの組（品種ごとの設定値）に名前を付けて持ち、`recipe_table` で選んでタグへ書き込む。
+
+```json
+"recipes": {
+  "level": 2,
+  "books": [
+    { "name": "bread",
+      "items": ["mixer_rpm_sp", "mix_time_sp", "proofing_temp_sp", "oven_temp_sp"],
+      "recipes": [
+        { "name": "Shokupan", "values": { "mixer_rpm_sp": 120, "mix_time_sp": 600, "proofing_temp_sp": 38, "oven_temp_sp": 210 } },
+        { "name": "Baguette", "values": { "mixer_rpm_sp": 90,  "mix_time_sp": 480, "proofing_temp_sp": 26, "oven_temp_sp": 240 } }
+      ] }
+  ]
+}
+```
+
+| キー | 内容 |
+| --- | --- |
+| `books[].name` | ブックの名前（必須、1〜32 文字、`/ \ : * ? " < > | .` は使えない。`recipe_table` の `book`） |
+| `books[].items` | レシピが持つタグ（必須。タグ名の配列。設定値のタグにする: 書き込むと機器へ送られる） |
+| `books[].recipes` | 最初から入っているレシピ: `{ "name", "values": { タグ名: 値 } }`（名前は重複不可） |
+| `level` | 書き込み・保存・削除ができるユーザーのレベル（`users` があるとき。0 = だれでも） |
+| `verify_ms` | 書き込んだあと、機器の値が同じになったか確かめる時間（既定 2000、0 = 確かめない） |
+| `path` | 装置で変えたレシピを置くフォルダー（既定 `recipes`。そこにファイルがあれば、プロジェクトの `recipes` より優先） |
+
+- レシピの名前は表示にそのまま出る（`"@ID"` は使えない）。日本語の名前にするならフォントが要る。
+- 選んでいるレシピの名前は `sys.recipe.<ブック名>.selected`、最後の操作の結果は `sys.recipe.status`（文字列のタグ。画面に出すときに使う）。
+
+## スクリプト (`scripts`)
+
+Lua で、タグを計算する・画面を切り替えるなど。`{ "action": "script", "name": "<名前>" }` で呼ぶか、`trigger` で自動に動く。
+
+```json
+"scripts": [
+  { "name": "can_start", "trigger": "tag", "tags": ["auto_mode", "mixer_running"], "code": "tag.can_start = not tag.auto_mode and not tag.mixer_running" },
+  { "name": "line", "trigger": "interval", "interval_ms": 500, "file": "scripts/line.lua" },
+  { "name": "init", "trigger": "startup", "code": ["tag.shift = 1", "tag.batch = 0"] }
+]
+```
+
+| キー | 内容 |
+| --- | --- |
+| `name` | 名前（重複不可） |
+| `code` / `file` | Lua のコード（文字列か、1 行ずつの配列）、またはプロジェクトの中の `.lua` ファイル |
+| `trigger` | `"manual"`（既定。動作から呼ぶ）/ `"startup"` / `"interval"`（+ `interval_ms`）/ `"tag"`（+ `tags`: どれかが変わったとき）/ `"screen_show"` `"screen_hide"`（+ `screen`） |
+| `enabled` | `false` で使わない |
+
+Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["sys.alarm.active"]`）、`goto_screen("名前")`、`back()`、
+`current_screen()`、`run("スクリプト")`、`call("fn", "arg")`（`call` の動作と同じ）、`log(...)` / `warn(...)`、`millis()`、
+`os.time()` / `os.date(...)` / `os.clock()`、`event.trigger` / `event.tag` / `event.value` / `event.screen`。
+ライブラリは `string` `table` `math` `utf8` `coroutine`（ファイルやプロセスは使えない）。1 回 500 ms を超えると止められる。
+
+- 書いたタグは、機器につながるタグなら機器へ送られる。**機器が持つ値（実際の温度など）をスクリプトで書かない**（下の「機器なしで値を動かす」は別）。
+- `--check --render` でもスクリプトは動く（周期のものは描く前に数回動く）。
+
+## 日付と時刻
+
+ランタイムが持つ文字列のタグ: `sys.date`（`2026-11-22`）、`sys.time`（`13:05:07`）、`sys.datetime`（`2026-11-22 13:05:07`）。
+装置の時刻（その地域の時刻）で、秒ごとに変わる。ヘッダーの時計は `{ "type": "label", "bind": { "text": "sys.datetime" } }`。
+
+- 別の形（`13:05`、曜日つき）が要るときは、文字列のタグを作り、周期のスクリプトで `tag.clock = os.date("%H:%M")` と書く。
+- `--check --render` の画像は、実行したときの時刻になる。決まった時刻で描くなら `--set "sys.datetime=2026-11-22 08:30:00"`
+  （`--set` はそのタグだけを変える。`sys.date` / `sys.time` も出しているなら、それぞれに `--set` する）。
+
+## 機器なしで値を動かす
+
+デモや確認で、PLC なしに値を動かす方法は 2 つ。どちらも**動いて見える値が本物ではない**ので、画面に「SIMULATION」などの表示を
+出すか、報告で必ず伝える。**頼まれていなければ、どちらもしない**（値は `tags` の `init` のまま止まる。それで正しい）。
+
+1. **シミュレーター（`drivers` の `"type": "sim"`）**: 決まった波形をタグに書く。`drivers` を変えるので、ユーザーが許したときだけ。
+   `{ "tag": "oven_temperature", "mode": "sine", "min": 205, "max": 215, "period_ms": 20000 }`。`mode`: `sine` `triangle` `ramp`
+   （`min` → `max` を繰り返す）`square`（真 / 偽）`random` `counter`（`min` から 1 ずつ）`cycle`（`values` の文字を順に）。
+2. **スクリプト**: 操作に応じた動き（運転ボタンで回転数が上がる、運転中だけ生産数が増える）は、周期のスクリプトで書く。
+   PLC がつながっていないときだけ動くようにする（つながりを示すタグがあれば `if not tag.plc_online then ... end`）。
+   見本: `projects/demo` の `pump` スクリプト（運転中だけ速度が設定値に近づく）。
 
 ## スケジュール (`schedules`)
 

@@ -1,6 +1,7 @@
 #include "project.hpp"
 #include "schedule.hpp"
 #include "alarm.hpp"
+#include "clock_tags.hpp"
 #include "data_log.hpp"
 #include "driver.hpp"
 #include "operation_log.hpp"
@@ -225,6 +226,8 @@ bool Project::load(const std::string& path)
         }
         HML_INFO("%d tags created", n);
     }
+    // sys.date / sys.time / sys.datetime (clock_tags.hpp)
+    poll_clock_tags();
 
     // users and levels ("users"); a list edited on the device comes from project.local.json
     users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());

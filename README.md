@@ -1121,6 +1121,18 @@ The screen turns off when a set time passes without any operation.
 - The time can be changed on the device in the system settings, **System > Display**. The changed value stays in `project.local.json` (`"screen_saver": { "after_s": N }`),
   and disappears when it is set back to the value of the project. A deploy does not overwrite it.
 
+## Date and time
+
+The runtime keeps the date and time of the device in three string tags, for a clock on the screens without a script:
+`sys.date` (`2026-11-22`), `sys.time` (`13:05:07`) and `sys.datetime` (`2026-11-22 13:05:07`), in local time, updated every second.
+
+```json
+{ "type": "label", "bind": { "text": "sys.datetime" } }
+```
+
+- Another layout (`13:05`, the day of the week): a string tag of the project and an interval script, `tag.clock = os.date("%H:%M")`.
+- `--check --render` draws the time it is run at; `--set "sys.datetime=2026-11-22 08:30:00"` draws a fixed one (each tag is set on its own).
+
 ## Schedules (actions that run by the clock)
 
 At a set time, the runtime runs the same actions as a button on a screen. Typical uses: enable operation at the start of work, switch the lights off at night,

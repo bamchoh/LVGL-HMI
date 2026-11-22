@@ -64,8 +64,9 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
   **そこにないキーは書かない**（ランタイムは黙って無視する。`--check` が見つける）。
 - `bind`（タグとの接続）、動作、ポップアップ、多言語、アラーム・トレンドなどの部品の使い方は
   **`reference/binding-and-actions.md`**。
-- 画面の外の機能（テンプレート画面、スケジュール、音、機器間のデータ転送、メール、ログの送信）の設定キーは
-  **`reference/project-features.md`**。これらは `project.json` に書く。頼まれたときだけ足す・変える。
+- 画面の外の機能（テンプレート画面、アラーム、データのログ、レシピ、スクリプト、日付と時刻のタグ、機器なしで値を動かす方法、
+  スケジュール、音、機器間のデータ転送、メール、ログの送信）の設定キーは **`reference/project-features.md`**。
+  これらは `project.json` に書く。頼まれたときだけ足す・変える（アラーム・トレンド・レシピの画面を頼まれたら、その設定は足してよい）。
 - そのまま動く見本は `examples/`（`project.json`、`screens/overview.json`、ポップアップの `screens/confirm_stop.json`）。
 
 ## 作るときの決まり
@@ -112,7 +113,9 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 - 画像（ロゴ、機器の絵、アイコン、背景）は `image` と `style` の `bg_image`。使い方と形式ごとの制限は資料の「画像」。
   **画像ファイルは作らない**: `assets/` にあるものを使い、なければ要るものを伝える。
 - アラーム、トレンド、レシピは専用の部品（`alarm_list` / `alarm_banner`、`trend`、`recipe_table`）を使う。
-  それぞれ `project.json` 側の設定（`alarms`、`data_log` のグループ、`recipes`）が要る。
+  それぞれ `project.json` 側の設定（`alarms`、`data_log` のグループ、`recipes`）が要る（書き方は `reference/project-features.md`）。
+- 日付と時刻は `sys.date` / `sys.time` / `sys.datetime`（文字列のタグ）を `label` に `bind` する。
+- 機器がないと、値は `tags` の `init` のまま動かない。動いて見せるのは頼まれたときだけ（`project-features.md` の「機器なしで値を動かす」）。
 
 ## 確かめ方
 
