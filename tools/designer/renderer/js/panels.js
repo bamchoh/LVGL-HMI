@@ -596,6 +596,11 @@ const Panels = {
       U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.font.add' }, disabled: !(App.info && App.info.fontsDir), onclick: () => App.addBundledFont() }, 'Add the Japanese font (Noto Sans JP)'),
         U.el('span', { class: 'dim' }, 'copies it into assets/fonts/ of the project, with its license, and sets it here')),
       U.el('div', { class: 'hint' }, 'Keep the license of the font next to it (Noto Sans JP: SIL Open Font License, OFL.txt).')));
+    el.append(Props.section('Icons', false,
+      U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.icons.add' }, disabled: !(App.info && App.info.iconsDir), onclick: () => App.addBundledIcons() }, 'Add the preset icons'),
+        U.el('span', { class: 'dim' }, 'copies them into assets/icons/ of the project')),
+      U.el('div', { class: 'hint' }, 'White pictograms (equipment: motor, pump, fan, oven, conveyor ... and for menus: home, trend, alarm, settings ...) in 24, 32, 48 and 64 px: assets/icons/48/motor.png. '
+        + 'Give them a color with the style "image_recolor" (green running, red fault). The list is assets/icons/icons.txt, a picture of all of them assets/icons/preview.png.')));
     el.append(Props.section('Theme', true,
       ...Props.fields(th, [{ k: 'dark', t: 'bool' }, { k: 'primary', t: 'color' }, { k: 'secondary', t: 'color' }, { k: 'font', t: 'font' }], fk + '.theme')));
     const raw = U.el('textarea', { rows: 10, class: 'mono', value: JSON.stringify(Object.assign({}, p, { screens: M.st.screens.map(s => s.file) }), null, 2), onchange: e => {

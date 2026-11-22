@@ -754,6 +754,7 @@ struct Host {
     webview::webview* w = nullptr;
     fs::path exe, renderer, runtime, settings_path;
     fs::path fonts;                    // fonts shipped with the designer (<exe dir>/fonts), or empty
+    fs::path icons;                    // preset icons shipped with the designer (<exe dir>/icons), or empty
     fs::path skill;                    // the AI skill shipped with the designer (<exe dir>/skills/hml-screens), or empty
     std::string argv_project;
     json settings = json::object();
@@ -800,6 +801,7 @@ struct Host {
             { "exeDir", ustr(exe) }, { "rendererDir", ustr(renderer) },
             { "skillDir", skill.empty() ? json(nullptr) : json(ustr(skill)) },
             { "fontsDir", fonts.empty() ? json(nullptr) : json(ustr(fonts)) },
+            { "iconsDir", icons.empty() ? json(nullptr) : json(ustr(icons)) },
             { "runtime", runtime.empty() ? json(nullptr) : json(ustr(runtime)) },
             { "argvProject", argv_project }, { "version", HML_DESIGNER_VERSION },
             { "targetRuntimes", target_runtimes() },
@@ -911,6 +913,19 @@ struct Host {
             if(ec) return err(std::string("cannot copy ") + name + " into " + ustr(to) + ": " + ec.message());
         }
         return json{ { "ok", true }, { "rel", std::string("assets/fonts/") + kFile } };
+    }
+
+    // Put the preset icons that come with the designer into a project: assets/icons/<size>/<name>.png
+    // (all of them: a few hundred small files), with their list and license.
+    json add_icons(const std::string& project_dir)
+    {
+        if(icons.empty()) return err("no icons were found next to the designer");
+        const fs::path to = upath(project_dir) / "assets" / "icons";
+        std::error_code ec;
+        fs::create_directories(to, ec);
+        fs::copy(icons, to, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
+        if(ec) return err("cannot copy the icons into " + ustr(to) + ": " + ec.message());
+        return json{ { "ok", true }, { "rel", "assets/icons" } };
     }
 
     // Copy the skill to where Claude Code looks for the user's skills (~/.claude/skills/hml-screens).
@@ -1546,6 +1561,7 @@ struct Host {
         });
         w->bind("hml_openFolder", [this, args_of, str](const std::string& req) { return open_folder(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_addFont", [this, args_of, str](const std::string& req) { return add_font(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
+        w->bind("hml_addIcons", [this, args_of, str](const std::string& req) { return add_icons(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_installSkill", [this](const std::string&) { return install_skill().dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_writeFiles", [this, args_of, str](const std::string& req) {
             json a = args_of(req);
@@ -1756,6 +1772,11 @@ int app_main(const std::vector<std::string>& args)
         font_dirs.push_back(upath(HML_DESIGNER_FONTS_DIR));
 #endif
         for(const auto& c : font_dirs) if(fs::exists(c / "NotoSansJP-subset.otf", ec)) { h.fonts = fs::absolute(c); break; }
+        std::vector<fs::path> icon_dirs{ exe_dir() / "icons" };
+#ifdef HML_DESIGNER_ICONS_DIR
+        icon_dirs.push_back(upath(HML_DESIGNER_ICONS_DIR));
+#endif
+        for(const auto& c : icon_dirs) if(fs::exists(c / "icons.txt", ec)) { h.icons = fs::absolute(c); break; }
     }
     if(h.renderer.empty()) {
         std::fprintf(stderr, "hml_designer: renderer/index.html not found (looked next to the executable in designer/)\n");
