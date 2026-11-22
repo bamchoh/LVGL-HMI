@@ -681,3 +681,75 @@ TEST_CASE("mqtt: no broker: the driver stops quickly; a bad configuration is ref
     CHECK(start(rt, json{ { "type", "mqtt" } }) == 0);            // no host
     CHECK(start(rt, json{ { "type", "mqtt" }, { "host", "h" }, { "cert_file", "c.pem" } }) == 0);   // no key_file
 }
+
+TEST_CASE("mqtt: JSON messages: several tags in one message out, fields of a message in")
+{
+    LogCapture log;
+    FakeBroker broker(false);
+    Runtime rt;
+    Tag* temp = rt.tag("temp", TagType::Float, 211.5);
+    rt.tag("count", TagType::Int, 3420);
+    rt.tag("run", TagType::Bool, 1);
+    rt.tag("product", "White bread");
+    Tag* sp = rt.tag("oven_sp", TagType::Int, 200, 150, 260);
+    Tag* rpm = rt.tag("rpm_sp", TagType::Float, 100);
+    Tag* mode = rt.tag("mode", "auto");
+    json cfg = plain_cfg(broker.port);
+    cfg["publish"] = json::parse(R"([
+        { "topic": "line1/status", "fields": { "/oven/temp": "temp", "/count": "count", "/run": "run", "/product": "product" },
+          "const": { "/device": "line1" }, "ts": "/ts" },
+        { "topic": "line1/beat", "fields": { "/count": "count" }, "mode": "interval", "interval_ms": 100 } ])");
+    cfg["subscribe"] = json::parse(R"([ { "topic": "line1/cmd", "fields": { "/oven/setpoint": "oven_sp", "/mixer/rpm": "rpm_sp", "/mode": "mode" } } ])");
+    REQUIRE(start(rt, cfg) == 1);
+    REQUIRE(wait_for(rt, [&] { return broker.online() && broker.subscriptions().size() == 1; }));
+    CHECK(broker.subscriptions()[0] == "plant/p1/line1/cmd");
+
+    // out: one message of all the fields, with the constants and the time; again when one changes
+    REQUIRE(wait_for(rt, [&] { return !broker.got("plant/p1/line1/status").empty(); }));
+    json m = json::parse(broker.got("plant/p1/line1/status")[0].payload);
+    CHECK(m["oven"]["temp"] == 211.5);
+    CHECK(m["count"] == 3420);
+    CHECK(m["count"].is_number_integer());
+    CHECK(m["run"] == true);
+    CHECK(m["product"] == "White bread");
+    CHECK(m["device"] == "line1");
+    CHECK(m["ts"].is_number_integer());
+    temp->set_number(212.0, nullptr);
+    CHECK(wait_for(rt, [&] { auto g = broker.got("plant/p1/line1/status"); return g.size() >= 2 && json::parse(g.back().payload)["oven"]["temp"] == 212.0; }));
+    CHECK(wait_for(rt, [&] { return broker.got("plant/p1/line1/beat").size() >= 3; }));
+
+    // in: the fields that are there, checked like a command; the others stay
+    broker.send(mqtt::publish("plant/p1/line1/cmd", R"({"oven":{"setpoint":220},"mixer":{"rpm":"135.5"},"other":1})", 0, false, 0));
+    REQUIRE(wait_for(rt, [&] { return sp->get_number() == 220 && rpm->get_number() == 135.5; }));
+    CHECK(mode->get().str == "auto");
+    broker.send(mqtt::publish("plant/p1/line1/cmd", R"({"oven":{"setpoint":999},"mode":"manual","mixer":{"rpm":null}})", 0, false, 0));
+    REQUIRE(wait_for(rt, [&] { return mode->get().str == "manual"; }));
+    CHECK(sp->get_number() == 220);                                     // 999 is outside 150..260: refused
+    CHECK(rpm->get_number() == 135.5);                                  // null: unchanged
+    CHECK(log.has("999 is outside 150..260"));
+    broker.send(mqtt::publish("plant/p1/line1/cmd", "not json", 0, false, 0));
+    broker.send(mqtt::publish("plant/p1/line1/cmd", R"({"oven":{"setpoint":{"v":1}}})", 0, false, 0));
+    CHECK(wait_for(rt, [&] { return log.has("not a JSON object") && log.has("refused: not a value"); }));
+    CHECK(sp->get_number() == 220);
+    CHECK(broker.online());
+}
+
+TEST_CASE("mqtt: JSON messages: wrong settings are left out")
+{
+    LogCapture log;
+    FakeBroker broker(false);
+    Runtime rt;
+    rt.tag("a", TagType::Int, 1);
+    json cfg = plain_cfg(broker.port);
+    cfg["publish"] = json::parse(R"([ { "fields": { "/a": "a" } }, { "topic": "t", "fields": { "a": "a", "/b": "nope", "": "a" } },
+                                      { "topic": "ok", "fields": { "/a": "a", "/x": "nope" } } ])");
+    cfg["subscribe"] = json::parse(R"([ { "topic": "c/#", "fields": { "/a": "a" } } ])");
+    REQUIRE(start(rt, cfg) == 1);
+    REQUIRE(wait_for(rt, [&] { return !broker.got("plant/p1/ok").empty(); }));
+    CHECK(json::parse(broker.got("plant/p1/ok")[0].payload) == json::parse(R"({"a":1})"));
+    CHECK(log.has("a message needs a \"topic\""));
+    CHECK(log.has("'a' is not a JSON pointer"));
+    CHECK(log.has("unknown tag 'nope'"));
+    CHECK(log.has("wildcards are not allowed"));
+    CHECK(broker.subscriptions().empty());
+}

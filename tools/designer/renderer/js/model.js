@@ -313,7 +313,11 @@ const M = {
       for (const [k, v] of Object.entries(d || {})) {
         if (!Array.isArray(v)) continue;
         if (k === 'tags' || k === 'publish' || k === 'subscribe') list(v, loc, k);
-        for (const row of v) if (row && typeof row === 'object') prop(row, 'tag', loc, k);
+        for (const row of v) if (row && typeof row === 'object') {
+          prop(row, 'tag', loc, k);
+          // a JSON message (mqtt): "fields": { "/pointer": "tag" }
+          if (row.fields && typeof row.fields === 'object') for (const f of Object.keys(row.fields)) prop(row.fields, f, loc, k);
+        }
       }
       prop(d, 'status_tag', loc);
     });

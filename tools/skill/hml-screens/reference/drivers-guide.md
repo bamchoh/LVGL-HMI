@@ -72,6 +72,12 @@ SLMP / FINS の `"dtype": "string"` は 1 文字 1 バイト（ASCII。1 ワー�
 - **FINS（オムロン）**: `D100` `CIO10` `W0.00` `H5` `A0` `E0_100` `T1` `C1`（`.00`〜`.15` はビット）。BCD の値は `bcd16` / `bcd32`。
 - **OPC UA クライアント**: `map` の各行に `node`（`ns=2;s=Line1.Temp` のようなノード ID）。サーバーの証明書を `server_cert` に。
 - **MQTT**: `publish`（タグ → ブローカー）と `subscribe`（ブローカー → タグ。外から書かれるのはここに書いたタグだけ）。トピックは `topic_prefix` + `topic`。
+  - 1 トピックに 1 つの値: `{ "tag": "temp", "topic": "oven/temp" }`（値はそのまま文字列。`"payload": "json"` なら `{"v": 21.5, "ts": ...}`）。
+  - **相手が決めた JSON**（メッセージの仕様書やサンプルがある）: 1 行に `"topic"` と `"fields": { "<JSON Pointer>": "<タグ>" }`。
+    publish は `const`（決まった値: `{ "/device": "line1" }`）と `ts`（時刻を入れる場所: `"/ts"`）も書ける。subscribe は、メッセージにあるフィールドだけを書く。
+    例: 仕様が `{"device": "line1", "oven": {"temp": 211.5}, "ts": 1763800000000}` なら
+    `{ "topic": "line1/status", "fields": { "/oven/temp": "oven_temperature" }, "const": { "/device": "line1" }, "ts": "/ts" }`。
+    配列の中は `/list/0/value`。仕様の名前と型（数値か文字列か）をタグに合わせ、合わなければ聞く。
 
 ## 例: アドレス表から
 

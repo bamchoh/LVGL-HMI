@@ -187,7 +187,7 @@ Only what is listed here exists. **How to add or change a driver safely: drivers
 | `timeout_ms` | number | connect / handshake (default 5000) |
 | `reconnect_ms` | number | first wait before connecting again; doubles up to 30 s (default 1000) |
 
-`publish` (Publish (tag values to the broker)): an array of rows (a row may also be just the tag name). Columns:
+`publish` (Publish (tag values to the broker; a JSON message of several tags: a row with "fields", edit it in raw JSON)): an array of rows (a row may also be just the tag name). Columns:
 
 | column | value | |
 | --- | --- | --- |
@@ -198,7 +198,7 @@ Only what is listed here exists. **How to add or change a driver safely: drivers
 | `qos` | `0` / `1` |  |
 | `retain` | true / false | optional.  |
 
-`subscribe` (Subscribe (commands: only these tags can be written)): an array of rows (a row may also be just the tag name). Columns:
+`subscribe` (Subscribe (commands: only these tags can be written; fields of a JSON message: a row with "fields", in raw JSON)): an array of rows (a row may also be just the tag name). Columns:
 
 | column | value | |
 | --- | --- | --- |
