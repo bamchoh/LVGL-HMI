@@ -114,9 +114,34 @@ const json* Project::driver_base_config(const std::string& key) const
 }
 
 // The transfers hold on to the drivers: gone before them, back after them.
+// "simulation": the items of a sim driver, kept apart from the device drivers (a demo may be
+// changed without touching the connection to the PLC). Off with "enabled": false.
+static bool simulation_on(const json& root)
+{
+    const json* sim = jget(root, "simulation");
+    return sim && sim->is_object() && jbool(*sim, "enabled", true) && jget(*sim, "items");
+}
+
+// sys.sim.active: 1 when values of the project are simulated (the "simulation" section, or a "sim"
+// driver that is on): screens can say so ("SIMULATION").
+static void update_sim_tag(const json& root)
+{
+    bool on = simulation_on(root);
+    if(const json* d = jget(root, "drivers"); d && d->is_array())
+        for(const json& cfg : *d) on = on || (iequals(jstr(cfg, "type", ""), "sim") && jbool(cfg, "enabled", true));
+    Tag* t = tags().find("sys.sim.active");
+    Value v = Value::number(on ? 1 : 0, TagType::Bool);
+    if(!t) tags().create("sys.sim.active", TagType::Bool, &v, false, 0, 0);
+    else t->set(v, nullptr);
+}
+
 static int load_drivers_and_transfers(const json& root)
 {
-    const int n = drivers().load(jget(root, "drivers"));
+    int n = drivers().load(jget(root, "drivers"));
+    if(simulation_on(root)) {
+        json one = json::array({ json{ { "type", "sim" }, { "name", "simulation" }, { "items", (*jget(root, "simulation"))["items"] } } });
+        n += drivers().load(&one);
+    }
     transfers().load(jget(root, "transfers"), jget(root, "drivers"), drivers());
     return n;
 }
@@ -228,6 +253,7 @@ bool Project::load(const std::string& path)
     }
     // sys.date / sys.time / sys.datetime (clock_tags.hpp)
     poll_clock_tags();
+    update_sim_tag(root_);
 
     // users and levels ("users"); a list edited on the device comes from project.local.json
     users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());

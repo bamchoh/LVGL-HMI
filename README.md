@@ -732,7 +732,30 @@ How to use it:
 }
 ```
 
-`mode`: `sine` / `triangle` / `ramp` / `square` / `random` / `counter` / `cycle`
+`mode`: `sine` / `triangle` / `ramp` / `square` / `random` / `counter` / `cycle` / `follow`
+
+| Key | Description |
+| --- | --- |
+| `when` | A tag (true), or `{ "tag": "mode", "eq": 2 }` (`eq ne gt lt ge le`). While it is false the item writes nothing (a counter stops counting) |
+| `target`, `rate`, `idle` | `follow`: moves towards `target` (a tag or a number) at `rate` units a second (default (max − min) / 5), within `min`..`max`; while `when` is false, towards `idle` (default `min`) |
+| `noise` | A random amount up to ± `noise` added to what `sine` / `triangle` / `ramp` / `follow` write |
+
+```json
+{ "tag": "mixer_rpm", "mode": "follow", "target": "mixer_rpm_sp", "rate": 40, "when": "mixer_running", "idle": 0, "noise": 1.5, "min": 0, "max": 300 },
+{ "tag": "production_count", "mode": "counter", "min": 0, "max": 999999, "period_ms": 3000, "when": "line_running" }
+```
+
+#### Simulation apart from the drivers (`simulation`)
+
+```json
+"simulation": { "items": [ { "tag": "oven_temperature", "mode": "sine", "min": 208, "max": 212, "period_ms": 30000 } ] }
+```
+
+- The same items as the `sim` driver, in their own section of project.json: a demo can be set up or changed without touching the drivers (the connection to the PLC).
+  `"enabled": false` turns it off. The designer has it under the Drivers tab, "Simulation".
+- Tag `sys.sim.active`: 1 when the project simulates values (this section, or a `sim` driver that is on). Show it on the screens, so that nobody takes the values for real ones:
+  `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" } }`.
+- To simulate only while no PLC is connected, give the items `"when": { "tag": "plc_online", "eq": false }` (the `status_tag` of the driver).
 
 ### Driver: modbus_tcp
 

@@ -199,8 +199,9 @@ const SCHEMA = {
     sim: {
       label: 'Simulation', fields: [],
       table: { key: 'items', label: 'Items', columns: [
-        { k: 'tag', t: 'tag' }, { k: 'mode', t: 'select', o: ['sine', 'triangle', 'ramp', 'square', 'random', 'counter', 'cycle'] },
-        { k: 'min', t: 'number' }, { k: 'max', t: 'number' }, { k: 'period_ms', t: 'number' }, { k: 'values', t: 'csv' }] },
+        { k: 'tag', t: 'tag' }, { k: 'mode', t: 'select', o: ['sine', 'triangle', 'ramp', 'square', 'random', 'counter', 'cycle', 'follow'] },
+        { k: 'min', t: 'number' }, { k: 'max', t: 'number' }, { k: 'period_ms', t: 'number' }, { k: 'values', t: 'csv' },
+        { k: 'when', t: 'tag', opt: true }, { k: 'target', t: 'text', opt: true }, { k: 'rate', t: 'number', opt: true }, { k: 'idle', t: 'number', opt: true }, { k: 'noise', t: 'number', opt: true }] },
     },
     modbus_tcp: {
       label: 'Modbus TCP client',

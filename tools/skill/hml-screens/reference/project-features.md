@@ -165,15 +165,39 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 
 ## 機器なしで値を動かす
 
-デモや確認で、PLC なしに値を動かす方法は 2 つ。どちらも**動いて見える値が本物ではない**ので、画面に「SIMULATION」などの表示を
-出すか、報告で必ず伝える。**頼まれていなければ、どちらもしない**（値は `tags` の `init` のまま止まる。それで正しい）。
+デモや確認で PLC なしに値を動かすのは、**頼まれたときだけ**（頼まれていなければ、値は `tags` の `init` のまま止まる。それで正しい）。
+動いて見える値は本物ではないので、**画面に必ず「SIMULATION」と出す**（`sys.sim.active` が 1 の間だけ出る `label`。下）。
 
-1. **シミュレーター（`drivers` の `"type": "sim"`）**: 決まった波形をタグに書く。`drivers` を変えるので、ユーザーが許したときだけ。
-   `{ "tag": "oven_temperature", "mode": "sine", "min": 205, "max": 215, "period_ms": 20000 }`。`mode`: `sine` `triangle` `ramp`
-   （`min` → `max` を繰り返す）`square`（真 / 偽）`random` `counter`（`min` から 1 ずつ）`cycle`（`values` の文字を順に）。
-2. **スクリプト**: 操作に応じた動き（運転ボタンで回転数が上がる、運転中だけ生産数が増える）は、周期のスクリプトで書く。
-   PLC がつながっていないときだけ動くようにする（つながりを示すタグがあれば `if not tag.plc_online then ... end`）。
-   見本: `projects/demo` の `pump` スクリプト（運転中だけ速度が設定値に近づく）。
+**`simulation`（`project.json`）に書く**。`drivers`（機器との接続）とは別の場所なので、「`drivers` に触らない」という決まりのままで足せる。
+`drivers` の `"type": "sim"` は使わない（既にあれば、そのままにする）。
+
+```json
+"simulation": { "items": [
+  { "tag": "oven_temperature", "mode": "sine", "min": 208, "max": 212, "period_ms": 30000 },
+  { "tag": "mixer_rpm", "mode": "follow", "target": "mixer_rpm_sp", "rate": 40, "when": "mixer_running", "idle": 0, "noise": 1.5, "min": 0, "max": 300 },
+  { "tag": "production_count", "mode": "counter", "min": 0, "max": 999999, "period_ms": 3000, "when": "line_running" },
+  { "tag": "line_state", "mode": "cycle", "values": ["Idle", "Run"], "period_ms": 10000 }
+] }
+```
+
+| キー | 内容 |
+| --- | --- |
+| `tag` | 書くタグ（必須） |
+| `mode` | `sine` `triangle` `ramp`（`min` → `max` を繰り返す）/ `square`（`max` と `min` を交互）/ `random` / `counter`（`period_ms` ごとに 1 増え、`max` の次は `min`）/ `cycle`（`values` の文字を順に）/ `follow`（下） |
+| `min`、`max`、`period_ms` | 範囲（省くとタグの `min` / `max`）、周期（既定 1000） |
+| `when` | タグ名（真の間だけ動く）か `{ "tag": "mode", "eq": 2 }`。偽の間は書かない（カウンターは止まる） |
+| `target`、`rate`、`idle` | `follow`: `target`（タグか数値）へ 1 秒に `rate` ずつ近づく。`when` が偽の間は `idle`（既定 `min`）へ。運転ボタンで回転数が上がる、ヒーターで温度が上がる、という動き |
+| `noise` | `sine` `triangle` `ramp` `follow` の値に ± `noise` の揺れを足す（本物らしく見せる。小さく） |
+| `enabled`（`simulation` の） | `false` で止める |
+
+- 操作に応じて動かす: ボタンが書くタグ（`mixer_running`、設定値 `mixer_rpm_sp`）を `when` と `target` に使う。
+  「A かつ B のとき」はスクリプトで bool のタグを作って `when` にする。もっと複雑な動きはスクリプト（`projects/demo` の `pump`）。
+- 機器の値（実際の温度など）を、機器がつながったあとも書き続けないよう、PLC のつながりを示すタグがあれば
+  `"when": { "tag": "plc_online", "eq": false }` を付ける。
+- 表示: `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" }, "style": { "text_color": "#f5b942" } }`
+  をヘッダー（テンプレート）に置く。`sys.sim.active` は、`simulation` か有効な `sim` ドライバがあるとき 1。
+- `--check --render` では動かない（値は `init`。`--set` で確かめる）。動きを見るのは「押したあとの様子を確かめたいとき」の手順で
+  （コピーの `drivers` を消しても `simulation` は残る）。
 
 ## スケジュール (`schedules`)
 

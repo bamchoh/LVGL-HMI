@@ -431,6 +431,34 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
         }
     }
 
+    // ---- simulated values: the "simulation" section and "sim" drivers (driver_sim.cpp)
+    auto check_sim = [&](const std::string& where, const json* items) {
+        if(!items || !items->is_array()) { c.add(where, "no \"items\""); return; }
+        static const std::set<std::string> modes{ "sine", "triangle", "ramp", "sawtooth", "square", "toggle", "random", "counter", "cycle", "follow" };
+        static const std::set<std::string> keys{ "tag", "mode", "min", "max", "period_ms", "values", "when", "noise", "target", "rate", "idle" };
+        for(size_t i = 0; i < items->size(); i++) {
+            const json& it = (*items)[i];
+            const std::string w = where + ": items[" + std::to_string(i) + "]";
+            if(!it.is_object()) { c.add(w, "not an object"); continue; }
+            for(auto k = it.begin(); k != it.end(); ++k) if(!keys.count(k.key())) c.add(w, "unknown key \"" + k.key() + "\" (ignored by the runtime)");
+            const std::string mode = jstr(it, "mode", "sine");
+            if(!modes.count(mode)) c.add(w, "unknown mode \"" + mode + "\" (sine triangle ramp square random counter cycle follow)");
+            if(const json* wh = jget(it, "when")) c.need_tag(w, "when", wh->is_object() ? wh->value("tag", json("")) : *wh);
+            if(mode == "follow") {
+                const json* t = jget(it, "target");
+                if(!t || !(t->is_string() || t->is_number())) c.add(w, "mode \"follow\" needs \"target\" (a tag or a number)");
+                else if(t->is_string()) c.need_tag(w, "target", *t);
+            }
+        }
+    };
+    if(const json* sim = jget(root, "simulation")) {
+        if(!sim->is_object()) c.add("simulation", "not an object");
+        else check_sim("simulation", jget(*sim, "items"));
+    }
+    if(const json* dl = jget(root, "drivers"); dl && dl->is_array())
+        for(size_t i = 0; i < dl->size(); i++)
+            if((*dl)[i].is_object() && jstr((*dl)[i], "type", "") == "sim") check_sim("drivers[" + std::to_string(i) + "] (sim)", jget((*dl)[i], "items"));
+
     // ---- the screens: read them all first (their names are needed for goto / popup)
     struct Screen { std::string file; json def; };
     std::vector<Screen> screens;
