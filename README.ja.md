@@ -1840,6 +1840,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 ```json
 "bind": {
   "text":       { "tag": "temp", "format": "%.1f C" },
+  "text":       { "tag": "state", "map": { "0": "@stopped", "1": "@running", "default": "?" } },
   "value":      { "tag": "pressure", "scale": 10 },
   "checked":    "run",
   "on":         "run",
@@ -1860,7 +1861,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `scale` / `offset`                      | ウィジェット値 = タグ値 × scale + offset（双方向時は逆変換）                                                                                |
 | `invert`                                | 真偽を反転                                                                                                                                  |
 | `eq` / `ne` / `gt` / `lt` / `ge` / `le` | 条件付き真偽（`visible`, `enabled`, `checked`, `on` で使用）。比較対象は定数か、`{ "tag": "temp_hi" }` のように別のタグ（どちらのタグが変わっても再評価）。`checked` に `eq` を付けると、ON 時にその値をタグへ書く（ラジオボタン的動作） |
-| `map`                                   | 値 → 色 のマップ。`default` で既定色                                                                                                        |
+| `map`                                   | 値 → 色（`bg_color`、`text_color`）、または 値 → 文字（`text`。`@ID` は訳される）のマップ。数値のキー（`true` / `false` = 1 / 0）はその数値に当たり、どのキーも、その文字を持つ文字列のタグに当たる（`"main"`）。`default` でその他。`text` で当たるキーも `default` もなければ、値を `format` で出す |
 | `part`                                  | `bg_color` の対象パート: `main` (既定) / `indicator` / `knob`                                                                               |
 | `two_way`                               | 双方向の明示的な ON/OFF                                                                                                                     |
 

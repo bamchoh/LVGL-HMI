@@ -108,7 +108,7 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 **データ**
 - 表示は `label` + `bind`（大きな数値、文章の中の値）か `numeric_display`（枠付きの値、入力もできる値）。入力は `numeric_display` / `text_display` に `"input": true`
   （画面に `keyboard` を 1 つ置く）。入力には `min` / `max` を付ける。
-- 状態は `led` や `bind` の `bg_color` + `map`。値によって出し分けるものは `visible` と条件（`eq` `gt` …）。
+- 状態は `led` や `bind` の `bg_color` + `map`、言葉は `bind` の `text` + `map`（`{ "0": "@stopped", "1": "@running" }`）。値によって出し分けるものは `visible` と条件（`eq` `gt` …）。
 - 点滅・回転・移動などの動きは `animate`（資料の「アニメーション」）。気づいてほしい状態だけに、タグの条件（`when`）を付けて使う。
 - 画像（ロゴ、機器の絵、アイコン、背景）は `image` と `style` の `bg_image`。使い方と形式ごとの制限は資料の「画像」。
   **画像ファイルは作らない**: `assets/` にあるものを使い、なければ要るものを伝える。

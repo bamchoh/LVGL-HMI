@@ -1838,6 +1838,7 @@ The object form can give several properties.
 ```json
 "bind": {
   "text":       { "tag": "temp", "format": "%.1f C" },
+  "text":       { "tag": "state", "map": { "0": "@stopped", "1": "@running", "default": "?" } },
   "value":      { "tag": "pressure", "scale": 10 },
   "checked":    "run",
   "on":         "run",
@@ -1858,7 +1859,7 @@ The object form can give several properties.
 | `scale` / `offset`                      | Widget value = tag value × scale + offset (the inverse conversion when two-way)                                                             |
 | `invert`                                | Inverts true and false                                                                                                                      |
 | `eq` / `ne` / `gt` / `lt` / `ge` / `le` | A conditional true / false (used with `visible`, `enabled`, `checked`, `on`). The value to compare with is a constant, or another tag as in `{ "tag": "temp_hi" }` (evaluated again when either tag changes). With `eq` on `checked`, that value is written to the tag when the widget turns ON (it behaves like a radio button) |
-| `map`                                   | A map of value → color. `default` gives the default color                                                                                   |
+| `map`                                   | A map of value → color (`bg_color`, `text_color`) or value → text (`text`; `@ID` is translated). A key that is a number (`true` / `false` = 1 / 0) matches that number; every key also matches a string tag with that text (`"main"`). `default` gives the rest. A `text` without a matching key or `default` shows the value with `format` |
 | `part`                                  | The part that `bg_color` applies to: `main` (default) / `indicator` / `knob`                                                                |
 | `two_way`                               | Turns two-way ON/OFF explicitly                                                                                                             |
 
