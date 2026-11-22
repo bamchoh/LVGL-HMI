@@ -1,0 +1,446 @@
+{
+ "name": "alarms",
+ "template": "frame",
+ "template_args": {
+  "title": "Alarm Monitor"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 912,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "CURRENT ALARMS",
+     "x": 0,
+     "y": 12,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     },
+     "bind": {
+      "visible": {
+       "tag": "alarm_view",
+       "eq": 0
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "ALARM HISTORY (7 days)",
+     "x": 0,
+     "y": 12,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     },
+     "bind": {
+      "visible": {
+       "tag": "alarm_view",
+       "eq": 1
+      }
+     }
+    },
+    {
+     "type": "panel",
+     "y": 0,
+     "w": 312,
+     "h": 48,
+     "style": {
+      "pad_gap": 8,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "row",
+     "align": "top_right",
+     "children": [
+      {
+       "type": "button",
+       "w": 152,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "alarm_view",
+        "value": 0
+       },
+       "text": "Current",
+       "style_label": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "alarm_view",
+         "eq": 0
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      },
+      {
+       "type": "button",
+       "w": 152,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "alarm_view",
+        "value": 1
+       },
+       "text": "History",
+       "style_label": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "alarm_view",
+         "eq": 1
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      }
+     ]
+    },
+    {
+     "type": "alarm_list",
+     "x": 0,
+     "y": 64,
+     "w": 880,
+     "h": 448,
+     "mode": "current",
+     "row_height": 48,
+     "columns": [
+      "time",
+      "severity",
+      "message",
+      "state"
+     ],
+     "ack_on_tap": true,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "alarm_view",
+       "eq": 0
+      }
+     }
+    },
+    {
+     "type": "alarm_list",
+     "x": 0,
+     "y": 64,
+     "w": 880,
+     "h": 448,
+     "mode": "history",
+     "days": 7,
+     "row_height": 48,
+     "columns": [
+      "time",
+      "severity",
+      "message",
+      "state"
+     ],
+     "ack_on_tap": false,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "alarm_view",
+       "eq": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 944,
+   "y": 80,
+   "w": 320,
+   "h": 248,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "Active",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "x": 0,
+     "y": 24,
+     "style": {
+      "font": 48,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.alarm.active",
+       "format": "%d"
+      },
+      "text_color": {
+       "tag": "sys.alarm.active",
+       "map": {
+        "0": "#36c98f",
+        "default": "#f06464"
+       }
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "Unacknowledged",
+     "x": 136,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "x": 136,
+     "y": 24,
+     "style": {
+      "font": 48,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.alarm.unacked",
+       "format": "%d"
+      },
+      "text_color": {
+       "tag": "sys.alarm.unacked",
+       "map": {
+        "0": "#36c98f",
+        "default": "#f5b942"
+       }
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "Tap a row to acknowledge it.",
+     "x": 0,
+     "y": 92,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "button",
+     "w": 288,
+     "h": 64,
+     "style": {
+      "bg_color": "#19707c",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 8
+     },
+     "on_click": {
+      "action": "call",
+      "fn": "alarm.ack_all"
+     },
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/check.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "ACKNOWLEDGE ALL",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       }
+      }
+     ],
+     "x": 0,
+     "y": 136
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 944,
+   "y": 344,
+   "w": 320,
+   "h": 280,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "bind": {
+    "visible": "sys.sim.active"
+   },
+   "children": [
+    {
+     "type": "label",
+     "text": "SIMULATION",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#f5b942",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Demo only: raise a fault without a PLC.",
+     "x": 0,
+     "y": 28,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     },
+     "w": 288,
+     "long_mode": "wrap"
+    },
+    {
+     "type": "button",
+     "w": 288,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0
+     },
+     "on_click": {
+      "action": "toggle",
+      "tag": "conveyor_fault"
+     },
+     "text": "Conveyor error",
+     "style_label": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "x": 0,
+     "y": 64,
+     "checkable": true,
+     "bind": {
+      "checked": "conveyor_fault"
+     },
+     "style_checked": {
+      "bg_color": "#b23b3b"
+     }
+    },
+    {
+     "type": "button",
+     "w": 288,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0
+     },
+     "on_click": {
+      "action": "toggle",
+      "tag": "plc_comm_error"
+     },
+     "text": "PLC comm. error",
+     "style_label": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "x": 0,
+     "y": 128,
+     "checkable": true,
+     "bind": {
+      "checked": "plc_comm_error"
+     },
+     "style_checked": {
+      "bg_color": "#b23b3b"
+     }
+    },
+    {
+     "type": "button",
+     "w": 288,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0
+     },
+     "on_click": {
+      "action": "toggle",
+      "tag": "mixer_fault"
+     },
+     "text": "Mixer fault",
+     "style_label": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "x": 0,
+     "y": 192,
+     "checkable": true,
+     "bind": {
+      "checked": "mixer_fault"
+     },
+     "style_checked": {
+      "bg_color": "#b23b3b"
+     }
+    }
+   ]
+  }
+ ]
+}

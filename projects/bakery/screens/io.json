@@ -1,0 +1,1086 @@
+{
+ "name": "io",
+ "template": "frame",
+ "template_args": {
+  "title": "I/O Monitor"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 464,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "BIT DEVICES",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Addr",
+     "x": 40,
+     "y": 32,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "text": "Tag",
+     "x": 104,
+     "y": 32,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "text": "Value",
+     "x": 330,
+     "y": 32,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "text": "Access",
+     "y": 32,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 56,
+     "w": 432,
+     "h": 1,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 64,
+     "w": 432,
+     "h": 448,
+     "style": {
+      "pad_gap": 4,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "column",
+     "children": [
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "conveyor_running"
+        },
+        {
+         "type": "label",
+         "text": "X000",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "conveyor_running",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_running",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "conveyor_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "RO",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "mixer_running"
+        },
+        {
+         "type": "label",
+         "text": "X001",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "mixer_running",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_running",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "mixer_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "RO",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "mixer_fault"
+        },
+        {
+         "type": "label",
+         "text": "X002",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "mixer_fault",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_fault",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "mixer_fault",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "RO",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "conveyor_fault"
+        },
+        {
+         "type": "label",
+         "text": "X003",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "conveyor_fault",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_fault",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "conveyor_fault",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "RO",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "mixer_reverse"
+        },
+        {
+         "type": "label",
+         "text": "Y010",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "mixer_reverse",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_reverse",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "mixer_reverse",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "proofing_heater_on"
+        },
+        {
+         "type": "label",
+         "text": "Y011",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "proofing_heater_on",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_heater_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "proofing_heater_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "proofing_humidifier_on"
+        },
+        {
+         "type": "label",
+         "text": "Y012",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "proofing_humidifier_on",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_humidifier_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "proofing_humidifier_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "oven_heater_on"
+        },
+        {
+         "type": "label",
+         "text": "Y013",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "oven_heater_on",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_heater_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "oven_heater_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "cooling_fan_on"
+        },
+        {
+         "type": "label",
+         "text": "Y014",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "cooling_fan_on",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "cooling_fan_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "cooling_fan_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 432,
+       "h": 40,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "led",
+         "x": 0,
+         "y": 8,
+         "w": 24,
+         "h": 24,
+         "color": "#36c98f",
+         "bind": "manual_mode"
+        },
+        {
+         "type": "label",
+         "text": "M100",
+         "x": 40,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#26c6da"
+         }
+        },
+        {
+         "type": "label",
+         "text": "manual_mode",
+         "x": 104,
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "label",
+         "text": "",
+         "y": 10,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "manual_mode",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "manual_mode",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         },
+         "x": 330
+        },
+        {
+         "type": "label",
+         "text": "R/W",
+         "y": 10,
+         "style": {
+          "font": 14,
+          "text_color": "#f5b942"
+         },
+         "align": "top_right"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 496,
+   "y": 80,
+   "w": 768,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "WORD DEVICES",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Planned PLC addresses - no PLC connected, values are simulated",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 14,
+      "text_color": "#f5b942"
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "table",
+     "x": 0,
+     "y": 32,
+     "w": 736,
+     "h": 476,
+     "header": true,
+     "columns": [
+      {
+       "title": "Addr",
+       "width": 80
+      },
+      {
+       "title": "Tag",
+       "width": 256
+      },
+      {
+       "title": "Type",
+       "width": 96
+      },
+      {
+       "title": "Value",
+       "align": "right",
+       "width": 200
+      },
+      {
+       "title": "Access",
+       "width": 100
+      }
+     ],
+     "rows": [
+      [
+       "D100",
+       "mixer_rpm",
+       "FLOAT",
+       {
+        "tag": "mixer_rpm",
+        "format": "%.1f rpm"
+       },
+       "RO"
+      ],
+      [
+       "D102",
+       "mixer_rpm_sp",
+       "INT",
+       {
+        "tag": "mixer_rpm_sp",
+        "format": "%d rpm"
+       },
+       "R/W"
+      ],
+      [
+       "D110",
+       "proofing_temperature",
+       "FLOAT",
+       {
+        "tag": "proofing_temperature",
+        "format": "%.1f °C"
+       },
+       "RO"
+      ],
+      [
+       "D112",
+       "proofing_humidity",
+       "FLOAT",
+       {
+        "tag": "proofing_humidity",
+        "format": "%.1f %%RH"
+       },
+       "RO"
+      ],
+      [
+       "D120",
+       "oven_temperature",
+       "FLOAT",
+       {
+        "tag": "oven_temperature",
+        "format": "%.1f °C"
+       },
+       "RO"
+      ],
+      [
+       "D122",
+       "oven_target_temperature",
+       "INT",
+       {
+        "tag": "oven_target_temperature",
+        "format": "%d °C"
+       },
+       "R/W"
+      ],
+      [
+       "D124",
+       "oven_heater_output",
+       "FLOAT",
+       {
+        "tag": "oven_heater_output",
+        "format": "%.0f %%"
+       },
+       "RO"
+      ],
+      [
+       "D130",
+       "conveyor_speed",
+       "FLOAT",
+       {
+        "tag": "conveyor_speed",
+        "format": "%.2f m/min"
+       },
+       "RO"
+      ],
+      [
+       "D200",
+       "production_count",
+       "INT",
+       {
+        "tag": "production_count",
+        "format": "%d"
+       },
+       "RO"
+      ],
+      [
+       "D202",
+       "packaging_film_remaining",
+       "FLOAT",
+       {
+        "tag": "packaging_film_remaining",
+        "format": "%.0f %%"
+       },
+       "RO"
+      ]
+     ],
+     "style": {
+      "bg_color": "#192538",
+      "border_width": 0,
+      "font": 16,
+      "text_color": "#e5edf5"
+     }
+    }
+   ]
+  }
+ ]
+}

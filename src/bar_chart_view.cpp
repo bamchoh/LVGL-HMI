@@ -158,8 +158,10 @@ lv_obj_t* build_bar_chart(lv_obj_t* parent, const json& w)
     if(!iequals(mode, "increase") && !iequals(mode, "value")) HML_WARN("bar_chart: unknown mode '%s' (increase, value)", mode.c_str());
     const double bs = std::clamp(jnum(w, "bucket_s", 3600), 60.0, 86400.0);
     c->bucket_ms = static_cast<int64_t>(bs) * 1000;
-    c->bars = std::clamp(static_cast<int>(jnum(w, "bars", 12)), 1, kMaxBars);
     c->from_day = iequals(jstr(w, "start", "now"), "day");
+    // from midnight without "bars": the whole day (24 bars of an hour), at most 48
+    const double whole_day = std::ceil(86400.0 / bs);
+    c->bars = std::clamp(static_cast<int>(jnum(w, "bars", c->from_day ? whole_day : 12)), 1, kMaxBars);
     c->max = jnum(w, "max", 0);
     c->decimals = std::clamp(static_cast<int>(jnum(w, "decimals", 0)), 0, 3);
     c->show_values = jbool(w, "show_values", true);

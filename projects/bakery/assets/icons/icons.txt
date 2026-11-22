@@ -1,0 +1,2 @@
+equipment: conveyor cooling factory fan flame gauge heater humidity mixer motor oven package pump slicer tank thermometer valve
+interface: alarm back check clock error forward home info io list lock menu pause play power process recipe report reset settings stop trend user warning

@@ -17,6 +17,9 @@
 //     { "tag": "made",  "mode": "counter",  "min": 0, "max": 999999, "period_ms": 2000, "when": "line_run" }
 //   ]
 // }
+// A counter goes on from the value the tag has when the simulation starts (its "init"), when that
+// is inside min..max. Waveforms start at their phase 0: sine in the middle, ramp / triangle at min.
+// A follow item writes no noise while "when" is false, and its noisy values stay inside min..max.
 // "when": a tag (true) or { "tag": ..., "eq" | "ne" | "gt" | "lt" | "ge" | "le": <number, true / false, text> }.
 // While it is false an item writes nothing (a follow item goes to its idle value). "noise": a random
 // amount up to +- noise is added to what a number item writes.
@@ -94,7 +97,14 @@ public:
     {
         t0_ = millis();
         last_tick_ = t0_;
-        for(Item& it : items_) if(it.mode == Mode::Follow) it.state = it.tag->get_number();
+        for(Item& it : items_) {
+            if(it.mode == Mode::Follow) it.state = it.tag->get_number();
+            // a counter goes on from the value the tag has (its init), not from min
+            if(it.mode == Mode::Counter) {
+                const double v = it.tag->get_number();
+                if(v >= it.min && v <= it.max) it.step = static_cast<int>(std::lround(v - it.min));
+            }
+        }
         timer_ = lv_timer_create(&SimDriver::tick, 50, this);
         return timer_ != nullptr;
     }
@@ -124,7 +134,7 @@ private:
 
     static void tick(lv_timer_t* t) { static_cast<SimDriver*>(lv_timer_get_user_data(t))->on_tick(); }
     void on_tick();
-    void write(Item& it, double v);
+    void write(Item& it, double v, bool clamp = false);
 
     std::vector<Item> items_;
     uint32_t          t0_ = 0, last_tick_ = 0;
@@ -189,11 +199,12 @@ SimDriver::SimDriver(const json& cfg)
     ok_ = true;
 }
 
-void SimDriver::write(Item& it, double v)
+void SimDriver::write(Item& it, double v, bool clamp)
 {
     if(it.noise > 0) {
         std::uniform_real_distribution<double> dist(-it.noise, it.noise);
         v += dist(rng_);
+        if(clamp) v = std::clamp(v, std::min(it.min, it.max), std::max(it.min, it.max));
     }
     it.tag->set_number(v, this);
 }
@@ -211,7 +222,8 @@ void SimDriver::on_tick()
             const double step = it.rate * dt;
             if(it.state < goal) it.state = std::min(goal, it.state + step);
             else if(it.state > goal) it.state = std::max(goal, it.state - step);
-            write(it, it.state);
+            if(on) write(it, it.state, true);
+            else it.tag->set_number(it.state, this);            // (at rest: no noise, a stopped machine reads 0)
             continue;
         }
         if(!on) { it.last_step = now; continue; }           // (a counter starts a whole period after "when" comes)

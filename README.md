@@ -738,7 +738,9 @@ How to use it:
 | --- | --- |
 | `when` | A tag (true), or `{ "tag": "mode", "eq": 2 }` (`eq ne gt lt ge le`). While it is false the item writes nothing (a counter stops counting) |
 | `target`, `rate`, `idle` | `follow`: moves towards `target` (a tag or a number) at `rate` units a second (default (max − min) / 5), within `min`..`max`; while `when` is false, towards `idle` (default `min`) |
-| `noise` | A random amount up to ± `noise` added to what `sine` / `triangle` / `ramp` / `follow` write |
+| `noise` | A random amount up to ± `noise` added to what `sine` / `triangle` / `ramp` / `follow` write. A `follow` item at rest (`when` false) has none, and stays within `min`..`max` |
+
+- A `counter` goes on from the value the tag has when it starts (its `init`, when that is within `min`..`max`). Waveforms start at their phase 0: `sine` in the middle, `ramp` / `triangle` at `min`.
 
 ```json
 { "tag": "mixer_rpm", "mode": "follow", "target": "mixer_rpm_sp", "rate": 40, "when": "mixer_running", "idle": 0, "noise": 1.5, "min": 0, "max": 300 },
@@ -2136,7 +2138,7 @@ It shows one tag of a data log group in time slices on the clock, one bar each: 
 | `group`, `tag` | The data log group and the tag it records |
 | `mode` | `increase` (default): what the tag grew by in each slice (a counter). `value`: its last value in each slice |
 | `bucket_s` | One bar = this many seconds (60 to 86400, default 3600), on the clock: whole hours |
-| `bars` | How many (1 to 48, default 12), the newest on the right |
+| `bars` | How many (1 to 48), the newest on the right. Default 12; with `start: "day"` a whole day (24 bars of an hour) |
 | `start` | `now` (default): the last bars up to now. `day`: from midnight on (24 bars of an hour = today, the hours to come empty) |
 | `max` | The top of the scale (omitted: a little above the largest bar or the target) |
 | `target`, `target_color` | A line at this value (a number, or `{ "tag": "hourly_target" }`) |

@@ -110,6 +110,8 @@
 
 - `fit`（PNG）: `w` `h` の枠に、`contain`（比率を保って全体が入る）/ `stretch`（引き伸ばす）/ `tile`（敷き詰める）/ `center`。
   省くと元の大きさで、`w` `h` は画像の大きさになる。
+- **状態で色を変えるアイコン**: `image` の色は `bind` で変えられない。同じファイルを `image_recolor` だけ変えて同じ位置に重ね、それぞれに
+  `visible` の条件を付ける。枠の色（`border_color`）も `bind` できないので、状態は色の帯（`panel` の `bg_color` + `map`）で出す。
 - 値で絵を替える: `bind` の `src` に `map`（値 → ファイル。bool は `"true"` / `"false"`、その他は `"default"`）。
   当てはまるファイルがない値のときは何も表示しない。文字列のタグにファイル名を入れて `"bind": { "src": "タグ" }` でもよい。
 - 背景に敷く: `style` の `bg_image`（画面・`panel`・`button` など。中央に元の大きさ。`"bg_image_tiled": true` で敷き詰め、
@@ -223,6 +225,8 @@
 
 - 開くのは `{ "action": "popup", "screen": "confirm_stop" }`。開いている間、下の画面は触れない。
 - 確かめるときは `--render <開く元の画面>+confirm_stop,<ファイル.png>`。
+- 中の幅は `w` から `pad` の 2 倍と枠（`border_width`。テーマでは 2 px）の 2 倍を引いたもの。子をぴったりの幅にすると横のスクロールバーが
+  出る。子の幅は `"100%"` にするか、余裕を取る。
 - 大きさと位置は `w` `h` `x` `y` `align`（既定は 60% × 60%、中央）。
 - 確認が要る操作（停止、削除）や、1 台分の詳細表示に使う。`"set"` で「どの装置か」をタグに渡せる。
 - ポップアップも `project.json` の `"screens"` に足す。
@@ -246,6 +250,8 @@
 ## 専用の部品
 
 これらは中に自分の表示（見出し、ボタン、行）を持つので、小さすぎると中身が入らない。下の「大きさ」を守る。
+部品の `style`（`bg_color`、`border_width`、`radius`、`pad`、`font`、`text_color`）は枠と文字に効く。中の行やボタンの色（`alarm_list` の
+重要度の色、履歴の行、`recipe_table` の書き込みボタン）は変えられない。
 
 | 部品 | 要るもの | 例 |
 | --- | --- | --- |
@@ -277,6 +283,7 @@
 
 - 「今出ているアラームを 1 行で」は `alarm_banner`（いちばん新しい未確認の 1 件。なければ `idle` の文字）。
   「一覧で」は `alarm_list`。
+- 「対象設備」の列はない。`message` の頭に設備名を書く（`"Oven: temperature high"`）。
 - `alarm_list` の `columns`: `time` `severity` `message` `state` から選ぶ（省くと `["time", "message", "state"]`）。
   `mode`: `current`（省いたとき。発生中と未確認）/ `history`（履歴。`days` で期間）。`rows` は出す行数の上限
   （省くと 50、履歴は 20）、`row_height` は省くと 40。`ack_on_tap` は省くと true（行を押すと確認）。
@@ -303,7 +310,9 @@
 - 変数ロギングの 1 つのタグを、時計に合わせた区切り（既定 1 時間）ごとに棒で出す。**時間別の生産数**は、生産数のカウンター
   （増えていくタグ）を `data_log` のグループに入れ（`"trigger": "interval"`, `"interval_ms": 60000` で十分）、`"mode": "increase"`（既定）にする。
   区切りごとの最後の値（温度、在庫）は `"mode": "value"`。
-- `bucket_s`（1 本の秒数、既定 3600）、`bars`（本数 1〜48、既定 12）、`start`: `now`（今までの最後の何本）/ `day`（0 時から。24 本で今日）。
+- `bucket_s`（1 本の秒数、既定 3600）、`bars`（本数 1〜48）、`start`: `now`（今までの最後の何本。既定 12 本）/ `day`（0 時から。`bars` を
+  省くと 1 日分 = 24 本。12 本にすると 0〜11 時だけになる）。
+- `target` は各棒の目標の高さに横線を引く（棒の間で切れた破線に見える）。`label` は**棒の下の時刻の書式**（題ではない。題は別の `label` 部品）。
 - `target`（数値）で目標の線、`color` / `target_color`、`decimals`、`show_values`（棒の上の数値）、`label`（棒の下の時刻、strftime。既定は `%H`）。
 - 中に、上の数値・棒・下の時刻を持つ。**高さは 160 以上、1 本あたり幅 24 以上**（12 本なら幅 360 以上。数値が入らなければ `show_values: false`）。
   文字の大きさと色は部品の `style`（`font`、`text_color`）。

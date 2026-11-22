@@ -1,0 +1,792 @@
+{
+ "name": "trend",
+ "template": "frame",
+ "template_args": {
+  "title": "Trend Monitor"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 304,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "SERIES  (now)",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 32,
+     "w": 272,
+     "h": 480,
+     "style": {
+      "pad_gap": 10,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "column",
+     "children": [
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#ff8a65",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Oven temperature",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_temperature",
+           "format": "%.1f °C"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#91a0b4",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Oven set temp.",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_target_temperature",
+           "format": "%d °C"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#ffb74d",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Proofing temp.",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_temperature",
+           "format": "%.1f °C"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#4fc3f7",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Proofing humidity",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_humidity",
+           "format": "%.0f %%RH"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#ba68c8",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Mixer speed",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_rpm",
+           "format": "%.0f rpm"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#e5edf5",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Motor load",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_load",
+           "format": "%.0f %%"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 272,
+       "h": 56,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "panel",
+         "x": 0,
+         "y": 6,
+         "w": 6,
+         "h": 44,
+         "style": {
+          "bg_color": "#26c6da",
+          "radius": 3,
+          "pad": 0,
+          "border_width": 0
+         },
+         "scrollable": false,
+         "children": []
+        },
+        {
+         "type": "label",
+         "text": "Conveyor speed",
+         "x": 18,
+         "y": 4,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 18,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_speed",
+           "format": "%.1f m/min"
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 336,
+   "y": 80,
+   "w": 928,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "COMPARE",
+     "x": 0,
+     "y": 12,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "panel",
+     "x": 112,
+     "y": 0,
+     "w": 608,
+     "h": 48,
+     "style": {
+      "pad_gap": 8,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "row",
+     "children": [
+      {
+       "type": "button",
+       "w": 144,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "trend_view",
+        "value": 0
+       },
+       "text": "Oven",
+       "style_label": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "trend_view",
+         "eq": 0
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      },
+      {
+       "type": "button",
+       "w": 144,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "trend_view",
+        "value": 1
+       },
+       "text": "Proofing",
+       "style_label": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "trend_view",
+         "eq": 1
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      },
+      {
+       "type": "button",
+       "w": 144,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "trend_view",
+        "value": 2
+       },
+       "text": "Mixer",
+       "style_label": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "trend_view",
+         "eq": 2
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      },
+      {
+       "type": "button",
+       "w": 144,
+       "h": 48,
+       "style": {
+        "bg_color": "#22314a",
+        "radius": 10,
+        "shadow_width": 0
+       },
+       "on_click": {
+        "action": "set",
+        "tag": "trend_view",
+        "value": 3
+       },
+       "text": "Conveyor",
+       "style_label": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "checkable": true,
+       "bind": {
+        "checked": {
+         "tag": "trend_view",
+         "eq": 3
+        }
+       },
+       "style_checked": {
+        "bg_color": "#19707c"
+       }
+      }
+     ]
+    },
+    {
+     "type": "label",
+     "text": "Oven temperature and set temperature (°C)",
+     "x": 0,
+     "y": 64,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 0
+      }
+     }
+    },
+    {
+     "type": "trend",
+     "x": 0,
+     "y": 96,
+     "w": 896,
+     "h": 416,
+     "group": "process",
+     "tags": [
+      {
+       "tag": "oven_temperature",
+       "color": "#ff8a65"
+      },
+      {
+       "tag": "oven_target_temperature",
+       "color": "#91a0b4"
+      }
+     ],
+     "range_s": 600,
+     "min": 150,
+     "max": 260,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 0
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "Proofing temperature (°C) and humidity (%RH)",
+     "x": 0,
+     "y": 64,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 1
+      }
+     }
+    },
+    {
+     "type": "trend",
+     "x": 0,
+     "y": 96,
+     "w": 896,
+     "h": 416,
+     "group": "process",
+     "tags": [
+      {
+       "tag": "proofing_temperature",
+       "color": "#ffb74d"
+      },
+      {
+       "tag": "proofing_humidity",
+       "color": "#4fc3f7"
+      }
+     ],
+     "range_s": 600,
+     "min": 0,
+     "max": 100,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 1
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "Mixer speed (rpm) and motor load (%)",
+     "x": 0,
+     "y": 64,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 2
+      }
+     }
+    },
+    {
+     "type": "trend",
+     "x": 0,
+     "y": 96,
+     "w": 896,
+     "h": 416,
+     "group": "process",
+     "tags": [
+      {
+       "tag": "mixer_rpm",
+       "color": "#ba68c8"
+      },
+      {
+       "tag": "mixer_load",
+       "color": "#e5edf5"
+      }
+     ],
+     "range_s": 600,
+     "min": 0,
+     "max": 200,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 2
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "Conveyor speed (m/min)",
+     "x": 0,
+     "y": 64,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 3
+      }
+     }
+    },
+    {
+     "type": "trend",
+     "x": 0,
+     "y": 96,
+     "w": 896,
+     "h": 416,
+     "group": "process",
+     "tags": [
+      {
+       "tag": "conveyor_speed",
+       "color": "#26c6da"
+      }
+     ],
+     "range_s": 600,
+     "min": 0,
+     "max": 12,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "bind": {
+      "visible": {
+       "tag": "trend_view",
+       "eq": 3
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

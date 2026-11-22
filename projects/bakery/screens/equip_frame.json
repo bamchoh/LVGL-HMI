@@ -1,0 +1,404 @@
+{
+ "name": "equip_frame",
+ "template": "frame",
+ "template_args": {
+  "title": "${title}"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 1248,
+   "h": 48,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 0,
+    "pad": 0,
+    "border_width": 0,
+    "bg_opa": 0
+   },
+   "scrollable": false,
+   "flex": "row",
+   "flex_main": "space_between",
+   "children": [
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_feeder": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_feeder"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "1",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Feeding",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_mixer": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_mixer"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "2",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Mixing",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_divider": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_divider"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "3",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Dividing",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_proofing": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_proofing"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "4",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Proofing",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_oven": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_oven"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "5",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Baking",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_cooling": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_cooling"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "6",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Cooling",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_slicer": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_slicer"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "7",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Slicing",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 148,
+     "h": 48,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 4
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_packaging": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_packaging"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "8",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Packaging",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

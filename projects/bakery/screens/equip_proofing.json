@@ -1,0 +1,880 @@
+{
+ "name": "equip_proofing",
+ "template": "equip_frame",
+ "template_args": {
+  "title": "Equipment / Proofing"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 144,
+   "w": 368,
+   "h": 480,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 0,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 0,
+     "w": 368,
+     "h": 6,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "proofing_state",
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "image",
+     "src": "assets/icons/64/humidity.png",
+     "style": {
+      "image_recolor": "#5b6b80"
+     },
+     "x": 20,
+     "y": 28,
+     "bind": {
+      "visible": {
+       "tag": "proofing_state",
+       "eq": 0
+      }
+     }
+    },
+    {
+     "type": "image",
+     "src": "assets/icons/64/humidity.png",
+     "style": {
+      "image_recolor": "#36c98f"
+     },
+     "x": 20,
+     "y": 28,
+     "bind": {
+      "visible": {
+       "tag": "proofing_state",
+       "eq": 1
+      }
+     }
+    },
+    {
+     "type": "image",
+     "src": "assets/icons/64/humidity.png",
+     "style": {
+      "image_recolor": "#f06464"
+     },
+     "x": 20,
+     "y": 28,
+     "bind": {
+      "visible": {
+       "tag": "proofing_state",
+       "eq": 2
+      }
+     }
+    },
+    {
+     "type": "image",
+     "src": "assets/icons/64/humidity.png",
+     "style": {
+      "image_recolor": "#f5b942"
+     },
+     "x": 20,
+     "y": 28,
+     "bind": {
+      "visible": {
+       "tag": "proofing_state",
+       "eq": 3
+      }
+     }
+    },
+    {
+     "type": "label",
+     "text": "PROCESS 4 OF 8",
+     "x": 104,
+     "y": 28,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Proofing",
+     "x": 104,
+     "y": 50,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5"
+     }
+    },
+    {
+     "type": "panel",
+     "x": 104,
+     "y": 88,
+     "w": 152,
+     "h": 40,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 20,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "style": {
+        "font": 16,
+        "text_color": "#101827"
+       },
+       "align": "center",
+       "bind": {
+        "text": {
+         "tag": "proofing_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        }
+       }
+      }
+     ],
+     "bind": {
+      "bg_color": {
+       "tag": "proofing_state",
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
+      }
+     }
+    },
+    {
+     "type": "panel",
+     "x": 20,
+     "y": 148,
+     "w": 328,
+     "h": 1,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "label",
+     "text": "In process",
+     "x": 20,
+     "y": 164,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "y": 164,
+     "style": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "proofing_qty",
+       "format": "%d pcs"
+      }
+     },
+     "align": "top_right",
+     "x": -20
+    },
+    {
+     "type": "label",
+     "text": "Mode",
+     "x": 20,
+     "y": 196,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "text": "",
+     "y": 196,
+     "style": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "manual_mode",
+       "map": {
+        "true": "MANUAL",
+        "false": "AUTO"
+       }
+      },
+      "text_color": {
+       "tag": "manual_mode",
+       "map": {
+        "true": "#f5b942",
+        "false": "#e5edf5"
+       }
+      }
+     },
+     "align": "top_right",
+     "x": -20
+    },
+    {
+     "type": "button",
+     "w": 328,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 8
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "manual"
+     },
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/power.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Manual operation",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ],
+     "align": "bottom_left",
+     "x": 20,
+     "y": -20
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 400,
+   "y": 144,
+   "w": 864,
+   "h": 288,
+   "style": {
+    "pad_row": 16,
+    "pad": 0,
+    "bg_opa": 0,
+    "radius": 0,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "flex": "row_wrap",
+   "flex_main": "space_between",
+   "children": [
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Temperature",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 32,
+       "style": {
+        "font": 48,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_temperature",
+         "format": "%.1f"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "°C",
+       "x": 0,
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_temp_sp",
+         "format": "set %.1f °C"
+        }
+       },
+       "align": "top_right"
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Humidity",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 32,
+       "style": {
+        "font": 48,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_humidity",
+         "format": "%.0f"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "%RH",
+       "x": 0,
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_humidity_sp",
+         "format": "set %.0f %%RH"
+        }
+       },
+       "align": "top_right"
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Proofing time",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 32,
+       "style": {
+        "font": 48,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_elapsed_time",
+         "format": "%.0f"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "min elapsed",
+       "x": 0,
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_time_sp",
+         "format": "of %d min"
+        }
+       },
+       "align": "top_right"
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Heater",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "led",
+       "x": 0,
+       "y": 44,
+       "w": 32,
+       "h": 32,
+       "color": "#36c98f",
+       "bind": "proofing_heater_on"
+      },
+      {
+       "type": "label",
+       "text": "",
+       "x": 48,
+       "y": 44,
+       "style": {
+        "font": 32,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_heater_on",
+         "map": {
+          "true": "ON",
+          "false": "OFF"
+         }
+        },
+        "text_color": {
+         "tag": "proofing_heater_on",
+         "map": {
+          "true": "#36c98f",
+          "false": "#5b6b80"
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Humidifier",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "led",
+       "x": 0,
+       "y": 44,
+       "w": 32,
+       "h": 32,
+       "color": "#36c98f",
+       "bind": "proofing_humidifier_on"
+      },
+      {
+       "type": "label",
+       "text": "",
+       "x": 48,
+       "y": 44,
+       "style": {
+        "font": 32,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_humidifier_on",
+         "map": {
+          "true": "ON",
+          "false": "OFF"
+         }
+        },
+        "text_color": {
+         "tag": "proofing_humidifier_on",
+         "map": {
+          "true": "#36c98f",
+          "false": "#5b6b80"
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 264,
+     "h": 136,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Temp. alarm limit",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 32,
+       "style": {
+        "font": 48,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_temp_hi",
+         "format": "%.0f"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "°C",
+       "x": 0,
+       "y": 92,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 400,
+   "y": 448,
+   "w": 864,
+   "h": 176,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "SETTINGS",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Tap a value to change it",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 40,
+     "w": 832,
+     "h": 104,
+     "style": {
+      "pad_gap": 20,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "row",
+     "flex_main": "start",
+     "children": [
+      {
+       "type": "panel",
+       "w": 264,
+       "h": 104,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Temperature setting",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "numeric_display",
+         "w": 264,
+         "h": 56,
+         "bind": "proofing_temp_sp",
+         "decimals": 1,
+         "unit": " °C",
+         "input": true,
+         "min": 20,
+         "max": 45,
+         "style": {
+          "bg_color": "#101827",
+          "border_color": "#26c6da",
+          "border_width": 2,
+          "radius": 8,
+          "font": 24,
+          "text_color": "#e5edf5",
+          "text_align": "right",
+          "pad_right": 12
+         },
+         "y": 32
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 264,
+       "h": 104,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Humidity setting",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "numeric_display",
+         "w": 264,
+         "h": 56,
+         "bind": "proofing_humidity_sp",
+         "decimals": 0,
+         "unit": " %RH",
+         "input": true,
+         "min": 40,
+         "max": 95,
+         "style": {
+          "bg_color": "#101827",
+          "border_color": "#26c6da",
+          "border_width": 2,
+          "radius": 8,
+          "font": 24,
+          "text_color": "#e5edf5",
+          "text_align": "right",
+          "pad_right": 12
+         },
+         "y": 32
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 264,
+       "h": 104,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Proofing time",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "numeric_display",
+         "w": 264,
+         "h": 56,
+         "bind": "proofing_time_sp",
+         "decimals": 0,
+         "unit": " min",
+         "input": true,
+         "min": 10,
+         "max": 180,
+         "style": {
+          "bg_color": "#101827",
+          "border_color": "#26c6da",
+          "border_width": 2,
+          "radius": 8,
+          "font": 24,
+          "text_color": "#e5edf5",
+          "text_align": "right",
+          "pad_right": 12
+         },
+         "y": 32
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "keyboard",
+   "align": "bottom_mid",
+   "w": "100%",
+   "h": "45%"
+  }
+ ]
+}
