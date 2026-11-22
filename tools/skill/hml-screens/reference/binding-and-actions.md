@@ -30,7 +30,9 @@
   "visible":    { "tag": "alarm", "eq": 2 },
   "enabled":    { "tag": "auto_mode", "invert": true },
   "bg_color":   { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828", "default": "#555" } },
-  "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } }
+  "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } },
+  "border_color": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464", "default": "#3b4a5e" } },
+  "image_recolor": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464", "default": "#91a0b4" } }
 }
 ```
 
@@ -40,7 +42,7 @@
 | `scale` / `offset` | 部品の値 = タグの値 × scale + offset（書き込みは逆算） |
 | `invert` | 真偽を反転 |
 | `eq` `ne` `gt` `lt` `ge` `le` | 条件。`visible` `hidden` `enabled` `disabled` `checked` `on` で使う。比べる相手は定数か `{ "tag": "temp_hi" }` |
-| `map` | 値 → 色（`bg_color` `text_color`）、値 → 文字（`text`。`"@ID"` が使える）。`default` がその他。bool は `"true"` / `"false"`。文字列のタグには、その文字のキーが当たる（`{ "main": "#26c6da" }`） |
+| `map` | 値 → 色（`bg_color` `text_color` `border_color` `image_recolor`）、値 → 文字（`text`。`"@ID"` が使える）。`default` がその他。bool は `"true"` / `"false"`。文字列のタグには、その文字のキーが当たる（`{ "main": "#26c6da" }`） |
 | `part` | `bg_color` を付ける場所: `main`（既定）/ `indicator` / `knob` |
 
 - 短い形と一緒にほかの種類も付けたいときは、長い形で書く:
@@ -91,8 +93,7 @@
   設備: `motor` `pump` `fan` `heater` `flame` `valve` `tank` `conveyor` `mixer` `oven` `cooling` `slicer` `package`
   `thermometer` `humidity` `gauge` `factory`。メニュー・操作: `home` `trend` `report` `alarm` `warning` `info` `check` `error`
   `play` `stop` `pause` `reset` `power` `settings` `user` `lock` `recipe` `io` `back` `forward` `menu` `list` `clock` `process`。
-- 色は `"style": { "image_recolor": "#36c98f" }`（白い絵なのでそのまま色になる）。状態で色を変えるときは、色違いの `image` を
-  重ねて `visible` で出し分ける（`bind` の色は `image` には使えない）。
+- 色は `"style": { "image_recolor": "#36c98f" }`（白い絵なのでそのまま色になる）。状態で色を変えるときは `bind` の `image_recolor` + `map`。
 - ボタンに載せるなら、`button` の中に `image` を置く（`"align": "center"` か、文字と並べるなら `flex`）。押せる大きさは `button` で取る。
 
 ```json
@@ -112,8 +113,8 @@
 
 - `fit`（PNG）: `w` `h` の枠に、`contain`（比率を保って全体が入る）/ `stretch`（引き伸ばす）/ `tile`（敷き詰める）/ `center`。
   省くと元の大きさで、`w` `h` は画像の大きさになる。
-- **状態で色を変えるアイコン**: `image` の色は `bind` で変えられない。同じファイルを `image_recolor` だけ変えて同じ位置に重ね、それぞれに
-  `visible` の条件を付ける。枠の色（`border_color`）も `bind` できないので、状態は色の帯（`panel` の `bg_color` + `map`）で出す。
+- **状態で色を変えるアイコン**: `image` に `"bind": { "image_recolor": { "tag": "state", "map": { ... } } }`（白いアイコンがその色になる）。
+  色違いの `image` を重ねる必要はない。カードの枠は `bind` の `border_color` + `map`（枠の太さは `style` の `border_width` で決めておく）。
 - 値で絵を替える: `bind` の `src` に `map`（値 → ファイル。bool は `"true"` / `"false"`、その他は `"default"`）。
   当てはまるファイルがない値のときは何も表示しない。文字列のタグにファイル名を入れて `"bind": { "src": "タグ" }` でもよい。
 - 背景に敷く: `style` の `bg_image`（画面・`panel`・`button` など。中央に元の大きさ。`"bg_image_tiled": true` で敷き詰め、
@@ -125,7 +126,7 @@
 - 大きさの調べ方（PowerShell）: `Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile("<ファイル>"); "$($i.Width)x$($i.Height)"; $i.Dispose()`。
   白い絵に透明の背景のアイコンは、画像として開くと真っ白に見える。暗い `panel` の上に置いて `--render` で確かめる。
 - 押せる絵: `image` に `on_click`。小さい絵は、まわりに `panel` を置いて押せる範囲を 48px 以上にする。
-- 単色のアイコン（白い PNG）は `"style": { "image_recolor": "#4caf50" }` で色を付けられる（`bind` の色は `image` には使えない）。
+- 単色のアイコン（白い PNG）は `"style": { "image_recolor": "#4caf50" }` で色を付けられる（値で変えるなら `bind` の `image_recolor`）。
 - 1 枚の画像は幅 × 高さが約 400 万ピクセルまで。画面より大きい画像は使わない（メモリは 幅 × 高さ × 4 バイト要る）。
 - `--check` が見るもの: ファイルがあるか、プロジェクトの中か、形式、JPEG / BMP に `fit` などを付けていないか。
   壊れたファイルや大きすぎる画像は `runtime:` の行に出る。

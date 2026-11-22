@@ -168,7 +168,7 @@ const SCHEMA = {
     image_recolor: 'color', width: 'size', height: 'size',
   },
 
-  bindKinds: ['text', 'value', 'checked', 'on', 'visible', 'hidden', 'enabled', 'disabled', 'bg_color', 'text_color', 'options', 'src'],
+  bindKinds: ['text', 'value', 'checked', 'on', 'visible', 'hidden', 'enabled', 'disabled', 'bg_color', 'text_color', 'border_color', 'image_recolor', 'options', 'src'],
   // the property a plain "bind": "tag" means for each widget type
   // the columns a log view shows: those it names, else the usual ones of its source
   logColumns(w) {

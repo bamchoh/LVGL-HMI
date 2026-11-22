@@ -367,54 +367,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "feeder_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/tank.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "feeder_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/tank.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "feeder_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/tank.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "feeder_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -664,54 +625,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "mixer_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -961,54 +883,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "divider_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/process.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "divider_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/process.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "divider_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/process.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "divider_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -1258,54 +1141,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "proofing_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/humidity.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "proofing_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/humidity.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "proofing_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/humidity.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "proofing_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -1555,54 +1399,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "oven_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/oven.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "oven_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/oven.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "oven_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/oven.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "oven_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -1852,54 +1657,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "cooling_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/cooling.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "cooling_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/cooling.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "cooling_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/cooling.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "cooling_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -2149,54 +1915,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "slicer_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/slicer.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "slicer_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/slicer.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "slicer_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/slicer.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "slicer_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
@@ -2446,54 +2173,15 @@
      "y": 56,
      "align": "top_mid",
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "packaging_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/package.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "packaging_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/package.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "packaging_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/package.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "y": 56,
-     "align": "top_mid",
-     "bind": {
-      "visible": {
-       "tag": "packaging_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },

@@ -55,54 +55,15 @@
      "x": 20,
      "y": 28,
      "bind": {
-      "visible": {
+      "image_recolor": {
        "tag": "mixer_state",
-       "eq": 0
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#36c98f"
-     },
-     "x": 20,
-     "y": 28,
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 1
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#f06464"
-     },
-     "x": 20,
-     "y": 28,
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 2
-      }
-     }
-    },
-    {
-     "type": "image",
-     "src": "assets/icons/64/mixer.png",
-     "style": {
-      "image_recolor": "#f5b942"
-     },
-     "x": 20,
-     "y": 28,
-     "bind": {
-      "visible": {
-       "tag": "mixer_state",
-       "eq": 3
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
       }
      }
     },
