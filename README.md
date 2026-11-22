@@ -20,7 +20,7 @@ The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
 
 These three screens of the demo, and its schedules, sound and data transfers, **were made by an AI that was given nothing but the skill** (no documentation, no source code).
 
-![BAKERY LINE: the demo running, operated by touch](projects/bakery/renders/demo.gif)
+![BAKERY LINE: the live view of the line; a fault is raised, reset, and the line stopped](projects/bakery/renders/live.gif)
 
 **BAKERY LINE** (`projects/bakery`), a whole HMI for a bread factory, was made the same way: an AI got the skill, an empty 1280x720 project and a customer's
 request, and wrote 21 screens with the alarms, trends, recipes, data log and the simulation that moves the values.
@@ -380,6 +380,8 @@ pallets. Touching a machine opens its details, where you can cause a fault and r
 (it needs Pillow), and the same script writes the screen files. The simulation of the run is `scripts/line.lua`.
 `projects/factory35` is the 480x320 version of the same screen (the pictures scaled by 0.6; for the 3.5 inch LCD of the Raspberry Pi).
 
+![projects/factory: the line running; the press is made to fail and recovered](projects/factory/renders/demo.gif)
+
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json
 ```
@@ -389,6 +391,11 @@ a dashboard, the line from feeding to packaging, an equipment screen for each of
 trends, alarms, a production report with hourly bars and an I/O monitor, all on one template with the header and the navigation. There is no PLC:
 the `simulation` section moves the values (the screens say SIMULATION), and stopping or starting the line from the Manual screen changes them.
 `renders/` has a picture of every screen and `renders/demo.gif` a recording of it running.
+The **Live** screen shows the line from diagonally above, like `projects/factory`: the bread changes from station to station (dough, pieces, risen, baked,
+sliced), the mixer turns, the fans of the cooler spin, the oven glows while its heater is on, and each machine's lamp and name tag follow its state
+(tap one for its details). Its pictures and the screen are drawn by `tools/gen_bakery_line.py` (Pillow), as `tools/gen_factory_demo.py` does for the factory.
+
+![BAKERY LINE: operating the screens](projects/bakery/renders/demo.gif)
 
 ```bash
 ./build/bin/hml_runtime projects/bakery/project.json

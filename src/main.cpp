@@ -69,7 +69,7 @@ volatile bool s_reload = false;
 volatile int  s_restart = -1;      // -1 none, otherwise a hml::RestartTarget
 
 // ---- scripted pointer clicks (--click) ----
-struct Click { int32_t x, y; uint32_t at_ms; };
+struct Click { int32_t x, y; uint32_t at_ms; int reads = 0; };       // reads: how often LVGL saw it pressed
 struct Shot { uint32_t at_ms; std::string path; bool done = false; };
 std::vector<Click> s_clicks;
 std::vector<Shot>  s_shots;
@@ -79,13 +79,15 @@ void script_pointer_read(lv_indev_t*, lv_indev_data_t* data)
 {
     uint32_t now = hml::millis() - s_t_start;
     data->state = LV_INDEV_STATE_RELEASED;
-    for(const Click& c : s_clicks) {
-        if(now >= c.at_ms && now < c.at_ms + 80) {
-            data->point.x = c.x;
-            data->point.y = c.y;
-            data->state = LV_INDEV_STATE_PRESSED;
-            return;
-        }
+    // A click is pressed from its time on until LVGL has read it pressed at least twice and for
+    // 80 ms: a busy main loop (screenshots of a large animated screen) must not lose it.
+    for(Click& c : s_clicks) {
+        if(now < c.at_ms || (c.reads >= 2 && now >= c.at_ms + 80)) continue;
+        data->point.x = c.x;
+        data->point.y = c.y;
+        data->state = LV_INDEV_STATE_PRESSED;
+        c.reads++;
+        return;
     }
 }
 

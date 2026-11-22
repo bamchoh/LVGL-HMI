@@ -247,6 +247,20 @@ struct Checker {
         if(screen) return;
 
         if(const json* an = jget(w, "animate")) check_animate(where, type, *an);
+        // a checkable button bound to a tag writes it when pressed: a "toggle" of the same tag on
+        // the same press turns it back, so nothing happens
+        if(type == "button" && jbool(w, "checkable", false))
+            if(const json* b = jget(w, "bind"); b && b->is_object())
+                if(const json* ck = jget(*b, "checked")) {
+                    const std::string t = ck->is_string() ? ck->get<std::string>() : jstr(*ck, "tag", "");
+                    for(const char* ev : { "on_click", "on_press", "on_release" })
+                        if(const json* acts = jget(w, ev)) {
+                            const json list = acts->is_array() ? *acts : json::array({ *acts });
+                            for(const json& a : list)
+                                if(a.is_object() && jstr(a, "action", "") == "toggle" && jstr(a, "tag", "") == t && !t.empty())
+                                    add(where, std::string(ev) + ": toggles \"" + t + "\", which the button already writes (checkable + bind checked): the two cancel out; leave out the toggle");
+                        }
+                }
         for(const char* k : { "text", "placeholder" }) if(const json* v = jget(w, k)) text_id(where, k, *v);
         if(const json* o = jget(w, "options"); o && o->is_array()) for(const json& v : *o) text_id(where, "options", v);
         if(const json* l = jget(w, "labels"); l && l->is_object()) for(auto it = l->begin(); it != l->end(); ++it) text_id(where, "labels." + it.key(), it.value());
