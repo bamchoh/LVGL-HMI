@@ -20,6 +20,11 @@ The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
 
 These three screens of the demo, and its schedules, sound and data transfers, **were made by an AI that was given nothing but the skill** (no documentation, no source code).
 
+![BAKERY LINE: the demo running, operated by touch](projects/bakery/renders/demo.gif)
+
+**BAKERY LINE** (`projects/bakery`), a whole HMI for a bread factory, was made the same way: an AI got the skill, an empty 1280x720 project and a customer's
+request, and wrote 21 screens with the alarms, trends, recipes, data log and the simulation that moves the values.
+
 ### How an AI can draw the screens
 
 1. **Screens are text.** A project is `project.json` and one JSON file per screen (HML: the HMI markup that the runtime reads). An AI writes it like any other file.
@@ -377,6 +382,16 @@ pallets. Touching a machine opens its details, where you can cause a fault and r
 
 ```bash
 ./build/bin/hml_runtime projects/factory/project.json
+```
+
+`projects/bakery` (**BAKERY LINE**, 1280x720) is the HMI of an automated bread factory, made by an AI that was given only the skill and the customer's request:
+a dashboard, the line from feeding to packaging, an equipment screen for each of the 8 machines, manual operation with confirmations, recipes,
+trends, alarms, a production report with hourly bars and an I/O monitor, all on one template with the header and the navigation. There is no PLC:
+the `simulation` section moves the values (the screens say SIMULATION), and stopping or starting the line from the Manual screen changes them.
+`renders/` has a picture of every screen and `renders/demo.gif` a recording of it running.
+
+```bash
+./build/bin/hml_runtime projects/bakery/project.json
 ```
 
 The demo (`projects/demo`) has 9 screens, switched with the navigation at the bottom, that let you try everything the runtime can do.
