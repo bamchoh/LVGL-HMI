@@ -19,14 +19,16 @@
 #endif
 
 #include <string>
+#include <mbedtls/net_sockets.h>
 
 using namespace hml;
 using hmltest::Runtime;
 
 namespace {
 
-// Ports are picked from a private range and advanced when one is busy.
-uint16_t s_next_port = static_cast<uint16_t>(47000 + (millis() % 500));
+// Ports are picked from a private range and advanced when one is busy. (Below 32768: on Linux the
+// ports 32768 .. 60999 are given to clients, so a connection of another test could hold one.)
+uint16_t s_next_port = static_cast<uint16_t>(24000 + (millis() % 500));
 
 // Start an opcua_server driver, trying a few ports. Returns the port or 0.
 uint16_t start_opcua(Runtime& rt, json cfg)
@@ -294,6 +296,27 @@ TEST_CASE("opcua: the server stops cleanly and the port can be reused")
 
     json cfg = json{ { "type", "opcua_server" }, { "port", port } };
     json arr = json::array({ cfg });
+    CHECK(rt.drivers.load(&arr) == 1);
+    { Client cl(port); UA_Variant v; CHECK(cl.read("x", &v) == UA_STATUSCODE_GOOD); UA_Variant_clear(&v); }
+}
+
+TEST_CASE("opcua: a port that another program holds is not taken (the server does not pretend to listen)")
+{
+    Runtime rt;
+    rt.tag("x", TagType::Int, 1);
+    // another program: a listening socket on IPv4 (open62541 would still bind IPv6 and call that a start)
+    mbedtls_net_context other;
+    mbedtls_net_init(&other);
+    uint16_t port = 0;
+    for(int attempt = 0; attempt < 10 && !port; attempt++) {
+        const uint16_t p = s_next_port++;
+        if(mbedtls_net_bind(&other, "127.0.0.1", std::to_string(p).c_str(), MBEDTLS_NET_PROTO_TCP) == 0) port = p;
+    }
+    REQUIRE(port != 0);
+    json arr = json::array({ json{ { "type", "opcua_server" }, { "port", port } } });
+    CHECK(rt.drivers.load(&arr) == 0);
+    mbedtls_net_free(&other);
+    // free again: it starts
     CHECK(rt.drivers.load(&arr) == 1);
     { Client cl(port); UA_Variant v; CHECK(cl.read("x", &v) == UA_STATUSCODE_GOOD); UA_Variant_clear(&v); }
 }
