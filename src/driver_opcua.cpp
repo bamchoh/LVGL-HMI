@@ -36,6 +36,8 @@
 #ifdef _WIN32
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
+#else
+#  include <unistd.h>                 // gethostname
 #endif
 #include <mbedtls/net_sockets.h>
 #include <open62541/server.h>
