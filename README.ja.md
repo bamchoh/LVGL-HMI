@@ -734,7 +734,30 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 }
 ```
 
-`mode`: `sine` / `triangle` / `ramp` / `square` / `random` / `counter` / `cycle`
+`mode`: `sine` / `triangle` / `ramp` / `square` / `random` / `counter` / `cycle` / `follow`
+
+| キー | 内容 |
+| --- | --- |
+| `when` | タグ（真のとき）、または `{ "tag": "mode", "eq": 2 }`（`eq ne gt lt ge le`）。偽の間、その項目は何も書きません（カウンターは数えるのを止めます） |
+| `target`、`rate`、`idle` | `follow`: `target`（タグか数値）へ、1 秒あたり `rate`（既定 (max − min) / 5）で `min`..`max` の中を近づきます。`when` が偽の間は `idle`（既定 `min`）へ |
+| `noise` | `sine` / `triangle` / `ramp` / `follow` の書く値に、± `noise` までの乱数を足します |
+
+```json
+{ "tag": "mixer_rpm", "mode": "follow", "target": "mixer_rpm_sp", "rate": 40, "when": "mixer_running", "idle": 0, "noise": 1.5, "min": 0, "max": 300 },
+{ "tag": "production_count", "mode": "counter", "min": 0, "max": 999999, "period_ms": 3000, "when": "line_running" }
+```
+
+#### ドライバと分けたシミュレーション（`simulation`）
+
+```json
+"simulation": { "items": [ { "tag": "oven_temperature", "mode": "sine", "min": 208, "max": 212, "period_ms": 30000 } ] }
+```
+
+- `sim` ドライバと同じ項目を、project.json の別の場所に書きます。ドライバ（PLC との接続）に触らずにデモを作り・変えられます。
+  `"enabled": false` で止まります。デザイナーでは Drivers タブの「Simulation」です。
+- タグ `sys.sim.active`: プロジェクトが値をシミュレーションしているとき（この設定か、有効な `sim` ドライバがあるとき）1。本物の値と取り違えないよう、画面に出します:
+  `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" } }`。
+- PLC がつながっていない間だけ動かすなら、項目に `"when": { "tag": "plc_online", "eq": false }`（ドライバの `status_tag`）を付けます。
 
 ### ドライバ: modbus_tcp
 

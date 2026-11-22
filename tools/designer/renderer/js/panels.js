@@ -160,6 +160,21 @@ const Panels = {
     const addSel = U.el('select', { style: { flex: '1' } });
     for (const [k, v] of Object.entries(SCHEMA.drivers)) addSel.append(U.el('option', { value: k }, I18N.t(v.label) + ' (' + k + ')'));
     side.append(U.el('div', { class: 'row' }, addSel, U.el('button', { onclick: () => { M.addDriver(addSel.value); this.driverSel = drivers.length - 1; } }, '+ Add')));
+    // "simulation": values for a demo, kept apart from the devices (not a driver of the list)
+    const p = M.st.project;
+    side.append(U.el('h3', null, 'Simulation'), U.el('div', { class: 'list' }, U.el('div', { class: 'item' + (this.driverSel === 'simulation' ? ' sel' : ''), onclick: () => { this.driverSel = 'simulation'; this.renderDrivers(); } },
+      U.el('input', { type: 'checkbox', checked: !!p.simulation && p.simulation.enabled !== false, title: 'enabled', onclick: e => e.stopPropagation(),
+        onchange: e => M.mutate(() => { if (e.target.checked) { p.simulation = p.simulation || { items: [] }; delete p.simulation.enabled; } else if (p.simulation) p.simulation.enabled = false; }) }),
+      U.el('span', { class: 'grow' }, 'simulation', U.el('span', { class: 'dim' }, ' ' + (p.simulation ? (p.simulation.items || []).length + ' items' : 'none'))))));
+    if (this.driverSel === 'simulation') {
+      const sim = p.simulation = p.simulation || { items: [] };
+      el.append(U.el('h3', { style: { marginTop: '0' } }, 'Simulation'),
+        U.el('div', { class: 'hint' }, 'Values for a demo or for trying screens without a device, kept apart from the drivers: changing them never touches the connection to the PLC. '
+          + 'Same items as the simulator driver; "when" (a tag) makes an item run only while it is true, mode "follow" moves towards "target" (a tag or a number) at "rate" a second and to "idle" while "when" is false, "noise" adds a little randomness. '
+          + 'The tag sys.sim.active is 1 while values are simulated: show it on the screens ("SIMULATION").'),
+        U.el('div', { class: 'drv-form' }, this.tableEditor(sim, SCHEMA.drivers.sim.table, 'drv.simulation')));
+      return;
+    }
 
     const d = drivers[this.driverSel];
     if (!d) { el.append(U.el('div', { class: 'hint' }, drivers.length ? 'Select a driver on the left.' : 'No drivers. Add one on the left (simulator, Modbus TCP, OPC UA server ...).')); return; }

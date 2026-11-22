@@ -203,3 +203,88 @@ TEST_CASE("sim: several drivers may run side by side")
     CHECK(tags().find("a")->get_number() == doctest::Approx(1));
     CHECK(tags().find("b")->get_number() == doctest::Approx(2));
 }
+
+TEST_CASE("sim: \"when\" holds an item while its condition is false")
+{
+    Runtime rt;
+    Tag* run = rt.tag("run", TagType::Bool, 0);
+    Tag* mode = rt.tag("mode", TagType::Int, 0);
+    rt.tag("cnt", TagType::Int, 0);
+    rt.tag("sq", TagType::Float, 0);
+    json items = json::parse(R"([
+        { "tag": "cnt", "mode": "counter", "min": 0, "max": 1000, "period_ms": 1, "when": "run" },
+        { "tag": "sq",  "mode": "square", "min": 1, "max": 9, "period_ms": 3600000, "when": { "tag": "mode", "eq": 2 } },
+        { "tag": "cnt", "mode": "sine", "when": "nobody" }
+    ])");
+    REQUIRE(load_sim(rt, items) == 1);
+    for(int i = 0; i < 3; i++) tick(rt);
+    CHECK(tags().find("cnt")->get_number() == doctest::Approx(0));     // not running: no counting
+    CHECK(tags().find("sq")->get_number() == doctest::Approx(0));
+
+    run->set_number(1, nullptr);
+    mode->set_number(2, nullptr);
+    for(int i = 0; i < 3; i++) tick(rt);
+    const double counted = tags().find("cnt")->get_number();
+    CHECK(counted >= 2);
+    CHECK(tags().find("sq")->get_number() == doctest::Approx(9));
+
+    run->set_number(0, nullptr);                                       // stops where it was
+    for(int i = 0; i < 3; i++) tick(rt);
+    CHECK(tags().find("cnt")->get_number() == doctest::Approx(counted));
+}
+
+TEST_CASE("sim: \"follow\" moves towards its target at its rate, and to idle while \"when\" is false")
+{
+    Runtime rt;
+    Tag* sp = rt.tag("sp", TagType::Float, 120);
+    Tag* run = rt.tag("run", TagType::Bool, 1);
+    Tag* pv = rt.tag("pv", TagType::Float, 0);
+    json items = json::parse(R"([ { "tag": "pv", "mode": "follow", "target": "sp", "rate": 100000, "when": "run", "idle": 0, "min": 0, "max": 200 } ])");
+    REQUIRE(load_sim(rt, items) == 1);
+    tick(rt);
+    tick(rt);
+    CHECK(pv->get_number() == doctest::Approx(120));                   // (a fast rate: there at once)
+
+    sp->set_number(500, nullptr);                                      // beyond max: kept at max
+    tick(rt);
+    tick(rt);
+    CHECK(pv->get_number() == doctest::Approx(200));
+
+    run->set_number(0, nullptr);
+    tick(rt);
+    tick(rt);
+    CHECK(pv->get_number() == doctest::Approx(0));
+}
+
+TEST_CASE("sim: \"follow\" is gradual at a slow rate; a number target; noise stays within its amount")
+{
+    Runtime rt;
+    Tag* pv = rt.tag("pv", TagType::Float, 0);
+    rt.tag("n", TagType::Float, 0);
+    json items = json::parse(R"([
+        { "tag": "pv", "mode": "follow", "target": 100, "rate": 10 },
+        { "tag": "n",  "mode": "sine", "min": 50, "max": 50, "period_ms": 3600000, "noise": 2 }
+    ])");
+    REQUIRE(load_sim(rt, items) == 1);
+    bool moved = false;
+    for(int i = 0; i < 5; i++) {
+        tick(rt);
+        const double n = tags().find("n")->get_number();
+        CHECK(n >= 48.0);
+        CHECK(n <= 52.0);
+        moved = moved || n != 50.0;
+    }
+    CHECK(moved);
+    CHECK(pv->get_number() > 0);
+    CHECK(pv->get_number() < 50);                                     // 10 a second: far from 100 after a few ms
+}
+
+TEST_CASE("sim: follow without target, and an unknown \"when\" tag, are skipped")
+{
+    Runtime rt;
+    rt.tag("pv", TagType::Float, 3);
+    json items = json::parse(R"([ { "tag": "pv", "mode": "follow" }, { "tag": "pv", "mode": "follow", "target": "ghost" }, { "tag": "pv", "mode": "sine", "when": { "tag": "ghost" } } ])");
+    REQUIRE(load_sim(rt, items) == 1);
+    tick(rt);
+    CHECK(tags().find("pv")->get_number() == doctest::Approx(3));
+}

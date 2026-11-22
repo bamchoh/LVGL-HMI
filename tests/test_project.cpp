@@ -269,6 +269,41 @@ TEST_CASE("Project::start_drivers loads the drivers array through the global reg
     CHECK(none.start_drivers() == 0);
 }
 
+TEST_CASE("Project: the \"simulation\" section runs apart from the drivers; sys.sim.active says so")
+{
+    Runtime rt;
+    TempProject tp;
+    static bool builtins_registered = (drivers().register_builtins(), true);
+    (void)builtins_registered;
+    auto active = [] { Tag* t = tags().find("sys.sim.active"); return t ? t->get_number() : -1.0; };
+
+    Project p;
+    REQUIRE(p.load(tp.project(R"({
+        "tags": [ { "name": "x" } ],
+        "simulation": { "items": [ { "tag": "x", "mode": "square", "min": 0, "max": 5, "period_ms": 3600000 } ] }
+    })")));
+    CHECK(active() == doctest::Approx(1));
+    CHECK(p.start_drivers() == 1);
+    REQUIRE(drivers().all().size() == 1);
+    CHECK(drivers().all()[0]->name() == "simulation");
+    rt.advance(50, 50);
+    CHECK(tags().find("x")->get_number() == doctest::Approx(5));
+    drivers().stop_all();
+
+    Project off;
+    REQUIRE(off.load(tp.project(R"({ "tags": [ { "name": "x" } ], "simulation": { "enabled": false, "items": [ { "tag": "x" } ] } })")));
+    CHECK(active() == doctest::Approx(0));
+    CHECK(off.start_drivers() == 0);
+
+    Project drv;                                                // a sim driver counts too
+    REQUIRE(drv.load(tp.project(R"({ "tags": [ { "name": "x" } ], "drivers": [ { "type": "sim", "items": [] } ] })")));
+    CHECK(active() == doctest::Approx(1));
+
+    Project none;
+    REQUIRE(none.load(tp.project("{}")));
+    CHECK(active() == doctest::Approx(0));
+}
+
 TEST_CASE("Project::build_screens builds file and inline screens and shows the start screen")
 {
     Runtime rt;
