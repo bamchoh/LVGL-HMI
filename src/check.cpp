@@ -6,6 +6,7 @@
 #include "sound.hpp"
 #include <functional>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -473,6 +474,8 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
 
     // ---- the maps of device drivers: a tag twice, an address twice, a type that cannot fit
     // (the form of each address is checked by the driver itself, when the project is loaded: run_check)
+    struct FromDevice { std::string where, access; };
+    std::map<std::string, FromDevice> from_device;               // tag -> the row of a device driver that reads it
     if(const json* dl = jget(root, "drivers"); dl && dl->is_array()) {
         for(size_t i = 0; i < dl->size(); i++) {
             const json& d = (*dl)[i];
@@ -504,6 +507,12 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
                 }
                 auto tt = c.tag_types.find(tag);
                 const std::string dtype = jstr(row, "dtype", "");
+                if(!tag.empty() && !from_device.count(tag)) from_device[tag] = { w, jstr(row, "access", "") };
+                if(tt != c.tag_types.end() && !addr.empty() && tt->second == "int") {
+                    const double scale = jnum(row, "scale", 1), offset = jnum(row, "offset", 0);
+                    if(dtype == "float") c.add(w, "tag \"" + tag + "\" is int, the address holds a real number (its fraction is lost: make the tag float)");
+                    else if(scale != std::floor(scale) || offset != std::floor(offset)) c.add(w, "tag \"" + tag + "\" is int, \"scale\" / \"offset\" make a fraction (make the tag float)");
+                }
                 if(tt != c.tag_types.end() && !addr.empty()) {
                     const bool text_tag = tt->second == "string", text_dt = dtype == "string";
                     if(text_dt && !text_tag) c.add(w, "tag \"" + tag + "\" is " + tt->second + ", the address holds a text (\"dtype\": \"string\" needs a string tag)");
@@ -527,6 +536,10 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
             if(!it.is_object()) { c.add(w, "not an object"); continue; }
             for(auto k = it.begin(); k != it.end(); ++k) if(!keys.count(k.key())) c.add(w, "unknown key \"" + k.key() + "\" (ignored by the runtime)");
             const std::string mode = jstr(it, "mode", "sine");
+            // a value the PLC gives must not be made up as well: it would fight the real one (and a
+            // "follow" item writes its idle value even while "when" is false)
+            if(auto fd = from_device.find(jstr(it, "tag", "")); fd != from_device.end())
+                c.add(w, "\"" + fd->first + "\" is read from the device (" + fd->second.where + "): leave it out of the simulation");
             if(!modes.count(mode)) c.add(w, "unknown mode \"" + mode + "\" (sine triangle ramp square random counter cycle follow)");
             if(const json* wh = jget(it, "when")) c.need_tag(w, "when", wh->is_object() ? wh->value("tag", json("")) : *wh);
             if(mode == "follow") {
@@ -543,6 +556,35 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(const json* dl = jget(root, "drivers"); dl && dl->is_array())
         for(size_t i = 0; i < dl->size(); i++)
             if((*dl)[i].is_object() && jstr((*dl)[i], "type", "") == "sim") check_sim("drivers[" + std::to_string(i) + "] (sim)", jget((*dl)[i], "items"));
+
+    // ---- scripts that write a value the device gives (read-only rows): the PLC's value would
+    // come back at the next read, the screen flickers between the two. (Lua is only searched for
+    // "tag.<name> =": what a script builds by other means is not found.)
+    if(const json* sc = jget(root, "scripts"); sc && sc->is_array() && !from_device.empty()) {
+        for(size_t i = 0; i < sc->size(); i++) {
+            const json& s = (*sc)[i];
+            std::string code;
+            if(const json* cd = jget(s, "code")) {
+                if(cd->is_string()) code = cd->get<std::string>();
+                else if(cd->is_array()) for(const json& l : *cd) if(l.is_string()) code += l.get<std::string>() + "\n";
+            }
+            else if(const std::string f = jstr(s, "file", ""); !f.empty()) {
+                if(auto t = read_file((c.dir / fs::u8path(f)).generic_u8string(), 1u << 20)) code = *t;
+            }
+            for(const auto& [tag, fd] : from_device) {
+                if(fd.access != "ro") continue;
+                for(size_t at = code.find("tag." + tag); at != std::string::npos; at = code.find("tag." + tag, at + 1)) {
+                    size_t e = at + 4 + tag.size();
+                    if(e < code.size() && (std::isalnum(static_cast<unsigned char>(code[e])) || code[e] == '_')) continue;
+                    while(e < code.size() && code[e] == ' ') e++;
+                    if(e + 1 < code.size() && code[e] == '=' && code[e + 1] != '=') {
+                        c.add("scripts[" + std::to_string(i) + "] (" + jstr(s, "name", "?") + ")", "writes \"" + tag + "\", which is read from the device (" + fd.where + ", read-only): the script's value is overwritten at the next read");
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     // ---- the screens: read them all first (their names are needed for goto / popup)
     struct Screen { std::string file; json def; };

@@ -304,3 +304,24 @@ TEST_CASE("check: driver maps: a tag twice, an address twice, a text on a number
     CHECK(has(lines, "map[2]: addr 65535: a Modbus address"));                  // a float takes 65535 and 65536
     CHECK(has(lines, "map[3]: addr \"5\": a Modbus address"));
 }
+
+TEST_CASE("check: values read from the PLC are not simulated or written by a script; a real number does not go into an int tag")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ],
+      "tags": [ { "name": "temp", "type": "float" }, { "name": "count", "type": "int" }, { "name": "sp", "type": "int" }, { "name": "hum", "type": "int" }, { "name": "local", "type": "int" } ],
+      "drivers": [ { "type": "slmp", "host": "10.0.0.1", "map": [
+          { "tag": "temp", "addr": "D100", "dtype": "float", "access": "ro" }, { "tag": "count", "addr": "D200", "dtype": "int32", "access": "ro" },
+          { "tag": "sp", "addr": "D102", "dtype": "float", "access": "rw" }, { "tag": "hum", "addr": "D111", "scale": 0.1, "access": "ro" } ] } ],
+      "simulation": { "items": [ { "tag": "temp", "mode": "follow", "target": 200, "when": "x_off" }, { "tag": "local", "mode": "counter" } ] },
+      "scripts": [ { "name": "calc", "trigger": "interval", "code": ["tag.count = tag.local + 1", "if tag.temp == 3 then tag.sp = 5 end", "tag.local = tag.count"] } ] })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    const auto lines = p.check();
+    CHECK(has(lines, "simulation: items[0]: \"temp\" is read from the device (drivers[0] (slmp): map[0])"));
+    CHECK_FALSE(has(lines, "items[1]: \"local\""));
+    CHECK(has(lines, "scripts[0] (calc): writes \"count\", which is read from the device"));
+    CHECK_FALSE(has(lines, "writes \"temp\""));                   // (temp == 3 is a comparison)
+    CHECK_FALSE(has(lines, "writes \"sp\""));                     // a setpoint (rw) may be written
+    CHECK(has(lines, "map[2]: tag \"sp\" is int, the address holds a real number"));
+    CHECK(has(lines, "map[3]: tag \"hum\" is int, \"scale\" / \"offset\" make a fraction"));
+}
