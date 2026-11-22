@@ -1,0 +1,144 @@
+{
+ "name": "confirm_stop_all",
+ "popup": true,
+ "w": 560,
+ "h": 280,
+ "dim": true,
+ "scrollable": false,
+ "style": {
+  "bg_color": "#192538",
+  "radius": 16,
+  "pad": 24,
+  "border_width": 2,
+  "border_color": "#b23b3b"
+ },
+ "children": [
+  {
+   "type": "label",
+   "text": "Stop the whole line?",
+   "x": 0,
+   "y": 0,
+   "style": {
+    "font": 28,
+    "text_color": "#e5edf5"
+   }
+  },
+  {
+   "type": "label",
+   "text": "All machines, the conveyor, heaters and fans are switched off at once.",
+   "x": 0,
+   "y": 48,
+   "style": {
+    "font": 18,
+    "text_color": "#91a0b4"
+   },
+   "w": "100%",
+   "long_mode": "wrap"
+  },
+  {
+   "type": "button",
+   "w": 200,
+   "h": 64,
+   "style": {
+    "bg_color": "#22314a",
+    "radius": 10,
+    "shadow_width": 0
+   },
+   "on_click": {
+    "action": "close"
+   },
+   "text": "Cancel",
+   "style_label": {
+    "font": 20,
+    "text_color": "#e5edf5"
+   },
+   "align": "bottom_left"
+  },
+  {
+   "type": "button",
+   "w": 240,
+   "h": 64,
+   "style": {
+    "bg_color": "#b23b3b",
+    "radius": 10,
+    "shadow_width": 0
+   },
+   "on_click": [
+    {
+     "action": "set",
+     "tag": "feeder_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "mixer_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "divider_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "proofing_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "oven_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "cooling_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "slicer_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "packaging_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "conveyor_running",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "proofing_heater_on",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "proofing_humidifier_on",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "oven_heater_on",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "cooling_fan_on",
+     "value": false
+    },
+    {
+     "action": "close"
+    }
+   ],
+   "text": "STOP ALL",
+   "style_label": {
+    "font": 20,
+    "text_color": "#e5edf5"
+   },
+   "align": "bottom_right"
+  }
+ ]
+}

@@ -1,0 +1,133 @@
+{
+ "name": "confirm_reset",
+ "popup": true,
+ "w": 560,
+ "h": 280,
+ "dim": true,
+ "scrollable": false,
+ "style": {
+  "bg_color": "#192538",
+  "radius": 16,
+  "pad": 24,
+  "border_width": 2,
+  "border_color": "#7a5a1c"
+ },
+ "children": [
+  {
+   "type": "label",
+   "text": "Reset faults?",
+   "x": 0,
+   "y": 0,
+   "style": {
+    "font": 28,
+    "text_color": "#e5edf5"
+   }
+  },
+  {
+   "type": "label",
+   "text": "Clears the fault flags of all machines and acknowledges all alarms. Remove the cause first.",
+   "x": 0,
+   "y": 48,
+   "style": {
+    "font": 18,
+    "text_color": "#91a0b4"
+   },
+   "w": "100%",
+   "long_mode": "wrap"
+  },
+  {
+   "type": "button",
+   "w": 200,
+   "h": 64,
+   "style": {
+    "bg_color": "#22314a",
+    "radius": 10,
+    "shadow_width": 0
+   },
+   "on_click": {
+    "action": "close"
+   },
+   "text": "Cancel",
+   "style_label": {
+    "font": 20,
+    "text_color": "#e5edf5"
+   },
+   "align": "bottom_left"
+  },
+  {
+   "type": "button",
+   "w": 240,
+   "h": 64,
+   "style": {
+    "bg_color": "#7a5a1c",
+    "radius": 10,
+    "shadow_width": 0
+   },
+   "on_click": [
+    {
+     "action": "set",
+     "tag": "feeder_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "mixer_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "divider_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "proofing_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "oven_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "cooling_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "slicer_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "packaging_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "conveyor_fault",
+     "value": false
+    },
+    {
+     "action": "set",
+     "tag": "plc_comm_error",
+     "value": false
+    },
+    {
+     "action": "call",
+     "fn": "alarm.ack_all"
+    },
+    {
+     "action": "close"
+    }
+   ],
+   "text": "RESET",
+   "style_label": {
+    "font": 20,
+    "text_color": "#e5edf5"
+   },
+   "align": "bottom_right"
+  }
+ ]
+}

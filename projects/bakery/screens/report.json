@@ -1,0 +1,591 @@
+{
+ "name": "report",
+ "template": "frame",
+ "template_args": {
+  "title": "Production Report"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 1248,
+   "h": 112,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 0,
+    "pad": 0,
+    "border_width": 0,
+    "bg_opa": 0
+   },
+   "scrollable": false,
+   "flex": "row",
+   "flex_main": "space_between",
+   "children": [
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Today's production",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "production_count",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "pcs",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Target",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "production_target",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "pcs",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Achievement",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#26c6da"
+       },
+       "bind": {
+        "text": {
+         "tag": "achievement_rate",
+         "format": "%.1f %%"
+        }
+       }
+      },
+      {
+       "type": "bar",
+       "x": 0,
+       "y": 80,
+       "w": 160,
+       "h": 8,
+       "min": 0,
+       "max": 100,
+       "bind": "achievement_rate",
+       "style": {
+        "bg_color": "#101827",
+        "radius": 4
+       },
+       "style_indicator": {
+        "bg_color": "#26c6da",
+        "radius": 4
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Good",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#36c98f"
+       },
+       "bind": {
+        "text": {
+         "tag": "good_count",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "pcs",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Defects",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#f5b942"
+       },
+       "bind": {
+        "text": {
+         "tag": "defect_count",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "pcs",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 192,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Operating rate",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "line_operating_rate",
+         "format": "%.1f %%"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 208,
+   "w": 800,
+   "h": 416,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "HOURLY PRODUCTION (pcs per hour, today)",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "bar_chart",
+     "x": 0,
+     "y": 32,
+     "w": 768,
+     "h": 352,
+     "group": "production",
+     "tag": "production_count",
+     "mode": "increase",
+     "bucket_s": 3600,
+     "bars": 24,
+     "start": "day",
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     },
+     "target": 500,
+     "color": "#26c6da",
+     "target_color": "#f5b942",
+     "decimals": 0,
+     "show_values": false
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 832,
+   "y": 208,
+   "w": 432,
+   "h": 416,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "PRODUCTION PER PRODUCT",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "White bread",
+     "x": 0,
+     "y": 40,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     }
+    },
+    {
+     "type": "label",
+     "y": 36,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "prod_white_bread",
+       "format": "%d pcs"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "bar",
+     "x": 0,
+     "y": 76,
+     "w": 400,
+     "h": 12,
+     "min": 0,
+     "max": 6000,
+     "bind": "prod_white_bread",
+     "style": {
+      "bg_color": "#101827",
+      "radius": 6
+     },
+     "style_indicator": {
+      "bg_color": "#26c6da",
+      "radius": 6
+     }
+    },
+    {
+     "type": "label",
+     "text": "Baguette",
+     "x": 0,
+     "y": 120,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     }
+    },
+    {
+     "type": "label",
+     "y": 116,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "prod_baguette",
+       "format": "%d pcs"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "bar",
+     "x": 0,
+     "y": 156,
+     "w": 400,
+     "h": 12,
+     "min": 0,
+     "max": 6000,
+     "bind": "prod_baguette",
+     "style": {
+      "bg_color": "#101827",
+      "radius": 6
+     },
+     "style_indicator": {
+      "bg_color": "#ffb74d",
+      "radius": 6
+     }
+    },
+    {
+     "type": "label",
+     "text": "Roll",
+     "x": 0,
+     "y": 200,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     }
+    },
+    {
+     "type": "label",
+     "y": 196,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "prod_roll",
+       "format": "%d pcs"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "bar",
+     "x": 0,
+     "y": 236,
+     "w": 400,
+     "h": 12,
+     "min": 0,
+     "max": 6000,
+     "bind": "prod_roll",
+     "style": {
+      "bg_color": "#101827",
+      "radius": 6
+     },
+     "style_indicator": {
+      "bg_color": "#ba68c8",
+      "radius": 6
+     }
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 288,
+     "w": 400,
+     "h": 1,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "label",
+     "text": "Good / defects",
+     "x": 0,
+     "y": 304,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "y": 300,
+     "style": {
+      "font": 24,
+      "text_color": "#36c98f"
+     },
+     "bind": {
+      "text": {
+       "tag": "good_count",
+       "format": "%d good"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "label",
+     "y": 336,
+     "style": {
+      "font": 20,
+      "text_color": "#f5b942"
+     },
+     "bind": {
+      "text": {
+       "tag": "defect_count",
+       "format": "%d defects"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "label",
+     "text": "Bar scale: 0 - 6000 pcs",
+     "x": 0,
+     "y": 340,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     }
+    }
+   ]
+  }
+ ]
+}

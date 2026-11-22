@@ -1,0 +1,506 @@
+{
+ "name": "recipe",
+ "template": "frame",
+ "template_args": {
+  "title": "Recipe Management"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 800,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "RECIPES",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Select a recipe, then Write to send its values to the line",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "recipe_table",
+     "x": 0,
+     "y": 32,
+     "w": 768,
+     "h": 480,
+     "book": "products",
+     "row_height": 48,
+     "style": {
+      "bg_color": "#101827",
+      "border_width": 0,
+      "radius": 8
+     }
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 832,
+   "y": 80,
+   "w": 432,
+   "h": 544,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "VALUES IN USE ON THE LINE",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Selected recipe",
+     "x": 0,
+     "y": 36,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "y": 32,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.recipe.products.selected",
+       "format": "%s"
+      }
+     },
+     "align": "top_right"
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 72,
+     "w": 400,
+     "h": 1,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 88,
+     "w": 400,
+     "h": 336,
+     "style": {
+      "pad_gap": 6,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "column",
+     "children": [
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Mixing speed",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_rpm_sp",
+           "format": "%d rpm"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Mixing time",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_time_sp",
+           "format": "%d min"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Proofing temperature",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_temp_sp",
+           "format": "%.1f °C"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Proofing humidity",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_humidity_sp",
+           "format": "%.0f %%RH"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Proofing time",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_time_sp",
+           "format": "%d min"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Baking temperature",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_target_temperature",
+           "format": "%d °C"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Baking time",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_baking_time_sp",
+           "format": "%d min"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 400,
+       "h": 36,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Conveyor speed",
+         "x": 0,
+         "y": 6,
+         "style": {
+          "font": 16,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "y": 2,
+         "style": {
+          "font": 20,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_speed_sp",
+           "format": "%.1f m/min"
+          }
+         },
+         "align": "top_right"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 440,
+     "w": 400,
+     "h": 1,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "label",
+     "text": "Status",
+     "x": 0,
+     "y": 456,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "label",
+     "y": 456,
+     "style": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.recipe.status",
+       "format": "%s"
+      }
+     },
+     "align": "top_right"
+    }
+   ]
+  }
+ ]
+}

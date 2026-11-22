@@ -740,7 +740,9 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 | --- | --- |
 | `when` | タグ（真のとき）、または `{ "tag": "mode", "eq": 2 }`（`eq ne gt lt ge le`）。偽の間、その項目は何も書きません（カウンターは数えるのを止めます） |
 | `target`、`rate`、`idle` | `follow`: `target`（タグか数値）へ、1 秒あたり `rate`（既定 (max − min) / 5）で `min`..`max` の中を近づきます。`when` が偽の間は `idle`（既定 `min`）へ |
-| `noise` | `sine` / `triangle` / `ramp` / `follow` の書く値に、± `noise` までの乱数を足します |
+| `noise` | `sine` / `triangle` / `ramp` / `follow` の書く値に、± `noise` までの乱数を足します。止まっている（`when` が偽の）`follow` には足さず、`min`..`max` の外には出ません |
+
+- `counter` は、始まったときのタグの値（`init`。`min`..`max` の中なら）から数え続けます。波形は位相 0 から始まります: `sine` は真ん中、`ramp` / `triangle` は `min`。
 
 ```json
 { "tag": "mixer_rpm", "mode": "follow", "target": "mixer_rpm_sp", "rate": 40, "when": "mixer_running", "idle": 0, "noise": 1.5, "min": 0, "max": 300 },
@@ -2138,7 +2140,7 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | `group`、`tag` | 変数ロギングのグループと、それが記録しているタグ |
 | `mode` | `increase`（既定）: 区切りごとにタグが増えた分（カウンター）。`value`: 区切りごとの最後の値 |
 | `bucket_s` | 1 本 = この秒数（60〜86400、既定 3600）。時計に合わせて区切ります（ちょうどの時） |
-| `bars` | 本数（1〜48、既定 12）。右がいちばん新しい |
+| `bars` | 本数（1〜48）。右がいちばん新しい。既定 12、`start: "day"` なら 1 日分（1 時間なら 24 本） |
 | `start` | `now`（既定）: 今までの最後の何本。`day`: 0 時から（1 時間 × 24 本 = 今日。これからの時間は空） |
 | `max` | 目盛りの上（省くと、いちばん高い棒か目標の少し上） |
 | `target`、`target_color` | この値に線を引きます（数値、または `{ "tag": "hourly_target" }`） |

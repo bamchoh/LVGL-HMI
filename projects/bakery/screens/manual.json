@@ -1,0 +1,1451 @@
+{
+ "name": "manual",
+ "template": "frame",
+ "template_args": {
+  "title": "Manual Operation"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 1248,
+   "h": 96,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "Operation mode",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "button",
+     "w": 152,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0
+     },
+     "on_click": {
+      "action": "set",
+      "tag": "manual_mode",
+      "value": false
+     },
+     "text": "AUTO",
+     "style_label": {
+      "font": 20,
+      "text_color": "#e5edf5"
+     },
+     "x": 0,
+     "y": 24,
+     "checkable": true,
+     "bind": {
+      "checked": {
+       "tag": "manual_mode",
+       "eq": false
+      }
+     },
+     "style_checked": {
+      "bg_color": "#19707c"
+     }
+    },
+    {
+     "type": "button",
+     "w": 152,
+     "h": 56,
+     "style": {
+      "bg_color": "#22314a",
+      "radius": 10,
+      "shadow_width": 0
+     },
+     "on_click": {
+      "action": "set",
+      "tag": "manual_mode",
+      "value": true
+     },
+     "text": "MANUAL",
+     "style_label": {
+      "font": 20,
+      "text_color": "#e5edf5"
+     },
+     "x": 160,
+     "y": 24,
+     "checkable": true,
+     "bind": {
+      "checked": {
+       "tag": "manual_mode",
+       "eq": true
+      }
+     },
+     "style_checked": {
+      "bg_color": "#7a5a1c"
+     }
+    },
+    {
+     "type": "label",
+     "text": "",
+     "x": 336,
+     "y": 24,
+     "style": {
+      "font": 16,
+      "text_color": "#e5edf5"
+     },
+     "w": 264,
+     "long_mode": "wrap",
+     "bind": {
+      "text": {
+       "tag": "manual_mode",
+       "map": {
+        "true": "MANUAL: switch devices one by one.",
+        "false": "AUTO: device buttons are locked."
+       }
+      }
+     }
+    },
+    {
+     "type": "button",
+     "w": 168,
+     "h": 64,
+     "style": {
+      "bg_color": "#1f5c48",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 8
+     },
+     "on_click": {
+      "action": "popup",
+      "screen": "confirm_start_all"
+     },
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/play.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "START ALL",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       }
+      }
+     ],
+     "align": "right_mid",
+     "x": -424,
+     "y": 4
+    },
+    {
+     "type": "button",
+     "w": 184,
+     "h": 64,
+     "style": {
+      "bg_color": "#7a5a1c",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 8
+     },
+     "on_click": {
+      "action": "popup",
+      "screen": "confirm_reset"
+     },
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/reset.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "FAULT RESET",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       }
+      }
+     ],
+     "align": "right_mid",
+     "x": -232,
+     "y": 4
+    },
+    {
+     "type": "button",
+     "w": 192,
+     "h": 64,
+     "style": {
+      "bg_color": "#b23b3b",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 8
+     },
+     "on_click": {
+      "action": "popup",
+      "screen": "confirm_stop_all"
+     },
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/stop.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "STOP ALL",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       }
+      }
+     ],
+     "align": "right_mid",
+     "x": 0,
+     "y": 4
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 192,
+   "w": 616,
+   "h": 432,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "DEVICES (manual mode only)",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 32,
+     "w": 584,
+     "h": 368,
+     "style": {
+      "pad_gap": 32,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "column",
+     "children": [
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/mixer.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Mixer",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "mixer_running"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "mixer_running",
+           "map": {
+            "true": "RUNNING",
+            "false": "STOPPED"
+           }
+          },
+          "text_color": {
+           "tag": "mixer_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "mixer_running",
+          "value": true
+         },
+         "text": "RUN",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "mixer_running",
+          "value": false
+         },
+         "text": "STOP",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "mixer_reverse",
+          "value": false
+         },
+         "text": "FWD",
+         "style_label": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "x": 416,
+         "y": 4,
+         "checkable": true,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          },
+          "checked": {
+           "tag": "mixer_reverse",
+           "eq": false
+          }
+         },
+         "style_checked": {
+          "bg_color": "#19707c"
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "mixer_reverse",
+          "value": true
+         },
+         "text": "REV",
+         "style_label": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "x": 504,
+         "y": 4,
+         "checkable": true,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          },
+          "checked": {
+           "tag": "mixer_reverse",
+           "eq": true
+          }
+         },
+         "style_checked": {
+          "bg_color": "#7a5a1c"
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/conveyor.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Main conveyor",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "conveyor_running"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_running",
+           "map": {
+            "true": "RUNNING",
+            "false": "STOPPED"
+           }
+          },
+          "text_color": {
+           "tag": "conveyor_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "conveyor_running",
+          "value": true
+         },
+         "text": "RUN",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "conveyor_running",
+          "value": false
+         },
+         "text": "STOP",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "conveyor_reverse",
+          "value": false
+         },
+         "text": "FWD",
+         "style_label": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "x": 416,
+         "y": 4,
+         "checkable": true,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          },
+          "checked": {
+           "tag": "conveyor_reverse",
+           "eq": false
+          }
+         },
+         "style_checked": {
+          "bg_color": "#19707c"
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "conveyor_reverse",
+          "value": true
+         },
+         "text": "REV",
+         "style_label": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         },
+         "x": 504,
+         "y": 4,
+         "checkable": true,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          },
+          "checked": {
+           "tag": "conveyor_reverse",
+           "eq": true
+          }
+         },
+         "style_checked": {
+          "bg_color": "#7a5a1c"
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/heater.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Proofing heater",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "proofing_heater_on"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_heater_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "proofing_heater_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "proofing_heater_on",
+          "value": true
+         },
+         "text": "ON",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "proofing_heater_on",
+          "value": false
+         },
+         "text": "OFF",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/humidity.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Proofing humidifier",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "proofing_humidifier_on"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_humidifier_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "proofing_humidifier_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "proofing_humidifier_on",
+          "value": true
+         },
+         "text": "ON",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "proofing_humidifier_on",
+          "value": false
+         },
+         "text": "OFF",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 648,
+   "y": 192,
+   "w": 616,
+   "h": 432,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "DEVICES (manual mode only)",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#26c6da",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 32,
+     "w": 584,
+     "h": 368,
+     "style": {
+      "pad_gap": 32,
+      "pad": 0,
+      "bg_opa": 0,
+      "radius": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "flex": "column",
+     "children": [
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/flame.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Oven heater",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "oven_heater_on"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_heater_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "oven_heater_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "oven_heater_on",
+          "value": true
+         },
+         "text": "ON",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "oven_heater_on",
+          "value": false
+         },
+         "text": "OFF",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/fan.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Cooling fan",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "cooling_fan_on"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "cooling_fan_on",
+           "map": {
+            "true": "ON",
+            "false": "OFF"
+           }
+          },
+          "text_color": {
+           "tag": "cooling_fan_on",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "cooling_fan_on",
+          "value": true
+         },
+         "text": "ON",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "cooling_fan_on",
+          "value": false
+         },
+         "text": "OFF",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/slicer.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Slicer",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "slicer_running"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "slicer_running",
+           "map": {
+            "true": "RUNNING",
+            "false": "STOPPED"
+           }
+          },
+          "text_color": {
+           "tag": "slicer_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "slicer_running",
+          "value": true
+         },
+         "text": "RUN",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "slicer_running",
+          "value": false
+         },
+         "text": "STOP",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 584,
+       "h": 64,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "image",
+         "src": "assets/icons/32/package.png",
+         "style": {
+          "image_recolor": "#e5edf5"
+         },
+         "x": 0,
+         "y": 16
+        },
+        {
+         "type": "label",
+         "text": "Packaging machine",
+         "x": 44,
+         "y": 8,
+         "style": {
+          "font": 16,
+          "text_color": "#e5edf5"
+         }
+        },
+        {
+         "type": "led",
+         "x": 44,
+         "y": 36,
+         "w": 16,
+         "h": 16,
+         "color": "#36c98f",
+         "bind": "packaging_running"
+        },
+        {
+         "type": "label",
+         "text": "",
+         "x": 68,
+         "y": 36,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         },
+         "bind": {
+          "text": {
+           "tag": "packaging_running",
+           "map": {
+            "true": "RUNNING",
+            "false": "STOPPED"
+           }
+          },
+          "text_color": {
+           "tag": "packaging_running",
+           "map": {
+            "true": "#36c98f",
+            "false": "#5b6b80"
+           }
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#1f5c48",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "packaging_running",
+          "value": true
+         },
+         "text": "RUN",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 232,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        },
+        {
+         "type": "button",
+         "w": 80,
+         "h": 56,
+         "style": {
+          "bg_color": "#22314a",
+          "radius": 10,
+          "shadow_width": 0
+         },
+         "on_click": {
+          "action": "set",
+          "tag": "packaging_running",
+          "value": false
+         },
+         "text": "STOP",
+         "style_label": {
+          "font": 18,
+          "text_color": "#e5edf5"
+         },
+         "x": 320,
+         "y": 4,
+         "bind": {
+          "enabled": {
+           "tag": "manual_mode"
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

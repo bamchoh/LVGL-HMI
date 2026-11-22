@@ -1,0 +1,1187 @@
+{
+ "title": "BAKERY LINE",
+ "display": {
+  "width": 1280,
+  "height": 720
+ },
+ "theme": {
+  "dark": true,
+  "primary": "#26c6da",
+  "secondary": "#19707c",
+  "font": 16
+ },
+ "start_screen": "dashboard",
+ "tags": [
+  {
+   "name": "line_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "manual_mode",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "production_target",
+   "type": "int",
+   "init": 6000,
+   "min": 0,
+   "max": 99999
+  },
+  {
+   "name": "production_count",
+   "type": "int",
+   "init": 3420
+  },
+  {
+   "name": "prod_white_bread",
+   "type": "int",
+   "init": 2340,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "prod_baguette",
+   "type": "int",
+   "init": 620,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "prod_roll",
+   "type": "int",
+   "init": 460,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "good_count",
+   "type": "int",
+   "init": 3383
+  },
+  {
+   "name": "defect_count",
+   "type": "int",
+   "init": 37,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "achievement_rate",
+   "type": "float",
+   "init": 57.0
+  },
+  {
+   "name": "line_operating_rate",
+   "type": "float",
+   "init": 92.4,
+   "min": 0,
+   "max": 100
+  },
+  {
+   "name": "plc_comm_error",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "conveyor_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "conveyor_reverse",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "conveyor_speed",
+   "type": "float",
+   "init": 6.0
+  },
+  {
+   "name": "conveyor_speed_sp",
+   "type": "float",
+   "init": 6.0,
+   "min": 0,
+   "max": 12
+  },
+  {
+   "name": "conveyor_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "conveyor_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "feeder_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "feeder_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "feeder_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "feeder_qty",
+   "type": "int",
+   "init": 240,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "mixer_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "mixer_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "mixer_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "mixer_qty",
+   "type": "int",
+   "init": 118,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "divider_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "divider_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "divider_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "divider_qty",
+   "type": "int",
+   "init": 46,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "proofing_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "proofing_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "proofing_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "proofing_qty",
+   "type": "int",
+   "init": 192,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "oven_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "oven_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "oven_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "oven_qty",
+   "type": "int",
+   "init": 64,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "cooling_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "cooling_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "cooling_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "cooling_qty",
+   "type": "int",
+   "init": 310,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "slicer_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "slicer_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "slicer_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "slicer_qty",
+   "type": "int",
+   "init": 12,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "packaging_running",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "packaging_fault",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "packaging_state",
+   "type": "int",
+   "init": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "packaging_qty",
+   "type": "int",
+   "init": 10,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "feeder_flour_level",
+   "type": "float",
+   "init": 64.0,
+   "min": 0,
+   "max": 100
+  },
+  {
+   "name": "feeder_feed_rate",
+   "type": "float",
+   "init": 18.5
+  },
+  {
+   "name": "feeder_water_temp",
+   "type": "float",
+   "init": 18.2
+  },
+  {
+   "name": "feeder_batch_weight",
+   "type": "float",
+   "init": 120.0
+  },
+  {
+   "name": "feeder_batch_sp",
+   "type": "int",
+   "init": 120,
+   "min": 50,
+   "max": 200
+  },
+  {
+   "name": "feeder_batch_count",
+   "type": "int",
+   "init": 28,
+   "min": 0,
+   "max": 9999
+  },
+  {
+   "name": "mixer_rpm",
+   "type": "float",
+   "init": 118.0
+  },
+  {
+   "name": "mixer_rpm_sp",
+   "type": "int",
+   "init": 120,
+   "min": 0,
+   "max": 250
+  },
+  {
+   "name": "mixer_load",
+   "type": "float",
+   "init": 64.0
+  },
+  {
+   "name": "mixer_time_sp",
+   "type": "int",
+   "init": 12,
+   "min": 1,
+   "max": 30
+  },
+  {
+   "name": "mixer_elapsed_time",
+   "type": "float",
+   "init": 7.4
+  },
+  {
+   "name": "mixer_remaining_time",
+   "type": "float",
+   "init": 4.6
+  },
+  {
+   "name": "mixer_reverse",
+   "type": "bool",
+   "init": false
+  },
+  {
+   "name": "mixer_dough_temp",
+   "type": "float",
+   "init": 26.5
+  },
+  {
+   "name": "divider_speed",
+   "type": "float",
+   "init": 45.0
+  },
+  {
+   "name": "divider_weight",
+   "type": "float",
+   "init": 452.0
+  },
+  {
+   "name": "divider_weight_sp",
+   "type": "int",
+   "init": 450,
+   "min": 100,
+   "max": 1000
+  },
+  {
+   "name": "divider_reject_count",
+   "type": "int",
+   "init": 3,
+   "min": 0,
+   "max": 99999
+  },
+  {
+   "name": "divider_piece_count",
+   "type": "int",
+   "init": 3466,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "divider_rounder_speed",
+   "type": "float",
+   "init": 72.0
+  },
+  {
+   "name": "proofing_temperature",
+   "type": "float",
+   "init": 38.0
+  },
+  {
+   "name": "proofing_temp_sp",
+   "type": "float",
+   "init": 38.0,
+   "min": 20,
+   "max": 45
+  },
+  {
+   "name": "proofing_temp_hi",
+   "type": "float",
+   "init": 42.0,
+   "min": 20,
+   "max": 60
+  },
+  {
+   "name": "proofing_humidity",
+   "type": "float",
+   "init": 82.0
+  },
+  {
+   "name": "proofing_humidity_sp",
+   "type": "float",
+   "init": 85.0,
+   "min": 40,
+   "max": 95
+  },
+  {
+   "name": "proofing_time_sp",
+   "type": "int",
+   "init": 50,
+   "min": 10,
+   "max": 180
+  },
+  {
+   "name": "proofing_elapsed_time",
+   "type": "float",
+   "init": 31.0
+  },
+  {
+   "name": "proofing_heater_on",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "proofing_humidifier_on",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "oven_temperature",
+   "type": "float",
+   "init": 210.4
+  },
+  {
+   "name": "oven_target_temperature",
+   "type": "int",
+   "init": 210,
+   "min": 150,
+   "max": 260
+  },
+  {
+   "name": "oven_temp_hi",
+   "type": "int",
+   "init": 235,
+   "min": 150,
+   "max": 300
+  },
+  {
+   "name": "oven_top_heat",
+   "type": "float",
+   "init": 214.0
+  },
+  {
+   "name": "oven_bottom_heat",
+   "type": "float",
+   "init": 206.0
+  },
+  {
+   "name": "oven_heater_output",
+   "type": "float",
+   "init": 62.0
+  },
+  {
+   "name": "oven_heater_on",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "oven_baking_time_sp",
+   "type": "int",
+   "init": 30,
+   "min": 5,
+   "max": 90
+  },
+  {
+   "name": "cooling_temperature",
+   "type": "float",
+   "init": 32.5
+  },
+  {
+   "name": "cooling_room_temp",
+   "type": "float",
+   "init": 22.0
+  },
+  {
+   "name": "cooling_fan_on",
+   "type": "bool",
+   "init": true
+  },
+  {
+   "name": "cooling_fan_speed",
+   "type": "float",
+   "init": 80.0
+  },
+  {
+   "name": "cooling_time_sp",
+   "type": "int",
+   "init": 90,
+   "min": 10,
+   "max": 240
+  },
+  {
+   "name": "slicer_speed",
+   "type": "float",
+   "init": 42.0
+  },
+  {
+   "name": "slicer_thickness",
+   "type": "float",
+   "init": 20.0,
+   "min": 8,
+   "max": 40
+  },
+  {
+   "name": "slicer_blade_hours",
+   "type": "int",
+   "init": 312,
+   "min": 0,
+   "max": 99999
+  },
+  {
+   "name": "slicer_count",
+   "type": "int",
+   "init": 3431,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "slicer_reject_count",
+   "type": "int",
+   "init": 9,
+   "min": 0,
+   "max": 99999
+  },
+  {
+   "name": "packaging_speed",
+   "type": "float",
+   "init": 44.0
+  },
+  {
+   "name": "packaging_speed_sp",
+   "type": "int",
+   "init": 44,
+   "min": 10,
+   "max": 80
+  },
+  {
+   "name": "packaging_count",
+   "type": "int",
+   "init": 2210,
+   "min": 0,
+   "max": 999999
+  },
+  {
+   "name": "packaging_defects",
+   "type": "int",
+   "init": 12,
+   "min": 0,
+   "max": 99999
+  },
+  {
+   "name": "packaging_film_remaining",
+   "type": "float",
+   "init": 8.0,
+   "min": 0,
+   "max": 100
+  },
+  {
+   "name": "trend_view",
+   "type": "int",
+   "init": 0,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "alarm_view",
+   "type": "int",
+   "init": 0,
+   "min": 0,
+   "max": 1
+  }
+ ],
+ "scripts": [
+  {
+   "name": "line_status",
+   "trigger": "interval",
+   "interval_ms": 500,
+   "code": [
+    "local function on(v) return v == true or (type(v) == 'number' and v ~= 0) end",
+    "local function st(run, fault) if on(fault) then return 2 elseif on(run) then return 1 else return 0 end end",
+    "local states = {}",
+    "do local s = st(tag.feeder_running, tag.feeder_fault) if s == 1 and tag.feeder_flour_level < 5 then s = 3 end tag.feeder_state = s; states[#states+1] = s end",
+    "do local s = st(tag.mixer_running, tag.mixer_fault) if s == 1 and tag.mixer_load > 90 then s = 3 end tag.mixer_state = s; states[#states+1] = s end",
+    "do local s = st(tag.divider_running, tag.divider_fault) tag.divider_state = s; states[#states+1] = s end",
+    "do local s = st(tag.proofing_running, tag.proofing_fault) tag.proofing_state = s; states[#states+1] = s end",
+    "do local s = st(tag.oven_running, tag.oven_fault) tag.oven_state = s; states[#states+1] = s end",
+    "do local s = st(tag.cooling_running, tag.cooling_fault) tag.cooling_state = s; states[#states+1] = s end",
+    "do local s = st(tag.slicer_running, tag.slicer_fault) tag.slicer_state = s; states[#states+1] = s end",
+    "do local s = st(tag.packaging_running, tag.packaging_fault) if s == 1 and tag.packaging_film_remaining < 10 then s = 3 end tag.packaging_state = s; states[#states+1] = s end",
+    "local fault, warn, running = on(tag.conveyor_fault) or on(tag.plc_comm_error), false, 0",
+    "for _, s in ipairs(states) do if s == 2 then fault = true elseif s == 3 then warn = true end if s == 1 or s == 3 then running = running + 1 end end",
+    "if fault then tag.line_state = 2 elseif running == 0 or not on(tag.conveyor_running) then tag.line_state = 0 elseif warn then tag.line_state = 3 else tag.line_state = 1 end",
+    "tag.conveyor_state = st(tag.conveyor_running, tag.conveyor_fault)",
+    "tag.production_count = tag.prod_white_bread + tag.prod_baguette + tag.prod_roll",
+    "tag.good_count = math.max(0, tag.production_count - tag.defect_count)",
+    "if tag.production_target > 0 then tag.achievement_rate = tag.production_count * 100.0 / tag.production_target else tag.achievement_rate = 0 end",
+    "tag.mixer_remaining_time = math.max(0, tag.mixer_time_sp - tag.mixer_elapsed_time)"
+   ]
+  }
+ ],
+ "simulation": {
+  "items": [
+   {
+    "tag": "mixer_rpm",
+    "mode": "follow",
+    "target": "mixer_rpm_sp",
+    "rate": 30,
+    "when": "mixer_running",
+    "idle": 0,
+    "min": 0,
+    "max": 250
+   },
+   {
+    "tag": "mixer_load",
+    "mode": "follow",
+    "target": 64,
+    "rate": 15,
+    "when": "mixer_running",
+    "idle": 0,
+    "min": 0,
+    "max": 100
+   },
+   {
+    "tag": "mixer_elapsed_time",
+    "mode": "ramp",
+    "min": 0,
+    "max": 12,
+    "period_ms": 720000,
+    "when": "mixer_running"
+   },
+   {
+    "tag": "mixer_dough_temp",
+    "mode": "sine",
+    "min": 25.8,
+    "max": 27.0,
+    "period_ms": 90000
+   },
+   {
+    "tag": "feeder_flour_level",
+    "mode": "sine",
+    "min": 3,
+    "max": 95,
+    "period_ms": 900000,
+    "when": "feeder_running"
+   },
+   {
+    "tag": "feeder_feed_rate",
+    "mode": "follow",
+    "target": 18.5,
+    "rate": 5,
+    "when": "feeder_running",
+    "idle": 0,
+    "min": 0,
+    "max": 40
+   },
+   {
+    "tag": "feeder_batch_weight",
+    "mode": "ramp",
+    "min": 0,
+    "max": 120,
+    "period_ms": 400000,
+    "when": "feeder_running"
+   },
+   {
+    "tag": "divider_speed",
+    "mode": "follow",
+    "target": 45,
+    "rate": 10,
+    "when": "divider_running",
+    "idle": 0,
+    "min": 0,
+    "max": 80
+   },
+   {
+    "tag": "divider_weight",
+    "mode": "follow",
+    "target": "divider_weight_sp",
+    "rate": 20,
+    "noise": 2.5,
+    "min": 0,
+    "max": 1000
+   },
+   {
+    "tag": "divider_reject_count",
+    "mode": "counter",
+    "min": 3,
+    "max": 99999,
+    "period_ms": 240000,
+    "when": "divider_running"
+   },
+   {
+    "tag": "proofing_temperature",
+    "mode": "follow",
+    "target": "proofing_temp_sp",
+    "rate": 0.3,
+    "when": "proofing_heater_on",
+    "idle": 24,
+    "noise": 0.15,
+    "min": 0,
+    "max": 60
+   },
+   {
+    "tag": "proofing_humidity",
+    "mode": "follow",
+    "target": "proofing_humidity_sp",
+    "rate": 0.6,
+    "when": "proofing_humidifier_on",
+    "idle": 45,
+    "noise": 0.6,
+    "min": 0,
+    "max": 100
+   },
+   {
+    "tag": "proofing_elapsed_time",
+    "mode": "ramp",
+    "min": 0,
+    "max": 50,
+    "period_ms": 3000000,
+    "when": "proofing_running"
+   },
+   {
+    "tag": "oven_temperature",
+    "mode": "follow",
+    "target": "oven_target_temperature",
+    "rate": 2,
+    "when": "oven_heater_on",
+    "idle": 25,
+    "noise": 0.8,
+    "min": 0,
+    "max": 300
+   },
+   {
+    "tag": "oven_top_heat",
+    "mode": "follow",
+    "target": "oven_target_temperature",
+    "rate": 2,
+    "when": "oven_heater_on",
+    "idle": 25,
+    "noise": 1.5,
+    "min": 0,
+    "max": 300
+   },
+   {
+    "tag": "oven_bottom_heat",
+    "mode": "follow",
+    "target": "oven_target_temperature",
+    "rate": 2,
+    "when": "oven_heater_on",
+    "idle": 25,
+    "noise": 1.5,
+    "min": 0,
+    "max": 300
+   },
+   {
+    "tag": "oven_heater_output",
+    "mode": "follow",
+    "target": 62,
+    "rate": 10,
+    "when": "oven_heater_on",
+    "idle": 0,
+    "min": 0,
+    "max": 100
+   },
+   {
+    "tag": "cooling_temperature",
+    "mode": "sine",
+    "min": 31,
+    "max": 34,
+    "period_ms": 120000
+   },
+   {
+    "tag": "cooling_fan_speed",
+    "mode": "follow",
+    "target": 80,
+    "rate": 20,
+    "when": "cooling_fan_on",
+    "idle": 0,
+    "min": 0,
+    "max": 100
+   },
+   {
+    "tag": "slicer_speed",
+    "mode": "follow",
+    "target": 42,
+    "rate": 10,
+    "when": "slicer_running",
+    "idle": 0,
+    "min": 0,
+    "max": 80
+   },
+   {
+    "tag": "packaging_speed",
+    "mode": "follow",
+    "target": "packaging_speed_sp",
+    "rate": 10,
+    "when": "packaging_running",
+    "idle": 0,
+    "min": 0,
+    "max": 80
+   },
+   {
+    "tag": "packaging_count",
+    "mode": "counter",
+    "min": 2210,
+    "max": 999999,
+    "period_ms": 1400,
+    "when": "packaging_running"
+   },
+   {
+    "tag": "packaging_defects",
+    "mode": "counter",
+    "min": 12,
+    "max": 99999,
+    "period_ms": 150000,
+    "when": "packaging_running"
+   },
+   {
+    "tag": "packaging_film_remaining",
+    "mode": "sine",
+    "min": 6,
+    "max": 60,
+    "period_ms": 600000,
+    "when": "packaging_running"
+   },
+   {
+    "tag": "conveyor_speed",
+    "mode": "follow",
+    "target": "conveyor_speed_sp",
+    "rate": 2,
+    "when": "conveyor_running",
+    "idle": 0,
+    "min": 0,
+    "max": 12
+   },
+   {
+    "tag": "prod_white_bread",
+    "mode": "counter",
+    "min": 2340,
+    "max": 999999,
+    "period_ms": 1400,
+    "when": "packaging_running"
+   },
+   {
+    "tag": "defect_count",
+    "mode": "counter",
+    "min": 37,
+    "max": 999999,
+    "period_ms": 60000,
+    "when": "packaging_running"
+   },
+   {
+    "tag": "feeder_batch_count",
+    "mode": "counter",
+    "min": 28,
+    "max": 9999,
+    "period_ms": 400000,
+    "when": "feeder_running"
+   },
+   {
+    "tag": "divider_piece_count",
+    "mode": "counter",
+    "min": 3466,
+    "max": 999999,
+    "period_ms": 1333,
+    "when": "divider_running"
+   },
+   {
+    "tag": "divider_rounder_speed",
+    "mode": "follow",
+    "target": 72,
+    "rate": 10,
+    "when": "divider_running",
+    "idle": 0,
+    "min": 0,
+    "max": 100
+   },
+   {
+    "tag": "slicer_count",
+    "mode": "counter",
+    "min": 3431,
+    "max": 999999,
+    "period_ms": 1430,
+    "when": "slicer_running"
+   },
+   {
+    "tag": "slicer_reject_count",
+    "mode": "counter",
+    "min": 9,
+    "max": 99999,
+    "period_ms": 300000,
+    "when": "slicer_running"
+   },
+   {
+    "tag": "line_operating_rate",
+    "mode": "sine",
+    "min": 90,
+    "max": 95,
+    "period_ms": 600000
+   },
+   {
+    "tag": "feeder_qty",
+    "mode": "random",
+    "min": 230,
+    "max": 250,
+    "period_ms": 5000,
+    "when": "feeder_running"
+   },
+   {
+    "tag": "divider_qty",
+    "mode": "random",
+    "min": 42,
+    "max": 48,
+    "period_ms": 5000,
+    "when": "divider_running"
+   },
+   {
+    "tag": "proofing_qty",
+    "mode": "random",
+    "min": 186,
+    "max": 198,
+    "period_ms": 5000,
+    "when": "proofing_running"
+   },
+   {
+    "tag": "oven_qty",
+    "mode": "random",
+    "min": 60,
+    "max": 68,
+    "period_ms": 5000,
+    "when": "oven_running"
+   },
+   {
+    "tag": "cooling_qty",
+    "mode": "random",
+    "min": 300,
+    "max": 320,
+    "period_ms": 5000,
+    "when": "cooling_running"
+   },
+   {
+    "tag": "slicer_qty",
+    "mode": "random",
+    "min": 10,
+    "max": 14,
+    "period_ms": 5000,
+    "when": "slicer_running"
+   },
+   {
+    "tag": "packaging_qty",
+    "mode": "random",
+    "min": 8,
+    "max": 12,
+    "period_ms": 5000,
+    "when": "packaging_running"
+   }
+  ]
+ },
+ "alarms": {
+  "items": [
+   {
+    "name": "oven_temp_abnormal",
+    "tag": "oven_temperature",
+    "condition": "gt",
+    "value_tag": "oven_temp_hi",
+    "severity": "critical",
+    "message": "Oven: oven temperature abnormal"
+   },
+   {
+    "name": "proofing_temp_abnormal",
+    "tag": "proofing_temperature",
+    "condition": "gt",
+    "value_tag": "proofing_temp_hi",
+    "severity": "critical",
+    "message": "Proofing: proofing temperature abnormal"
+   },
+   {
+    "name": "ingredient_empty",
+    "tag": "feeder_flour_level",
+    "condition": "lt",
+    "value": 5,
+    "severity": "warning",
+    "message": "Feeding: out of ingredients (flour)"
+   },
+   {
+    "name": "mixer_overload",
+    "tag": "mixer_load",
+    "condition": "gt",
+    "value": 90,
+    "severity": "critical",
+    "message": "Mixer: motor overload"
+   },
+   {
+    "name": "conveyor_error",
+    "tag": "conveyor_fault",
+    "severity": "critical",
+    "message": "Conveyor: transport error"
+   },
+   {
+    "name": "film_low",
+    "tag": "packaging_film_remaining",
+    "condition": "lt",
+    "value": 10,
+    "severity": "warning",
+    "message": "Packaging: film low"
+   },
+   {
+    "name": "plc_comm_error",
+    "tag": "plc_comm_error",
+    "severity": "critical",
+    "message": "System: PLC communication error"
+   }
+  ]
+ },
+ "data_log": {
+  "groups": [
+   {
+    "name": "process",
+    "trigger": "interval",
+    "interval_ms": 2000,
+    "tags": [
+     "oven_temperature",
+     "oven_target_temperature",
+     "proofing_temperature",
+     "proofing_humidity",
+     "mixer_rpm",
+     "mixer_load",
+     "conveyor_speed"
+    ]
+   },
+   {
+    "name": "production",
+    "trigger": "interval",
+    "interval_ms": 10000,
+    "tags": [
+     "production_count",
+     "defect_count"
+    ]
+   }
+  ]
+ },
+ "recipes": {
+  "books": [
+   {
+    "name": "products",
+    "items": [
+     "mixer_rpm_sp",
+     "mixer_time_sp",
+     "proofing_temp_sp",
+     "proofing_humidity_sp",
+     "proofing_time_sp",
+     "oven_target_temperature",
+     "oven_baking_time_sp",
+     "conveyor_speed_sp"
+    ],
+    "recipes": [
+     {
+      "name": "White bread",
+      "values": {
+       "mixer_rpm_sp": 120,
+       "mixer_time_sp": 12,
+       "proofing_temp_sp": 38,
+       "proofing_humidity_sp": 85,
+       "proofing_time_sp": 50,
+       "oven_target_temperature": 210,
+       "oven_baking_time_sp": 30,
+       "conveyor_speed_sp": 6.0
+      }
+     },
+     {
+      "name": "Baguette",
+      "values": {
+       "mixer_rpm_sp": 90,
+       "mixer_time_sp": 15,
+       "proofing_temp_sp": 26,
+       "proofing_humidity_sp": 75,
+       "proofing_time_sp": 90,
+       "oven_target_temperature": 240,
+       "oven_baking_time_sp": 25,
+       "conveyor_speed_sp": 5.0
+      }
+     },
+     {
+      "name": "Roll",
+      "values": {
+       "mixer_rpm_sp": 110,
+       "mixer_time_sp": 10,
+       "proofing_temp_sp": 36,
+       "proofing_humidity_sp": 80,
+       "proofing_time_sp": 40,
+       "oven_target_temperature": 200,
+       "oven_baking_time_sp": 14,
+       "conveyor_speed_sp": 7.5
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "screens": [
+  "screens/frame.json",
+  "screens/equip_frame.json",
+  "screens/dashboard.json",
+  "screens/process.json",
+  "screens/equip_feeder.json",
+  "screens/equip_mixer.json",
+  "screens/equip_divider.json",
+  "screens/equip_proofing.json",
+  "screens/equip_oven.json",
+  "screens/equip_cooling.json",
+  "screens/equip_slicer.json",
+  "screens/equip_packaging.json",
+  "screens/manual.json",
+  "screens/recipe.json",
+  "screens/trend.json",
+  "screens/alarms.json",
+  "screens/report.json",
+  "screens/io.json",
+  "screens/confirm_stop_all.json",
+  "screens/confirm_start_all.json",
+  "screens/confirm_reset.json"
+ ]
+}

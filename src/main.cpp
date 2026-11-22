@@ -136,6 +136,7 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
     bool loaded = hml::project().load(project_path);
     int rendered = 0;
     std::vector<std::string> notes, glyphs;
+    std::vector<bool> written(renders.size(), false);
     if(loaded) {
         const hml::ProjectInfo& info = hml::project().info();
         lv_init();
@@ -200,15 +201,16 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
                 }
             }
         }
-        for(const Render& r : renders) {
+        for(size_t ri = 0; ri < renders.size(); ri++) {
+            const Render& r = renders[ri];
             while(hml::ui().close_popup()) {}
             if(!hml::project().info().start_screen.empty()) hml::ui().show_screen(hml::project().info().start_screen, "none");
             if(!hml::ui().show_screen(r.screen, "none")) { notes.push_back("--render: unknown screen \"" + r.screen + "\""); continue; }
             if(!r.popup.empty() && !hml::ui().open_popup(r.popup)) { notes.push_back("--render: \"" + r.popup + "\" is not a popup"); continue; }
             settle(std::max(1, static_cast<int>(render_at_ms / 5)));     // (animations: the picture after that time)
             lv_refr_now(disp);
-            if(hml::save_screenshot(disp, r.path)) rendered++;
-            else notes.push_back("--render: cannot write " + r.path);
+            if(hml::save_screenshot(disp, r.path)) { rendered++; written[ri] = true; }
+            else notes.push_back("--render: cannot write " + r.path + " (a Windows path, D:/..., not /d/...)");
         }
     }
     hml::set_log_sink(nullptr);
@@ -226,7 +228,10 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
     for(const std::string& m : s_check_log) std::printf("runtime: %s\n", m.c_str());
     for(const std::string& m : glyphs) std::printf("%s (drawn as an empty box)\n", m.c_str());
     for(const std::string& m : notes) std::printf("%s\n", m.c_str());
-    for(const Render& r : renders) std::printf("rendered: %s%s%s -> %s\n", r.screen.c_str(), r.popup.empty() ? "" : "+", r.popup.c_str(), r.path.c_str());
+    for(size_t ri = 0; ri < renders.size(); ri++) {           // (only the pictures that were written)
+        const Render& r = renders[ri];
+        if(written[ri]) std::printf("rendered: %s%s%s -> %s\n", r.screen.c_str(), r.popup.empty() ? "" : "+", r.popup.c_str(), r.path.c_str());
+    }
     const size_t n = problems.size() + s_check_log.size() + notes.size() + glyphs.size() + ((!loaded && problems.empty()) ? 1 : 0);
     if(n) std::printf("%d problem(s)\n", static_cast<int>(n));
     else std::printf("no problems\n");

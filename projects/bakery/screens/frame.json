@@ -1,0 +1,656 @@
+{
+ "name": "frame",
+ "scrollable": false,
+ "style": {
+  "bg_color": "#101827",
+  "pad": 0
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 0,
+   "y": 0,
+   "w": 1280,
+   "h": 64,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 0,
+    "pad": 0,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "image",
+     "src": "assets/icons/32/factory.png",
+     "style": {
+      "image_recolor": "#26c6da"
+     },
+     "x": 16,
+     "y": 16
+    },
+    {
+     "type": "label",
+     "text": "BAKERY LINE",
+     "x": 60,
+     "y": 18,
+     "style": {
+      "font": 24,
+      "text_color": "#e5edf5",
+      "text_letter_space": 2
+     }
+    },
+    {
+     "type": "panel",
+     "x": 252,
+     "y": 16,
+     "w": 2,
+     "h": 32,
+     "style": {
+      "bg_color": "#2c3d57",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": []
+    },
+    {
+     "type": "label",
+     "text": "${title}",
+     "x": 272,
+     "y": 21,
+     "style": {
+      "font": 18,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "panel",
+     "x": 576,
+     "y": 14,
+     "w": 144,
+     "h": 36,
+     "style": {
+      "bg_color": "#101827",
+      "radius": 18,
+      "pad": 0,
+      "border_width": 2,
+      "border_color": "#f5b942"
+     },
+     "scrollable": false,
+     "bind": {
+      "visible": "sys.sim.active"
+     },
+     "children": [
+      {
+       "type": "label",
+       "text": "SIMULATION",
+       "style": {
+        "font": 16,
+        "text_color": "#f5b942"
+       },
+       "align": "center"
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 736,
+     "y": 12,
+     "w": 200,
+     "h": 40,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 20,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "style": {
+        "font": 18,
+        "text_color": "#101827"
+       },
+       "align": "center",
+       "bind": {
+        "text": {
+         "tag": "line_state",
+         "map": {
+          "0": "LINE STOPPED",
+          "1": "LINE RUNNING",
+          "2": "LINE FAULT",
+          "3": "LINE WARNING",
+          "default": "---"
+         }
+        }
+       }
+      }
+     ],
+     "bind": {
+      "bg_color": {
+       "tag": "line_state",
+       "map": {
+        "0": "#5b6b80",
+        "1": "#36c98f",
+        "2": "#f06464",
+        "3": "#f5b942",
+        "default": "#5b6b80"
+       }
+      }
+     }
+    },
+    {
+     "type": "panel",
+     "x": 952,
+     "y": 12,
+     "w": 112,
+     "h": 40,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 20,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "sys.alarm.active",
+       "map": {
+        "0": "#22314a",
+        "default": "#f06464"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "alarms"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/alarm.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       },
+       "x": 12,
+       "y": 8
+      },
+      {
+       "type": "label",
+       "x": 44,
+       "y": 8,
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "sys.alarm.active",
+         "format": "%d"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "label",
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.datetime",
+       "format": "%s"
+      }
+     },
+     "align": "right_mid",
+     "x": -16
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 640,
+   "w": 1248,
+   "h": 64,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 0,
+    "pad": 0,
+    "border_width": 0,
+    "bg_opa": 0
+   },
+   "scrollable": false,
+   "flex": "row",
+   "flex_main": "space_between",
+   "children": [
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "dashboard": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "dashboard"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/home.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Dashboard",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "process": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "process"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/process.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Process",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "equip_feeder": "#19707c",
+        "equip_mixer": "#19707c",
+        "equip_divider": "#19707c",
+        "equip_proofing": "#19707c",
+        "equip_oven": "#19707c",
+        "equip_cooling": "#19707c",
+        "equip_slicer": "#19707c",
+        "equip_packaging": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_feeder"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/settings.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Equipment",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "manual": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "manual"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/power.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Manual",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "recipe": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "recipe"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/recipe.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Recipe",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "trend": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "trend"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/trend.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Trend",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "alarms": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "alarms"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/alarm.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Alarm",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "report": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "report"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/report.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "Report",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    },
+    {
+     "type": "button",
+     "w": 130,
+     "h": 64,
+     "flex": "row",
+     "flex_main": "center",
+     "flex_cross": "center",
+     "flex_track": "center",
+     "style": {
+      "bg_color": "#192538",
+      "radius": 10,
+      "shadow_width": 0,
+      "pad_gap": 6,
+      "pad": 2
+     },
+     "bind": {
+      "bg_color": {
+       "tag": "sys.screen",
+       "map": {
+        "io": "#19707c",
+        "default": "#192538"
+       }
+      }
+     },
+     "on_click": {
+      "action": "goto",
+      "screen": "io"
+     },
+     "children": [
+      {
+       "type": "image",
+       "src": "assets/icons/24/io.png",
+       "style": {
+        "image_recolor": "#e5edf5"
+       }
+      },
+      {
+       "type": "label",
+       "text": "I/O",
+       "style": {
+        "font": 16,
+        "text_color": "#e5edf5"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

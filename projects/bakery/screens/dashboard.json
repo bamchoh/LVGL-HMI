@@ -1,0 +1,2465 @@
+{
+ "name": "dashboard",
+ "template": "frame",
+ "template_args": {
+  "title": "Dashboard"
+ },
+ "children": [
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 80,
+   "w": 1248,
+   "h": 112,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 0,
+    "pad": 0,
+    "border_width": 0,
+    "bg_opa": 0
+   },
+   "scrollable": false,
+   "flex": "row",
+   "flex_main": "space_between",
+   "children": [
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Line status",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "panel",
+       "w": 168,
+       "h": 44,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 22,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "style": {
+          "font": 20,
+          "text_color": "#101827"
+         },
+         "align": "center",
+         "bind": {
+          "text": {
+           "tag": "line_state",
+           "map": {
+            "0": "STOPPED",
+            "1": "RUNNING",
+            "2": "FAULT",
+            "3": "WARNING",
+            "default": "---"
+           }
+          }
+         }
+        }
+       ],
+       "bind": {
+        "bg_color": {
+         "tag": "line_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "y": 36
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Today's production",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "production_count",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "production_target",
+         "format": "pcs  /  target %d"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Achievement",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#26c6da"
+       },
+       "bind": {
+        "text": {
+         "tag": "achievement_rate",
+         "format": "%.1f %%"
+        }
+       }
+      },
+      {
+       "type": "bar",
+       "x": 0,
+       "y": 80,
+       "w": 160,
+       "h": 8,
+       "min": 0,
+       "max": 100,
+       "bind": "achievement_rate",
+       "style": {
+        "bg_color": "#101827",
+        "radius": 4
+       },
+       "style_indicator": {
+        "bg_color": "#26c6da",
+        "radius": 4
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Operating rate",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "line_operating_rate",
+         "format": "%.1f %%"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "of planned time",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Defects",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "defect_count",
+         "format": "%d"
+        }
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "good_count",
+         "format": "pcs  /  good %d"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "w": 196,
+     "h": 112,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 16,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "children": [
+      {
+       "type": "label",
+       "text": "Active alarms",
+       "x": 0,
+       "y": 0,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 28,
+       "style": {
+        "font": 40,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "sys.alarm.active",
+         "format": "%d"
+        },
+        "text_color": {
+         "tag": "sys.alarm.active",
+         "map": {
+          "0": "#36c98f",
+          "default": "#f06464"
+         }
+        }
+       }
+      },
+      {
+       "type": "label",
+       "x": 0,
+       "y": 76,
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "sys.alarm.unacked",
+         "format": "%d unacknowledged"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 208,
+   "w": 1248,
+   "h": 264,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "PRODUCTION LINE",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 18,
+      "text_color": "#e5edf5",
+      "text_letter_space": 1
+     }
+    },
+    {
+     "type": "label",
+     "text": "Raw materials in  >  packed bread out.   Tap a process for details.",
+     "x": 200,
+     "y": 2,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "panel",
+     "x": 8,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_feeder"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "feeder_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "1",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/tank.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "feeder_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/tank.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "feeder_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/tank.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "feeder_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/tank.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "feeder_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Feeding",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "feeder_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "feeder_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "feeder_feed_rate",
+         "format": "%.1f kg/min"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "feeder_qty",
+         "format": "%d kg in hopper"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 140,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 160,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_mixer"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "mixer_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "2",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/mixer.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "mixer_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/mixer.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "mixer_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/mixer.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "mixer_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/mixer.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "mixer_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Mixing",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "mixer_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "mixer_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "mixer_rpm",
+         "format": "%.0f rpm"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "mixer_qty",
+         "format": "%d kg dough"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 292,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 312,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_divider"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "divider_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "3",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/process.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "divider_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/process.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "divider_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/process.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "divider_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/process.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "divider_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Dividing",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "divider_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "divider_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "divider_speed",
+         "format": "%.0f /min"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "divider_qty",
+         "format": "%d pcs"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 444,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 464,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_proofing"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "proofing_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "4",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/humidity.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "proofing_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/humidity.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "proofing_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/humidity.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "proofing_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/humidity.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "proofing_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Proofing",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "proofing_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_temperature",
+         "format": "%.1f °C"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "proofing_qty",
+         "format": "%d pcs"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 596,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 616,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_oven"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "oven_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "5",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/oven.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "oven_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/oven.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "oven_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/oven.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "oven_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/oven.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "oven_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Baking",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "oven_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "oven_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "oven_temperature",
+         "format": "%.0f °C"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "oven_qty",
+         "format": "%d loaves"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 748,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 768,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_cooling"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "cooling_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "6",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/cooling.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "cooling_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/cooling.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "cooling_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/cooling.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "cooling_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/cooling.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "cooling_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Cooling",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "cooling_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "cooling_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "cooling_temperature",
+         "format": "%.1f °C"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "cooling_qty",
+         "format": "%d loaves"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 900,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 920,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_slicer"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "slicer_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "7",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/slicer.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "slicer_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/slicer.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "slicer_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/slicer.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "slicer_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/slicer.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "slicer_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Slicing",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "slicer_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "slicer_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "slicer_speed",
+         "format": "%.0f /min"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "slicer_qty",
+         "format": "%d loaves"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "x": 1052,
+     "y": 100,
+     "w": 24,
+     "h": 8,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 4,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "bind": {
+      "bg_color": {
+       "tag": "conveyor_running",
+       "map": {
+        "true": "#26c6da",
+        "false": "#5b6b80"
+       }
+      }
+     },
+     "children": []
+    },
+    {
+     "type": "panel",
+     "x": 1072,
+     "y": 40,
+     "w": 136,
+     "h": 200,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 12,
+      "pad": 0,
+      "border_width": 0
+     },
+     "scrollable": false,
+     "on_click": {
+      "action": "goto",
+      "screen": "equip_packaging"
+     },
+     "children": [
+      {
+       "type": "panel",
+       "x": 0,
+       "y": 0,
+       "w": 136,
+       "h": 6,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "bind": {
+        "bg_color": {
+         "tag": "packaging_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "children": []
+      },
+      {
+       "type": "label",
+       "text": "8",
+       "x": 12,
+       "y": 16,
+       "style": {
+        "font": 16,
+        "text_color": "#91a0b4"
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/package.png",
+       "style": {
+        "image_recolor": "#5b6b80"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "packaging_state",
+         "eq": 0
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/package.png",
+       "style": {
+        "image_recolor": "#36c98f"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "packaging_state",
+         "eq": 1
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/package.png",
+       "style": {
+        "image_recolor": "#f06464"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "packaging_state",
+         "eq": 2
+        }
+       }
+      },
+      {
+       "type": "image",
+       "src": "assets/icons/48/package.png",
+       "style": {
+        "image_recolor": "#f5b942"
+       },
+       "y": 16,
+       "align": "top_mid",
+       "bind": {
+        "visible": {
+         "tag": "packaging_state",
+         "eq": 3
+        }
+       }
+      },
+      {
+       "type": "label",
+       "text": "Packaging",
+       "style": {
+        "font": 18,
+        "text_color": "#e5edf5"
+       },
+       "align": "top_mid",
+       "y": 72
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "packaging_state",
+         "map": {
+          "0": "STOPPED",
+          "1": "RUNNING",
+          "2": "FAULT",
+          "3": "WARNING",
+          "default": "---"
+         }
+        },
+        "text_color": {
+         "tag": "packaging_state",
+         "map": {
+          "0": "#5b6b80",
+          "1": "#36c98f",
+          "2": "#f06464",
+          "3": "#f5b942",
+          "default": "#5b6b80"
+         }
+        }
+       },
+       "align": "top_mid",
+       "y": 98
+      },
+      {
+       "type": "panel",
+       "x": 12,
+       "y": 128,
+       "w": 112,
+       "h": 1,
+       "style": {
+        "bg_color": "#2c3d57",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0
+       },
+       "scrollable": false,
+       "children": []
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 20,
+        "text_color": "#e5edf5"
+       },
+       "bind": {
+        "text": {
+         "tag": "packaging_speed",
+         "format": "%.0f /min"
+        }
+       },
+       "align": "top_mid",
+       "y": 140
+      },
+      {
+       "type": "label",
+       "style": {
+        "font": 14,
+        "text_color": "#91a0b4"
+       },
+       "bind": {
+        "text": {
+         "tag": "packaging_qty",
+         "format": "%d packs"
+        }
+       },
+       "align": "top_mid",
+       "y": 172
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 16,
+   "y": 488,
+   "w": 616,
+   "h": 136,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "on_click": {
+    "action": "goto",
+    "screen": "alarms"
+   },
+   "children": [
+    {
+     "type": "label",
+     "text": "Latest alarm",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "alarm_banner",
+     "x": 0,
+     "y": 32,
+     "w": 584,
+     "h": 48,
+     "ack_on_tap": false,
+     "labels": {
+      "idle": "No active alarms"
+     }
+    },
+    {
+     "type": "label",
+     "text": "",
+     "x": 0,
+     "y": 88,
+     "style": {
+      "font": 14,
+      "text_color": "#91a0b4"
+     },
+     "bind": {
+      "text": {
+       "tag": "sys.alarm.unacked",
+       "format": "%d unacknowledged - open the Alarm monitor to acknowledge"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "x": 648,
+   "y": 488,
+   "w": 616,
+   "h": 136,
+   "style": {
+    "bg_color": "#192538",
+    "radius": 12,
+    "pad": 16,
+    "border_width": 0
+   },
+   "scrollable": false,
+   "children": [
+    {
+     "type": "label",
+     "text": "Key process values",
+     "x": 0,
+     "y": 0,
+     "style": {
+      "font": 16,
+      "text_color": "#91a0b4"
+     }
+    },
+    {
+     "type": "panel",
+     "x": 0,
+     "y": 32,
+     "w": 584,
+     "h": 72,
+     "style": {
+      "bg_color": "#192538",
+      "radius": 0,
+      "pad": 0,
+      "border_width": 0,
+      "bg_opa": 0
+     },
+     "scrollable": false,
+     "flex": "row",
+     "flex_main": "space_between",
+     "children": [
+      {
+       "type": "panel",
+       "w": 136,
+       "h": 72,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Oven",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 0,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "oven_temperature",
+           "format": "%.1f °C"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 136,
+       "h": 72,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Proofing",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 0,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_temperature",
+           "format": "%.1f °C"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 136,
+       "h": 72,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Humidity",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 0,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "proofing_humidity",
+           "format": "%.0f %%RH"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "w": 136,
+       "h": 72,
+       "style": {
+        "bg_color": "#192538",
+        "radius": 0,
+        "pad": 0,
+        "border_width": 0,
+        "bg_opa": 0
+       },
+       "scrollable": false,
+       "children": [
+        {
+         "type": "label",
+         "text": "Conveyor",
+         "x": 0,
+         "y": 0,
+         "style": {
+          "font": 14,
+          "text_color": "#91a0b4"
+         }
+        },
+        {
+         "type": "label",
+         "x": 0,
+         "y": 24,
+         "style": {
+          "font": 24,
+          "text_color": "#e5edf5"
+         },
+         "bind": {
+          "text": {
+           "tag": "conveyor_speed",
+           "format": "%.1f m/min"
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

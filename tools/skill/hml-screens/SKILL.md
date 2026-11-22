@@ -79,6 +79,9 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 - 画面の大きさは `display.width` × `display.height`。端から 16px は空ける。すべてこの中に収める（スクロールに頼らない）。
 - 位置と大きさは 8px 刻み。同じ種類の物は幅・高さ・間隔をそろえる。
 - 並べるものは `panel` に入れ、`"flex": "row"` / `"column"` と `pad_gap` で並べる（座標を 1 つずつ計算しない）。
+  **真ん中にそろえる**: `flex_main`（並ぶ向き）と `flex_cross`（行の中）に加えて `flex_track: "center"`（行そのものの位置）も書く。
+  ボタンにアイコンと文字を並べるなら `{ "type": "button", "flex": "row", "flex_main": "center", "flex_cross": "center", "flex_track": "center", "style": { "pad_column": 8 }, "children": [ image, label ] }`
+  （`text` は書かず、文字は子の `label`）。`flex_cross` だけでは縦に真ん中にならない。
   決まった位置に置くもの（画面の題名、隅のボタン）は `x` `y` か `align`。
 - 上に題名と状態、中央に主な情報、下か右に操作、という並びを基本にする。既存の画面に並びがあれば合わせる。
 
@@ -97,6 +100,9 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
   枠にぎりぎり入る寸法にしない。
 - 赤は異常・停止、黄 / 橙は警告、緑は正常・運転だけに使う。飾りには使わない。色だけで伝えず、文字も変える。
 - `theme.dark` が true なら暗い背景に明るい文字。背景と文字の明暗差を十分に取る。
+  `theme.primary`（ボタン、選ばれている物）と `theme.secondary`（`trend` の「Now」、`recipe_table` の選ばれている行など）は
+  専用の部品の色にもなる。**`secondary` を省くと赤系**なので、色の決まり（赤・黄は異常・警告だけ）があるプロジェクトでは、
+  `primary` と `secondary` をアクセントの色にそろえる。
 - **日本語などは `project.json` の `font.file` がないと表示できない**（□ になる。ランタイムの組み込みフォントは欧文だけ）。
   プロジェクトにフォントがなく、日本語を出す必要があるときは、**デザイナーに付いている日本語フォントをプロジェクトに入れる**:
   `<デザイナーのフォルダー>\fonts\` の `NotoSansJP-subset.otf` と `OFL.txt`（ライセンス文。必ず一緒に）を
@@ -107,7 +113,7 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 
 **データ**
 - 表示は `label` + `bind`（大きな数値、文章の中の値）か `numeric_display`（枠付きの値、入力もできる値）。入力は `numeric_display` / `text_display` に `"input": true`
-  （画面に `keyboard` を 1 つ置く）。入力には `min` / `max` を付ける。
+  （画面に `keyboard` を 1 つ置く）。入力には `min` / `max` を付ける。キーボードは、入力欄が下半分にあると画面の上に出る（入力欄は隠れない）。
 - 状態は `led` や `bind` の `bg_color` + `map`、言葉は `bind` の `text` + `map`（`{ "0": "@stopped", "1": "@running" }`）。値によって出し分けるものは `visible` と条件（`eq` `gt` …）。
 - 点滅・回転・移動などの動きは `animate`（資料の「アニメーション」）。気づいてほしい状態だけに、タグの条件（`when`）を付けて使う。
 - 画像（ロゴ、機器の絵、アイコン、背景）は `image` と `style` の `bg_image`。使い方と形式ごとの制限は資料の「画像」。
@@ -117,6 +123,7 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
 - アラーム、トレンド、時間別の棒グラフ、レシピは専用の部品（`alarm_list` / `alarm_banner`、`trend`、`bar_chart`、`recipe_table`）を使う。
   それぞれ `project.json` 側の設定（`alarms`、`data_log` のグループ、`recipes`）が要る（書き方は `reference/project-features.md`）。
 - 日付と時刻は `sys.date` / `sys.time` / `sys.datetime`（文字列のタグ）を `label` に `bind` する。
+- 依頼に `alarm_count` のようなタグがあっても、アラームの数は作らずに `sys.alarm.active`（未確認は `sys.alarm.unacked`）を使い、報告で伝える。
 - 機器がないと、値は `tags` の `init` のまま動かない。動いて見せるのは頼まれたときだけ（`project-features.md` の「機器なしで値を動かす」）。
 
 ## 確かめ方
@@ -152,6 +159,7 @@ rendered: overview -> C:\...\overview.png
 4. 最後の画像は、ユーザーに見せられる場所に残す。
 
 知っておくこと:
+- 画像の場所は Windows の書き方（`D:/...` か `D:\...`）。Git Bash の `/d/...` は書けない（`--render: cannot write` と出る）。
 - 機器につながないので、値は `tags` の `init`（と `--set`）から始まる。`trend` は枠と目盛りだけで、線は出ない。
 - プロジェクトのスクリプト（`scripts`）は動く。周期で動くスクリプトがタグを書き換えていると、`--set` した値と
   違う値が画像に出ることがある（`project.json` の `scripts` を読むとわかる）。

@@ -288,3 +288,30 @@ TEST_CASE("sim: follow without target, and an unknown \"when\" tag, are skipped"
     tick(rt);
     CHECK(tags().find("pv")->get_number() == doctest::Approx(3));
 }
+
+TEST_CASE("sim: a counter goes on from the tag's value; a follow item at rest writes no noise")
+{
+    Runtime rt;
+    rt.tag("made", TagType::Int, 3420);
+    Tag* run = rt.tag("run", TagType::Bool, 0);
+    Tag* rpm = rt.tag("rpm", TagType::Float, 0);
+    json items = json::parse(R"([
+        { "tag": "made", "mode": "counter", "min": 0, "max": 999999, "period_ms": 1 },
+        { "tag": "rpm", "mode": "follow", "target": 120, "rate": 100000, "when": "run", "idle": 0, "min": 0, "max": 200, "noise": 5 }
+    ])");
+    REQUIRE(load_sim(rt, items) == 1);
+    for(int i = 0; i < 3; i++) tick(rt);
+    CHECK(tags().find("made")->get_number() > 3420);          // (not back to 0)
+    CHECK(tags().find("made")->get_number() < 3430);
+    for(int i = 0; i < 5; i++) { tick(rt); CHECK(rpm->get_number() == doctest::Approx(0)); }   // stopped: exactly 0
+    run->set_number(1, nullptr);
+    for(int i = 0; i < 5; i++) {
+        tick(rt);
+        CHECK(rpm->get_number() >= 115.0);
+        CHECK(rpm->get_number() <= 125.0);
+    }
+    Tag* lo = rt.tag("lo", TagType::Float, 0);
+    json near_min = json::parse(R"([ { "tag": "lo", "mode": "follow", "target": 0, "rate": 100000, "min": 0, "max": 10, "noise": 3 } ])");
+    REQUIRE(load_sim(rt, near_min) == 1);
+    for(int i = 0; i < 8; i++) { tick(rt); CHECK(lo->get_number() >= 0.0); }   // noise stays inside min..max
+}

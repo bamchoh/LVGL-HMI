@@ -35,6 +35,9 @@
   各ボタンの `bind` に書く: `"bind": { "bg_color": { "tag": "sys.screen", "map": { "trend": "#26c6da", "default": "#192538" } } }`
   （`trend` はそのボタンの行き先）。下線などを出すなら、`visible` に `{ "tag": "sys.screen", "eq": "trend" }`。
 - 土台もふつうの画面なので、`project.json` の `"screens"` に入れる。土台にポップアップは使えない。8 段まで重ねられる。
+- **土台を重ねるとき**（`frame` の上に `equip_frame`、その上に各画面）: 真ん中の土台は自分の `template_args` で、上の画面から
+  来る値を下へ渡す: `{ "name": "equip_frame", "template": "frame", "template_args": { "title": "${title}" }, ... }`。
+  渡さないと `--check` が「template … has ${title}, which template_args does not give」と出す。
 - 画面自身の部品は、土台の部品（ヘッダー、ナビゲーション）に重ならない位置に置く。`--render` の画像には土台も描かれる。
 - 既存の画面がテンプレートを使っているプロジェクトでは、新しい画面も同じ `template` を付ける（共通部分を書き写さない）。
 
@@ -125,7 +128,10 @@
 | `path` | 装置で変えたレシピを置くフォルダー（既定 `recipes`。そこにファイルがあれば、プロジェクトの `recipes` より優先） |
 
 - レシピの名前は表示にそのまま出る（`"@ID"` は使えない）。日本語の名前にするならフォントが要る。
-- 選んでいるレシピの名前は `sys.recipe.<ブック名>.selected`、最後の操作の結果は `sys.recipe.status`（文字列のタグ。画面に出すときに使う）。
+- `sys.recipe.<ブック名>.selected` は**一覧で選んでいる**レシピの名前（書き込んだレシピではない）。最後の操作の結果は `sys.recipe.status`。
+  「今使っているレシピ」を出すなら文字列のタグを作り、`sys.recipe.status` の変化を受けるスクリプト（`trigger: "tag"`）で入れる。
+- `recipe_table` の行の見出しはタグ名のまま（読みやすい名前は付けられない）。名前と単位は隣に `label` や `table` で並べる。
+  書き込みの確認の文は英語で固定（「… to the PLC?」）。
 
 ## スクリプト (`scripts`)
 
@@ -187,9 +193,12 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 | `min`、`max`、`period_ms` | 範囲（省くとタグの `min` / `max`）、周期（既定 1000） |
 | `when` | タグ名（真の間だけ動く）か `{ "tag": "mode", "eq": 2 }`。偽の間は書かない（カウンターは止まる） |
 | `target`、`rate`、`idle` | `follow`: `target`（タグか数値）へ 1 秒に `rate` ずつ近づく。`when` が偽の間は `idle`（既定 `min`）へ。運転ボタンで回転数が上がる、ヒーターで温度が上がる、という動き |
-| `noise` | `sine` `triangle` `ramp` `follow` の値に ± `noise` の揺れを足す（本物らしく見せる。小さく） |
+| `noise` | `sine` `triangle` `ramp` `follow` の値に ± `noise` の揺れを足す（本物らしく見せる。小さく）。`follow` は `when` が偽の間は揺らさず、揺れても `min`..`max` の外に出ない |
 | `enabled`（`simulation` の） | `false` で止める |
 
+- **始まりの値**: `counter` はタグの `init`（`min`..`max` の中なら）から数え続ける（今日の生産数 3420 から増える）。波形は位相 0 から:
+  `sine` は真ん中、`ramp` / `triangle` は `min` から始まる。起動直後にアラームの条件に入らないよう `min` / `max` を決める（下限アラームの
+  あるタグを `ramp` で `min` から始めない）。bool のタグは `square`（`period_ms` の半分ずつ真と偽）で動かす。
 - 操作に応じて動かす: ボタンが書くタグ（`mixer_running`、設定値 `mixer_rpm_sp`）を `when` と `target` に使う。
   「A かつ B のとき」はスクリプトで bool のタグを作って `when` にする。もっと複雑な動きはスクリプト（`projects/demo` の `pump`）。
 - 機器の値（実際の温度など）を、機器がつながったあとも書き続けないよう、PLC のつながりを示すタグがあれば
