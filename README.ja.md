@@ -1904,6 +1904,8 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
   "enabled":    { "tag": "auto_mode", "invert": true },
   "bg_color":   { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828", "default": "#555" } },
   "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } },
+  "border_color": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464", "default": "#3b4a5e" } },
+  "image_recolor": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464" } },
   "options":    "option_list_tag",
   "src":        "image_path_tag"
 }
@@ -1915,7 +1917,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `scale` / `offset`                      | ウィジェット値 = タグ値 × scale + offset（双方向時は逆変換）                                                                                |
 | `invert`                                | 真偽を反転                                                                                                                                  |
 | `eq` / `ne` / `gt` / `lt` / `ge` / `le` | 条件付き真偽（`visible`, `enabled`, `checked`, `on` で使用）。比較対象は定数か、`{ "tag": "temp_hi" }` のように別のタグ（どちらのタグが変わっても再評価）。`checked` に `eq` を付けると、ON 時にその値をタグへ書く（ラジオボタン的動作） |
-| `map`                                   | 値 → 色（`bg_color`、`text_color`）、または 値 → 文字（`text`。`@ID` は訳される）のマップ。数値のキー（`true` / `false` = 1 / 0）はその数値に当たり、どのキーも、その文字を持つ文字列のタグに当たる（`"main"`）。`default` でその他。`text` で当たるキーも `default` もなければ、値を `format` で出す |
+| `map`                                   | 値 → 色（`bg_color`、`text_color`、`border_color`（太さは style で決める）、`image_recolor`（`image`: 白いアイコンがその色になる））、または 値 → 文字（`text`。`@ID` は訳される）のマップ。数値のキー（`true` / `false` = 1 / 0）はその数値に当たり、どのキーも、その文字を持つ文字列のタグに当たる（`"main"`）。`default` でその他。`text` で当たるキーも `default` もなければ、値を `format` で出す |
 | `part`                                  | `bg_color` の対象パート: `main` (既定) / `indicator` / `knob`                                                                               |
 | `two_way`                               | 双方向の明示的な ON/OFF                                                                                                                     |
 

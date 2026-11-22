@@ -119,7 +119,7 @@ Style objects: `style`, `style_pressed`, `style_checked`, `style_disabled`, `sty
 
 ## Bindings (`"bind"`)
 
-Kinds: `text`, `value`, `checked`, `on`, `visible`, `hidden`, `enabled`, `disabled`, `bg_color`, `text_color`, `options`, `src`.
+Kinds: `text`, `value`, `checked`, `on`, `visible`, `hidden`, `enabled`, `disabled`, `bg_color`, `text_color`, `border_color`, `image_recolor`, `options`, `src`.
 
 Conditions: `eq`, `ne`, `gt`, `lt`, `ge`, `le`.
 

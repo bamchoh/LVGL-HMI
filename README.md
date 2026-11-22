@@ -1902,6 +1902,8 @@ The object form can give several properties.
   "enabled":    { "tag": "auto_mode", "invert": true },
   "bg_color":   { "tag": "alarm", "map": { "0": "#2e7d32", "1": "#f9a825", "2": "#c62828", "default": "#555" } },
   "text_color": { "tag": "plc_online", "map": { "true": "#4caf50", "false": "#78909c" } },
+  "border_color": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464", "default": "#3b4a5e" } },
+  "image_recolor": { "tag": "state", "map": { "1": "#36c98f", "2": "#f06464" } },
   "options":    "option_list_tag",
   "src":        "image_path_tag"
 }
@@ -1913,7 +1915,7 @@ The object form can give several properties.
 | `scale` / `offset`                      | Widget value = tag value × scale + offset (the inverse conversion when two-way)                                                             |
 | `invert`                                | Inverts true and false                                                                                                                      |
 | `eq` / `ne` / `gt` / `lt` / `ge` / `le` | A conditional true / false (used with `visible`, `enabled`, `checked`, `on`). The value to compare with is a constant, or another tag as in `{ "tag": "temp_hi" }` (evaluated again when either tag changes). With `eq` on `checked`, that value is written to the tag when the widget turns ON (it behaves like a radio button) |
-| `map`                                   | A map of value → color (`bg_color`, `text_color`) or value → text (`text`; `@ID` is translated). A key that is a number (`true` / `false` = 1 / 0) matches that number; every key also matches a string tag with that text (`"main"`). `default` gives the rest. A `text` without a matching key or `default` shows the value with `format` |
+| `map`                                   | A map of value → color (`bg_color`, `text_color`, `border_color` (the width comes from the style), `image_recolor` (an `image`: a white icon takes the color)) or value → text (`text`; `@ID` is translated). A key that is a number (`true` / `false` = 1 / 0) matches that number; every key also matches a string tag with that text (`"main"`). `default` gives the rest. A `text` without a matching key or `default` shows the value with `format` |
 | `part`                                  | The part that `bg_color` applies to: `main` (default) / `indicator` / `knob`                                                                |
 | `two_way`                               | Turns two-way ON/OFF explicitly                                                                                                             |
 

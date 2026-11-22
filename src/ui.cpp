@@ -478,7 +478,7 @@ void apply_styles(lv_obj_t* obj, const json& w)
 // ================================================================ model
 
 enum class Widget { Panel, Label, Button, Switch, Checkbox, Slider, Bar, Arc, Led, Dropdown, Roller, Textarea, Image, Chart, Spinner, Keyboard, Line, Meter, DateTime };
-enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, Options, Anim };
+enum class BindKind { Text, Value, Checked, Visible, Enabled, BgColor, TextColor, BorderColor, ImageRecolor, Options, Anim };
 enum class Cmp { None, Eq, Ne, Gt, Lt, Ge, Le };
 
 struct Screen;
@@ -719,6 +719,13 @@ void Binding::on_tag_changed(const Value& v, const void* source)
             break;
         case BindKind::TextColor:
             if(auto c = map_color(v)) lv_obj_set_style_text_color(obj, *c, part);
+            break;
+        case BindKind::BorderColor:
+            // (the width comes from the style: a widget without a border shows nothing)
+            if(auto c = map_color(v)) { lv_obj_set_style_border_color(obj, *c, part); lv_obj_set_style_border_opa(obj, LV_OPA_COVER, part); }
+            break;
+        case BindKind::ImageRecolor:
+            if(auto c = map_color(v)) { lv_obj_set_style_image_recolor(obj, *c, 0); lv_obj_set_style_image_recolor_opa(obj, LV_OPA_COVER, 0); }
             break;
         case BindKind::Anim:
             if(anim) { anim->cond = condition(v); anim->update(); }
@@ -1368,7 +1375,7 @@ Binding* Ui::Impl::add_binding(lv_obj_t* obj, Widget wk, BindKind kind, const js
         parse_cmp(*b, spec);
         const json* map = jget(spec, "map");
         if(map && !map->is_object()) map = nullptr;
-        if(map && wk == Widget::Image) {
+        if(map && wk == Widget::Image && kind == BindKind::Text) {          // (bind.src: value -> file)
             b->has_src_map = true;
             for(auto it = map->begin(); it != map->end(); ++it) {
                 if(!it.value().is_string()) continue;
@@ -1468,6 +1475,11 @@ void Ui::Impl::parse_bindings(lv_obj_t* obj, lv_obj_t* text_obj, Widget wk, cons
         else if(iequals(k, "disabled")) add_binding_inverted(obj, wk, BindKind::Enabled, spec);
         else if(iequals(k, "bg_color")) add_binding(obj, wk, BindKind::BgColor, spec, false);
         else if(iequals(k, "text_color")) add_binding(tobj, wk, BindKind::TextColor, spec, false);
+        else if(iequals(k, "border_color")) add_binding(obj, wk, BindKind::BorderColor, spec, false);
+        else if(iequals(k, "image_recolor")) {
+            if(wk == Widget::Image) add_binding(obj, wk, BindKind::ImageRecolor, spec, false);
+            else HML_WARN("bind: image_recolor is for image widgets");
+        }
         else if(iequals(k, "options")) add_binding(obj, wk, BindKind::Options, spec, false);
         else if(iequals(k, "src")) add_binding(obj, wk, BindKind::Text, spec, false);
         else HML_WARN("bind: unknown property '%s'", k.c_str());

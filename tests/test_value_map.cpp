@@ -122,3 +122,31 @@ TEST_CASE("bind color map: text keys match a string tag (a screen name)")
     CHECK(bg(lv_obj_get_child(s, 1)) == 0xf06464);
 }
 }
+
+TEST_SUITE("functional suitability") {
+TEST_CASE("bind border_color and image_recolor: a card's frame and an icon in the state colour")
+{
+    Runtime rt;
+    Tag* st = rt.tag("st", TagType::Int, 1);
+    lv_obj_t* s = build_widgets(J(R"json([
+        { "type": "panel", "w": 100, "h": 60, "style": { "border_width": 3 },
+          "bind": { "border_color": { "tag": "st", "map": { "1": "#36c98f", "2": "#f06464", "default": "#3b4a5e" } } } },
+        { "type": "image", "bind": { "image_recolor": { "tag": "st", "map": { "1": "#36c98f", "2": "#f06464" } } } }
+    ])json"));
+    lv_obj_t* card = lv_obj_get_child(s, 0);
+    lv_obj_t* icon = lv_obj_get_child(s, 1);
+    auto border = [&] { return lv_color_to_u32(lv_obj_get_style_border_color(card, LV_PART_MAIN)) & 0xffffff; };
+    auto recolor = [&] { return lv_color_to_u32(lv_obj_get_style_image_recolor(icon, LV_PART_MAIN)) & 0xffffff; };
+    CHECK(border() == 0x36c98f);
+    CHECK(recolor() == 0x36c98f);
+    CHECK(lv_obj_get_style_image_recolor_opa(icon, LV_PART_MAIN) == LV_OPA_COVER);
+    st->set_number(2, nullptr);
+    rt.pump();
+    CHECK(border() == 0xf06464);
+    CHECK(recolor() == 0xf06464);
+    st->set_number(7, nullptr);                  // default for the frame; the icon keeps its colour
+    rt.pump();
+    CHECK(border() == 0x3b4a5e);
+    CHECK(recolor() == 0xf06464);
+}
+}
