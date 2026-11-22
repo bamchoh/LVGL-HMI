@@ -2122,6 +2122,32 @@ It shows a group of the data log as lines, for a chosen window of time.
   Even a million records are drawn in some tens of ms (a few seconds without the summary).
 - Reading is done on another thread, so the screen does not stop even when a long period is shown.
 
+#### Viewing on a screen: `bar_chart` (production per hour)
+
+It shows one tag of a data log group in time slices on the clock, one bar each: what a counter made in each hour, the last value of each shift.
+
+```json
+{ "type": "bar_chart", "w": 600, "h": 260, "group": "production", "tag": "production_count",
+  "mode": "increase", "bucket_s": 3600, "bars": 12, "target": 60 }
+```
+
+| Key | Description |
+| --- | --- |
+| `group`, `tag` | The data log group and the tag it records |
+| `mode` | `increase` (default): what the tag grew by in each slice (a counter). `value`: its last value in each slice |
+| `bucket_s` | One bar = this many seconds (60 to 86400, default 3600), on the clock: whole hours |
+| `bars` | How many (1 to 48, default 12), the newest on the right |
+| `start` | `now` (default): the last bars up to now. `day`: from midnight on (24 bars of an hour = today, the hours to come empty) |
+| `max` | The top of the scale (omitted: a little above the largest bar or the target) |
+| `target`, `target_color` | A line at this value (a number, or `{ "tag": "hourly_target" }`) |
+| `color`, `decimals`, `show_values` | The bars, the numbers above them (default 0 decimals, shown) |
+| `label` | The time under each bar, a strftime format (default `%H` for hours, `%H:%M` below an hour, `%m/%d` for days) |
+| `refresh_ms` | How often it reads the log while it is shown (default 10000) |
+
+- The bar of the slice that is not over yet is lighter. A counter that is set back (a new day, a new shift) counts from 0 again in that slice.
+- The first bar counts from the first record of its slice when there is none before it.
+- Record the counter at an interval (`"trigger": "interval"`, 1 minute is enough) or on change. `--check --render` reads no log: the bars are empty there.
+
 ### Alarms (`alarms`)
 
 An alarm defines a condition on a tag. One row is recorded when the condition becomes true (`raised`), when it is no longer true (`cleared`),

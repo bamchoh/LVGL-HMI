@@ -3,6 +3,7 @@
 #include "font_cmap.hpp"
 #include <map>
 #include "trend_view.hpp"
+#include "bar_chart_view.hpp"
 #include "recipe.hpp"
 #include "alarm_view.hpp"
 #include "alarm_summary_view.hpp"
@@ -1987,6 +1988,9 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     }
     else if(iequals(type, "trend")) {
         obj = build_trend(parent, w);
+    }
+    else if(iequals(type, "bar_chart")) {
+        obj = build_bar_chart(parent, w);
     }
     else if(iequals(type, "recipe_table")) {
         obj = build_recipe_table(parent, w);

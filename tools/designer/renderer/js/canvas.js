@@ -147,6 +147,7 @@ const Canvas = {
       case 'keyboard': return ['100%', '50%'];
       case 'recipe_table': return ['100%', 300];
       case 'trend': return ['100%', 300];
+      case 'bar_chart': return [600, 260];
       case 'alarm_list': return ['100%', 240];
       case 'alarm_summary': return ['100%', 300];
       case 'log_view': return ['100%', 300];
@@ -456,6 +457,25 @@ const Canvas = {
     el.append(U.el('div', { class: 'lv-rt-foot' }, ...['◀', '▶', '−', '+'].map(s => U.el('span', { class: 'lv-al-btn' }, s)),
       U.el('span', { class: 'lv-al-btn', style: { background: '#ff9800', width: 'auto', padding: '0 14px' } }, (w.labels && w.labels.now) || 'Now'),
       ...list.map(t => U.el('span', { style: { color: t.color, alignSelf: 'center' } }, t.tag))));
+  },
+
+  // a bar chart: sample bars with the times under them (the data log is read on the device)
+  w_bar_chart(el, w) {
+    const p = M.st.project, g = ((p && p.data_log && p.data_log.groups) || []).find(x => x.name === w.group);
+    const n = Math.max(1, Math.min(48, U.num(w.bars, 12))), bs = U.num(w.bucket_s, 3600), color = w.color || '#2196f3';
+    el.style.display = 'flex'; el.style.gap = '6px'; el.style.alignItems = 'stretch';
+    if (!g) { el.append(U.el('div', null, "no data log group '" + (w.group || '') + "'")); return; }
+    const now = new Date(), start = w.start === 'day' ? 0 : now.getHours() - n + 1;
+    for (let i = 0; i < n; i++) {
+      const v = Math.round(40 + 35 * Math.sin(i * 0.9) + 20 * ((i * 7) % 3)), h = Math.max(4, Math.min(100, v));
+      const t = bs >= 86400 ? (i + 1) + '' : bs >= 3600 ? String(((start + i) % 24 + 24) % 24).padStart(2, '0') : String(i * bs / 60);
+      el.append(U.el('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '0' } },
+        U.el('div', { style: { fontSize: '.85em' } }, w.show_values === false ? '' : String(v)),
+        U.el('div', { style: { flex: '1', width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', position: 'relative' } },
+          U.el('div', { style: { width: '70%', height: h + '%', background: color, borderRadius: '2px' } }),
+          w.target !== undefined && w.target !== '' ? U.el('div', { style: { position: 'absolute', left: 0, right: 0, bottom: '80%', height: '2px', background: w.target_color || '#ffc107' } }) : null),
+        U.el('div', { style: { opacity: '.7', fontSize: '.85em' } }, t)));
+    }
   },
 
   // the book's own recipes as the device will show them (current values: from the tags' init)

@@ -290,6 +290,18 @@ struct Checker {
                 }
             }
         }
+        if(type == "bar_chart") {
+            const std::string g = jstr(w, "group", ""), t = jstr(w, "tag", "");
+            auto it = groups.find(g);
+            if(it == groups.end()) add(where, g.empty() ? "no \"group\" (a data log group)" : "unknown data log group \"" + g + "\"");
+            else if(t.empty()) add(where, "no \"tag\" (a tag of the data log group)");
+            else if(!it->second.empty() && !it->second.count(t)) add(where, "data log group \"" + g + "\" does not record \"" + t + "\"");
+            const std::string mode = jstr(w, "mode", "increase");
+            if(mode != "increase" && mode != "value") add(where, "mode: \"" + mode + "\" is not increase or value");
+            const std::string start = jstr(w, "start", "now");
+            if(start != "now" && start != "day") add(where, "start: \"" + start + "\" is not now or day");
+            if(const json* tg = jget(w, "target"); tg && (tg->is_string() || tg->is_object())) need_tag(where, "target", tg->is_string() ? *tg : tg->value("tag", json("")));
+        }
         if(type == "recipe_table") {
             const std::string b = jstr(w, "book", "");
             if(!books.count(b) && !(b.empty() && books.size() == 1)) add(where, b.empty() ? "no \"book\" (a recipe book)" : "unknown recipe book \"" + b + "\"");

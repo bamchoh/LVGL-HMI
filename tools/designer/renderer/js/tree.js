@@ -110,6 +110,7 @@ const Tree = {
       case 'line': return '╱';
       case 'recipe_table': return '☷';
       case 'trend': return '〰';
+      case 'bar_chart': return '▥';
       case 'alarm_list': return '⚠';
       case 'alarm_summary': return '∑';
       case 'log_view': return '☰';

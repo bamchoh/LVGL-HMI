@@ -114,7 +114,7 @@ HML の画面は JSON ファイルです。デザイナー（`hml_designer`）�
   **画像ファイルは作らない**: `assets/` にあるものを使う。設備やメニューの**アイコン**は、デザイナーに付いているプリセット
   （`<デザイナーのフォルダー>\icons\`。依頼の文に「アイコン」の場所があればそれ）を、なければプロジェクトの `assets\icons\` に
   フォルダーごとコピーして使う（入れたことを報告する）。それ以外の絵（写真、ロゴ、装置の図）は、要るものを伝える。
-- アラーム、トレンド、レシピは専用の部品（`alarm_list` / `alarm_banner`、`trend`、`recipe_table`）を使う。
+- アラーム、トレンド、時間別の棒グラフ、レシピは専用の部品（`alarm_list` / `alarm_banner`、`trend`、`bar_chart`、`recipe_table`）を使う。
   それぞれ `project.json` 側の設定（`alarms`、`data_log` のグループ、`recipes`）が要る（書き方は `reference/project-features.md`）。
 - 日付と時刻は `sys.date` / `sys.time` / `sys.datetime`（文字列のタグ）を `label` に `bind` する。
 - 機器がないと、値は `tags` の `init` のまま動かない。動いて見せるのは頼まれたときだけ（`project-features.md` の「機器なしで値を動かす」）。

@@ -966,6 +966,12 @@ const M = {
             if (n && !(g.tags || []).includes(n)) out.push({ text: 'trend: data log group "' + g.name + '" does not record "' + n + '"', screen: si, path });
           }
         }
+        if (w.type === 'bar_chart') {
+          const g = groups.find(x => x.name === w.group);
+          if (!g) out.push({ text: 'bar_chart: no data log group "' + (w.group || '') + '"', screen: si, path });
+          else if (!w.tag) out.push({ text: 'bar_chart: no tag', screen: si, path });
+          else if (!(g.tags || []).includes(w.tag)) out.push({ text: 'bar_chart: data log group "' + g.name + '" does not record "' + w.tag + '"', screen: si, path });
+        }
         (w.children || []).forEach((c, i) => walk(c, path.concat(i)));
       };
       walk(s.data, []);
