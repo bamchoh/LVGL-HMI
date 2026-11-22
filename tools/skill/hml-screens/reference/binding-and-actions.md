@@ -13,7 +13,8 @@
 
 - `min` / `max` を付けると、画面からの書き込みがその範囲に丸められる。操作できる数値のタグには付ける。
 - `sys.` で始まるタグはランタイムが持つ（`sys.date`、`sys.time`、`sys.datetime`、`sys.screen`（表示中の画面の名前）、`sys.lang`、`sys.user.name`、`sys.user.level`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.screen.off` など）。作らない。
-  ここと `project-features.md` にない `sys.` の名前は書かない（`--check` は `sys.` の名前のつづりを確かめない）。
+  ここと `project-features.md` にない `sys.` の名前は書かない（`--check` は、そのプロジェクトにない `sys.` のタグを知らせる。
+  `sys.sound.*` などは、その機能が `project.json` にあるときだけある）。
 
 ## bind
 

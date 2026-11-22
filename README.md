@@ -420,6 +420,7 @@ project.json: drivers[0] (plc): map: unknown tag "pressur"
 | Files | Cannot be read, JSON syntax error, no screens, duplicate screen names, no `start_screen` |
 | Widgets | Unknown `type`, unknown key (a spelling mistake; the runtime silently ignores it), unknown style key |
 | `bind` | Unknown kind, missing tag, unknown key |
+| Tags of the runtime | A `sys.` tag that the runtime does not have with this project (a spelling mistake, or `sys.sound.*` without `sound`) |
 | Actions | Unknown action or key, missing tag, screen, script, language or animation, `popup` to a screen that is not a popup |
 | References | An `"@ID"` that is not in `texts`, a missing image or font file, the group and tags of a trend, the book of a recipe, missing alarm settings |
 | Drivers | Missing tags in the tables (`map`, `items`, `publish` …) and in `status_tag` |
