@@ -169,6 +169,17 @@ python -I tools/karakuri_check.py --api http://localhost:8765/api slmp     # slm
 | `opcua-server`| 逆向き: ランタイムの OPC UA サーバー（暗号なし）に Karakuri の OPC UA クライアントをつなぎ、ノードの一覧と型、読み出し、書き込み、読み取り専用・型違い・存在しないノードの拒否を確かめる |
 | `transfer`    | 機器間のデータ転送: SLMP → FINS / Modbus、FINS → SLMP。起動時の値、変化、100 件同時、条件、周期での書き直し、**FINS / SLMP のサーバーを止めて再開**（止まっている間は書かない、再開後は最新の値だけが届く、古い値を書き戻さない） |
 
+### 実際のブローカーとの MQTT の確認（Mosquitto）
+
+```bash
+python -I tools/mosquitto_check.py                    # [--mosquitto <フォルダー>] [--port 1883] [--runtime <hml_runtime>]
+```
+
+[Eclipse Mosquitto](https://mosquitto.org/) を相手に確かめます（CTest には入りません）。すでに動いているブローカー（Windows ではインストーラーが
+localhost:1883 のサービスを作ります）で暗号化なし、スクリプトが起動するブローカー（ポート 18883、使い捨ての CA。`openssl` が要ります）で TLS を確かめます。
+オンライン / オフラインの状態（Last Will）、1 トピック 1 値、複数のタグの JSON メッセージ（`fields`、`const`、`ts`、変化で送り直し）、
+受信した指令（1 つの値、JSON メッセージのフィールド、`min` / `max` の外は書かない）を見ます。
+
 ## ビルド（Raspberry Pi / Linux）
 
 表示バックエンドは CMake の `-DHML_BACKEND=` で選びます（`build.sh` が引数で切り替えます）。

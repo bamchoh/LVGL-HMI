@@ -167,6 +167,17 @@ print the tag values, then has it write values to tags, reads them back from the
 | `opcua-server`| The other direction: the OPC UA client of Karakuri connects to the OPC UA server of the runtime (no encryption) and checks the list of nodes and their types, reading, writing, and the rejection of read-only nodes, wrong types and nodes that do not exist |
 | `transfer` | Data transfer between devices: SLMP → FINS / Modbus, FINS → SLMP. The values at startup, changes, 100 entries at once, conditions, periodic rewriting, **stopping and restarting the FINS / SLMP server** (nothing is written while it is stopped, only the latest value arrives after the restart, old values are not written back) |
 
+### Checking MQTT against a real broker (Mosquitto)
+
+```bash
+python -I tools/mosquitto_check.py                    # [--mosquitto <its folder>] [--port 1883] [--runtime <hml_runtime>]
+```
+
+Against [Eclipse Mosquitto](https://mosquitto.org/) (not part of CTest): plaintext on a broker that already runs (on Windows the installer sets up a service on
+localhost:1883), and TLS on a broker the script starts on port 18883 with a throw-away CA (needs `openssl`). It checks the online / offline status
+(last will), a value per topic, a JSON message of several tags (`fields`, `const`, `ts`, sent again on a change) and commands coming in (one value, the fields
+of a JSON message, a value outside `min` / `max` refused).
+
 ## Building (Raspberry Pi / Linux)
 
 The display backend is chosen with `-DHML_BACKEND=` of CMake (`build.sh` switches it by its argument).
