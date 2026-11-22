@@ -1723,6 +1723,8 @@ When a screen has `"template": "<name of another screen>"`, **the widgets of tha
 - The settings of the screen itself in the template, such as `style`, `scrollable` and `flex`, are inherited too. If the screen has the same setting, the screen's setting wins.
 - A template is an ordinary screen, so its tag bindings and its button actions work on every screen that uses it. The template itself can be shown too
   (then `${...}` appears as it is). A template can be put on top of another template (up to 8 levels).
+- The menu of a template can mark the screen it is on: the tag `sys.screen` is the name of the screen shown (popups do not change it), so a button binds
+  `"bg_color": { "tag": "sys.screen", "map": { "trend": "#26c6da", "default": "#192538" } }` (or `"visible": { "tag": "sys.screen", "eq": "trend" }` for an underline).
 - A template that does not exist, a popup, the screen itself and a circular reference are not used; that screen is made of its own widgets only (a warning in the log; `--check` finds it).
   `--check` also reports when a screen does not pass a `${name}` that the template asks for, and when it passes a value that is not used.
 - The designer: choose the template in "template" of the screen's properties, and enter the title and so on in "template_args". The canvas shows the widgets of the
