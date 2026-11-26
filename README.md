@@ -126,6 +126,7 @@ build.cmd Debug
 | `test_template.cpp` | Template screens (the widgets of the template come first and those of the screen are on top, replacing `${name}`, bindings and actions that work per screen, nested templates, **no crash with a missing template, a popup, itself or a loop**, the time to build 50 screens, `--check`) |
 | `test_texts.cpp` | Languages (resolving `@ID`, falling back to the default language, `@@`, an ID that does not exist, switching with `sys.lang` and reverting an invalid value, the language of widgets, options and alarms, the screens are rebuilt on switching), fonts (can be made at any size, missing characters come from the built-in font, reading `cmap` and `hmtx`, broken / truncated / random font files, drawing every screen of the demo) |
 | `test_users.cpp` | Users (login, lockout, automatic logout, levels of widgets and screens, the login screen, editing users on the device) |
+| `test_system_access.cpp` | Opening the system settings by holding a corner (a tap stays a tap, letting go early, the countdown, **the button under the finger gets no click**, other places / sliding out do not count, the corner and the time of the project, `"none"`, the login with users, the touch that wakes the dark screen) |
 | `test_project_archive.cpp` | Project files (the list of member files, creating and extracting, rejection of paths that leave the project, protection of the per-PC files) |
 | `test_script.cpp` | Lua scripts (reading and writing tags, every trigger, the sandbox, timeouts, **a script that takes too much memory fails and nothing else does**, hot reload) |
 | `tools/designer/test/model.test.js` | util / schema / model of the designer (`node --test`, no dependency packages) |
@@ -1694,6 +1695,30 @@ Changes to settings such as the levels and `auto_logout_s` take effect at a rest
 
 Apart from project.json, the runtime generates a built-in "System" menu screen (`__system`) and settings page screens
 (`__system_<id>`) by itself. A button on a screen opens them with `{ "action": "system" }`.
+
+**Without a button too: hold a corner of the screen.** A finger held in the **top left corner for 3 seconds** opens the system
+settings on every project, so that a project without such a button does not leave the device without a way to its own settings
+(System > Deploy, Storage, Keys, Driver …). After the first second a small note in the corner counts down ("System 2"); letting
+go before the end does nothing.
+
+```json
+"system_access": { "hold": "top_left", "hold_s": 3 }
+```
+
+| Key | Description |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| `hold`   | The corner: `"top_left"` (default), `"top_right"`, `"bottom_left"`, `"bottom_right"`, or `"none"` (holding opens nothing) |
+| `hold_s` | How long to hold, 2 to 10 seconds (default 3) |
+
+- The corner is a square of 1/8 of the shorter side of the screen, at least 48 px (480x320: 48 px, 800x480: 60 px).
+- It is the same door as `{ "action": "system" }`: with `users`, the login for `users.system_level` comes first. Without `users`
+  anybody at the device can open the settings this way - as with a button. Add users, or set `"hold": "none"`, where that matters.
+- When the menu opens, the rest of that touch is dropped: a button under the finger gets no click. What a widget does while it is
+  held (`repeat`, a long press) has happened by then: do not put such a widget into that corner, or choose another corner.
+- The touch that wakes a dark screen does not count, nor a touch that slides out of the corner, nor one on the system screens.
+- `--check` says so when a project sets `"hold": "none"` and has no `{ "action": "system" }` anywhere: nobody could open the
+  system settings on the device then.
+- To try it without a touch panel: `hml_runtime <project.json> --click 5,5,500,3300` (a press at 5,5 from 0.5 s on, held for 3.3 s).
 
 | Page | Meaning |
 |---|---|

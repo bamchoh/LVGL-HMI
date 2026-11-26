@@ -665,6 +665,32 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
 
+    // ---- system_access: the corner that opens the system settings; a project that leaves no way to them
+    {
+        std::string hold = "top_left";
+        if(const json* sa = jget(root, "system_access")) {
+            if(!sa->is_object()) c.add("system_access", "\"system_access\" is { \"hold\": \"top_left\", \"hold_s\": 3 }");
+            else {
+                static const std::set<std::string> known{ "hold", "hold_s" }, corners{ "top_left", "top_right", "bottom_left", "bottom_right", "none" };
+                for(auto k = sa->begin(); k != sa->end(); ++k)
+                    if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add("system_access", "unknown key \"" + k.key() + "\"");
+                hold = jstr(*sa, "hold", "top_left");
+                if(!corners.count(hold)) c.add("system_access", "hold: \"" + hold + "\" is not top_left, top_right, bottom_left, bottom_right or none");
+                if(const json* hs = jget(*sa, "hold_s"); hs && (!hs->is_number() || jnum(*sa, "hold_s", 3) < 2 || jnum(*sa, "hold_s", 3) > 10)) c.add("system_access", "hold_s is 2..10 (seconds)");
+            }
+        }
+        if(hold == "none") {
+            // (looked for as text: an action of any widget or event, or a script that goes there)
+            bool way = false;
+            for(const Screen& s : screens) {
+                std::string text = s.def.dump();
+                way = way || text.find("\"action\":\"system\"") != std::string::npos;
+            }
+            if(const json* sc = jget(root, "scripts")) way = way || sc->dump().find("__system") != std::string::npos;
+            if(!way) c.add("system_access", "\"hold\": \"none\" and no { \"action\": \"system\" } on any screen: the system settings cannot be opened on the device (System > Deploy, Storage, Keys, Driver ... are out of reach there)");
+        }
+    }
+
     // ---- remote (VNC): who may connect is the device's, not the project's
     if(const json* rm = jget(root, "remote")) {
         if(!rm->is_object()) c.add("remote", "\"remote\" is { \"enabled\": true, \"port\": 5900, \"view_only\": false }");

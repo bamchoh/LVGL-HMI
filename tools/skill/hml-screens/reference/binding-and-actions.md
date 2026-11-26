@@ -207,7 +207,7 @@
   `sound.play`（`arg` は音の名前）/ `sound.stop` / `sound.silence`、`mail.send`（`arg` は `"件名\n本文"`）/ `mail.test`、
   `upload.run`（`arg` は `uploads` の名前。省くとすべて）。後ろの 3 組は、プロジェクトにその機能（`sound` / `mail` / `uploads`）が
   あるときだけ働く（下の「画面の外の機能を画面から使う」）。ほかの名前は書かない。
-- `system` は組み込みのシステム設定画面を開く。`reload` `exit` `restart` は保守用。ふつうの画面には置かない。
+- `system` は組み込みのシステム設定画面を開く（ボタンがなくても、装置では画面の左上の隅を 3 秒押すと開く）。`reload` `exit` `restart` は保守用。ふつうの画面には置かない。
 - `script` は Lua。`code` に短く書くか、`name` で `project.json` の `scripts` のものを呼ぶ。タグは `tag.名前`。
 
 ## ポップアップ

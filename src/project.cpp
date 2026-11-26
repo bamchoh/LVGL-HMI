@@ -13,6 +13,7 @@
 #include "upload.hpp"
 #include "screen_saver.hpp"
 #include "sound.hpp"
+#include "system_access.hpp"
 #include <algorithm>
 #include "recipe.hpp"
 #include "alarm_summary_view.hpp"
@@ -257,6 +258,9 @@ bool Project::load(const std::string& path)
     poll_clock_tags();
     update_sim_tag(root_);
 
+    // the corner that opens the system settings without a button of the project ("system_access")
+    system_access().configure(jget(root_, "system_access"));
+
     // users and levels ("users"); a list edited on the device comes from project.local.json
     users().load(jget(root_, "users"), local_users_.is_null() ? nullptr : &local_users_, local_overlay_path());
 
@@ -448,6 +452,7 @@ int Project::build_screens()
 void Project::unload()
 {
     screen_saver().clear();
+    system_access().clear();
     scheduler().clear();
     sound().clear();
     alarms().set_listener(nullptr);
