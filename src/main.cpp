@@ -457,6 +457,14 @@ int main(int argc, char** argv)
     // projects from the designer without SSH: only when it was switched on at this device
     // (System > Deploy). Its keys and settings are the device's: --data-dir, else <exe>/keys
     hml::deploy_service().open(hml::device_data_dir(data_dir));
+    {   // the program file a runtime sent by a designer would replace (System > Deploy > Runtime)
+        std::string exe = std::filesystem::u8path(argv[0]).filename().u8string();
+#ifdef _WIN32
+        if(exe.size() < 4 || exe.substr(exe.size() - 4) != ".exe") exe += ".exe";
+#endif
+        const std::string dir = hml::install_dir();
+        if(!dir.empty()) hml::deploy_service().set_runtime_path(dir + "/" + exe);
+    }
     hml::deploy_service().start();
     hml::scheduler().start();
     hml::sound().start();

@@ -3,7 +3,8 @@
 //   Receive projects  [switch]     while on, an accepted designer can send a project (no SSH needed)
 //   Add a designer    [switch]     for a few minutes a new designer may ask to be accepted
 //   (a designer asks)              sender, name, fingerprint         [Accept] [Reject]
-//   Accepted designers             one row each                      [Delete] -> confirmation
+//   Accepted designers             one row each          [Runtime] -> confirmation   [Remove] -> confirmation
+//                                  (Runtime: this designer may replace the runtime of the device, too)
 //
 // A project that arrives is checked and installed here (on the UI thread), like one from a USB
 // memory, and the runtime restarts.
@@ -70,6 +71,11 @@ public:
         if(!del) confirm_.clear();
         flag("confirm", del != nullptr);
         info("confirm_text", del ? "Remove this designer? It cannot send projects any more.\n" + describe(*del) : "");
+        const DeployDesigner* rt = nullptr;
+        for(const DeployDesigner& d : list_) if(d.fingerprint == confirm_rt_) rt = &d;
+        if(!rt) confirm_rt_.clear();
+        flag("confirm_rt", rt != nullptr);
+        info("confirm_rt_text", rt ? "Allow this designer to replace the runtime (the program) of this device?\nWhoever uses that PC can then run anything here. Only for a PC you trust as much as this device.\n" + describe(*rt) : "");
 
         info("count", list_.empty() ? "No designer is accepted." : vformat("%d accepted designer(s)", static_cast<int>(list_.size())));
         for(int i = 0; i < kSlots; i++) {
@@ -97,10 +103,20 @@ public:
         else if(cmd == "reject") ds.reject();
         else if(cmd == "delete") {                                    // ask first
             const int slot = std::atoi(arg.c_str());
-            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) confirm_ = list_[static_cast<size_t>(slot - 1)].fingerprint;
+            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) { confirm_ = list_[static_cast<size_t>(slot - 1)].fingerprint; confirm_rt_.clear(); }
         }
         else if(cmd == "delete_yes") { if(!confirm_.empty()) err = ds.remove(confirm_); confirm_.clear(); }
         else if(cmd == "delete_no") confirm_.clear();
+        else if(cmd == "runtime") {                                   // taking it away at once, giving it asks first
+            const int slot = std::atoi(arg.c_str());
+            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) {
+                const DeployDesigner& d = list_[static_cast<size_t>(slot - 1)];
+                if(d.runtime) err = ds.set_runtime_allowed(d.fingerprint, false);
+                else { confirm_rt_ = d.fingerprint; confirm_.clear(); }
+            }
+        }
+        else if(cmd == "runtime_yes") { if(!confirm_rt_.empty()) err = ds.set_runtime_allowed(confirm_rt_, true); confirm_rt_.clear(); }
+        else if(cmd == "runtime_no") confirm_rt_.clear();
         else HML_WARN("system: deploy: unknown command '%s'", cmd.c_str());
         if(!err.empty()) HML_WARN("system: deploy: %s", err.c_str());
         set_status(err);
@@ -110,22 +126,25 @@ public:
     bool poll() override
     {
         DeployService& ds = deploy_service();
-        if(restart_ && ++restart_ticks_ >= 3) { restart_ = false; restart_ticks_ = 0; ui().request_restart(RestartTarget::App); return false; }
+        // (the restart waits until the designer has gone: a project may follow the runtime)
+        if(restart_ && !ds.serving() && ++restart_ticks_ >= 3) { restart_ = false; restart_ticks_ = 0; ui().request_restart(RestartTarget::App); return false; }
 
         DeployService::Received r;
-        if(!restart_ && ds.received(r)) {
+        if(ds.received(r)) {
             const TransferTarget t = target();
-            const std::string msg = transfer_install(t, r.file);
+            const char* what = r.runtime ? "runtime" : "project";
+            const std::string msg = r.runtime ? deploy_install_runtime(r.file, ds.runtime_path()) : transfer_install(t, r.file);
             ds.finish(msg);
             if(msg.empty()) {
-                operation_log().record("deploy", "install project", t.name, r.name + " from " + r.designer + " (" + r.from + ")");
-                HML_INFO("deploy: project '%s' installed, restarting", r.name.c_str());
-                set_status("A project was received and installed. Restarting ...");
+                operation_log().record("deploy", r.runtime ? "install runtime" : "install project", r.runtime ? "" : t.name, r.name + " from " + r.designer + " (" + r.from + ")");
+                HML_INFO("deploy: %s '%s' installed, restarting", what, r.name.c_str());
+                set_status(r.runtime ? "A new runtime was received and put in place. Restarting ..." : "A project was received and installed. Restarting ...");
                 restart_ = true;
+                restart_ticks_ = 0;
             }
             else {
-                HML_WARN("deploy: project '%s' from %s was not installed: %s", r.name.c_str(), r.from.c_str(), msg.c_str());
-                set_status("A project was received but not installed: " + msg);
+                HML_WARN("deploy: %s '%s' from %s was not installed: %s", what, r.name.c_str(), r.from.c_str(), msg.c_str());
+                set_status(std::string(r.runtime ? "A runtime" : "A project") + " was received but not installed: " + msg);
             }
             return true;
         }
@@ -185,11 +204,17 @@ public:
             text("confirm_text", "#ffffff"),
             row(json::array({ button("Remove", "#c62828", "delete_yes"), button("Cancel", "#455a64", "delete_no") })),
         })));
+        rows.push_back(box("confirm_rt", "#4a1c1c", json::array({
+            text("confirm_rt_text", "#ffffff"),
+            row(json::array({ button("Allow", "#c62828", "runtime_yes"), button("Cancel", "#455a64", "runtime_no") })),
+        })));
         rows.push_back(text("count", muted));
         for(int i = 1; i <= kSlots; i++) {
             json r = row(json::array({
                 json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag("d" + std::to_string(i)) } } },
                       { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
+                json{ { "type", "button" }, { "text", "Runtime" }, { "w", compact ? 70 : 96 }, { "h", compact ? 30 : 40 },
+                      { "style", { { "bg_color", "#455a64" } } }, { "style_label", { { "font", font } } }, { "on_click", call("runtime:" + std::to_string(i)) } },
                 json{ { "type", "button" }, { "text", "Remove" }, { "w", compact ? 70 : 96 }, { "h", compact ? 30 : 40 },
                       { "style", { { "bg_color", "#455a64" } } }, { "style_label", { { "font", font } } }, { "on_click", call("delete:" + std::to_string(i)) } },
             }));
@@ -203,7 +228,7 @@ public:
 private:
     static std::string describe(const DeployDesigner& d)
     {
-        return d.name + (d.added.empty() ? "" : "  (" + d.added + ")") + "\n" + d.fingerprint;
+        return d.name + (d.added.empty() ? "" : "  (" + d.added + ")") + "\n" + d.fingerprint + (d.runtime ? "\nmay replace the runtime" : "");
     }
     TransferTarget target() const
     {
@@ -229,6 +254,7 @@ private:
     Project& proj_;
     std::vector<DeployDesigner> list_;    // as last shown: the slots of the Remove buttons
     std::string confirm_;                 // fingerprint waiting for "Remove?" confirmation
+    std::string confirm_rt_;              // fingerprint waiting for "Allow to replace the runtime?"
     uint32_t deadline_ms_ = 0;
     bool restart_ = false;
     int  restart_ticks_ = 0;

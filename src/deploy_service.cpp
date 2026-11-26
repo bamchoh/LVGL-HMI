@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -30,6 +32,7 @@ static void sock_close(sock_t s) { closesocket(s); }
 #  include <netinet/in.h>
 #  include <sys/select.h>
 #  include <sys/socket.h>
+#  include <sys/stat.h>
 #  include <unistd.h>
 using sock_t = int;
 static const sock_t kInvalidSock = -1;
@@ -78,6 +81,42 @@ bool is_hex64(const std::string& s)
 
 } // namespace
 
+std::string deploy_staged_runtime(const std::string& exe)
+{
+    const fs::path e = fs::u8path(exe);
+    return (e.parent_path() / (e.stem().u8string() + ".new" + e.extension().u8string())).u8string();
+}
+
+std::string deploy_install_runtime(const std::string& staged, const std::string& exe)
+{
+    std::error_code ec;
+    const fs::path s = fs::u8path(staged), e = fs::u8path(exe);
+    auto refuse = [&](const std::string& why) { fs::remove(s, ec); return why; };
+    if(!fs::is_regular_file(s, ec)) return "the runtime that was sent is not there any more";
+    if(!fs::is_regular_file(e, ec)) return refuse("the runtime of this device is not where it is expected (" + exe + ")");
+    // (the path goes into a command line: it is this program's own folder, but nothing that a shell reads)
+    for(char c : staged) if(c == '"' || c == '$' || c == '`' || c == '%' || c == '&' || c == '^' || c == '!' || c == '\n') return refuse("the folder of the runtime has a name that cannot be used here");
+#ifdef _WIN32
+    const std::string cmd = "\"\"" + s.string() + "\" --help\" >NUL 2>&1";
+#else
+    ::chmod(s.c_str(), 0755);
+    const std::string cmd = "\"" + s.string() + "\" --help >/dev/null 2>&1";
+#endif
+    if(std::system(cmd.c_str()) != 0) return refuse("the runtime that was sent does not start on this device (built for another kind of device?)");
+    fs::path prev = e;
+    prev += ".prev";
+    fs::remove(prev, ec);
+    fs::rename(e, prev, ec);
+    if(ec) return refuse("the runtime in use cannot be moved aside: " + ec.message());
+    fs::rename(s, e, ec);
+    if(ec) {
+        const std::string why = ec.message();
+        fs::rename(prev, e, ec);
+        return refuse("the new runtime cannot be put in place: " + why);
+    }
+    return "";
+}
+
 std::string device_data_dir(const std::string& given)
 {
     if(!given.empty()) return given;
@@ -110,14 +149,18 @@ void DeployService::open(const std::string& data_dir)
     if(const json* list = jget(j, "designers"); list && list->is_array())
         for(const json& d : *list) {
             const std::string fp = jstr(d, "fingerprint", "");
-            if(fp.rfind("SHA256:", 0) == 0) designers_.push_back({ fp, clean_name(jstr(d, "name", "")), jstr(d, "added", "") });
+            if(fp.rfind("SHA256:", 0) == 0) designers_.push_back({ fp, clean_name(jstr(d, "name", "")), jstr(d, "added", ""), jbool(d, "runtime", false) });
         }
 }
 
 std::string DeployService::save()
 {
     json list = json::array();
-    for(const DeployDesigner& d : designers_) list.push_back({ { "fingerprint", d.fingerprint }, { "name", d.name }, { "added", d.added } });
+    for(const DeployDesigner& d : designers_) {
+        json one = { { "fingerprint", d.fingerprint }, { "name", d.name }, { "added", d.added } };
+        if(d.runtime) one["runtime"] = true;
+        list.push_back(one);
+    }
     const json j = { { "enabled", enabled_ }, { "port", port_cfg_ }, { "designers", list } };
     std::string err;
     if(!write_file_atomic((fs::u8path(dir_) / "deploy.json").u8string(), j.dump(2) + "\n", &err)) return err;
@@ -263,6 +306,37 @@ std::string DeployService::remove(const std::string& fingerprint)
     return "";
 }
 
+std::string DeployService::set_runtime_allowed(const std::string& fingerprint, bool on)
+{
+    std::string name;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        DeployDesigner* d = nullptr;
+        for(DeployDesigner& x : designers_) if(x.fingerprint == fingerprint) d = &x;
+        if(!d) return "No such designer.";
+        if(d->runtime == on) return "";
+        d->runtime = on;
+        const std::string err = save();
+        if(!err.empty()) { d->runtime = !on; return err; }
+        name = d->name;
+    }
+    HML_INFO("deploy: designer %s %s %s replace the runtime", name.c_str(), fingerprint.c_str(), on ? "may now" : "may no longer");
+    operation_log().record("deploy", "runtime from designer", on ? "not allowed" : "allowed", (on ? "allowed: " : "not allowed: ") + name + " " + fingerprint);
+    return "";
+}
+
+void DeployService::set_runtime_path(const std::string& exe)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    runtime_path_ = exe;
+}
+
+std::string DeployService::runtime_path() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return runtime_path_;
+}
+
 bool DeployService::pending(Offer& out) const
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -282,7 +356,7 @@ std::string DeployService::accept()
         bool have = false;
         for(const DeployDesigner& d : designers_) have = have || d.fingerprint == o.fingerprint;
         if(!have) {
-            designers_.push_back({ o.fingerprint, o.name, now_text() });
+            designers_.push_back({ o.fingerprint, o.name, now_text(), false });
             err = save();
             if(!err.empty()) designers_.pop_back();
         }
@@ -324,7 +398,7 @@ void DeployService::finish(const std::string& error)
         finish_error_ = error;
         finished_ = true;
         std::error_code ec;
-        fs::remove(fs::u8path(received_.file), ec);
+        fs::remove(fs::u8path(received_.file), ec);          // (a runtime that was installed has been moved into place: nothing is left here)
     }
     cv_.notify_all();
 }
@@ -352,6 +426,7 @@ void DeployService::run()
 // One designer at a time: others wait in the listen queue.
 void DeployService::serve(std::intptr_t client, const std::string& from)
 {
+    struct Serving { std::atomic<bool>& f; explicit Serving(std::atomic<bool>& x) : f(x) { f = true; } ~Serving() { f = false; } } guard(serving_);
     DeployIdentity me;
     { std::lock_guard<std::mutex> lock(mutex_); me = identity_; }
     DeployConn c;
@@ -402,79 +477,106 @@ void DeployService::serve(std::intptr_t client, const std::string& from)
     }
     if(!c.write_line("READY")) return;
 
-    // ---- "PUT <bytes> <sha256> <name>" and the bytes
-    std::string put;
-    if(!c.read_line(put, 600, 30000)) return;
-    unsigned long long size = 0;
-    char hash[80] = "", fname[300] = "";
-    if(std::sscanf(put.c_str(), "PUT %llu %64s %255s", &size, hash, fname) != 3 || !is_hex64(hash)) { c.write_line("ERROR unknown request"); return; }
-    if(size == 0 || size > kMaxBytes) { c.write_line("ERROR the file is too large for this device"); return; }
-    std::string base = fs::u8path(std::string(fname)).filename().u8string();
-    if(base.size() < 9 || base.substr(base.size() - 8) != kProjectArchiveExt) { c.write_line("ERROR not a project file (.hmlproj)"); return; }
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if(has_received_) { c.write_line("ERROR the device is busy installing another project"); return; }
-    }
-    const fs::path part = fs::u8path(dir_) / "incoming.hmlproj.part", file = fs::u8path(dir_) / "incoming.hmlproj";
-    std::error_code ec;
-    bool ok = false;
-    {
-        std::ofstream f(part, std::ios::binary | std::ios::trunc);
-        mbedtls_sha256_context sha;
-        mbedtls_sha256_init(&sha);
-        mbedtls_sha256_starts(&sha, 0);
-        std::vector<char> buf(64 * 1024);
-        unsigned long long got = 0;
-        const auto until = Clock::now() + std::chrono::minutes(15);
-        while(f && got < size && Clock::now() < until) {
-            const int n = c.read_some(buf.data(), static_cast<size_t>(std::min<unsigned long long>(buf.size(), size - got)), 30000);
-            if(n <= 0) break;
-            f.write(buf.data(), n);
-            mbedtls_sha256_update(&sha, reinterpret_cast<const unsigned char*>(buf.data()), static_cast<size_t>(n));
-            got += static_cast<unsigned long long>(n);
+    // ---- what it sends: the runtime ("RUNTIME ..."), a project ("PUT ..."), or one after the other
+    for(int n = 0; n < 4; n++) {
+        std::string req;
+        if(!c.read_line(req, 600, n == 0 ? 30000 : 10000)) return;
+        unsigned long long size = 0;
+        char verb[16] = "", hash[80] = "", fname[300] = "";
+        if(std::sscanf(req.c_str(), "%15s %llu %64s %255s", verb, &size, hash, fname) != 4 || !is_hex64(hash)) { c.write_line("ERROR unknown request"); return; }
+        const bool runtime = std::strcmp(verb, "RUNTIME") == 0;
+        if(!runtime && std::strcmp(verb, "PUT") != 0) { c.write_line("ERROR unknown request"); return; }
+        const std::string base = fs::u8path(std::string(fname)).filename().u8string();
+        fs::path file;
+        if(runtime) {
+            bool allowed = false;
+            std::string exe;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                for(const DeployDesigner& d : designers_) if(d.fingerprint == fp) allowed = d.runtime;
+                exe = runtime_path_;
+            }
+            if(!allowed) {
+                HML_WARN("deploy: the designer %s (%s) from %s tried to replace the runtime and is not allowed to", name.c_str(), fp.c_str(), from.c_str());
+                c.write_line("ERROR this designer may not replace the runtime of the device. Allow it there first (System > Deploy > Runtime)");
+                return;
+            }
+            if(exe.empty()) { c.write_line("ERROR this device cannot replace its runtime"); return; }
+            if(size == 0 || size > kMaxRuntimeBytes) { c.write_line("ERROR the file is too large for this device"); return; }
+            file = fs::u8path(deploy_staged_runtime(exe));
         }
-        unsigned char h[32];
-        mbedtls_sha256_finish(&sha, h);
-        mbedtls_sha256_free(&sha);
-        f.flush();
-        static const char* hex = "0123456789abcdef";
-        std::string mine;
-        for(unsigned char b : h) { mine += hex[b >> 4]; mine += hex[b & 15]; }
-        if(!f.good()) c.write_line("ERROR the device cannot store the file");
-        else if(got != size) HML_WARN("deploy: the project from %s did not arrive completely", from.c_str());
-        else if(mine != hash) c.write_line("ERROR the file arrived damaged");
-        else ok = true;
-    }
-    if(ok) {
-        fs::remove(file, ec);
-        fs::rename(part, file, ec);
-        if(ec) { ok = false; c.write_line("ERROR the device cannot store the file"); }
-    }
-    if(!ok) { fs::remove(part, ec); return; }
+        else {
+            if(size == 0 || size > kMaxBytes) { c.write_line("ERROR the file is too large for this device"); return; }
+            if(base.size() < 9 || base.substr(base.size() - 8) != kProjectArchiveExt) { c.write_line("ERROR not a project file (.hmlproj)"); return; }
+            file = fs::u8path(dir_) / "incoming.hmlproj";
+        }
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if(has_received_) { c.write_line("ERROR the device is busy installing"); return; }
+        }
+        fs::path part = file;
+        part += ".part";
+        std::error_code ec;
+        bool ok = false;
+        if(!c.write_line("SEND")) return;
+        {
+            std::ofstream f(part, std::ios::binary | std::ios::trunc);
+            mbedtls_sha256_context sha;
+            mbedtls_sha256_init(&sha);
+            mbedtls_sha256_starts(&sha, 0);
+            std::vector<char> buf(64 * 1024);
+            unsigned long long got = 0;
+            const auto until = Clock::now() + std::chrono::minutes(15);
+            while(f && got < size && Clock::now() < until) {
+                const int r = c.read_some(buf.data(), static_cast<size_t>(std::min<unsigned long long>(buf.size(), size - got)), 30000);
+                if(r <= 0) break;
+                f.write(buf.data(), r);
+                mbedtls_sha256_update(&sha, reinterpret_cast<const unsigned char*>(buf.data()), static_cast<size_t>(r));
+                got += static_cast<unsigned long long>(r);
+            }
+            unsigned char h[32];
+            mbedtls_sha256_finish(&sha, h);
+            mbedtls_sha256_free(&sha);
+            f.flush();
+            static const char* hex = "0123456789abcdef";
+            std::string mine;
+            for(unsigned char b : h) { mine += hex[b >> 4]; mine += hex[b & 15]; }
+            if(!f.good()) c.write_line("ERROR the device cannot store the file");
+            else if(got != size) HML_WARN("deploy: what %s sent did not arrive completely", from.c_str());
+            else if(mine != hash) c.write_line("ERROR the file arrived damaged");
+            else ok = true;
+        }
+        if(ok) {
+            fs::remove(file, ec);
+            fs::rename(part, file, ec);
+            if(ec) { ok = false; c.write_line("ERROR the device cannot store the file"); }
+        }
+        if(!ok) { fs::remove(part, ec); return; }
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        received_ = Received{ file.u8string(), base, from, name + " " + fp };
-        finish_error_.clear();
-        finished_ = false;
-        has_received_ = true;
-    }
-    HML_INFO("deploy: project '%s' (%llu bytes) received from %s (%s)", base.c_str(), size, from.c_str(), name.c_str());
-    c.write_line("RECEIVED");
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            received_ = Received{ file.u8string(), base, from, name + " " + fp, runtime };
+            finish_error_.clear();
+            finished_ = false;
+            has_received_ = true;
+        }
+        HML_INFO("deploy: %s '%s' (%llu bytes) received from %s (%s)", runtime ? "runtime" : "project", base.c_str(), size, from.c_str(), name.c_str());
+        c.write_line("RECEIVED");
 
-    // ---- the UI thread checks and installs it
-    std::string answer;
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        const bool done = cv_.wait_for(lock, std::chrono::seconds(install_timeout_s_.load()), [&] { return finished_ || stop_.load(); });
-        if(done && finished_) answer = finish_error_.empty() ? "INSTALLED" : "ERROR " + finish_error_;
-        else answer = "ERROR the device did not install the project in time";
-        if(!finished_) fs::remove(file, ec);
-        has_received_ = false;
-        finished_ = false;
+        // ---- the UI thread checks and installs it
+        std::string answer;
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            const bool done = cv_.wait_for(lock, std::chrono::seconds(install_timeout_s_.load()), [&] { return finished_ || stop_.load(); });
+            if(done && finished_) answer = finish_error_.empty() ? "INSTALLED" : "ERROR " + finish_error_;
+            else answer = "ERROR the device did not install it in time";
+            if(!finished_) fs::remove(file, ec);
+            has_received_ = false;
+            finished_ = false;
+        }
+        for(char& ch : answer) if(ch == '\n' || ch == '\r') ch = ' ';
+        if(!c.write_line(answer) || answer != "INSTALLED") return;
     }
-    for(char& ch : answer) if(ch == '\n' || ch == '\r') ch = ' ';
-    c.write_line(answer);
 }
 
 DeployService& deploy_service()

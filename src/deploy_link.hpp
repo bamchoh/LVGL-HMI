@@ -15,9 +15,15 @@
 //   designer: "HML-DEPLOY 1 <name of the designer's PC>"
 //   device:   "PENDING <fingerprint of the designer>"      waiting for the operator (new designers only)
 //             "READY"  |  "REJECTED <why>"  |  "TIMEOUT"  |  "ERROR <why>"
-//   designer: "PUT <bytes> <sha256 hex> <file name>"  and the bytes
+//   designer: "PUT <bytes> <sha256 hex> <file name>"        (a project file)
+//   device:   "SEND"  |  "ERROR <why>"                      (nothing is sent to a device that will not take it)
+//   designer: the bytes
 //   device:   "RECEIVED"                                    complete and unchanged
 //             "INSTALLED"  |  "ERROR <why>"                 checked and put in place; the runtime restarts
+//   Before the project, or instead of it, the designer may send the runtime itself:
+//   designer: "RUNTIME <bytes> <sha256 hex> <file name>", and after "SEND" the bytes
+//   device:   "RECEIVED", then "INSTALLED" | "ERROR <why>"  (only from a designer the device allows to)
+//   The device restarts once, after the designer has closed the connection.
 //
 // No dependency on the rest of the runtime (the designer host uses this file too): mbedTLS only.
 #pragma once
@@ -85,12 +91,15 @@ struct DeploySend {
     int         port = kDeployDefaultPort;
     std::string expect_fingerprint;      // the device's, as remembered. "" with probe: just ask
     bool        probe = false;           // only find out the fingerprint of the device; nothing is sent
-    std::string file;                    // the project file (.hmlproj)
+    std::string file;                    // the project file (.hmlproj); "" with runtime_file: the runtime only
+    std::string runtime_file;            // the runtime for the device, sent first ("" = not sent)
     std::string client_name;             // shown on the device next to the fingerprint
     int         connect_timeout_ms = 8000;
     int         approve_timeout_ms = 150000;   // the operator has to press a button
     int         install_timeout_ms = 120000;
-    std::function<void(const std::string&)> on_state;   // "connected", "pending <fp>", "sending", "sent 50", "received" (may be empty)
+    // "connected", "pending <fp>", "sending runtime", "runtime received", "runtime installed",
+    // "sending", "sent 50", "received" (may be empty)
+    std::function<void(const std::string&)> on_state;
     const std::atomic<bool>* cancel = nullptr;
 };
 

@@ -140,8 +140,8 @@ Object.assign(I18N.TEXT_JA, {
   'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.': 'ssh / scp を鍵認証で使います（パスワードは聞きません）。ターゲットの logs/ は残ります。',
   'Enter the target (host) and the user.': 'ターゲット（ホスト）とユーザーを入力してください。', 'Enter the target (host) first.': '先にターゲット（ホスト）を入力してください。',
   'method': '方法', 'SSH (ssh / scp)': 'SSH（ssh / scp）', 'Direct (to the runtime, no SSH)': '直接（ランタイムへ。SSH なし）',
-  'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts.':
-    'プロジェクトを、暗号化した通信でランタイムへ直接送ります。ターゲットに SSH サーバーは要りません。先にターゲットの画面で System > Deploy > Receive projects をオンにしてください。ターゲットの logs/ と、ターゲットで変更した設定は残ります。ランタイムは再起動します。',
+  'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts. "send runtime" needs one more permission on the target: System > Deploy > Runtime, next to this designer.':
+    'プロジェクトを、暗号化した通信でランタイムへ直接送ります。ターゲットに SSH サーバーは要りません。先にターゲットの画面で System > Deploy > Receive projects をオンにしてください。ターゲットの logs/ と、ターゲットで変更した設定は残ります。ランタイムは再起動します。「ランタイムも送る」には、ターゲット側でもう 1 つ許可が要ります（System > Deploy で、このデザイナーの行の Runtime）。',
   'This designer': 'このデザイナー', 'The target': 'ターゲット',
   'A target that sees this designer for the first time asks its operator: on its screen switch on System > Deploy > Add a designer, deploy, and accept it there if it shows this fingerprint.':
     'このデザイナーを初めて見るターゲットは、操作者に確認を求めます。ターゲットの画面で System > Deploy > Add a designer をオンにしてからデプロイし、同じ指紋が表示されていたら Accept を押してください。',
