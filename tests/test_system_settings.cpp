@@ -118,11 +118,12 @@ TEST_CASE("pages become tags, screens and an apply round trip")
 
         REQUIRE(ui().show_screen("__system", "none"));
         lv_obj_t* menu = lv_screen_active();
-        // header, the tabs of the groups (one group has pages here), the tiles of the group
-        REQUIRE(lv_obj_get_child_count(menu) == 3);
+        // header, the tabs of the groups (one group has pages here) and the line under them, the tiles of the group
+        REQUIRE(lv_obj_get_child_count(menu) == 4);
+        CHECK(lv_obj_get_child_count(nth(menu, 2)) == 1);
         CHECK(lv_obj_get_child_count(nth(menu, 1)) == 1);
         CHECK(tags().find("sys.menu.tab")->get_number() == 0);
-        lv_obj_t* list = nth(menu, 2);
+        lv_obj_t* list = nth(menu, 3);
         REQUIRE(list);
         REQUIRE(lv_obj_get_child_count(list) == 1);
         lv_obj_t* item = lv_obj_get_child(list, 0);
@@ -214,7 +215,7 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_send_event(lv_obj_get_child(home, 0), LV_EVENT_CLICKED, nullptr);
         REQUIRE(ui().current_screen() == std::optional<std::string>("__system"));
         lv_obj_t* menu = lv_screen_active();
-        lv_obj_send_event(lv_obj_get_child(nth(menu, 2), 0), LV_EVENT_CLICKED, nullptr);   // first page
+        lv_obj_send_event(lv_obj_get_child(nth(menu, 3), 0), LV_EVENT_CLICKED, nullptr);   // first page
         REQUIRE(ui().current_screen() == std::optional<std::string>("__system_fake"));
         rt.advance(400);
         lv_obj_t* pg = lv_screen_active();
@@ -815,7 +816,9 @@ TEST_CASE("system menu: a real project at 480x320 - the pages in groups, one at 
     lv_obj_t* tabs = lv_obj_get_child(menu, 1);
     const uint32_t groups = lv_obj_get_child_count(tabs);
     REQUIRE(groups >= 3);
-    REQUIRE(lv_obj_get_child_count(menu) == 2 + groups);
+    REQUIRE(lv_obj_get_child_count(menu) == 3 + groups);
+    lv_obj_t* marks = lv_obj_get_child(menu, 2);                  // the line under the tabs: one piece per tab
+    REQUIRE(lv_obj_get_child_count(marks) == groups);
     uint32_t tiles = 0;
     for(uint32_t g = 0; g < groups; g++) {
         // pressing a tab shows its group and hides the others
@@ -824,8 +827,14 @@ TEST_CASE("system menu: a real project at 480x320 - the pages in groups, one at 
         lv_obj_send_event(tab, LV_EVENT_VALUE_CHANGED, nullptr);
         rt.advance(100);
         lv_obj_update_layout(menu);
-        for(uint32_t k = 0; k < groups; k++) CHECK(lv_obj_has_flag(lv_obj_get_child(menu, static_cast<int32_t>(2 + k)), LV_OBJ_FLAG_HIDDEN) == (k != g));
-        lv_obj_t* list = lv_obj_get_child(menu, static_cast<int32_t>(2 + g));
+        for(uint32_t k = 0; k < groups; k++) CHECK(lv_obj_has_flag(lv_obj_get_child(menu, static_cast<int32_t>(3 + k)), LV_OBJ_FLAG_HIDDEN) == (k != g));
+        // the tab that is chosen is told by the line under it, in another colour than under the others
+        {
+            const lv_color_t mine = lv_obj_get_style_bg_color(lv_obj_get_child(marks, static_cast<int32_t>(g)), LV_PART_MAIN);
+            for(uint32_t k = 0; k < groups; k++)
+                if(k != g) CHECK_FALSE(lv_color_eq(mine, lv_obj_get_style_bg_color(lv_obj_get_child(marks, static_cast<int32_t>(k)), LV_PART_MAIN)));
+        }
+        lv_obj_t* list = lv_obj_get_child(menu, static_cast<int32_t>(3 + g));
         const uint32_t n = lv_obj_get_child_count(list);
         tiles += n;
         REQUIRE(n >= 1);

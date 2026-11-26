@@ -352,6 +352,42 @@ const char* icon_of(const std::string& id)
     return LV_SYMBOL_SETTINGS;
 }
 
+// The pages that build their rows themselves (Deploy, Keys, Storage, Users, Tags, Device ...)
+// get the same look as the others here, in one place: their rows become tiles, their buttons
+// and texts take the colours of the system screens. What a row contains and in which order is
+// the page's and is not touched.
+void restyle(json& w, bool top, bool compact, const std::string& accent)
+{
+    if(w.is_array()) { for(json& c : w) restyle(c, top, compact, accent); return; }
+    if(!w.is_object()) return;
+    static const char* kTile = "#222d3b";
+    static const char* kNeutral = "#3a4a5e";
+    const std::string type = jstr(w, "type", "");
+    if(!w.contains("style") || !w["style"].is_object()) w["style"] = json::object();
+    json& st = w["style"];
+    const std::string bgc = jstr(st, "bg_color", ""), tc = jstr(st, "text_color", "");
+    if(tc == "#9fb3c8") st["text_color"] = "#8fa3b8";
+    else if(tc == "#ffffff") st["text_color"] = "#eef3f8";
+    if(type == "button") {
+        st["radius"] = 8;
+        st["shadow_width"] = 0;
+        if(bgc == "#2c3e50" || bgc == "#455a64" || bgc == "#37474f") st["bg_color"] = kNeutral;
+        else if(bgc == "#1565c0") st["bg_color"] = accent;
+    }
+    else if(type == "panel") {
+        const bool plain = st.contains("bg_opa") && st["bg_opa"].is_number() && st["bg_opa"].get<double>() == 0;
+        if(plain && top) {                           // a row of the page: a tile
+            st.erase("bg_opa");
+            st["bg_color"] = kTile;
+            st["radius"] = 8;
+            st["pad"] = compact ? 6 : 10;
+        }
+        else if(bgc == "#22303f" || bgc == "#2c3e50") { st["bg_color"] = kTile; st["radius"] = 8; }
+    }
+    if(st.empty()) w.erase("style");
+    if(w.contains("children")) restyle(w["children"], false, compact, accent);
+}
+
 } // namespace
 
 std::vector<json> SystemSettings::screens(int width, int height) const
@@ -418,23 +454,29 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 }) },
             });
         }
-        // the groups that have pages, as tabs: pressing one writes its number into sys.menu.tab
-        const int tabs_h = compact ? 34 : 44;
-        json tabs = json::array();
+        // The groups that have pages, as tabs: a strip under the header that belongs to it, the
+        // names as text, and a line under the one that is chosen. Pressing a name writes the
+        // number of its group into sys.menu.tab.
+        const int tabs_h = compact ? 34 : 44, line_h = 3;
+        json tabs = json::array(), marks = json::array();
         std::vector<int> used;
         for(int g = 0; g < kGroupCount; g++) if(!items[g].empty()) used.push_back(g);
-        for(int g : used)
+        for(int g : used) {
             tabs.push_back(json{ { "type", "button" }, { "text", kGroups[g].title }, { "flex_grow", 1 }, { "h", tabs_h }, { "checkable", true },
                                  { "bind", { { "checked", { { "tag", "sys.menu.tab" }, { "eq", g } } } } },
-                                 { "style", { { "bg_color", bg }, { "radius", 8 }, { "shadow_width", 0 }, { "text_color", muted } } },
-                                 { "style_checked", { { "bg_color", accent }, { "text_color", "#ffffff" } } },
+                                 { "style", { { "bg_color", bar }, { "radius", 0 }, { "shadow_width", 0 }, { "text_color", muted } } },
+                                 { "style_checked", { { "bg_color", bar }, { "text_color", "#ffffff" } } },
                                  { "style_label", { { "font", font + 2 } } } });
-        json children = json::array({
-            header("System", ""),
-            json{ { "type", "panel" }, { "x", margin }, { "y", header_h + gap }, { "w", list_w }, { "h", tabs_h }, { "scrollable", false },
-                  { "flex", "row" }, { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", gap } } }, { "children", tabs } },
-        });
-        const int top = header_h + gap + tabs_h + gap;
+            marks.push_back(json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", line_h }, { "scrollable", false }, { "clickable", false },
+                                  { "bind", { { "bg_color", { { "tag", "sys.menu.tab" }, { "map", { { std::to_string(g), accent }, { "default", "#2b3848" } } } } } } },
+                                  { "style", { { "radius", 0 }, { "border_width", 0 }, { "pad", 0 } } } });
+        }
+        auto strip = [&](int y, int h, json row) {
+            return json{ { "type", "panel" }, { "x", 0 }, { "y", y }, { "w", "100%" }, { "h", h }, { "scrollable", false }, { "flex", "row" },
+                         { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 0 } } }, { "children", std::move(row) } };
+        };
+        json children = json::array({ header("System", ""), strip(header_h, tabs_h, tabs), strip(header_h + tabs_h, line_h, marks) });
+        const int top = header_h + tabs_h + line_h + gap;
         for(int g : used)
             children.push_back(json{ { "type", "panel" }, { "x", margin }, { "y", top }, { "w", list_w }, { "h", height - top - margin },
                                      { "flex", "row_wrap" }, { "scrollbar", "auto" },
@@ -451,7 +493,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         auto it = fields_.find(id);
         std::vector<SettingField> fields = it != fields_.end() ? it->second : p->fields();
         json custom = p->custom_rows(compact, font);
-        if(custom.is_array()) { rows = std::move(custom); fields.clear(); }
+        if(custom.is_array()) { rows = std::move(custom); fields.clear(); restyle(rows, true, compact, accent); }
         for(const SettingField& f : fields) {
             const std::string tag = tag_name(id, f.key);
             json widget;
@@ -504,7 +546,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             json buttons = json::array();
             for(const auto& [label, cmd] : extra)
                 buttons.push_back(json{ { "type", "button" }, { "text", label }, { "h", footer_h - 10 },
-                                        { "style", { { "bg_color", "#37474f" }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", 14 }, { "pad_right", 14 } } },
+                                        { "style", { { "bg_color", "#3a4a5e" }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", 14 }, { "pad_right", 14 } } },
                                         { "style_label", { { "font", font + 2 } } },
                                         { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":" + cmd } } } });
             children.push_back(json{ { "type", "panel" }, { "x", 0 }, { "y", height - footer_h }, { "w", "100%" }, { "h", footer_h }, { "scrollable", false },
