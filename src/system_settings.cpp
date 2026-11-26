@@ -762,6 +762,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     if(const json* sc = proj.section("schedules"); sc && sc->is_array() && !sc->empty()) s.add_page(make_schedule_page());
     s.add_page(make_monitor_page());
     if(has_device_driver(proj.drivers_config())) s.add_page(make_device_page());
+    s.add_page(make_deploy_page(proj));
     s.add_page(make_storage_page(proj));
 }
 

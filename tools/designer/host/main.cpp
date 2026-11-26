@@ -50,6 +50,7 @@ extern char** environ;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 using hml::project_files;
+#include "deploy_link.hpp"
 
 namespace {
 
@@ -1512,6 +1513,141 @@ struct Host {
         return res;
     }
 
+    // ---------------------------------------------------------------- deploy without SSH
+    // (deploy_link.hpp) The designer's own certificate and the devices it knows are kept in its
+    // data folder, never in ~/.ssh: the folder given with --data-dir, else "keys" next to the
+    // executable, else (when that cannot be written, e.g. under Program Files) the settings folder.
+    fs::path data_dir_arg;
+    fs::path keys_dir()
+    {
+        std::error_code ec;
+        if(!data_dir_arg.empty()) { fs::create_directories(data_dir_arg, ec); return data_dir_arg; }
+        const fs::path beside = exe / "keys";
+        fs::create_directories(beside, ec);
+        if(fs::is_directory(beside, ec)) {
+            const fs::path probe = beside / ".write_test";
+            { std::ofstream f(probe, std::ios::binary); f << "x"; if(!f.good()) ec = std::make_error_code(std::errc::permission_denied); }
+            const bool ok = !ec && fs::exists(probe, ec);
+            fs::remove(probe, ec);
+            if(ok) return beside;
+        }
+        const fs::path fallback = config_dir() / "keys";
+        fs::create_directories(fallback, ec);
+        return fallback;
+    }
+    static std::string pc_name()
+    {
+#ifdef _WIN32
+        const char* n = std::getenv("COMPUTERNAME");
+#else
+        const char* n = std::getenv("HOSTNAME");
+#endif
+        return n && *n ? n : "designer";
+    }
+    // the devices whose fingerprint the user has confirmed: { "<host>:<port>": "SHA256:..." }
+    json known_devices()
+    {
+        bool ok = false;
+        json j = json::parse(read_text(keys_dir() / "known_devices.json", &ok), nullptr, false, true);
+        return ok && j.is_object() ? j : json::object();
+    }
+    struct Direct { std::string host; int port = hml::kDeployDefaultPort; std::string key, error; };
+    static Direct direct_of(const json& o)
+    {
+        Direct d;
+        d.host = opt_str(o, "host");
+        if(auto it = o.find("directPort"); it != o.end()) {
+            if(it->is_number()) d.port = it->get<int>();
+            else if(it->is_string() && !trimmed(it->get<std::string>()).empty()) d.port = std::atoi(it->get<std::string>().c_str());
+        }
+        if(!safe_token(d.host, ".-:_")) d.error = "host: enter the target's address or host name";
+        else if(d.port < 1 || d.port > 65535) d.error = "port: must be 1..65535";
+        d.key = d.host + ":" + std::to_string(d.port);
+        return d;
+    }
+
+    // Who the device at host:port says it is, and who this designer is. Nothing is sent.
+    // { ok, mine, device, known, changed, keys }
+    json direct_info(const json& o)
+    {
+        const Direct d = direct_of(o);
+        if(!d.error.empty()) return err(d.error);
+        hml::DeployIdentity me;
+        std::string e;
+        if(!hml::deploy_identity(keys_dir(), "designer", pc_name(), me, &e)) return err(e);
+        hml::DeploySend req;
+        req.host = d.host;
+        req.port = d.port;
+        req.probe = true;
+        const hml::DeployOutcome out = hml::deploy_send(req, me);
+        if(!out.ok) { json r = err(out.error); r["mine"] = me.fingerprint; return r; }
+        const json known = known_devices();
+        const std::string was = known.contains(d.key) && known[d.key].is_string() ? known[d.key].get<std::string>() : std::string();
+        return json{ { "ok", true }, { "mine", me.fingerprint }, { "device", out.device_fingerprint }, { "known", was == out.device_fingerprint },
+                     { "changed", !was.empty() && was != out.device_fingerprint }, { "keys", ustr(keys_dir()) } };
+    }
+
+    // Send the project as one file to the runtime itself. o.trust: the fingerprint of the device
+    // the user has just confirmed (remembered from then on). { ok, log } or { ok: false, error, log }
+    json direct_deploy(const json& o)
+    {
+        std::string log;
+        auto fail = [&](const std::string& m) { json r = err(m); r["log"] = log; return r; };
+        auto step = [&](const std::string& m) { log += "> " + m + "\n"; };
+        const Direct d = direct_of(o);
+        if(!d.error.empty()) return fail(d.error);
+        const fs::path proj = upath(opt_str(o, "project"));
+        std::error_code ec;
+        if(!fs::is_regular_file(proj, ec)) return fail("project.json not found (save the project first)");
+        std::string name = opt_str(o, "name");
+        if(name.empty()) name = ustr(proj.parent_path().filename());
+        if(!safe_token(name, "._-") || name[0] == '-' || name[0] == '.') return fail("project name: only letters, digits and . _ - are allowed (rename the project folder or file)");
+
+        hml::DeployIdentity me;
+        std::string e;
+        if(!hml::deploy_identity(keys_dir(), "designer", pc_name(), me, &e)) return fail(e);
+        json known = known_devices();
+        const std::string trust = opt_str(o, "trust");
+        if(!trust.empty()) {
+            known[d.key] = trust;
+            if(!write_text(keys_dir() / "known_devices.json", known.dump(2) + "\n")) return fail("cannot write into " + ustr(keys_dir()));
+        }
+        const std::string expect = known.contains(d.key) && known[d.key].is_string() ? known[d.key].get<std::string>() : std::string();
+        if(expect.empty()) return fail("the device is not known yet: its fingerprint has to be confirmed first");
+
+        // ---- pack the project (not the logs recorded here, not this PC's local overrides)
+        const fs::path tmp = fs::temp_directory_path(ec) / ("hml_deploy_" + std::to_string(static_cast<long long>(std::time(nullptr))));
+        fs::create_directories(tmp, ec);
+        struct Cleanup { fs::path p; ~Cleanup() { std::error_code c; fs::remove_all(p, c); } } cleanup{ tmp };
+        const fs::path file = tmp / (name + hml::kProjectArchiveExt);
+        if(!hml::pack_project(proj.parent_path(), file, &e)) return fail(e);
+        step("packed " + ustr(proj.parent_path()) + " (" + std::to_string((fs::file_size(file, ec) + 1023) / 1024) + " KB)");
+
+        hml::DeploySend req;
+        req.host = d.host;
+        req.port = d.port;
+        req.expect_fingerprint = expect;
+        req.file = ustr(file);
+        req.client_name = pc_name();
+        req.on_state = [&](const std::string& s) {
+            if(s == "connected") step("connected to " + d.key + " (TLS), the device is the one confirmed: " + expect);
+            else if(s.rfind("pending", 0) == 0) step("waiting for the operator of the device to accept this designer (" + me.fingerprint + ")");
+            else if(s == "sending") step("accepted, sending the project");
+            else if(s == "received") step("the device has the file, checking and installing it");
+        };
+        const hml::DeployOutcome out = hml::deploy_send(req, me);
+        if(!out.ok) return fail(out.error);
+        step("installed: the runtime restarts with the project");
+        return json{ { "ok", true }, { "log", log } };
+    }
+    void direct_async(const std::string& id, const json& opts, bool info_only)
+    {
+        std::thread([this, id, opts, info_only] {
+            std::string dump = (info_only ? direct_info(opts) : direct_deploy(opts)).dump(-1, ' ', false, json::error_handler_t::replace);
+            w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+        }).detach();
+    }
+
     void deploy_async(const std::string& id, const json& opts)
     {
         std::thread([this, id, opts] {
@@ -1622,6 +1758,14 @@ struct Host {
             json a = args_of(req);
             deploy_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
         }, nullptr);
+        w->bind("hml_directInfo", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            direct_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object(), true);
+        }, nullptr);
+        w->bind("hml_directDeploy", [this, args_of](const std::string& id, const std::string& req, void*) {
+            json a = args_of(req);
+            direct_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object(), false);
+        }, nullptr);
         w->bind("hml_keyInfo", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             json opts = a.size() > 0 && a[0].is_object() ? a[0] : json::object();
@@ -1702,6 +1846,10 @@ int app_main(const std::vector<std::string>& args)
         else if(opt("--host", "host") || opt("--user", "user") || opt("--port", "port") || opt("--key", "key") ||
                 opt("--remote-dir", "remoteDir") || opt("--runtime", "runtime")) {}
         else if(args[i] == "--no-restart") deploy_opts["restart"] = false;
+        else if(args[i] == "--data-dir" && i + 1 < args.size()) h.data_dir_arg = fs::absolute(upath(args[++i]));
+        else if(args[i] == "--direct") deploy_opts["method"] = "direct";
+        else if(args[i] == "--direct-port" && i + 1 < args.size()) deploy_opts["directPort"] = std::atoi(args[++i].c_str());
+        else if(args[i] == "--trust" && i + 1 < args.size()) deploy_opts["trust"] = args[++i];
         else if(args[i] == "--clear-local") deploy_opts["clearLocal"] = true;
         else if(args[i] == "--no-activate") deploy_opts["activate"] = false;
         else if(args[i] == "--check") deploy_check = true;
@@ -1757,6 +1905,34 @@ int app_main(const std::vector<std::string>& args)
             std::fputs((c.dump(2, ' ', false, json::error_handler_t::replace) + "\n").c_str(), stdout);
             std::fflush(stdout);
             return c.value("ok", false) ? 0 : 1;
+        }
+        // --direct: to the runtime itself, no SSH (--direct-port <n>, --data-dir <folder> for this
+        // designer's keys). A device seen for the first time is only named: run again with
+        // --trust <its fingerprint> once it is the same as on the device's screen (System > Deploy).
+        if(o.value("method", std::string()) == "direct") {
+            json i = h.direct_info(o);
+            if(!i.value("ok", false)) { std::fprintf(stdout, "error: %s\n", i.value("error", std::string()).c_str()); return 1; }
+            std::fprintf(stdout, "this designer: %s\nthe device:    %s\n", i.value("mine", std::string()).c_str(), i.value("device", std::string()).c_str());
+            const std::string trust = o.value("trust", std::string());
+            if(!trust.empty() && trust != i.value("device", std::string())) { std::fprintf(stdout, "error: --trust does not match the device\n"); return 1; }
+            if(i.value("changed", false) && trust.empty()) {
+                std::fprintf(stdout, "error: this is not the device that was confirmed before at this address (reinstalled, or another device).\n"
+                                     "Compare the fingerprint with the device's screen (System > Deploy) and run again with --trust <fingerprint>\n");
+                return 1;
+            }
+            if(!i.value("known", false) && trust.empty()) {
+                std::fprintf(stdout, "the device is not known yet. Compare its fingerprint with the device's screen (System > Deploy)\n"
+                                     "and run again with --trust <fingerprint>\n");
+                return 1;
+            }
+            std::fflush(stdout);
+            if(deploy_check) return 0;
+            json r = h.direct_deploy(o);
+            std::string text = r.value("log", std::string());
+            if(!r.value("ok", false)) text += "error: " + r.value("error", std::string("failed")) + "\n";
+            std::fputs(text.c_str(), stdout);
+            std::fflush(stdout);
+            return r.value("ok", false) ? 0 : 1;
         }
         json r = h.deploy(o);
         std::string text = r.value("log", std::string());

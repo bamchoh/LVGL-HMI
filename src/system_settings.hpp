@@ -106,6 +106,7 @@ std::unique_ptr<SettingsPage> make_network_page();
 std::unique_ptr<SettingsPage> make_keys_page(Project& proj);
 // Users of the device (system_users.cpp); only with "users" in project.json.
 std::unique_ptr<SettingsPage> make_users_page();
+std::unique_ptr<SettingsPage> make_deploy_page(Project& proj);   // System > Deploy: projects from the designer without SSH - on / off, the designers that may send
 std::unique_ptr<SettingsPage> make_storage_page(Project& proj);  // System > Storage: backup, a project from a USB memory
 std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags: values of all tags, write one
 std::unique_ptr<SettingsPage> make_sound_page();               // System > Sound: mute, volume, a test (projects with "sound")
