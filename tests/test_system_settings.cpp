@@ -118,11 +118,21 @@ TEST_CASE("pages become tags, screens and an apply round trip")
 
         REQUIRE(ui().show_screen("__system", "none"));
         lv_obj_t* menu = lv_screen_active();
-        lv_obj_t* list = nth(menu, 1);
+        // header, the tabs of the groups (one group has pages here), the tiles of the group
+        REQUIRE(lv_obj_get_child_count(menu) == 3);
+        CHECK(lv_obj_get_child_count(nth(menu, 1)) == 1);
+        CHECK(tags().find("sys.menu.tab")->get_number() == 0);
+        lv_obj_t* list = nth(menu, 2);
         REQUIRE(list);
         REQUIRE(lv_obj_get_child_count(list) == 1);
         lv_obj_t* item = lv_obj_get_child(list, 0);
-        CHECK(lv_obj_check_type(item, &lv_button_class));
+        lv_obj_update_layout(menu);
+        // a tile, not a button over the whole width: beside the tiles and at the right edge
+        // there is room to put a finger down without opening a page
+        CHECK(lv_obj_get_width(item) < lv_obj_get_width(list) / 2);
+        CHECK(lv_obj_get_x2(item) + 20 <= lv_obj_get_width(list));
+        CHECK(std::string(lv_label_get_text(lv_obj_get_child(item, 0))).find("Fake") != std::string::npos);
+        CHECK(tags().find("sys.fake.summary") != nullptr);
         lv_obj_send_event(item, LV_EVENT_CLICKED, nullptr);               // goto the page
         CHECK(ui().current_screen() == std::optional<std::string>("__system_fake"));
 
@@ -130,8 +140,9 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_t* pg = lv_screen_active();
         lv_obj_t* content = nth(pg, 1);
         REQUIRE(content);
-        // 6 field rows + status label + Apply button
-        REQUIRE(lv_obj_get_child_count(content) == 8);
+        // 6 field rows + status label. Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
+        REQUIRE(lv_obj_get_child_count(content) == 7);
+        for(uint32_t i = 0; i < lv_obj_get_child_count(content); i++) CHECK_FALSE(lv_obj_check_type(lv_obj_get_child(content, static_cast<int32_t>(i)), &lv_button_class));
         auto widget_of_row = [&](int32_t row) { return nth(lv_obj_get_child(content, row), 1); };
         CHECK(lv_obj_check_type(widget_of_row(0), &lv_textarea_class));
         CHECK(std::string(lv_textarea_get_text(widget_of_row(0))) == "Alice");
@@ -144,7 +155,8 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         CHECK(lv_dropdown_get_selected(widget_of_row(4)) == 1);
         CHECK(lv_obj_check_type(widget_of_row(5), &lv_label_class));
         CHECK(std::string(lv_label_get_text(widget_of_row(5))) == "read only");
-        lv_obj_t* apply_btn = lv_obj_get_child(content, 7);
+        lv_obj_t* apply_btn = nth(nth(pg, 0), 2);                          // header: back, title, Apply
+        REQUIRE(apply_btn);
         REQUIRE(lv_obj_check_type(apply_btn, &lv_button_class));
 
         // edit through the widgets, then Apply (a "call" action registered by the fixture)
@@ -202,7 +214,7 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_send_event(lv_obj_get_child(home, 0), LV_EVENT_CLICKED, nullptr);
         REQUIRE(ui().current_screen() == std::optional<std::string>("__system"));
         lv_obj_t* menu = lv_screen_active();
-        lv_obj_send_event(lv_obj_get_child(nth(menu, 1), 0), LV_EVENT_CLICKED, nullptr);   // first page
+        lv_obj_send_event(lv_obj_get_child(nth(menu, 2), 0), LV_EVENT_CLICKED, nullptr);   // first page
         REQUIRE(ui().current_screen() == std::optional<std::string>("__system_fake"));
         rt.advance(400);
         lv_obj_t* pg = lv_screen_active();
@@ -779,4 +791,52 @@ TEST_CASE("System > Tags: lists the tags, filters, pages, writes a value")
     for(int i = 0; i < 6; i++) sys.poll();
     CHECK(text("v1") == "77");
     ui().unload_all();
+}
+
+TEST_CASE("system menu: a real project at 480x320 - the pages in groups, one at a time, and no group that has to scroll")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "lcd35" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    REQUIRE(sys.page_count() >= 8);
+    const int w = p.info().width, h = p.info().height;
+    REQUIRE(w == 480);
+    json menu_def;
+    for(const json& s : sys.screens(w, h)) if(jstr(s, "name", "") == "__system") menu_def = s;
+    REQUIRE(menu_def.is_object());
+    menu_def["level"] = 0;                                        // (the login is not what is looked at here)
+    lv_obj_t* menu = ui().build_screen(menu_def, "");
+    REQUIRE(menu);
+    REQUIRE(ui().show_screen("__system", "none"));
+    rt.advance(100);
+    lv_obj_update_layout(menu);
+
+    lv_obj_t* tabs = lv_obj_get_child(menu, 1);
+    const uint32_t groups = lv_obj_get_child_count(tabs);
+    REQUIRE(groups >= 3);
+    REQUIRE(lv_obj_get_child_count(menu) == 2 + groups);
+    uint32_t tiles = 0;
+    for(uint32_t g = 0; g < groups; g++) {
+        // pressing a tab shows its group and hides the others
+        lv_obj_t* tab = lv_obj_get_child(tabs, static_cast<int32_t>(g));
+        lv_obj_add_state(tab, LV_STATE_CHECKED);                  // (what a press does to a checkable button)
+        lv_obj_send_event(tab, LV_EVENT_VALUE_CHANGED, nullptr);
+        rt.advance(100);
+        lv_obj_update_layout(menu);
+        for(uint32_t k = 0; k < groups; k++) CHECK(lv_obj_has_flag(lv_obj_get_child(menu, static_cast<int32_t>(2 + k)), LV_OBJ_FLAG_HIDDEN) == (k != g));
+        lv_obj_t* list = lv_obj_get_child(menu, static_cast<int32_t>(2 + g));
+        const uint32_t n = lv_obj_get_child_count(list);
+        tiles += n;
+        REQUIRE(n >= 1);
+        // up to six pages fit without scrolling: there is nothing to scroll, so nothing to hit by scrolling
+        if(n <= 6) CHECK_MESSAGE(lv_obj_get_scroll_bottom(list) <= 0, "group " << g << " with " << n << " pages");
+        // every tile leaves the strip at the right edge free
+        for(uint32_t i = 0; i < n; i++) CHECK(lv_obj_get_x2(lv_obj_get_child(list, static_cast<int32_t>(i))) + 20 <= lv_obj_get_width(list));
+    }
+    CHECK(tiles == sys.page_count());                             // every page is in exactly one group
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
 }

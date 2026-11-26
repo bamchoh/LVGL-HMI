@@ -644,6 +644,12 @@ class RemotePage final : public SettingsPage {
 public:
     std::string id() const override { return "remote"; }
     std::string title() const override { return "Remote"; }
+    std::string summary() override
+    {
+        const VncServer& s = vnc_server();
+        if(!s.running()) return "Off";
+        return std::string(s.open_to_network() ? "On" : "This device only") + (s.client_connected() ? ", a viewer is connected" : "");
+    }
 
     static std::string state()
     {

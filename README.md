@@ -1696,6 +1696,23 @@ Changes to settings such as the levels and `auto_logout_s` take effect at a rest
 Apart from project.json, the runtime generates a built-in "System" menu screen (`__system`) and settings page screens
 (`__system_<id>`) by itself. A button on a screen opens them with `{ "action": "system" }`.
 
+**How they are laid out** - so that a finger that wants to scroll does not press something:
+
+- **The menu does not scroll.** The pages are in groups (Device / Connection / Notify / Service; a group without pages is not
+  shown), one group at a time, chosen with the tabs at the top. A group is shown as tiles in two columns: up to six pages fit
+  a 480x320 screen. Under the name of a page a tile says in one line how things are (the project, the IP addresses, "Off",
+  "Receiving, 1 designer(s)" …). Only a group with more than six pages (many drivers) scrolls.
+- **What acts is not in what scrolls.** On a page, "back", the title and **Apply** are in a bar at the top, and the other
+  buttons of a page (a test mail, "Remove the password" …) in a bar at the bottom. The list of settings between them has no
+  button of its own.
+- **A strip at the right edge of every list is empty** (22 px at 480x320, 30 px at 800x480): the place to put a finger down
+  to scroll.
+- What is chosen or pressed has the `primary` colour of the project's theme. The screens themselves are always dark.
+
+The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Device, Schedule …) are shown in the same
+frame; the buttons they have in their own rows (Accept, Remove, Install …) are still in what scrolls, each behind a confirmation
+where it cannot be undone.
+
 **Without a button too: hold a corner of the screen.** A finger held in the **top left corner for 3 seconds** opens the system
 settings on every project, so that a project without such a button does not leave the device without a way to its own settings
 (System > Deploy, Storage, Keys, Driver …). After the first second a small note in the corner counts down ("System 2"); letting

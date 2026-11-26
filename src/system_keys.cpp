@@ -27,6 +27,11 @@ public:
 
     std::string id() const override { return "keys"; }
     std::string title() const override { return "Keys"; }
+    std::string summary() override
+    {
+        KeyService& ks = key_service();
+        return ks.listening() ? "Accepting a key" : vformat("%d key(s)", static_cast<int>(ks.list().size()));
+    }
     bool has_apply() const override { return false; }
 
     std::vector<SettingField> fields() override

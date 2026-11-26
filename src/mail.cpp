@@ -475,6 +475,7 @@ class MailPage final : public SettingsPage {
 public:
     std::string id() const override { return "mail"; }
     std::string title() const override { return "Mail"; }
+    std::string summary() override { return mail().config().enabled ? "On" : "Off"; }
 
     std::vector<SettingField> fields() override
     {
