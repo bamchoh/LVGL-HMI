@@ -43,6 +43,13 @@ static const dsock_t kNoSock = -1;
 static void dsock_close(dsock_t s) { ::close(s); }
 #endif
 
+// (a socket the other end has closed must give an error, not end the program: SIGPIPE)
+#ifdef MSG_NOSIGNAL
+static const int kSendFlags = MSG_NOSIGNAL;
+#else
+static const int kSendFlags = 0;
+#endif
+
 namespace fs = std::filesystem;
 
 namespace hml {
@@ -293,7 +300,7 @@ struct DeployConn::Impl {
     static int bio_send(void* ctx, const unsigned char* buf, size_t len)
     {
         Impl* m = static_cast<Impl*>(ctx);
-        const int n = static_cast<int>(::send(m->sock, reinterpret_cast<const char*>(buf), static_cast<int>(std::min<size_t>(len, 1 << 20)), 0));
+        const int n = static_cast<int>(::send(m->sock, reinterpret_cast<const char*>(buf), static_cast<int>(std::min<size_t>(len, 1 << 20)), kSendFlags));
         return n < 0 ? MBEDTLS_ERR_SSL_INTERNAL_ERROR : n;
     }
     // (timeout 0 = no limit, as mbedTLS says; every 200 ms the cancel flag is looked at)

@@ -31,6 +31,12 @@ using tsock_t = int;
 static void tsock_close(tsock_t s) { close(s); }
 #endif
 
+#ifdef MSG_NOSIGNAL
+static const int kTestSendFlags = MSG_NOSIGNAL;
+#else
+static const int kTestSendFlags = 0;
+#endif
+
 using namespace hml;
 using hmltest::Runtime;
 namespace fs = std::filesystem;
@@ -406,7 +412,7 @@ TEST_CASE("deploy: garbage, a damaged file, a wrong kind of file, a stalled send
     {
         tsock_t s = tcp_connect(port);
         const char junk[] = "GET / HTTP/1.0\r\n\r\n\x16\x03\x01\xff\xff garbage garbage garbage";
-        send(s, junk, sizeof(junk), 0);
+        send(s, junk, sizeof(junk), kTestSendFlags);
         char b[64];
         CHECK(recv(s, b, sizeof(b), 0) <= 7);                     // at most a TLS alert: nothing about the device
         tsock_close(s);

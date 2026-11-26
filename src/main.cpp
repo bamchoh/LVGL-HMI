@@ -57,6 +57,7 @@
 #include "schedule.hpp"
 #include "sound.hpp"
 #include "vnc.hpp"
+#include <csignal>
 #include "deploy_service.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
@@ -275,6 +276,11 @@ int main(int argc, char** argv)
 {
     // Every line out at once, also into a pipe (the designer shows the log of the runtime it started).
     std::setvbuf(stdout, nullptr, _IONBF, 0);
+#ifndef _WIN32
+    // A viewer or a designer that goes away while something is being sent to it must not end
+    // the runtime (the write fails instead).
+    std::signal(SIGPIPE, SIG_IGN);
+#endif
     // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
     //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
     if(argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) { usage(argv[0]); return 0; }
