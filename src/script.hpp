@@ -4,6 +4,7 @@
 //  - Everything runs on the UI thread (LVGL timers, TagStore::dispatch, widget events).
 //  - The sandbox has base / string / table / math / utf8 / coroutine and a small os (time, date,
 //    clock); no file or process access. A script that runs longer than the timeout is aborted.
+//    The memory of the Lua state has a limit: a script that goes over it fails, nothing else.
 //
 // See README.md ("スクリプト") for the JSON format and the Lua API.
 #pragma once
@@ -43,6 +44,11 @@ public:
     int    error_count() const;                 // compile + runtime errors since the last load() / clear()
     const std::string& last_error() const;
     void   set_timeout_ms(uint32_t ms);         // per top-level run, default 500
+    // What the Lua state may hold, in bytes (default 32 MB, 0 = no limit). A script that asks for
+    // more fails with "not enough memory"; the runtime and the other scripts go on.
+    void   set_memory_limit(size_t bytes);
+    size_t memory_limit() const;
+    size_t memory_used() const;
 
 private:
     struct Impl;

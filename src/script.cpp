@@ -1,4 +1,6 @@
 #include "script.hpp"
+#include <algorithm>
+#include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <map>
@@ -23,6 +25,7 @@ enum class Trigger { Manual, Startup, Interval, Tag, ScreenShow, ScreenHide };
 
 constexpr int kMaxDepth = 8;            // script -> goto_screen -> screen_show script -> ...
 constexpr int kHookCount = 10000;       // VM instructions between two timeout checks
+constexpr size_t kMemoryLimit = 32u * 1024u * 1024u;   // what the Lua state of a project may hold
 
 struct Event {
     const char*  trigger = "manual";
@@ -73,6 +76,8 @@ struct ScriptEngine::Impl {
     int         depth = 0;
     uint32_t    t_start = 0;
     uint32_t    timeout_ms = 500;
+    size_t      mem_used = 0;                   // bytes the Lua state holds now
+    size_t      mem_limit = kMemoryLimit;       // 0 = no limit
     const void* source = nullptr;               // "source" of tag writes made by the running script
     int         errors = 0;
     std::string last_error;
@@ -192,10 +197,43 @@ struct ScriptEngine::Impl {
         }
     }
 
+    // The memory of the Lua state, counted. While a script runs, a request that would take the
+    // state over the limit is refused: Lua collects garbage, tries once more and then raises
+    // "not enough memory" in the script - the script fails, the runtime goes on. Outside a run
+    // (the few values the engine itself puts there, unprotected) nothing is refused: a state that
+    // a script left full must not take the runtime down.
+    static void* l_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
+    {
+        Impl* m = static_cast<Impl*>(ud);
+        const size_t old = ptr ? osize : 0;      // (for a new block osize is the kind of object)
+        if(nsize == 0) {
+            std::free(ptr);
+            m->mem_used -= std::min(old, m->mem_used);
+            return nullptr;
+        }
+        if(nsize > old && m->depth > 0 && m->mem_limit > 0) {
+            const size_t more = nsize - old;
+            if(m->mem_used >= m->mem_limit || more > m->mem_limit - m->mem_used) return nullptr;
+        }
+        void* p = std::realloc(ptr, nsize);
+        if(!p) return nullptr;
+        m->mem_used = m->mem_used - std::min(old, m->mem_used) + nsize;
+        return p;
+    }
+    static int l_panic(lua_State* L)
+    {
+        const char* msg = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "error object is not a string";
+        HML_ERROR("script: unprotected error in Lua: %s", msg);
+        return 0;
+    }
+
     void ensure_state()
     {
         if(L) return;
-        L = luaL_newstate();
+        mem_used = 0;
+        L = lua_newstate(l_alloc, this);
+        if(!L) { HML_ERROR("script: cannot create the Lua state (out of memory)"); return; }
+        lua_atpanic(L, l_panic);
         *static_cast<Impl**>(lua_getextraspace(L)) = this;
 
         static const luaL_Reg libs[] = {
@@ -246,6 +284,7 @@ struct ScriptEngine::Impl {
     int compile(const std::string& code, const std::string& label)
     {
         ensure_state();
+        if(!L) return LUA_NOREF;
         std::string chunk = "=" + label;
         if(luaL_loadbufferx(L, code.data(), code.size(), chunk.c_str(), "t") != LUA_OK) {
             const char* msg = lua_tostring(L, -1);
@@ -480,6 +519,9 @@ size_t ScriptEngine::count() const { return impl_->scripts.size(); }
 int ScriptEngine::error_count() const { return impl_->errors; }
 const std::string& ScriptEngine::last_error() const { return impl_->last_error; }
 void ScriptEngine::set_timeout_ms(uint32_t ms) { impl_->timeout_ms = ms; }
+void ScriptEngine::set_memory_limit(size_t bytes) { impl_->mem_limit = bytes; }
+size_t ScriptEngine::memory_limit() const { return impl_->mem_limit; }
+size_t ScriptEngine::memory_used() const { return impl_->L ? impl_->mem_used : 0; }
 
 ScriptEngine& scripts()
 {
