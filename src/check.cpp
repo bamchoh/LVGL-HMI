@@ -665,6 +665,18 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
 
+    // ---- remote (VNC): who may connect is the device's, not the project's
+    if(const json* rm = jget(root, "remote")) {
+        if(!rm->is_object()) c.add("remote", "\"remote\" is { \"enabled\": true, \"port\": 5900, \"view_only\": false }");
+        else {
+            static const std::set<std::string> known{ "enabled", "port", "password", "view_only" };
+            for(auto k = rm->begin(); k != rm->end(); ++k)
+                if(!k.key().empty() && k.key()[0] != '_' && !known.count(k.key())) c.add("remote", "unknown key \"" + k.key() + "\"");
+            if(const json* port = jget(*rm, "port"); port && (!port->is_number() || jnum(*rm, "port", 5900) < 0 || jnum(*rm, "port", 5900) > 65535)) c.add("remote", "port is 0..65535");
+            if(!jstr(*rm, "password", "").empty()) c.add("remote", "\"password\" is not used: the password of the VNC server is set on the device (System > Remote; kept in project.local.json). Until then only the device itself (127.0.0.1) can connect. Take it out of the project");
+        }
+    }
+
     // ---- mail: a server, addresses that are addresses; what should not be in a project file
     if(const json* ml = jget(root, "mail")) {
         MailConfig mc;

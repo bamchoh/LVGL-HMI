@@ -131,6 +131,46 @@ TEST_CASE("script: a runaway script is aborted by the timeout")
     scripts().set_timeout_ms(500);
 }
 
+TEST_CASE("script: a script that takes too much memory fails; the runtime and later scripts go on")
+{
+    Runtime rt;
+    Tag* x = rt.tag("x", TagType::Int, 0);
+    CHECK(scripts().memory_limit() == 32u * 1024u * 1024u);       // the default
+    CHECK(scripts().exec("tag.x = 1", "first"));
+    const size_t idle = scripts().memory_used();
+    CHECK(idle > 0);
+    scripts().set_memory_limit(idle + 2u * 1024u * 1024u);
+
+    // one huge request (never reaches malloc)
+    CHECK_FALSE(scripts().exec("local s = string.rep('x', 1024 * 1024 * 1024)  tag.x = #s", "rep"));
+    CHECK(scripts().last_error().find("not enough memory") != std::string::npos);
+    // many small ones
+    CHECK_FALSE(scripts().exec("local t = {}  for i = 1, 10000000 do t[i] = 'item ' .. i end  tag.x = #t", "grow"));
+    CHECK(scripts().last_error().find("not enough memory") != std::string::npos);
+    // a string that doubles
+    CHECK_FALSE(scripts().exec("local s = 'x'  while true do s = s .. s end", "double"));
+    CHECK(scripts().last_error().find("not enough memory") != std::string::npos);
+    CHECK(x->get_number() == 1);
+
+    // what the failed runs held is garbage: the next script has room again
+    CHECK(scripts().exec("local s = string.rep('x', 256 * 1024)  tag.x = #s", "after"));
+    CHECK(x->get_number() == 256 * 1024);
+    CHECK(scripts().memory_used() < idle + 2u * 1024u * 1024u);
+
+    // globals a script keeps count too: later scripts fail, the runtime does not
+    scripts().exec("keep = {}  for i = 1, 10000000 do keep[i] = 'item ' .. i end", "hoard");
+    CHECK(scripts().last_error().find("not enough memory") != std::string::npos);
+    for(int i = 0; i < 20; i++) scripts().exec("local t = {}  for i = 1, 100000 do t[i] = {} end", "full");
+    CHECK(scripts().exec("keep = nil  collectgarbage()  tag.x = 7", "free"));
+    CHECK(x->get_number() == 7);
+
+    // within the limit nothing changes
+    scripts().set_memory_limit(32u * 1024u * 1024u);
+    CHECK(scripts().exec("local s = string.rep('x', 4 * 1024 * 1024)  tag.x = #s", "ok"));
+    CHECK(x->get_number() == 4 * 1024 * 1024);
+    CHECK(load("[]") == 0);
+}
+
 TEST_CASE("script: globals persist between runs and are reset by load()")
 {
     Runtime rt;

@@ -3,11 +3,16 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <random>
+#include <sstream>
 #include <thread>
 #include "mbedtls/des.h"
 #include "operation_log.hpp"
+#include "system_settings.hpp"
+#include "tag.hpp"
 #include "util.hpp"
 
 #ifdef _WIN32
@@ -215,7 +220,26 @@ void put32(std::vector<uint8_t>& b, uint32_t v) { for(int s = 24; s >= 0; s -= 8
 
 } // namespace
 
+VncSettings vnc_settings(const json* section, const json* local)
+{
+    VncSettings s;
+    const bool has = section && section->is_object(), mine = local && local->is_object();
+    s.wanted = has && jbool(*section, "enabled", false);
+    s.allowed = !mine || jbool(*local, "enabled", true);
+    s.enabled = s.wanted && s.allowed;
+    if(has) s.port = static_cast<int>(std::clamp(jnum(*section, "port", 5900), 0.0, 65535.0));
+    s.project_password = has && !jstr(*section, "password", "").empty();
+    if(mine) s.password = jstr(*local, "password", "");
+    s.view_only = (has && jbool(*section, "view_only", false)) || (mine && jbool(*local, "view_only", false));
+    return s;
+}
+
 struct VncServer::Impl {
+    // what start() was given (set_local() starts again with it)
+    json        section, local;
+    std::string store;
+    VncSettings cfg;
+
     // configuration
     int         port = 5900;
     std::string password, title;
@@ -480,15 +504,23 @@ struct VncServer::Impl {
 VncServer::VncServer() : impl_(std::make_unique<Impl>()) {}
 VncServer::~VncServer() { stop(); }
 
-bool VncServer::start(const json* section, lv_display_t* disp, const std::string& title)
+bool VncServer::start(const json* section, const json* local, lv_display_t* disp, const std::string& title, const std::string& store)
 {
     stop();
     Impl& m = *impl_;
-    if(!section || !section->is_object() || !jbool(*section, "enabled", false) || !disp) return false;
-    m.port = static_cast<int>(std::clamp(jnum(*section, "port", 5900), 0.0, 65535.0));
-    m.password = jstr(*section, "password", "");
-    m.view_only = jbool(*section, "view_only", false);
+    m.section = section ? *section : json();
+    m.local = local ? *local : json();
+    m.store = store;
+    m.cfg = vnc_settings(section, local);
+    m.disp = disp;
     m.title = title.empty() ? "HML" : title;
+    if(m.cfg.project_password)
+        HML_WARN("remote: the \"password\" in project.json is not used: who may connect is set on the device (System > Remote)");
+    if(m.cfg.wanted && !m.cfg.allowed) HML_INFO("remote: VNC is turned off on this device (System > Remote)");
+    if(!m.cfg.enabled || !disp) return false;
+    m.port = m.cfg.port;
+    m.password = m.cfg.password;
+    m.view_only = m.cfg.view_only;
     m.disp = disp;
     m.width = lv_display_get_horizontal_resolution(disp);
     m.height = lv_display_get_vertical_resolution(disp);
@@ -529,8 +561,8 @@ bool VncServer::start(const json* section, lv_display_t* disp, const std::string
     m.logged = 0;
     m.running = true;
     m.thread = std::thread([&m] { m.run(); });
-    if(m.password.empty()) HML_WARN("remote: VNC on port %d without a password: only this machine itself (127.0.0.1) can connect", m.bound_port);
-    else HML_INFO("remote: VNC on port %d%s (not encrypted: for closed networks)", m.bound_port, m.view_only ? ", view only" : "");
+    if(m.password.empty()) HML_WARN("remote: VNC on port %d, no password set on this device (System > Remote): only this machine itself (127.0.0.1) can connect", m.bound_port);
+    else HML_INFO("remote: VNC on port %d%s, other machines can connect (not encrypted: for closed networks)", m.bound_port, m.view_only ? ", view only" : "");
     return true;
 }
 
@@ -553,6 +585,125 @@ void VncServer::stop()
 bool VncServer::running() const { return impl_->running; }
 int  VncServer::port() const { return impl_->bound_port; }
 bool VncServer::client_connected() const { return impl_->connected; }
+bool VncServer::open_to_network() const { return impl_->running && !impl_->password.empty(); }
+const VncSettings& VncServer::settings() const { return impl_->cfg; }
+
+std::string VncServer::set_local(bool allowed, const std::string& password, bool view_only, bool remove_password)
+{
+    Impl& m = *impl_;
+    if(!m.section.is_object()) return "the project has no \"remote\"";
+    if(!password.empty() && !remove_password) {
+        if(password.size() < kVncMinPassword) return "The password needs at least " + std::to_string(kVncMinPassword) + " characters.";
+        for(unsigned char c : password) if(c <= 0x20 || c > 0x7e) return "The password takes letters, digits and signs only (no spaces).";
+    }
+    const VncSettings before = m.cfg;
+    const VncSettings base = vnc_settings(&m.section, nullptr);
+    // only what the device adds is kept (a later deploy of the project still counts for the rest)
+    json mine = json::object();
+    if(!allowed) mine["enabled"] = false;
+    if(view_only && !base.view_only) mine["view_only"] = true;
+    const std::string pw = remove_password ? std::string() : !password.empty() ? password : before.password;
+    if(!pw.empty()) mine["password"] = pw;
+    if(!m.store.empty()) {
+        json overlay = json::object();
+        {
+            std::ifstream f(std::filesystem::u8path(m.store), std::ios::binary);
+            if(f) {
+                std::stringstream ss;
+                ss << f.rdbuf();
+                overlay = json::parse(ss.str(), nullptr, false, true);
+                if(!overlay.is_object()) overlay = json::object();
+            }
+        }
+        if(mine.empty()) overlay.erase("remote");
+        else overlay["remote"] = mine;
+        std::string err;
+        if(overlay.empty()) { std::error_code ec; std::filesystem::remove(std::filesystem::u8path(m.store), ec); }
+        else if(!write_file_atomic(m.store, overlay.dump(2) + "\n", &err)) return err;
+    }
+    // who changed what (never the password itself)
+    const VncSettings now = vnc_settings(&m.section, &mine);
+    if(now.allowed != before.allowed) operation_log().record("remote", "enabled", before.allowed ? "on" : "off", now.allowed ? "on" : "off");
+    if(now.view_only != before.view_only) operation_log().record("remote", "view_only", before.view_only ? "on" : "off", now.view_only ? "on" : "off");
+    if(now.password != before.password) operation_log().record("remote", "password", before.password.empty() ? "none" : "set", now.password.empty() ? "none" : "changed");
+
+    // (copies: start() assigns the members it is given)
+    const json section = m.section, local = mine;
+    const std::string title = m.title, store = m.store;
+    lv_display_t* disp = m.disp;
+    const bool listening = start(&section, mine.empty() ? nullptr : &local, disp, title, store);
+    if(now.enabled && disp && !listening) return "Saved, but the server could not be started (see the log).";
+    return "";
+}
+
+// ---------------------------------------------------------------- System > Remote
+
+namespace {
+
+class RemotePage final : public SettingsPage {
+public:
+    std::string id() const override { return "remote"; }
+    std::string title() const override { return "Remote"; }
+
+    static std::string state()
+    {
+        const VncServer& s = vnc_server();
+        const VncSettings& c = s.settings();
+        if(!c.wanted) return "Off (the project does not use it)";
+        if(!c.allowed) return "Off";
+        if(!s.running()) return "Not running";
+        std::string out = "Port " + std::to_string(s.port()) + (s.open_to_network() ? ": other machines can connect" : ": this device only (no password set)");
+        if(c.view_only) out += ", view only";
+        if(s.client_connected()) out += " - a viewer is connected";
+        return out;
+    }
+    std::vector<SettingField> fields() override
+    {
+        std::vector<SettingField> out;
+        const VncSettings& c = vnc_server().settings();
+        auto add = [&](const char* key, const char* label, SettingField::Type type, const std::string& value, bool password = false) {
+            SettingField f; f.key = key; f.label = label; f.type = type; f.value = value; f.password = password; out.push_back(f);
+        };
+        add("enabled", "Remote access (VNC)", SettingField::Type::Bool, c.allowed ? "1" : "0");
+        // (never shown, not even as dots: empty means "leave it as it is")
+        add("password", "Password (empty: unchanged)", SettingField::Type::Text, "", true);
+        add("view_only", "View only", SettingField::Type::Bool, c.view_only ? "1" : "0");
+        add("has_password", "Password", SettingField::Type::Info, c.password.empty() ? "Not set: only this device itself can connect" : "Set (the first 8 characters count)");
+        shown_ = state();
+        add("state", "State", SettingField::Type::Info, shown_);
+        return out;
+    }
+    std::string apply(const std::map<std::string, std::string>& v) override
+    {
+        auto get = [&](const char* k) { auto it = v.find(k); return it == v.end() ? std::string() : it->second; };
+        const std::string err = vnc_server().set_local(get("enabled") != "0", get("password"), get("view_only") == "1");
+        return err.empty() ? "Saved." : err;
+    }
+    std::vector<std::pair<std::string, std::string>> buttons() const override { return { { "Remove the password", "remove_password" } }; }
+    void command(const std::string& cmd, const std::string&) override
+    {
+        if(cmd != "remove_password") { HML_WARN("system: remote: unknown command '%s'", cmd.c_str()); return; }
+        const VncSettings c = vnc_server().settings();
+        const std::string err = vnc_server().set_local(c.allowed, "", c.view_only, true);
+        if(Tag* t = tags().find(SystemSettings::tag_name(id(), "status"))) t->set_string(err.empty() ? "The password was removed: only this device itself can connect." : err, nullptr);
+    }
+    // A viewer comes and goes: only the line that shows it is written.
+    bool poll() override
+    {
+        const std::string now = state();
+        if(now == shown_) return false;
+        shown_ = now;
+        if(Tag* t = tags().find(SystemSettings::tag_name(id(), "state"))) t->set_string(now, nullptr);
+        return false;
+    }
+
+private:
+    std::string shown_;
+};
+
+} // namespace
+
+std::unique_ptr<SettingsPage> make_remote_page() { return std::make_unique<RemotePage>(); }
 
 VncServer& vnc_server()
 {

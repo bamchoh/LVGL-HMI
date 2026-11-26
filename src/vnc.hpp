@@ -5,10 +5,17 @@
 //   "remote": {
 //     "enabled": true,
 //     "port": 5900,
-//     "password": "up to 8",       // VNC authentication. Without one only this machine itself
-//                                  // (127.0.0.1) may connect, for example through an SSH tunnel
 //     "view_only": false           // true: the pointer of the viewer does nothing
 //   }
+//
+// The project only says that it wants the server. Who may connect is the device's own decision
+// (System > Remote, kept in project.local.json: "remote": { "password", "enabled", "view_only" }):
+//   - the password is set on the device. A "password" in project.json is NOT used: whoever made
+//     the project would know it, and a project from somebody else could open the device to them;
+//   - without a password on the device only this machine itself (127.0.0.1) may connect, for
+//     example through an SSH tunnel;
+//   - the device can turn the server off ("enabled": false) or make it view only; it cannot be
+//     made more open than the project asks for.
 //
 // The protocol is not encrypted and its password check is weak (DES, 8 characters): use it on
 // a closed network or through an SSH tunnel. One viewer at a time; a second one is refused.
@@ -56,18 +63,42 @@ std::vector<VncRect> vnc_diff(const uint8_t* a, const uint8_t* b, int width, int
 constexpr int kVncCursorW = 12, kVncCursorH = 18;
 void vnc_cursor(const VncPixelFormat& f, std::vector<uint8_t>& out);
 
+// What the server does: "remote" of project.json (section) with what the device has set (local:
+// "remote" of project.local.json, or null).
+struct VncSettings {
+    bool        enabled = false;         // the project wants it and the device has not turned it off
+    bool        wanted = false;          // "enabled" of the project
+    bool        allowed = true;          // the device has not turned it off
+    int         port = 5900;
+    std::string password;                // the device's; empty = only 127.0.0.1 may connect
+    bool        view_only = false;       // the project's or the device's
+    bool        project_password = false;// project.json has a "password": it is not used
+};
+VncSettings vnc_settings(const json* section, const json* local);
+
+constexpr size_t kVncMinPassword = 6;
+
 class VncServer {
 public:
     VncServer();
     ~VncServer();
 
     // Start listening (UI thread, LVGL and the display exist). section = "remote" of project.json
-    // (nullptr or "enabled": false = nothing is started). Returns true when it listens.
-    bool start(const json* section, lv_display_t* disp, const std::string& title);
+    // (nullptr or "enabled": false = nothing is started), local = "remote" of project.local.json
+    // (or nullptr), store = the path of project.local.json for changes made on the device.
+    // Returns true when it listens.
+    bool start(const json* section, const json* local, lv_display_t* disp, const std::string& title, const std::string& store = "");
     void stop();
     bool running() const;
     int  port() const;                   // the port it listens on (0 = not running)
     bool client_connected() const;
+    bool open_to_network() const;        // it listens for other machines (a password is set on the device)
+    const VncSettings& settings() const; // what the last start() worked out
+
+    // Changed on the device (System > Remote): kept in project.local.json, the server is started
+    // again with it. An empty password leaves the one there is; remove_password takes it away
+    // (then only this machine itself can connect). Returns "" or what is wrong.
+    std::string set_local(bool allowed, const std::string& password, bool view_only, bool remove_password = false);
 
 private:
     struct Impl;

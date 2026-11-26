@@ -61,6 +61,7 @@ public:
     const json* drivers_config() const { return jget(root_, "drivers"); }
     const json* section(const char* name) const { return jget(root_, name); }   // any top-level object of project.json
     std::string local_overlay_path() const { return info_.dir + "/project.local.json"; }
+    const json* local_remote() const { return local_remote_.is_null() ? nullptr : &local_remote_; }   // "remote" of project.local.json
 
     // Build (or rebuild) every screen from its JSON file and show the start screen
     // (or the previously shown one on a reload). Returns the number of screens built.
@@ -80,6 +81,7 @@ private:
     json        local_screen_saver_;   // "screen_saver" of project.local.json (time changed on the device)
     json        local_sound_;          // "sound" of project.local.json (mute and volume set on the device)
     json        local_uploads_;        // "uploads" of project.local.json (the logins: set on the device)
+    json        local_remote_;         // "remote" of project.local.json (who may connect with a VNC viewer: set on the device)
     json        local_mail_;           // "mail" of project.local.json (recipients, the password: set on the device)
     json        local_schedules_;      // "schedules" of project.local.json (times changed on the device)
 };

@@ -23,6 +23,12 @@ struct ProjectFile {
     std::string           rel;     // inside the project, '/' separated
 };
 
+// Is this the path of a file inside a project: relative, no "..", no drive letter (nor any other
+// ':'), not empty? Everything that takes the name of a file from a project and reads or writes it
+// for the user (the designer: the screens) asks this first: a project somebody else made must
+// not reach files outside its own folder. normalised: the path with '/', without "." parts.
+bool project_rel_path(const std::string& path, std::string* normalised = nullptr);
+
 // Is this the name of a project file (by its extension)?
 bool is_project_archive(const std::string& path);
 

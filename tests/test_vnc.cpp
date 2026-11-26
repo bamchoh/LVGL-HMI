@@ -26,7 +26,10 @@ static void close_sock(sock_t s) { close(s); }
 
 #include <atomic>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -163,9 +166,51 @@ lv_obj_t* show_test_screen()
     return s;
 }
 
+// "remote" of project.json
 json remote(const char* extra = "")
 {
     return json::parse(std::string("{ \"enabled\": true, \"port\": 0") + extra + " }");
+}
+
+// "remote" of project.local.json: what the device itself has set
+const json kDevice = json::parse(R"({ "password": "secret12" })");
+
+// 0.0.0.0 or 127.0.0.1: where the server listens, seen from outside (a socket bound to this
+// machine's own address reaches it only when it listens for other machines too)
+bool reachable_from_network(int port)
+{
+    // the address this machine uses towards others (no packet is sent: UDP connect only)
+    sock_t u = socket(AF_INET, SOCK_DGRAM, 0);
+    if(u == kBadSock) return false;
+    sockaddr_in out{};
+    out.sin_family = AF_INET;
+    out.sin_port = htons(9);
+    inet_pton(AF_INET, "192.0.2.1", &out.sin_addr);
+    sockaddr_in mine{};
+    socklen_t len = sizeof(mine);
+    const bool has = connect(u, reinterpret_cast<sockaddr*>(&out), sizeof(out)) == 0 && getsockname(u, reinterpret_cast<sockaddr*>(&mine), &len) == 0;
+    close_sock(u);
+    if(!has || (ntohl(mine.sin_addr.s_addr) >> 24) == 127 || mine.sin_addr.s_addr == 0) return false;   // (no network: cannot be told)
+    sock_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if(s == kBadSock) return false;
+    mine.sin_port = htons(static_cast<uint16_t>(port));
+    const bool ok = connect(s, reinterpret_cast<sockaddr*>(&mine), sizeof(mine)) == 0;
+    close_sock(s);
+    return ok;
+}
+bool has_network()
+{
+    sock_t u = socket(AF_INET, SOCK_DGRAM, 0);
+    if(u == kBadSock) return false;
+    sockaddr_in out{};
+    out.sin_family = AF_INET;
+    out.sin_port = htons(9);
+    inet_pton(AF_INET, "192.0.2.1", &out.sin_addr);
+    sockaddr_in mine{};
+    socklen_t len = sizeof(mine);
+    const bool has = connect(u, reinterpret_cast<sockaddr*>(&out), sizeof(out)) == 0 && getsockname(u, reinterpret_cast<sockaddr*>(&mine), &len) == 0;
+    close_sock(u);
+    return has && (ntohl(mine.sin_addr.s_addr) >> 24) != 127 && mine.sin_addr.s_addr != 0;
 }
 
 } // namespace
@@ -252,8 +297,8 @@ TEST_CASE("vnc: a viewer logs in, sees the screen, touches a button and sees the
     lv_display_t* disp = lv_display_get_default();
     const int W = lv_display_get_horizontal_resolution(disp), H = lv_display_get_vertical_resolution(disp);
     VncServer srv;
-    const json cfg1 = remote(", \"password\": \"secret12\"");
-    REQUIRE(srv.start(&cfg1, disp, "Test HMI"));
+    const json cfg1 = remote();
+    REQUIRE(srv.start(&cfg1, &kDevice, disp, "Test HMI"));
     REQUIRE(srv.port() > 0);
 
     Client c;
@@ -329,8 +374,8 @@ TEST_CASE("vnc: a viewer that draws the pointer itself gets an arrow, once")
     rt.advance(50);
     lv_display_t* disp = lv_display_get_default();
     VncServer srv;
-    const json cfg = remote(", \"password\": \"secret12\"");
-    REQUIRE(srv.start(&cfg, disp, "Test HMI"));
+    const json cfg = remote();
+    REQUIRE(srv.start(&cfg, &kDevice, disp, "Test HMI"));
     Client c;
     std::vector<Client::Rect> first, second;
     with_client(rt, [&] {
@@ -362,8 +407,8 @@ TEST_CASE("vnc: a wrong password is not let in; older protocol versions; other p
     lv_display_t* disp = lv_display_get_default();
     const int W = lv_display_get_horizontal_resolution(disp), H = lv_display_get_vertical_resolution(disp);
     VncServer srv;
-    const json cfg2 = remote(", \"password\": \"secret12\"");
-    REQUIRE(srv.start(&cfg2, disp, "T"));
+    const json cfg2 = remote();
+    REQUIRE(srv.start(&cfg2, &kDevice, disp, "T"));
 
     int wrong = -1, v33 = -1, v37 = -1;
     std::string reason;
@@ -425,16 +470,16 @@ TEST_CASE("vnc: view only; without a password only this machine; off by default"
     lv_display_t* disp = lv_display_get_default();
     {
         VncServer off;
-        CHECK_FALSE(off.start(nullptr, disp, "T"));
+        CHECK_FALSE(off.start(nullptr, nullptr, disp, "T"));
         json no = json::parse(R"({ "port": 0 })");
-        CHECK_FALSE(off.start(&no, disp, "T"));
-        json disabled = json::parse(R"({ "enabled": false, "port": 0, "password": "x" })");
-        CHECK_FALSE(off.start(&disabled, disp, "T"));
+        CHECK_FALSE(off.start(&no, nullptr, disp, "T"));
+        json disabled = json::parse(R"({ "enabled": false, "port": 0 })");
+        CHECK_FALSE(off.start(&disabled, &kDevice, disp, "T"));      // the device cannot turn on what the project has off
         CHECK(off.port() == 0);
     }
     VncServer srv;
     const json cfg3 = remote(", \"view_only\": true");
-    REQUIRE(srv.start(&cfg3, disp, "T"));
+    REQUIRE(srv.start(&cfg3, nullptr, disp, "T"));
     uint8_t offered = 0;
     int result = -1;
     std::vector<Client::Rect> first;
@@ -457,6 +502,130 @@ TEST_CASE("vnc: view only; without a password only this machine; off by default"
     CHECK(tags().find("clicks")->get_number() == 0);              // the pointer of the viewer does nothing
 }
 
+// ================================================================ security: a project somebody else made
+
+TEST_CASE("vnc: a password in the project opens nothing - who may connect is set on the device")
+{
+    // the pieces: what the project says, what the device says
+    {
+        const json proj = json::parse(R"({ "enabled": true, "port": 5901, "password": "attacker", "view_only": false })");
+        VncSettings s = vnc_settings(&proj, nullptr);
+        CHECK(s.enabled);
+        CHECK(s.port == 5901);
+        CHECK(s.password.empty());                                // the project's password is not used ...
+        CHECK(s.project_password);                                // ... and that is said
+        const json dev = json::parse(R"({ "password": "device-pw", "view_only": true })");
+        s = vnc_settings(&proj, &dev);
+        CHECK(s.password == "device-pw");
+        CHECK(s.view_only);                                       // the device can narrow it
+        const json off = json::parse(R"({ "enabled": false, "password": "device-pw" })");
+        CHECK_FALSE(vnc_settings(&proj, &off).enabled);           // or turn it off
+        const json ro = json::parse(R"({ "enabled": true, "view_only": true })"), wide = json::parse(R"({ "view_only": false, "enabled": true })");
+        CHECK(vnc_settings(&ro, &wide).view_only);                // it cannot be widened from the device's file
+        const json none = json::parse(R"({ "port": 5900 })");
+        CHECK_FALSE(vnc_settings(&none, &wide).enabled);          // nor turned on when the project does not ask for it
+        CHECK_FALSE(vnc_settings(nullptr, &dev).enabled);
+    }
+
+    Runtime rt;
+    rt.tag("clicks", TagType::Int);
+    show_test_screen();
+    rt.advance(50);
+    lv_display_t* disp = lv_display_get_default();
+    VncServer srv;
+    const json evil = remote(", \"password\": \"attacker\"");
+    REQUIRE(srv.start(&evil, nullptr, disp, "T"));
+    CHECK_FALSE(srv.open_to_network());
+    if(has_network()) CHECK_FALSE(reachable_from_network(srv.port()));   // it listens on 127.0.0.1 only
+    uint8_t offered = 0;
+    int result = -1;
+    with_client(rt, [&] {
+        Client c;
+        if(!c.connect_to(srv.port())) return;
+        result = c.login("attacker", "RFB 003.008\n", nullptr, &offered);
+    });
+    CHECK(offered == 1);                                          // "None": no password is asked for, from this machine only
+    CHECK(result == 0);
+
+    // with the device's password: other machines can connect, and only that password works
+    REQUIRE(srv.start(&evil, &kDevice, disp, "T"));
+    CHECK(srv.open_to_network());
+    if(has_network()) CHECK(reachable_from_network(srv.port()));
+    int with_project_pw = -1, with_device_pw = -1;
+    with_client(rt, [&] {
+        { Client c; if(c.connect_to(srv.port())) with_project_pw = c.login("attacker"); }
+        { Client c; if(c.connect_to(srv.port())) with_device_pw = c.login("secret12"); }
+    });
+    CHECK(with_project_pw != 0);
+    CHECK(with_device_pw == 0);
+}
+
+TEST_CASE("vnc: the settings made on the device are kept in project.local.json and take effect at once")
+{
+    namespace fs = std::filesystem;
+    Runtime rt;
+    show_test_screen();
+    rt.advance(50);
+    lv_display_t* disp = lv_display_get_default();
+    const fs::path dir = fs::temp_directory_path() / ("hml_vnc_" + std::to_string(std::random_device{}()));
+    fs::create_directories(dir);
+    const fs::path file = dir / "project.local.json";
+    const std::string store = file.generic_string();
+    auto stored = [&] {
+        std::ifstream f(file, std::ios::binary);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return json::parse(ss.str(), nullptr, false, true);
+    };
+    { std::ofstream f(file, std::ios::binary); f << R"({ "sound": { "volume": 40 } })"; }
+
+    VncServer srv;
+    const json cfg = remote();
+    REQUIRE(srv.start(&cfg, nullptr, disp, "T", store));
+    CHECK_FALSE(srv.open_to_network());
+
+    CHECK(srv.set_local(true, "abc", false).find("at least 6") != std::string::npos);
+    CHECK_FALSE(srv.set_local(true, "with space", false).empty());
+    CHECK_FALSE(srv.open_to_network());
+    CHECK_FALSE(stored().contains("remote"));
+
+    CHECK(srv.set_local(true, "device12", false) == "");
+    CHECK(srv.running());
+    CHECK(srv.open_to_network());
+    CHECK(stored()["remote"]["password"] == "device12");
+    CHECK(stored()["sound"]["volume"] == 40);                     // what else is in the file stays
+    int ok = -1, bad = -1;
+    with_client(rt, [&] {
+        { Client c; if(c.connect_to(srv.port())) ok = c.login("device12"); }
+        { Client c; if(c.connect_to(srv.port())) bad = c.login("secret12"); }
+    });
+    CHECK(ok == 0);
+    CHECK(bad != 0);
+
+    // an empty field leaves the password; view only and off
+    CHECK(srv.set_local(true, "", true) == "");
+    CHECK(srv.settings().password == "device12");
+    CHECK(srv.settings().view_only);
+    CHECK(stored()["remote"]["view_only"] == true);
+    CHECK(srv.set_local(false, "", false) == "");
+    CHECK_FALSE(srv.running());
+    CHECK(srv.port() == 0);
+    CHECK(stored()["remote"]["enabled"] == false);
+    CHECK(stored()["remote"]["password"] == "device12");
+    CHECK_FALSE(stored()["remote"].contains("view_only"));
+
+    // back on, the password removed: this machine only, nothing of it left in the file
+    CHECK(srv.set_local(true, "", false, true) == "");
+    CHECK(srv.running());
+    CHECK_FALSE(srv.open_to_network());
+    CHECK_FALSE(stored().contains("remote"));
+    CHECK(stored()["sound"]["volume"] == 40);
+
+    srv.stop();
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+}
+
 // ================================================================ reliability / security: a hostile viewer
 
 TEST_CASE("vnc: garbage from a viewer, before and after the login, never takes the server down")
@@ -467,8 +636,8 @@ TEST_CASE("vnc: garbage from a viewer, before and after the login, never takes t
     rt.advance(50);
     lv_display_t* disp = lv_display_get_default();
     VncServer srv;
-    const json cfg = remote(", \"password\": \"secret12\"");
-    REQUIRE(srv.start(&cfg, disp, "Test HMI"));
+    const json cfg = remote();
+    REQUIRE(srv.start(&cfg, &kDevice, disp, "Test HMI"));
 
     // a well-behaved viewer gets in and gets the picture (the server may still be letting the last one go)
     auto alive = [&] {

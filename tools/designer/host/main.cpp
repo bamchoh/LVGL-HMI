@@ -849,6 +849,11 @@ struct Host {
         fs::path dir = p.parent_path();
         json screens = json::array();
         if(proj.contains("screens") && proj["screens"].is_array()) {
+            // (a project from somebody else: the files it names are read here and written when it
+            // is saved, so none of them may lie outside its folder)
+            for(const auto& s : proj["screens"])
+                if(s.is_string() && !hml::project_rel_path(s.get<std::string>()))
+                    return err("the project names a screen file outside its own folder: \"" + s.get<std::string>() + "\". It was not opened (\"screens\" of project.json takes paths inside the project only)");
             for(const auto& s : proj["screens"]) {
                 if(!s.is_string()) continue;
                 bool sok = false;
@@ -874,6 +879,7 @@ struct Host {
         std::string out;
         auto add = [&](const std::string& rel) {
             std::error_code ec;
+            if(!hml::project_rel_path(rel)) { out += rel + ":-;"; return; }
             const fs::path f = d / upath(rel);
             const auto size = fs::file_size(f, ec);
             if(ec) { out += rel + ":-;"; return; }
@@ -950,6 +956,13 @@ struct Host {
     {
         fs::path d = upath(dir);
         std::vector<std::string> failed;
+        // nothing at all is written when one of the names would leave the project's folder
+        for(const auto& f : files) {
+            if(!f.is_object() || !f.contains("rel") || !f.contains("text")) continue;
+            const bool strings = f["rel"].is_string() && f["text"].is_string();
+            if(!strings || !hml::project_rel_path(f["rel"].get<std::string>()))
+                return err("not saved: \"" + (strings ? f["rel"].get<std::string>() : std::string("?")) + "\" is not a file inside the project");
+        }
         for(const auto& f : files) {
             if(!f.is_object() || !f.contains("rel") || !f.contains("text")) continue;
             fs::path p = d / upath(f["rel"].get<std::string>());

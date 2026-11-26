@@ -100,7 +100,7 @@ build.cmd Debug
 | `test_meter.cpp` | Meter (needle and numbers, out-of-range and non-numeric values, extreme settings, drawing time, `--check`) |
 | `test_log_view.cpp` | Showing logs on a screen (pages, filters, periods, SQL injection, broken characters, the time for 100,000 rows, levels, `--check`) |
 | `test_karakuri.cpp` | Reading and writing with the device monitor against Karakuri (a PLC simulator). Runs only when started from `tools/karakuri_check.py device` |
-| `test_vnc.cpp`, `test_transfer.cpp` | Remote display (authentication, pixel formats, differences, a connection with the built-in client), updates and backups with a USB memory |
+| `test_vnc.cpp`, `test_transfer.cpp` | Remote display (authentication, pixel formats, differences, a connection with the built-in client, **a password in the project opens nothing: who may connect is set on the device**), updates and backups with a USB memory |
 | `test_driver_slmp.cpp` | SLMP (how devices are written, the bytes of requests and responses, rejection of responses that are broken, of another protocol or too long and of random bytes, reading and writing against a mock server (all data types, 3E / 4E), limits on writing, recovery from end codes, no response and disconnection, block reads of 1000 points) |
 | `test_driver_mqtt.cpp` | MQTT (the bytes of the packets, the boundaries of the remaining length, rejection of broken packets and 100,000 random packets, publishing to a mock broker, the status topic and the will, receiving commands, **checking of commands** (out of range, not a number, too long, not UTF-8, a topic that is not registered, wildcards), **TLS** (connects with the right CA, rejects a certificate of another CA or another host name, a warning without verify, plaintext is rejected, the password does not appear in the log), retry after a rejection, only the latest value is sent while disconnected, QoS 1 retransmission, stopping ends at once) |
 | `test_driver_opcua_client.cpp` | OPC UA client (against an open62541 server in the same process: reading nodes and subscriptions, writing only the `rw` rows, **signing and encryption**, **a server with another certificate is rejected**, a warning without verify, does not start without a trusted certificate, does not connect in plaintext to an encryption-only server, user name and password (a wrong one is rejected, they do not appear in the log), a value that does not fit the type is not written, the server stopping and coming back, stopping ends at once, the certificate of the device is made only once) |
@@ -126,7 +126,7 @@ build.cmd Debug
 | `test_texts.cpp` | Languages (resolving `@ID`, falling back to the default language, `@@`, an ID that does not exist, switching with `sys.lang` and reverting an invalid value, the language of widgets, options and alarms, the screens are rebuilt on switching), fonts (can be made at any size, missing characters come from the built-in font, reading `cmap` and `hmtx`, broken / truncated / random font files, drawing every screen of the demo) |
 | `test_users.cpp` | Users (login, lockout, automatic logout, levels of widgets and screens, the login screen, editing users on the device) |
 | `test_project_archive.cpp` | Project files (the list of member files, creating and extracting, rejection of paths that leave the project, protection of the per-PC files) |
-| `test_script.cpp` | Lua scripts (reading and writing tags, every trigger, the sandbox, timeouts, hot reload) |
+| `test_script.cpp` | Lua scripts (reading and writing tags, every trigger, the sandbox, timeouts, **a script that takes too much memory fails and nothing else does**, hot reload) |
 | `tools/designer/test/model.test.js` | util / schema / model of the designer (`node --test`, no dependency packages) |
 | `smoke_runtime.cmake` | Starts the executable `hml_runtime` headless with the demo project (the SDL dummy driver) and checks the screenshot and the exit code |
 
@@ -1162,16 +1162,24 @@ You can see and operate the screen of the device with a VNC viewer (RealVNC View
 The runtime has a small VNC server (RFB 3.3 / 3.7 / 3.8, Raw encoding). It is off by default.
 
 ```json
-"remote": { "enabled": true, "port": 5900, "password": "abcd1234", "view_only": false }
+"remote": { "enabled": true, "port": 5900, "view_only": false }
 ```
 
 | Key | Description |
 | ----------- | ------------------------------------------------------------------------------------------------ |
 | `enabled`   | `true` listens for a viewer (default `false`) |
 | `port`      | Default 5900 (in the viewer, enter `device address:5900` or `device address:0`) |
-| `password`  | The password of the VNC authentication (only the first 8 characters are used). **When it is empty, only the device itself (127.0.0.1) can connect** |
 | `view_only` | `true` only shows the screen (the mouse and touch of the viewer do nothing) |
 
+- **Who may connect is decided on the device, not in the project.** The password is set on the device in the system settings,
+  **System > Remote** (at least 6 characters; only the first 8 are used), and stays in `project.local.json`
+  (`"remote": { "password": … }`). **Until a password is set there, only the device itself (127.0.0.1) can connect.**
+  A `password` written in `project.json` is not used (the log and `--check` say so): whoever made a project knows what is
+  in it, so a project from somebody else could otherwise open the device to its author.
+- On the same page the device can turn the server off and make it view only (`"enabled": false`, `"view_only": true` in
+  `project.local.json`). It cannot be made more open than the project asks for. "Remove the password" goes back to
+  "the device itself only". The changes take effect at once and are recorded in the operation log (never the password itself).
+- The password is in `project.local.json` in plain text, so anybody who can read the files of the device can read it.
 - The viewer shows the same picture as a screenshot (the screen, and the dialogs and the screen saver above it). The runtime captures
   the screen only while a viewer is connected, and sends only the parts that changed.
 - A click in the viewer is handled exactly like a finger on the screen of the device (the level of the user and the operation log work as they are).
@@ -1183,8 +1191,8 @@ The runtime has a small VNC server (RFB 3.3 / 3.7 / 3.8, Raw encoding). It is of
   the server to a network with untrusted devices.
 - A guide to the load: on a Raspberry Pi 4, 480x320, with a screen that moves (`projects/factory35`), the CPU usage of the runtime was
   about 7 % without a viewer and about 13 % with TigerVNC connected. It was not measured on real 800x480 hardware.
-- **VNC is not encrypted, and its password check is a weak mechanism (DES, 8 characters).** Use it on a closed network, or leave the password
-  empty and use it through an SSH tunnel:
+- **VNC is not encrypted, and its password check is a weak mechanism (DES, 8 characters).** Use it on a closed network, or set no
+  password and use it through an SSH tunnel:
   keep `ssh -L 5900:127.0.0.1:5900 <user>@<device>` running, and connect the viewer to `localhost:5900`.
 - It is checked with a small client inside the tests (the authentication values are compared with the results of OpenSSL).
   With TigerVNC Viewer 1.16.2 (Windows), a connection with a password and the display of the screen were checked. Clicks from the viewer, and other viewers, are not checked.
@@ -1646,6 +1654,7 @@ Apart from project.json, the runtime generates a built-in "System" menu screen (
 | Transfers | The state of the data transfers between devices and the reason why one does not run (when there is `transfers`. Display only) → "Data transfer between devices" |
 | Upload | Sending the logs: on / off per destination, login, send now, the state of sending (when there is `uploads`) → "Uploading the logs (`uploads`)" |
 | Mail | Mail notification on / off, recipients, login, test mail, the state of sending (when there is `mail`) → "Mail (`mail`)" |
+| Remote | Remote access (VNC) on / off, its password, view only, the state (when there is `remote`) → "Remote display and remote operation (VNC)" |
 | Schedule | The list of schedules and the time of the next run. Press a schedule to change its time, weekdays and on / off (when there is `schedules`) → "Schedules (actions that run by the clock)" |
 | Tags | A list of the current values of all tags (8 at a time, filtered by a part of the name. Enter `sys.` for the tags of the runtime itself). Pressing a row lets you write a value to that tag (TRUE / FALSE buttons for a bool, a numeric keypad for a number, the keyboard for a string. "x" clears the filter). It is for checking and changing values that have no screen, during commissioning and maintenance. A write follows the limits of the tag, reaches the device through the driver, and is recorded in the operation log as `monitor`. Tags of `sys.` cannot be written |
 | Device | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Device page)" |
@@ -2091,6 +2100,8 @@ Define them in `scripts` of project.json and choose with `trigger` when they run
   scripts run once more (the tag values are kept).
 - An error (a syntax error, an undefined tag and so on) is written to the log as `[hml ERROR] script '<name>': <name>:<line>: ...`,
   and only the run of that script is aborted. A script that keeps running for more than 500 ms (an endless loop, for example) is cut off too.
+  The memory of the scripts has a limit as well (32 MB for all scripts of a project together): a script that asks for more
+  (a string or a table that keeps growing) fails with "not enough memory", and the runtime and the other scripts go on.
 - A script with the `tag` trigger is not run again by a tag change that it wrote itself (the other scripts are run).
 
 ### What Lua can use

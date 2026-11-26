@@ -442,7 +442,8 @@ int main(int argc, char** argv)
     hml::system_settings().register_actions();
     hml::register_user_actions();
     // "remote": the screen in a VNC viewer
-    hml::vnc_server().start(hml::project().section("remote"), disp, info.title);
+    // (who may connect is the device's: "remote" of project.local.json, System > Remote)
+    hml::vnc_server().start(hml::project().section("remote"), hml::project().local_remote(), disp, info.title, hml::project().local_overlay_path());
     hml::scheduler().start();
     hml::sound().start();
     hml::mail().start();

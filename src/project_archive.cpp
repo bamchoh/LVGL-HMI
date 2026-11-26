@@ -39,18 +39,21 @@ bool fail(std::string* error, const std::string& msg)
 }
 
 // A path inside a project: relative, no "..", no drive letter. Returns it normalised ('/').
-bool safe_rel(const std::string& in, std::string& out)
+bool safe_rel(const std::string& in, std::string& out) { return project_rel_path(in, &out); }
+
+} // namespace
+
+bool project_rel_path(const std::string& in, std::string* normalised)
 {
     std::string s = in;
     std::replace(s.begin(), s.end(), '\\', '/');
     fs::path p = fs::u8path(s).lexically_normal();
-    out = ustr(p);
+    const std::string out = ustr(p);
+    if(normalised) *normalised = out;
     if(out.empty() || out == "." || p.is_absolute() || out[0] == '/' || out.find(':') != std::string::npos) return false;
     for(const auto& part : p) if(part == "..") return false;
     return true;
 }
-
-} // namespace
 
 bool is_project_archive(const std::string& path)
 {
