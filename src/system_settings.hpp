@@ -111,6 +111,7 @@ std::unique_ptr<SettingsPage> make_monitor_page();             // System > Tags:
 std::unique_ptr<SettingsPage> make_sound_page();               // System > Sound: mute, volume, a test (projects with "sound")
 std::unique_ptr<SettingsPage> make_transfers_page();           // System > Transfers: what runs, what waits and why (projects with "transfers")
 std::unique_ptr<SettingsPage> make_upload_page();              // System > Upload: the login of an upload, "send now", what waits (projects with "uploads")
+std::unique_ptr<SettingsPage> make_remote_page();              // System > Remote: who may connect with a VNC viewer - on / off, the password, view only (projects with "remote")
 std::unique_ptr<SettingsPage> make_mail_page();                // System > Mail: recipients, the password, a test mail (projects with "mail")
 std::unique_ptr<SettingsPage> make_schedule_page();            // System > Schedule: time, days, on / off of the schedules (projects that have some)
 // System > Device: an address of a PLC without a tag (system_device.cpp); for projects with a

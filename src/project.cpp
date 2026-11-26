@@ -68,6 +68,7 @@ void Project::apply_local_overlay()
     local_mail_ = json();
     local_uploads_ = json();
     local_sound_ = json();
+    local_remote_ = json();
     std::string path = local_overlay_path();
     std::ifstream probe(path, std::ios::binary);
     if(!probe) return;
@@ -80,6 +81,7 @@ void Project::apply_local_overlay()
     if(const json* lm = jget(overlay, "mail")) local_mail_ = *lm;
     if(const json* lu = jget(overlay, "uploads")) local_uploads_ = *lu;
     if(const json* lo = jget(overlay, "sound")) local_sound_ = *lo;
+    if(const json* lr = jget(overlay, "remote")) local_remote_ = *lr;
     const json* od = jget(overlay, "drivers");
     json* drivers = root_.is_object() && root_.contains("drivers") && root_["drivers"].is_array() ? &root_["drivers"] : nullptr;
     if(!od || !od->is_object() || !drivers) return;

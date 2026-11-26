@@ -757,6 +757,7 @@ void register_builtin_pages(SystemSettings& s, Project& proj)
     if(const json* so = proj.section("sound"); so && so->is_object()) s.add_page(make_sound_page());
     if(const json* tr = proj.section("transfers"); tr && tr->is_array() && !tr->empty()) s.add_page(make_transfers_page());
     if(const json* ml = proj.section("mail"); ml && ml->is_object()) s.add_page(make_mail_page());
+    if(const json* rm = proj.section("remote"); rm && rm->is_object()) s.add_page(make_remote_page());
     if(const json* up = proj.section("uploads"); up && up->is_array() && !up->empty()) s.add_page(make_upload_page());
     if(const json* sc = proj.section("schedules"); sc && sc->is_array() && !sc->empty()) s.add_page(make_schedule_page());
     s.add_page(make_monitor_page());

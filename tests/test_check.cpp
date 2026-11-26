@@ -348,6 +348,22 @@ TEST_CASE("check: MQTT JSON messages: pointers, tags, topics")
     CHECK(has(lines, "subscribe[1]: \"fields\" is {"));
 }
 
+TEST_CASE("check: remote: a password in the project is not used; unknown keys")
+{
+    Proj p;
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ], "tags": [],
+      "remote": { "enabled": true, "port": 70000, "password": "abcd1234", "veiw_only": true } })json");
+    p.write("screens/a.json", R"json({ "name": "a", "children": [] })json");
+    auto lines = p.check();
+    CHECK(has(lines, "remote: \"password\" is not used"));
+    CHECK(has(lines, "remote: unknown key \"veiw_only\""));
+    CHECK(has(lines, "remote: port"));
+    p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ], "tags": [],
+      "remote": { "enabled": true, "port": 5900, "view_only": true } })json");
+    lines = p.check();
+    CHECK_FALSE(has(lines, "remote"));
+}
+
 TEST_CASE("check: OPC UA server: security, certificate files, no password in the project")
 {
     Proj p;
