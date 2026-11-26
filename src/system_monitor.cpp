@@ -168,6 +168,16 @@ public:
         return true;
     }
 
+    // what writes a value is in the bar at the bottom, not in the list
+    std::vector<PageAction> actions() const override
+    {
+        return {
+            { "Write", "write", PageAction::Kind::Danger, "sel_typed", "" },
+            { "TRUE", "set:true", PageAction::Kind::Ok, "sel_bool", "" },
+            { "FALSE", "set:false", PageAction::Kind::Neutral, "sel_bool", "" },
+        };
+    }
+
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
@@ -205,10 +215,7 @@ public:
             row(json::array({
                 entry("sel_text", nullptr),                                  // the keyboard
                 entry("sel_number", "0123456789.-"),                         // the number pad
-                button("Write", "#c62828", "write", compact ? 80 : 110, "sel_typed"),
-                button("TRUE", "#2e7d32", "set:true", compact ? 110 : 150, "sel_bool"),
-                button("FALSE", "#455a64", "set:false", compact ? 110 : 150, "sel_bool"),
-            })),
+            })),                                                             // (Write / TRUE / FALSE: the bar at the bottom)
         });
         rows.push_back(std::move(form));
 

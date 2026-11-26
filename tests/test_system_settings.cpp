@@ -1,5 +1,7 @@
 // System settings: pages -> tags -> generated screens -> apply.
 #include <doctest.h>
+#include <functional>
+#include <set>
 #include "driver.hpp"
 #include "operation_log.hpp"
 #include "lvgl_fixture.hpp"
@@ -844,6 +846,68 @@ TEST_CASE("system menu: a real project at 480x320 - the pages in groups, one at 
         for(uint32_t i = 0; i < n; i++) CHECK(lv_obj_get_x2(lv_obj_get_child(list, static_cast<int32_t>(i))) + 20 <= lv_obj_get_width(list));
     }
     CHECK(tiles == sys.page_count());                             // every page is in exactly one group
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
+
+// What scrolls must not act: on every page of a real project, the list between the bars holds
+// no button that changes something. What acts is in the bar at the top (Apply), in the bar at
+// the bottom, or in a question that is shown over the page.
+TEST_CASE("system pages: nothing in a list that scrolls changes anything by one press")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    // (the demo has no "remote": the pages a project can have are all looked at where they exist)
+    const std::set<std::string> harmless{ "refresh", "close", "clear", "prev", "next", "find", "read" };
+    std::function<void(const json&, const std::string&, std::vector<std::string>&)> buttons = [&](const json& w, const std::string& page, std::vector<std::string>& out) {
+        if(w.is_array()) { for(const json& c : w) buttons(c, page, out); return; }
+        if(!w.is_object()) return;
+        if(jstr(w, "type", "") == "button" && !jbool(w, "checkable", false)) {
+            std::string cmd = "?";
+            if(const json* oc = jget(w, "on_click"); oc && oc->is_object()) {
+                cmd = jstr(*oc, "arg", "?");
+                if(cmd.rfind(page + ":", 0) == 0) cmd = cmd.substr(page.size() + 1);
+            }
+            out.push_back(cmd.substr(0, cmd.find(':')));
+        }
+        if(w.contains("children")) buttons(w["children"], page, out);
+    };
+    int pages = 0, with_bar = 0, with_question = 0;
+    for(const json& s : sys.screens(480, 320)) {
+        const std::string name = jstr(s, "name", "");
+        if(name.rfind("__system_", 0) != 0) continue;
+        const std::string page = name.substr(9);
+        pages++;
+        const json& kids = s["children"];
+        REQUIRE(kids.size() >= 3);                                // header, list, ..., keyboard
+        std::vector<std::string> in_list;
+        buttons(kids[1], page, in_list);
+        for(const std::string& cmd : in_list) CHECK_MESSAGE(harmless.count(cmd) == 1, "page '" << page << "': a button for '" << cmd << "' is in the list that scrolls");
+        // the bar at the bottom and the questions are beside the list, not in it
+        const SettingsPage* sp = sys.page(page);
+        REQUIRE(sp);
+        const size_t expect = 2 + (sp->actions().empty() ? 0 : 1) + sp->dialogs().size() + 1;
+        CHECK_MESSAGE(kids.size() == expect, "page '" << page << "'");
+        with_bar += sp->actions().empty() ? 0 : 1;
+        with_question += sp->dialogs().empty() ? 0 : 1;
+        for(const PageDialog& d : sp->dialogs()) {                // every question has its tags
+            CHECK_MESSAGE(tags().find(SystemSettings::tag_name(page, d.visible)) != nullptr, page << "." << d.visible);
+            CHECK_MESSAGE(tags().find(SystemSettings::tag_name(page, d.text)) != nullptr, page << "." << d.text);
+        }
+        for(const PageAction& a : sp->actions()) {                // and what a button of the bar is bound to exists
+            auto full = [&](const std::string& key) { return key.find('.') != std::string::npos ? key : SystemSettings::tag_name(page, key); };
+            if(!a.visible.empty()) CHECK_MESSAGE(tags().find(full(a.visible)) != nullptr, page << ": " << a.visible);
+            if(!a.enabled.empty()) CHECK_MESSAGE(tags().find(full(a.enabled)) != nullptr, page << ": " << a.enabled);
+        }
+    }
+    CHECK(pages == static_cast<int>(sys.page_count()));
+    CHECK(pages >= 12);
+    CHECK(with_bar >= 5);                                         // Deploy, Storage, Tags, Device, Schedule ...
+    CHECK(with_question >= 2);                                    // Deploy, Storage
 
     ui().unload_all();
     p.stop_logs();

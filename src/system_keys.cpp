@@ -69,11 +69,17 @@ public:
                                  : "");
 
         info("count", keys_.empty() ? "No key is registered." : vformat("%d registered key(s) in %s", static_cast<int>(keys_.size()), ks.file().c_str()));
+        bool chosen = false;
         for(int i = 0; i < kSlots; i++) {
             bool used = static_cast<size_t>(i) < keys_.size();
+            const bool sel = used && keys_[static_cast<size_t>(i)].fingerprint == selected_;
+            chosen = chosen || sel;
             flag("k" + std::to_string(i + 1) + "_used", used);
+            flag("k" + std::to_string(i + 1) + "_sel", sel);
             info("k" + std::to_string(i + 1), used ? describe(keys_[static_cast<size_t>(i)]) : "");
         }
+        if(!chosen) selected_.clear();
+        flag("has_sel", chosen);                                  // the bar at the bottom: Delete
         info("more", keys_.size() > kSlots ? vformat("... and %d more (not shown)", static_cast<int>(keys_.size()) - kSlots) : "");
         return out;
     }
@@ -90,9 +96,17 @@ public:
         }
         else if(cmd == "accept") ks.accept(&err);
         else if(cmd == "reject") ks.reject();
-        else if(cmd == "delete") {                                // ask first
+        else if(cmd == "select") {                                // a row was pressed: chosen, or not any more
             int slot = std::atoi(arg.c_str());
-            if(slot >= 1 && static_cast<size_t>(slot) <= keys_.size()) confirm_ = keys_[static_cast<size_t>(slot - 1)].fingerprint;
+            if(slot >= 1 && static_cast<size_t>(slot) <= keys_.size()) {
+                const std::string& fp = keys_[static_cast<size_t>(slot - 1)].fingerprint;
+                selected_ = selected_ == fp ? std::string() : fp;
+            }
+        }
+        else if(cmd == "delete") {                                // ask first (the key chosen, or the row given)
+            int slot = std::atoi(arg.c_str());
+            if(arg.empty()) confirm_ = selected_;
+            else if(slot >= 1 && static_cast<size_t>(slot) <= keys_.size()) confirm_ = keys_[static_cast<size_t>(slot - 1)].fingerprint;
         }
         else if(cmd == "delete_yes") { if(!confirm_.empty()) ks.remove(confirm_, &err); confirm_.clear(); }
         else if(cmd == "delete_no") confirm_.clear();
@@ -129,20 +143,9 @@ public:
             return json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag(key) } } },
                          { "style", { { "font", font }, { "text_color", color } } } };
         };
-        auto button = [&](const char* label, const char* color, const std::string& cmd) {
-            return json{ { "type", "button" }, { "text", label }, { "w", compact ? 96 : 130 }, { "h", compact ? 32 : 42 },
-                         { "style", { { "bg_color", color } } }, { "style_label", { { "font", font + 2 } } }, { "on_click", call(cmd) } };
-        };
         auto row = [&](json children) {
             return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                          { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 8 } } }, { "children", std::move(children) } };
-        };
-        // a box that is only there while its tag is on
-        auto box = [&](const std::string& visible_tag, const char* color, json children) {
-            return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
-                         { "bind", { { "visible", tag(visible_tag) } } },
-                         { "style", { { "bg_color", color }, { "radius", 6 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                         { "children", std::move(children) } };
         };
 
         json rows = json::array();
@@ -151,27 +154,29 @@ public:
             json{ { "type", "switch" }, { "bind", tag("mode") }, { "on_change", call("mode") } },
         })));
         rows.push_back(text("state", "#ffffff"));
-        rows.push_back(box("pending", "#4a3a10", json::array({
-            text("pending_text", "#ffffff"),
-            row(json::array({ button("Accept", "#2e7d32", "accept"), button("Reject", "#c62828", "reject") })),
-        })));
-        rows.push_back(box("confirm", "#4a1c1c", json::array({
-            text("confirm_text", "#ffffff"),
-            row(json::array({ button("Delete", "#c62828", "delete_yes"), button("Cancel", "#455a64", "delete_no") })),
-        })));
         rows.push_back(text("count", muted));
+        // a key: press its row to choose it, then Delete below (the questions are over the top of the page)
         for(int i = 1; i <= kSlots; i++) {
+            const std::string n = std::to_string(i);
             json r = row(json::array({
-                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag("k" + std::to_string(i)) } } },
+                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag("k" + n) } } },
                       { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
-                json{ { "type", "button" }, { "text", "Delete" }, { "w", compact ? 70 : 96 }, { "h", compact ? 30 : 40 },
-                      { "style", { { "bg_color", "#455a64" } } }, { "style_label", { { "font", font } } }, { "on_click", call("delete:" + std::to_string(i)) } },
             }));
-            r["bind"] = { { "visible", tag("k" + std::to_string(i) + "_used") } };
+            r["bind"] = { { "visible", tag("k" + n + "_used") }, { "bg_color", { { "tag", tag("k" + n + "_sel") }, { "map", { { "true", "#2f4a6b" }, { "default", "#222d3b" } } } } } };
+            r["on_click"] = call("select:" + n);
             rows.push_back(std::move(r));
         }
         rows.push_back(text("more", muted));
         return rows;
+    }
+
+    std::vector<PageAction> actions() const override { return { { "Delete", "delete", PageAction::Kind::Danger, "has_sel", "" } }; }
+    std::vector<PageDialog> dialogs() const override
+    {
+        return {
+            { "pending", "pending_text", { "Accept", "accept", PageAction::Kind::Ok, "", "" }, { "Reject", "reject", PageAction::Kind::Danger, "", "" }, true },
+            { "confirm", "confirm_text", { "Delete", "delete_yes", PageAction::Kind::Danger, "", "" }, { "Cancel", "delete_no", PageAction::Kind::Neutral, "", "" }, false },
+        };
     }
 
 private:
@@ -191,6 +196,7 @@ private:
 
     int port_;
     std::vector<PublicKey> keys_;        // as last shown: the slots of the Delete buttons
+    std::string selected_;               // fingerprint of the key chosen on the page (its row was pressed)
     std::string confirm_;                // fingerprint waiting for "Delete?" confirmation
     uint32_t deadline_ms_ = 0;
     bool was_listening_ = false, was_pending_ = false;

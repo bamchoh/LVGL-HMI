@@ -3,8 +3,10 @@
 //   Receive projects  [switch]     while on, an accepted designer can send a project (no SSH needed)
 //   Add a designer    [switch]     for a few minutes a new designer may ask to be accepted
 //   (a designer asks)              sender, name, fingerprint         [Accept] [Reject]
-//   Accepted designers             one row each          [Runtime] -> confirmation   [Remove] -> confirmation
+//   Accepted designers             one row each: press it to choose it. Then, in the bar at the bottom:
+//                                  [Runtime] -> confirmation   [Remove] -> confirmation
 //                                  (Runtime: this designer may replace the runtime of the device, too)
+// The questions (a new designer, Remove?, Allow the runtime?) are shown over the top of the page.
 //
 // A project that arrives is checked and installed here (on the UI thread), like one from a USB
 // memory, and the runtime restarts.
@@ -84,11 +86,17 @@ public:
         info("confirm_rt_text", rt ? "Allow this designer to replace the runtime (the program) of this device?\nWhoever uses that PC can then run anything here. Only for a PC you trust as much as this device.\n" + describe(*rt) : "");
 
         info("count", list_.empty() ? "No designer is accepted." : vformat("%d accepted designer(s)", static_cast<int>(list_.size())));
+        bool chosen = false;
         for(int i = 0; i < kSlots; i++) {
             const bool used = static_cast<size_t>(i) < list_.size();
+            const bool sel = used && list_[static_cast<size_t>(i)].fingerprint == selected_;
+            chosen = chosen || sel;
             flag("d" + std::to_string(i + 1) + "_used", used);
+            flag("d" + std::to_string(i + 1) + "_sel", sel);
             info("d" + std::to_string(i + 1), used ? describe(list_[static_cast<size_t>(i)]) : "");
         }
+        if(!chosen) selected_.clear();
+        flag("has_sel", chosen);                                      // the bar at the bottom: Runtime / Remove
         info("more", list_.size() > kSlots ? vformat("... and %d more (not shown)", static_cast<int>(list_.size()) - kSlots) : "");
         return out;
     }
@@ -107,16 +115,23 @@ public:
         }
         else if(cmd == "accept") { err = ds.accept(); ds.set_adding(false); }
         else if(cmd == "reject") ds.reject();
-        else if(cmd == "delete") {                                    // ask first
+        else if(cmd == "select") {                                    // a row was pressed: chosen, or not any more
             const int slot = std::atoi(arg.c_str());
-            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) { confirm_ = list_[static_cast<size_t>(slot - 1)].fingerprint; confirm_rt_.clear(); }
+            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) {
+                const std::string& fp = list_[static_cast<size_t>(slot - 1)].fingerprint;
+                selected_ = selected_ == fp ? std::string() : fp;
+            }
+        }
+        else if(cmd == "delete") {                                    // ask first (the one chosen, or the row given)
+            const std::string fp = slot_or_selected(arg);
+            if(!fp.empty()) { confirm_ = fp; confirm_rt_.clear(); }
         }
         else if(cmd == "delete_yes") { if(!confirm_.empty()) err = ds.remove(confirm_); confirm_.clear(); }
         else if(cmd == "delete_no") confirm_.clear();
         else if(cmd == "runtime") {                                   // taking it away at once, giving it asks first
-            const int slot = std::atoi(arg.c_str());
-            if(slot >= 1 && static_cast<size_t>(slot) <= list_.size()) {
-                const DeployDesigner& d = list_[static_cast<size_t>(slot - 1)];
+            const std::string fp = slot_or_selected(arg);
+            for(const DeployDesigner& d : list_) {
+                if(d.fingerprint != fp) continue;
                 if(d.runtime) err = ds.set_runtime_allowed(d.fingerprint, false);
                 else { confirm_rt_ = d.fingerprint; confirm_.clear(); }
             }
@@ -176,19 +191,9 @@ public:
             return json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag(key) } } },
                          { "style", { { "font", font }, { "text_color", color } } } };
         };
-        auto button = [&](const char* label, const char* color, const std::string& cmd) {
-            return json{ { "type", "button" }, { "text", label }, { "w", compact ? 96 : 130 }, { "h", compact ? 32 : 42 },
-                         { "style", { { "bg_color", color } } }, { "style_label", { { "font", font + 2 } } }, { "on_click", call(cmd) } };
-        };
         auto row = [&](json children) {
             return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                          { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 8 } } }, { "children", std::move(children) } };
-        };
-        auto box = [&](const std::string& visible_tag, const char* color, json children) {
-            return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
-                         { "bind", { { "visible", tag(visible_tag) } } },
-                         { "style", { { "bg_color", color }, { "radius", 6 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                         { "children", std::move(children) } };
         };
         auto toggle = [&](const char* label, const std::string& key) {
             return row(json::array({
@@ -197,41 +202,53 @@ public:
             }));
         };
 
+        // (accepting, removing, allowing the runtime: the questions and the bar at the bottom - dialogs(), actions())
         json rows = json::array();
         rows.push_back(toggle("Receive projects", "receive"));
         rows.push_back(text("state", "#ffffff"));
         rows.push_back(toggle("Add a designer", "adding"));
         rows.push_back(text("adding_text", "#ffffff"));
-        rows.push_back(box("pending", "#4a3a10", json::array({
-            text("pending_text", "#ffffff"),
-            row(json::array({ button("Accept", "#2e7d32", "accept"), button("Reject", "#c62828", "reject") })),
-        })));
-        rows.push_back(box("confirm", "#4a1c1c", json::array({
-            text("confirm_text", "#ffffff"),
-            row(json::array({ button("Remove", "#c62828", "delete_yes"), button("Cancel", "#455a64", "delete_no") })),
-        })));
-        rows.push_back(box("confirm_rt", "#4a1c1c", json::array({
-            text("confirm_rt_text", "#ffffff"),
-            row(json::array({ button("Allow", "#c62828", "runtime_yes"), button("Cancel", "#455a64", "runtime_no") })),
-        })));
         rows.push_back(text("count", muted));
+        // a designer: press its row to choose it, then Runtime / Remove below
         for(int i = 1; i <= kSlots; i++) {
+            const std::string n = std::to_string(i);
             json r = row(json::array({
-                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag("d" + std::to_string(i)) } } },
+                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag("d" + n) } } },
                       { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
-                json{ { "type", "button" }, { "text", "Runtime" }, { "w", compact ? 70 : 96 }, { "h", compact ? 30 : 40 },
-                      { "style", { { "bg_color", "#455a64" } } }, { "style_label", { { "font", font } } }, { "on_click", call("runtime:" + std::to_string(i)) } },
-                json{ { "type", "button" }, { "text", "Remove" }, { "w", compact ? 70 : 96 }, { "h", compact ? 30 : 40 },
-                      { "style", { { "bg_color", "#455a64" } } }, { "style_label", { { "font", font } } }, { "on_click", call("delete:" + std::to_string(i)) } },
             }));
-            r["bind"] = { { "visible", tag("d" + std::to_string(i) + "_used") } };
+            r["bind"] = { { "visible", tag("d" + n + "_used") }, { "bg_color", { { "tag", tag("d" + n + "_sel") }, { "map", { { "true", "#2f4a6b" }, { "default", "#222d3b" } } } } } };
+            r["on_click"] = call("select:" + n);
             rows.push_back(std::move(r));
         }
         rows.push_back(text("more", muted));
         return rows;
     }
 
+    std::vector<PageAction> actions() const override
+    {
+        return {
+            { "Runtime", "runtime", PageAction::Kind::Neutral, "has_sel", "" },
+            { "Remove", "delete", PageAction::Kind::Danger, "has_sel", "" },
+        };
+    }
+    std::vector<PageDialog> dialogs() const override
+    {
+        const PageAction cancel_rm{ "Cancel", "delete_no", PageAction::Kind::Neutral, "", "" }, cancel_rt{ "Cancel", "runtime_no", PageAction::Kind::Neutral, "", "" };
+        return {
+            { "pending", "pending_text", { "Accept", "accept", PageAction::Kind::Ok, "", "" }, { "Reject", "reject", PageAction::Kind::Danger, "", "" }, true },
+            { "confirm", "confirm_text", { "Remove", "delete_yes", PageAction::Kind::Danger, "", "" }, cancel_rm, false },
+            { "confirm_rt", "confirm_rt_text", { "Allow", "runtime_yes", PageAction::Kind::Danger, "", "" }, cancel_rt, false },
+        };
+    }
+
 private:
+    // the designer a command is about: the row given ("2"), else the one chosen on the page
+    std::string slot_or_selected(const std::string& arg) const
+    {
+        if(arg.empty()) return selected_;
+        const int slot = std::atoi(arg.c_str());
+        return slot >= 1 && static_cast<size_t>(slot) <= list_.size() ? list_[static_cast<size_t>(slot - 1)].fingerprint : std::string();
+    }
     static std::string describe(const DeployDesigner& d)
     {
         return d.name + (d.added.empty() ? "" : "  (" + d.added + ")") + "\n" + d.fingerprint + (d.runtime ? "\nmay replace the runtime" : "");
@@ -259,6 +276,7 @@ private:
 
     Project& proj_;
     std::vector<DeployDesigner> list_;    // as last shown: the slots of the Remove buttons
+    std::string selected_;                // fingerprint of the designer chosen on the page (its row was pressed)
     std::string confirm_;                 // fingerprint waiting for "Remove?" confirmation
     std::string confirm_rt_;              // fingerprint waiting for "Allow to replace the runtime?"
     uint32_t deadline_ms_ = 0;

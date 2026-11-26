@@ -1709,9 +1709,20 @@ Apart from project.json, the runtime generates a built-in "System" menu screen (
   to scroll.
 - What is chosen or pressed has the `primary` colour of the project's theme. The screens themselves are always dark.
 
-The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Device, Schedule …) are shown in the same
-frame; the buttons they have in their own rows (Accept, Remove, Install …) are still in what scrolls, each behind a confirmation
-where it cannot be undone.
+The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Device, Schedule, Sound …) follow the same
+rule:
+
+- **A row is chosen first, then acted on.** A designer, a key or a user is a row: pressing it only chooses it (it is shown in
+  another colour; pressing it again lets go). What can be done with it - Runtime, Remove, Delete - then appears in the bar at
+  the bottom. Writing a value (Tags, Device), Save (Users, Schedule), Backup / Install (Storage) and the test sound are in that
+  bar too.
+- **A question is not part of the list.** "Remove this designer?", "Install this project?", a new designer or a new key that
+  waits for an answer: shown in a frame over the top of the page, with its two buttons.
+- What is left in the lists are the things that change nothing by one press (Refresh, the paging `<` `>`, closing a form) and the
+  switches and input fields of the settings themselves.
+
+A page of your own gets the same from `SettingsPage::actions()` (the bar at the bottom: a text, a command, when it is shown or
+enabled) and `SettingsPage::dialogs()` (the questions).
 
 **Without a button too: hold a corner of the screen.** A finger held in the **top left corner for 3 seconds** opens the system
 settings on every project, so that a project without such a button does not leave the device without a way to its own settings

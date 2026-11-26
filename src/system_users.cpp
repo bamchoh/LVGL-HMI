@@ -204,11 +204,17 @@ public:
         flag("confirm", del != nullptr);
         info("confirm_text", del ? "Delete the user '" + del->name + "'?" : "");
         info("count", vformat("%d user(s)%s", static_cast<int>(list.size()), us.local_list() ? ", edited on this device" : ", as defined in the project"));
+        bool chosen = false;
         for(int i = 0; i < kSlots; i++) {
             bool used = static_cast<size_t>(i) < list.size();
+            const bool sel = used && !selected_.empty() && iequals(list[static_cast<size_t>(i)].name, selected_);
+            chosen = chosen || sel;
             flag("k" + std::to_string(i + 1) + "_used", used);
+            flag("k" + std::to_string(i + 1) + "_sel", sel);
             info("k" + std::to_string(i + 1), used ? describe(list[static_cast<size_t>(i)]) : "");
         }
+        if(!chosen) selected_.clear();
+        flag("has_sel", chosen);                                  // the bar at the bottom: Delete
         return out;
     }
 
@@ -234,12 +240,14 @@ public:
                 const UserInfo& u = us.list()[static_cast<size_t>(slot - 1)];
                 form_name_ = u.name;
                 form_level_ = u.level;
+                selected_ = u.name;                               // (and it is the one Delete below is about)
                 msg = "Change the level, or type a new PIN, then press Save. An empty PIN keeps the old one.";
             }
         }
-        else if(cmd == "delete") {
+        else if(cmd == "delete") {                                // the user chosen, or the row given
             int slot = std::atoi(arg.c_str());
-            if(slot >= 1 && static_cast<size_t>(slot) <= us.list().size()) confirm_ = us.list()[static_cast<size_t>(slot - 1)].name;
+            if(arg.empty()) confirm_ = selected_;
+            else if(slot >= 1 && static_cast<size_t>(slot) <= us.list().size()) confirm_ = us.list()[static_cast<size_t>(slot - 1)].name;
         }
         else if(cmd == "delete_yes") {
             if(!confirm_.empty()) { msg = us.remove_user(confirm_); if(msg.empty()) msg = "'" + confirm_ + "' deleted."; }
@@ -262,10 +270,6 @@ public:
             return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                          { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 6 } } }, { "children", std::move(children) } };
         };
-        auto button = [&](const char* text, const char* color, const std::string& cmd, int w) {
-            return json{ { "type", "button" }, { "text", text }, { "w", w }, { "h", compact ? 30 : 40 }, { "style", { { "bg_color", color } } },
-                         { "style_label", { { "font", font } } }, { "on_click", call(cmd) } };
-        };
 
         json rows = json::array();
         rows.push_back(row(json::array({
@@ -278,33 +282,35 @@ public:
             label("PIN"),
             json{ { "type", "password_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 8 }, { "accepted_chars", "0123456789" }, { "bind", tag("pin") },
                   { "style", { { "font", font }, { "pad", 6 } } } },
-            button("Save", "#2e7d32", "save", compact ? 80 : 110),
         })));
-        rows.push_back(json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
-                             { "bind", { { "visible", tag("confirm") } } },
-                             { "style", { { "bg_color", "#4a1c1c" }, { "radius", 6 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                             { "children", json::array({
-                                 json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("confirm_text") } } },
-                                       { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
-                                 row(json::array({ button("Delete", "#c62828", "delete_yes", compact ? 90 : 120), button("Cancel", "#455a64", "delete_no", compact ? 90 : 120) })),
-                             }) } });
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "bind", { { "text", tag("count") } } }, { "style", { { "font", font }, { "text_color", muted } } } });
+        // a user: press its row to put it into the form (and to choose it for Delete below)
         for(int i = 1; i <= kSlots; i++) {
+            const std::string n = std::to_string(i);
             json r = row(json::array({
-                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dot" }, { "bind", { { "text", tag("k" + std::to_string(i)) } } },
+                json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dot" }, { "bind", { { "text", tag("k" + n) } } },
                       { "style", { { "font", font + 2 }, { "text_color", "#ffffff" } } } },
-                button("Edit", "#2c3e50", "edit:" + std::to_string(i), compact ? 56 : 80),
-                button("Delete", "#455a64", "delete:" + std::to_string(i), compact ? 64 : 90),
             }));
-            r["bind"] = { { "visible", tag("k" + std::to_string(i) + "_used") } };
+            r["bind"] = { { "visible", tag("k" + n + "_used") }, { "bg_color", { { "tag", tag("k" + n + "_sel") }, { "map", { { "true", "#2f4a6b" }, { "default", "#222d3b" } } } } } };
+            r["on_click"] = call("edit:" + n);
             rows.push_back(std::move(r));
         }
         return rows;
     }
 
+    std::vector<PageAction> actions() const override
+    {
+        return { { "Save", "save", PageAction::Kind::Ok, "", "" }, { "Delete", "delete", PageAction::Kind::Danger, "has_sel", "" } };
+    }
+    std::vector<PageDialog> dialogs() const override
+    {
+        return { { "confirm", "confirm_text", { "Delete", "delete_yes", PageAction::Kind::Danger, "", "" }, { "Cancel", "delete_no", PageAction::Kind::Neutral, "", "" }, false } };
+    }
+
 private:
     std::string form_name_;
     int         form_level_ = 1;
+    std::string selected_;          // the user chosen on the page (its row was pressed)
     std::string confirm_;           // user waiting for "Delete?" confirmation
 };
 

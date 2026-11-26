@@ -33,6 +33,24 @@ struct SettingField {
     std::string unit;                // Number
 };
 
+// A button of a page in the bar at the bottom of its screen: outside what scrolls, so that a
+// finger that scrolls cannot press it. Pressing it calls command(<command>, "").
+struct PageAction {
+    enum class Kind { Neutral, Primary, Ok, Danger };
+    std::string text, command;
+    Kind        kind = Kind::Neutral;
+    std::string visible;             // key of a Bool tag of the page: shown only while it is on ("" = always).
+    std::string enabled;             // ... can be pressed only while it is on. With a dot in it: the whole name of any tag
+};
+
+// A question of a page ("Remove this designer?"): shown over the top of the page, not in what
+// scrolls, while the Bool tag `visible` is on, with the text of the tag `text` and two buttons.
+struct PageDialog {
+    std::string visible, text;       // keys of tags of the page
+    PageAction  yes, no;
+    bool        warning = false;     // amber (something waits for an answer) instead of red (cannot be undone)
+};
+
 class SettingsPage {
 public:
     virtual ~SettingsPage() = default;
@@ -46,6 +64,15 @@ public:
     virtual bool has_apply() const { return true; }
     // More buttons under the form: { text, command } - a press calls command(<command>, "").
     virtual std::vector<std::pair<std::string, std::string>> buttons() const { return {}; }
+    // The same with more to say (when it is shown, what kind it is). Default: buttons().
+    virtual std::vector<PageAction> actions() const
+    {
+        std::vector<PageAction> out;
+        for(const auto& [text, cmd] : buttons()) out.push_back(PageAction{ text, cmd, PageAction::Kind::Neutral, "", "" });
+        return out;
+    }
+    // The questions the page can ask.
+    virtual std::vector<PageDialog> dialogs() const { return {}; }
 
     // ---- pages that are more than a form (optional)
     // The rows of the page body, as widgets bound to the page's tags. null = one row per field.
