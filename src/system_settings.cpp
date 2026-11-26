@@ -393,13 +393,19 @@ void restyle(json& w, bool top, bool compact, const std::string& accent)
 std::vector<json> SystemSettings::screens(int width, int height) const
 {
     const bool compact = width < 600;
-    const int header_h = compact ? 40 : 56;
-    const int font = compact ? 12 : 14;
-    const int title_font = compact ? 16 : 20;
+    const bool large = width >= 1100;                // a big screen: everything a size up
+    const int header_h = compact ? 40 : large ? 68 : 56;
+    const int font = compact ? 12 : large ? 16 : 14;
+    const int title_font = compact ? 16 : large ? 24 : 20;
     const int kb_h = height * (compact ? 60 : 45) / 100;
-    const int margin = compact ? 8 : 12;
-    const int gutter = compact ? 22 : 30;            // the strip at the right edge of a list: for scrolling, nothing to press
-    const int gap = compact ? 6 : 8;
+    const int margin = compact ? 8 : large ? 16 : 12;
+    const int gutter = compact ? 22 : large ? 36 : 30;   // the strip at the right edge of a list: for scrolling, nothing to press
+    const int gap = compact ? 6 : large ? 10 : 8;
+    // On a wide screen the content is a column in the middle, not stretched from edge to edge:
+    // lines stay short enough to read and what belongs together stays together. The bars at the
+    // top and at the bottom still go over the whole width; what is in them follows the column.
+    const int col_w = std::min(width, large ? 1040 : 880);
+    const int col_x = (width - col_w) / 2;
     const char* bg = "#10151c";
     const char* bar = "#19212c";
     const char* tile = "#222d3b";
@@ -416,12 +422,12 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", title }, { "style", { { "font", title_font }, { "text_color", text } } } },
         });
         if(!apply_page.empty())
-            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 84 : 120 }, { "h", header_h - 8 },
+            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 84 : large ? 150 : 120 }, { "h", header_h - 8 },
                                      { "style", { { "bg_color", "#2e7d32" }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                                      { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", apply_page } } } });
         return json{
             { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", "100%" }, { "h", header_h }, { "scrollable", false },
-            { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", margin }, { "pad_right", margin }, { "pad_top", 0 }, { "pad_bottom", 0 } } },
+            { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", col_x + margin }, { "pad_right", col_x + margin }, { "pad_top", 0 }, { "pad_bottom", 0 } } },
             { "children", children },
         };
     };
@@ -433,9 +439,9 @@ std::vector<json> SystemSettings::screens(int width, int height) const
     // ---- menu
     {
         std::vector<json> items[kGroupCount];
-        const int list_w = width - 2 * margin;
+        const int list_w = col_w - 2 * margin;
         const int tile_w = (list_w - gutter - gap) / 2;
-        const int tile_h = compact ? 50 : 66;
+        const int tile_h = compact ? 50 : large ? 80 : 66;
         for(const auto& p : pages_) {
             const std::string id = p->id();
             items[group_of(id)].push_back(json{
@@ -457,7 +463,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         // The groups that have pages, as tabs: a strip under the header that belongs to it, the
         // names as text, and a line under the one that is chosen. Pressing a name writes the
         // number of its group into sys.menu.tab.
-        const int tabs_h = compact ? 34 : 44, line_h = 3;
+        const int tabs_h = compact ? 34 : large ? 52 : 44, line_h = 3;
         json tabs = json::array(), marks = json::array();
         std::vector<int> used;
         for(int g = 0; g < kGroupCount; g++) if(!items[g].empty()) used.push_back(g);
@@ -473,12 +479,12 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         }
         auto strip = [&](int y, int h, json row) {
             return json{ { "type", "panel" }, { "x", 0 }, { "y", y }, { "w", "100%" }, { "h", h }, { "scrollable", false }, { "flex", "row" },
-                         { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 0 } } }, { "children", std::move(row) } };
+                         { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_left", col_x }, { "pad_right", col_x }, { "pad_column", 0 } } }, { "children", std::move(row) } };
         };
         json children = json::array({ header("System", ""), strip(header_h, tabs_h, tabs), strip(header_h + tabs_h, line_h, marks) });
         const int top = header_h + tabs_h + line_h + gap;
         for(int g : used)
-            children.push_back(json{ { "type", "panel" }, { "x", margin }, { "y", top }, { "w", list_w }, { "h", height - top - margin },
+            children.push_back(json{ { "type", "panel" }, { "x", col_x + margin }, { "y", top }, { "w", list_w }, { "h", height - top - margin },
                                      { "flex", "row_wrap" }, { "scrollbar", "auto" },
                                      { "bind", { { "visible", { { "tag", "sys.menu.tab" }, { "eq", g } } } } },
                                      { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "radius", 0 }, { "pad", 0 }, { "pad_right", gutter }, { "pad_row", gap }, { "pad_column", gap } } },
@@ -521,9 +527,9 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             // one setting, one tile: the name at the left, what it is at the right
             rows.push_back(json{
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
-                { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : 10 }, { "pad_left", compact ? 10 : 14 }, { "pad_column", 8 } } },
+                { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : large ? 14 : 10 }, { "pad_left", compact ? 10 : large ? 18 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 110 : 160 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", muted } } } },
+                    json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 110 : large ? 240 : 160 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", muted } } } },
                     widget,
                 }) },
             });
@@ -533,7 +539,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
 
         // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
         const std::vector<PageAction> extra = p->actions();
-        const int footer_h = extra.empty() ? 0 : (compact ? 42 : 54);
+        const int footer_h = extra.empty() ? 0 : (compact ? 42 : large ? 66 : 54);
         const int body_h = height - header_h - margin - (footer_h ? footer_h : margin);
         auto action_button = [&](const PageAction& a, int h) {
             const char* color = a.kind == PageAction::Kind::Danger ? "#c62828" : a.kind == PageAction::Kind::Ok ? "#2e7d32" : a.kind == PageAction::Kind::Primary ? accent.c_str() : "#3a4a5e";
@@ -551,7 +557,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         };
         json children = json::array({
             header(p->title(), p->has_apply() ? id : ""),             // "back" pops the history: menu, then the caller
-            json{ { "type", "panel" }, { "x", margin }, { "y", header_h + margin }, { "w", width - 2 * margin }, { "h", body_h - (footer_h ? gap : 0) },
+            json{ { "type", "panel" }, { "x", col_x + margin }, { "y", header_h + margin }, { "w", col_w - 2 * margin }, { "h", body_h - (footer_h ? gap : 0) },
                   { "flex", "column" }, { "flex_cross", "start" }, { "scrollbar", "auto" },
                   { "style", { { "bg_opa", 0 }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_right", gutter }, { "pad_row", gap } } },
                   { "children", rows } },
@@ -561,12 +567,12 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             for(const PageAction& a : extra) buttons.push_back(action_button(a, footer_h - 10));
             children.push_back(json{ { "type", "panel" }, { "x", 0 }, { "y", height - footer_h }, { "w", "100%" }, { "h", footer_h }, { "scrollable", false },
                                      { "flex", "row" }, { "flex_cross", "center" },
-                                     { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", margin }, { "pad_right", margin }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", gap } } },
+                                     { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", col_x + margin }, { "pad_right", col_x + margin }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", gap } } },
                                      { "children", buttons } });
         }
         // the questions of the page: over the top of the list, not part of it
         for(const PageDialog& d : p->dialogs())
-            children.push_back(json{ { "type", "panel" }, { "x", margin }, { "y", header_h + margin }, { "w", width - 2 * margin }, { "h", "content" },
+            children.push_back(json{ { "type", "panel" }, { "x", col_x + margin }, { "y", header_h + margin }, { "w", col_w - 2 * margin }, { "h", "content" },
                                      { "flex", "column" }, { "scrollable", false },
                                      { "bind", { { "visible", tag_name(id, d.visible) } } },
                                      { "style", { { "bg_color", d.warning ? "#4a3a10" : "#4a1c1c" }, { "radius", 10 }, { "border_width", 2 }, { "border_color", d.warning ? "#ffb300" : "#e53935" },

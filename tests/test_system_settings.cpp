@@ -913,3 +913,41 @@ TEST_CASE("system pages: nothing in a list that scrolls changes anything by one 
     p.stop_logs();
     p.unload();
 }
+
+TEST_CASE("system screens: on a wide display the content is a column in the middle; on a small one it uses the whole width")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    // (the lists: on the menu the group panels from the fourth child on, on a page the second child)
+    auto lists = [&](int w, int h) {
+        std::vector<std::pair<int, int>> out;                    // x, width
+        for(const json& s : sys.screens(w, h)) {
+            const json& kids = s["children"];
+            if(jstr(s, "name", "") == "__system") { for(size_t i = 3; i < kids.size(); i++) out.push_back({ static_cast<int>(jnum(kids[i], "x", -1)), static_cast<int>(jnum(kids[i], "w", -1)) }); }
+            else out.push_back({ static_cast<int>(jnum(kids[1], "x", -1)), static_cast<int>(jnum(kids[1], "w", -1)) });
+        }
+        return out;
+    };
+    for(const auto& size : { std::pair<int, int>{ 480, 320 }, { 800, 480 } }) {
+        const auto ls = lists(size.first, size.second);
+        REQUIRE(ls.size() > 10);
+        for(const auto& l : ls) {
+            CHECK(l.first <= 12);                                 // a margin, nothing more
+            CHECK(l.first + l.second + l.first == size.first);
+        }
+    }
+    for(const auto& size : { std::pair<int, int>{ 1024, 600 }, { 1280, 800 }, { 1920, 1080 } }) {
+        const auto ls = lists(size.first, size.second);
+        for(const auto& l : ls) {
+            CHECK(l.first + l.second + l.first == size.first);    // in the middle
+            CHECK(l.second <= 1040);                              // and not wider than a column that can be read
+            CHECK(l.second >= 800);
+            CHECK(l.first > 50);
+        }
+    }
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
