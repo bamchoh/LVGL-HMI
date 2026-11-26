@@ -31,6 +31,12 @@ public:
 
     std::string id() const override { return "deploy"; }
     std::string title() const override { return "Deploy"; }
+    std::string summary() override
+    {
+        DeployService& ds = deploy_service();
+        if(!ds.listening()) return "Off";
+        return vformat("Receiving, %d designer(s)", static_cast<int>(ds.designers().size()));
+    }
     bool has_apply() const override { return false; }
 
     std::vector<SettingField> fields() override

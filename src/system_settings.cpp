@@ -212,6 +212,14 @@ void set_tag(const std::string& name, TagType type, const Value& v)
 void SystemSettings::create_tags()
 {
     for(const auto& p : pages_) refresh(p->id());
+    // the menu: which group of pages is shown, and one line about each page under its name
+    if(!tags().find("sys.menu.tab")) set_tag("sys.menu.tab", TagType::Int, Value::number(0, TagType::Int));
+    update_summaries();
+}
+
+void SystemSettings::update_summaries()
+{
+    for(const auto& p : pages_) set_tag(tag_name(p->id(), "summary"), TagType::String, Value::string(p->summary()));
 }
 
 void SystemSettings::refresh(const std::string& page_id)
@@ -296,7 +304,55 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
 void SystemSettings::poll()
 {
     for(const auto& p : pages_) if(p->poll()) refresh(p->id());
+    // the lines under the names in the menu follow what happens (about once a second, while it is shown)
+    if(++summary_ticks_ % 4 == 0 && ui().current_screen().value_or("") == menu_screen()) update_summaries();
 }
+
+// ---------------------------------------------------------------- how the screens look
+//
+// The menu: the pages in a few groups, one group at a time as tiles in two columns. A group
+// fits the screen (also 480x320), so that the menu does not scroll: a finger that wants to
+// scroll cannot open a page by accident. Where a group is longer (many drivers) it scrolls,
+// and the strip at the right edge has nothing in it to press.
+// A page: a bar at the top with "back", the title and Apply - what acts is not in the list
+// that scrolls. The list has the same empty strip at its right edge; the other buttons of a
+// page are in a bar at the bottom.
+namespace {
+
+struct Group { const char* title; };
+const Group kGroups[] = { { "Device" }, { "Connection" }, { "Notify" }, { "Service" } };
+constexpr int kGroupCount = 4;
+
+int group_of(const std::string& id)
+{
+    if(id.rfind("driver_", 0) == 0 || id == "device" || id == "monitor" || id == "transfers") return 1;
+    if(id == "mail" || id == "upload" || id == "schedule") return 2;
+    if(id == "deploy" || id == "storage" || id == "keys" || id == "remote") return 3;
+    return 0;                                        // about, network, display, sound, users and what a project adds
+}
+
+const char* icon_of(const std::string& id)
+{
+    if(id == "about") return LV_SYMBOL_HOME;
+    if(id == "network") return LV_SYMBOL_WIFI;
+    if(id == "display") return LV_SYMBOL_IMAGE;
+    if(id == "sound") return LV_SYMBOL_VOLUME_MAX;
+    if(id == "users") return LV_SYMBOL_EYE_OPEN;
+    if(id.rfind("driver_", 0) == 0) return LV_SYMBOL_SHUFFLE;
+    if(id == "device") return LV_SYMBOL_EDIT;
+    if(id == "monitor") return LV_SYMBOL_LIST;
+    if(id == "transfers") return LV_SYMBOL_LOOP;
+    if(id == "mail") return LV_SYMBOL_ENVELOPE;
+    if(id == "upload") return LV_SYMBOL_UPLOAD;
+    if(id == "schedule") return LV_SYMBOL_BELL;
+    if(id == "deploy") return LV_SYMBOL_DOWNLOAD;
+    if(id == "storage") return LV_SYMBOL_USB;
+    if(id == "keys") return LV_SYMBOL_KEYBOARD;
+    if(id == "remote") return LV_SYMBOL_VIDEO;
+    return LV_SYMBOL_SETTINGS;
+}
+
+} // namespace
 
 std::vector<json> SystemSettings::screens(int width, int height) const
 {
@@ -305,44 +361,88 @@ std::vector<json> SystemSettings::screens(int width, int height) const
     const int font = compact ? 12 : 14;
     const int title_font = compact ? 16 : 20;
     const int kb_h = height * (compact ? 60 : 45) / 100;
-    const char* bg = "#141a22";
-    const char* card = "#1b2430";
-    const char* muted = "#9fb3c8";
+    const int margin = compact ? 8 : 12;
+    const int gutter = compact ? 22 : 30;            // the strip at the right edge of a list: for scrolling, nothing to press
+    const int gap = compact ? 6 : 8;
+    const char* bg = "#10151c";
+    const char* bar = "#19212c";
+    const char* tile = "#222d3b";
+    const char* text = "#eef3f8";
+    const char* muted = "#8fa3b8";
+    const std::string accent = accent_;
 
-    auto header = [&](const std::string& title, const json& back_action) {
+    // "back", the title and - for a form - Apply: always there, never in what scrolls
+    auto header = [&](const std::string& title, const std::string& apply_page) {
+        json children = json::array({
+            json{ { "type", "button" }, { "align", "left_mid" }, { "text", LV_SYMBOL_LEFT }, { "w", header_h + 4 }, { "h", header_h - 8 },
+                  { "style", { { "bg_color", tile }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
+                  { "on_click", { { "action", "back" } } } },
+            json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", title }, { "style", { { "font", title_font }, { "text_color", text } } } },
+        });
+        if(!apply_page.empty())
+            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 84 : 120 }, { "h", header_h - 8 },
+                                     { "style", { { "bg_color", "#2e7d32" }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
+                                     { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", apply_page } } } });
         return json{
             { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", "100%" }, { "h", header_h }, { "scrollable", false },
-            { "style", { { "bg_color", "#1f2a38" }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", 8 }, { "pad_right", 8 }, { "pad_top", 0 }, { "pad_bottom", 0 } } },
-            { "children", json::array({
-                json{ { "type", "button" }, { "align", "left_mid" }, { "text", "< Back" }, { "h", header_h - 10 }, { "style_label", { { "font", font } } }, { "on_click", back_action } },
-                json{ { "type", "label" }, { "align", "center" }, { "text", title }, { "style", { { "font", title_font }, { "text_color", "#ffffff" } } } },
-            }) },
+            { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", margin }, { "pad_right", margin }, { "pad_top", 0 }, { "pad_bottom", 0 } } },
+            { "children", children },
         };
     };
 
     std::vector<json> out;
-
-    // ---- menu
-    json menu_items = json::array();
-    for(const auto& p : pages_) {
-        menu_items.push_back(json{ { "type", "button" }, { "text", p->title() }, { "w", "100%" }, { "h", compact ? 34 : 44 },
-                                   { "style_label", { { "font", font + 2 } } },
-                                   { "on_click", json::array({
-                                       // what the page shows is read when it is opened (ports plugged in since startup ...)
-                                       { { "action", "call" }, { "fn", "system.refresh" }, { "arg", p->id() } },
-                                       { { "action", "goto" }, { "screen", page_screen(p->id()) }, { "anim", "slide_left" } } }) } });
-    }
     // with user management the whole of the system settings asks for a level ("users.system_level")
     const int level = users().system_level();
-    out.push_back(json{
-        { "name", menu_screen() }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
-        { "children", json::array({
-            header("System", json{ { "action", "back" } }),
-            json{ { "type", "panel" }, { "x", 8 }, { "y", header_h + 8 }, { "w", width - 16 }, { "h", height - header_h - 16 },
-                  { "flex", "column" }, { "style", { { "bg_color", card }, { "radius", 8 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                  { "children", menu_items } },
-        }) },
-    });
+
+    // ---- menu
+    {
+        std::vector<json> items[kGroupCount];
+        const int list_w = width - 2 * margin;
+        const int tile_w = (list_w - gutter - gap) / 2;
+        const int tile_h = compact ? 50 : 66;
+        for(const auto& p : pages_) {
+            const std::string id = p->id();
+            items[group_of(id)].push_back(json{
+                { "type", "panel" }, { "w", tile_w }, { "h", tile_h }, { "scrollable", false }, { "flex", "column" }, { "flex_main", "center" },
+                { "style", { { "bg_color", tile }, { "radius", 10 }, { "border_width", 0 }, { "pad_left", compact ? 10 : 14 }, { "pad_right", 6 }, { "pad_top", 4 }, { "pad_bottom", 4 }, { "pad_row", 2 } } },
+                { "style_pressed", { { "bg_color", accent } } },
+                { "on_click", json::array({
+                    // what the page shows is read when it is opened (ports plugged in since startup ...)
+                    { { "action", "call" }, { "fn", "system.refresh" }, { "arg", id } },
+                    { { "action", "goto" }, { "screen", page_screen(id) }, { "anim", "slide_left" } } }) },
+                { "children", json::array({
+                    json{ { "type", "label" }, { "w", "100%" }, { "h", font + 8 }, { "long_mode", "dots" }, { "text", std::string(icon_of(id)) + "  " + p->title() },
+                          { "style", { { "font", font + 2 }, { "text_color", text } } } },
+                    json{ { "type", "label" }, { "w", "100%" }, { "h", font + 4 }, { "long_mode", "dots" }, { "bind", { { "text", tag_name(id, "summary") } } },
+                          { "style", { { "font", font }, { "text_color", muted } } } },
+                }) },
+            });
+        }
+        // the groups that have pages, as tabs: pressing one writes its number into sys.menu.tab
+        const int tabs_h = compact ? 34 : 44;
+        json tabs = json::array();
+        std::vector<int> used;
+        for(int g = 0; g < kGroupCount; g++) if(!items[g].empty()) used.push_back(g);
+        for(int g : used)
+            tabs.push_back(json{ { "type", "button" }, { "text", kGroups[g].title }, { "flex_grow", 1 }, { "h", tabs_h }, { "checkable", true },
+                                 { "bind", { { "checked", { { "tag", "sys.menu.tab" }, { "eq", g } } } } },
+                                 { "style", { { "bg_color", bg }, { "radius", 8 }, { "shadow_width", 0 }, { "text_color", muted } } },
+                                 { "style_checked", { { "bg_color", accent }, { "text_color", "#ffffff" } } },
+                                 { "style_label", { { "font", font + 2 } } } });
+        json children = json::array({
+            header("System", ""),
+            json{ { "type", "panel" }, { "x", margin }, { "y", header_h + gap }, { "w", list_w }, { "h", tabs_h }, { "scrollable", false },
+                  { "flex", "row" }, { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", gap } } }, { "children", tabs } },
+        });
+        const int top = header_h + gap + tabs_h + gap;
+        for(int g : used)
+            children.push_back(json{ { "type", "panel" }, { "x", margin }, { "y", top }, { "w", list_w }, { "h", height - top - margin },
+                                     { "flex", "row_wrap" }, { "scrollbar", "auto" },
+                                     { "bind", { { "visible", { { "tag", "sys.menu.tab" }, { "eq", g } } } } },
+                                     { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "radius", 0 }, { "pad", 0 }, { "pad_right", gutter }, { "pad_row", gap }, { "pad_column", gap } } },
+                                     { "children", items[g] } });
+        out.push_back(json{ { "name", menu_screen() }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } }, { "children", children } });
+    }
 
     // ---- one screen per page
     for(const auto& p : pages_) {
@@ -373,12 +473,13 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                     break;
                 default:   // Info
                     widget = json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "wrap" }, { "bind", { { "text", tag } } },
-                                   { "style", { { "font", font }, { "text_color", "#ffffff" } } } };
+                                   { "style", { { "font", font }, { "text_color", text } } } };
                     break;
             }
+            // one setting, one tile: the name at the left, what it is at the right
             rows.push_back(json{
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
-                { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", 8 } } },
+                { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : 10 }, { "pad_left", compact ? 10 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
                     json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 110 : 160 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", muted } } } },
                     widget,
@@ -387,27 +488,33 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         }
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag_name(id, "status") } } },
                              { "style", { { "font", font }, { "text_color", "#ffc107" } } } });
-        if(p->has_apply()) {
-            rows.push_back(json{ { "type", "button" }, { "text", "Apply" }, { "w", compact ? 100 : 140 }, { "h", compact ? 34 : 44 },
-                                 { "style", { { "bg_color", "#2e7d32" } } }, { "style_label", { { "font", font + 2 } } },
-                                 { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", id } } } });
-        }
-        for(const auto& [text, cmd] : p->buttons())
-            rows.push_back(json{ { "type", "button" }, { "text", text }, { "w", compact ? 200 : 260 }, { "h", compact ? 34 : 44 },
-                                 { "style", { { "bg_color", "#37474f" } } }, { "style_label", { { "font", font + 2 } } },
-                                 { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":" + cmd } } } });
-        out.push_back(json{
-            { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } },
-            { "children", json::array({
-                header(p->title(), json{ { "action", "back" } }),   // pop the history: menu, then the caller
-                json{ { "type", "panel" }, { "x", 8 }, { "y", header_h + 8 }, { "w", width - 16 }, { "h", height - header_h - 16 },
-                      { "flex", "column" }, { "flex_cross", "start" }, { "scrollbar", "auto" },
-                      { "style", { { "bg_color", card }, { "radius", 8 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                      { "children", rows } },
-                json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", kb_h },
-                      { "style", { { "pad", compact ? 4 : 6 }, { "pad_gap", compact ? 4 : 6 } } }, { "style_items", { { "font", 18 } } } },
-            }) },
+
+        // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
+        const auto extra = p->buttons();
+        const int footer_h = extra.empty() ? 0 : (compact ? 42 : 54);
+        const int body_h = height - header_h - margin - (footer_h ? footer_h : margin);
+        json children = json::array({
+            header(p->title(), p->has_apply() ? id : ""),             // "back" pops the history: menu, then the caller
+            json{ { "type", "panel" }, { "x", margin }, { "y", header_h + margin }, { "w", width - 2 * margin }, { "h", body_h - (footer_h ? gap : 0) },
+                  { "flex", "column" }, { "flex_cross", "start" }, { "scrollbar", "auto" },
+                  { "style", { { "bg_opa", 0 }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_right", gutter }, { "pad_row", gap } } },
+                  { "children", rows } },
         });
+        if(footer_h) {
+            json buttons = json::array();
+            for(const auto& [label, cmd] : extra)
+                buttons.push_back(json{ { "type", "button" }, { "text", label }, { "h", footer_h - 10 },
+                                        { "style", { { "bg_color", "#37474f" }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", 14 }, { "pad_right", 14 } } },
+                                        { "style_label", { { "font", font + 2 } } },
+                                        { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":" + cmd } } } });
+            children.push_back(json{ { "type", "panel" }, { "x", 0 }, { "y", height - footer_h }, { "w", "100%" }, { "h", footer_h }, { "scrollable", false },
+                                     { "flex", "row" }, { "flex_cross", "center" },
+                                     { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", margin }, { "pad_right", margin }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", gap } } },
+                                     { "children", buttons } });
+        }
+        children.push_back(json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", kb_h },
+                                 { "style", { { "pad", compact ? 4 : 6 }, { "pad_gap", compact ? 4 : 6 } } }, { "style_items", { { "font", 18 } } } });
+        out.push_back(json{ { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } }, { "children", children } });
     }
     return out;
 }
@@ -427,6 +534,7 @@ public:
     explicit AboutPage(Project& proj) : proj_(proj) {}
     std::string id() const override { return "about"; }
     std::string title() const override { return "About"; }
+    std::string summary() override { return proj_.info().title; }
     bool has_apply() const override { return false; }
     std::vector<SettingField> fields() override
     {
@@ -463,6 +571,7 @@ class NetworkPage final : public SettingsPage {
 public:
     std::string id() const override { return "network"; }
     std::string title() const override { return "Network"; }
+    std::string summary() override { return local_ip_addresses(); }
 #ifdef _WIN32
     bool has_apply() const override { return false; }          // information only on the PC
 #endif
@@ -598,6 +707,14 @@ public:
         return s;
     }
     std::string title() const override { return "Driver: " + title_; }
+    std::string summary() override
+    {
+        const json* cfg = proj_.driver_config(key_);
+        if(!cfg) return "";
+        if(!jbool(*cfg, "enabled", true)) return "Off";
+        const std::string host = jstr(*cfg, "host", jstr(*cfg, "device", ""));
+        return host.empty() ? std::string("On") : host;
+    }
 
     std::vector<SettingField> fields() override
     {
@@ -748,6 +865,10 @@ void add_driver_pages(SystemSettings& s, Project& proj)
 void register_builtin_pages(SystemSettings& s, Project& proj)
 {
     s.clear();
+    {   // what is chosen or pressed has the colour of the project
+        const lv_color_t c = proj.info().primary;
+        s.set_accent(vformat("#%02x%02x%02x", c.red, c.green, c.blue));
+    }
     s.add_page(make_about_page(proj));
     s.add_page(make_network_page());
     s.add_page(make_display_page());

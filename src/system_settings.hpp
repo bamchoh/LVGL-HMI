@@ -56,6 +56,8 @@ public:
     // Called a few times a second on the UI thread. Return true when fields() would now give
     // other values (the tags are refreshed then).
     virtual bool poll() { return false; }
+    // One short line about the page for the menu, under its name ("192.168.0.8", "Off"). "" = none.
+    virtual std::string summary() { return ""; }
 };
 
 class SystemSettings {
@@ -89,8 +91,13 @@ public:
     // Let the pages follow what happens outside the UI (see SettingsPage::poll). Called by a
     // timer that register_actions() starts.
     void poll();
+    // The colour of what is chosen or pressed ("#rrggbb"): the project's primary colour.
+    void set_accent(const std::string& color) { accent_ = color; }
 
 private:
+    void update_summaries();
+    std::string accent_ = "#1e88e5";
+    unsigned    summary_ticks_ = 0;
     std::vector<std::unique_ptr<SettingsPage>> pages_;
     std::map<std::string, std::vector<SettingField>> fields_;   // last snapshot per page (for apply)
 };
