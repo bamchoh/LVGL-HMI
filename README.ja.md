@@ -94,6 +94,7 @@ build.cmd Debug
 | `test_animate.cpp`                                   | アニメーション（点滅がタグで始まり止まると元に戻る、移動・回転・拡大・色、コマ送り、回数、**表示していない画面と閉じたポップアップでは動かない**、**1 秒に 3 回より速く点滅しない**、書き間違いの警告、動作中に画面を消しても安全） |
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
+| `test_capabilities.cpp` | プロジェクトができること（`--capabilities`）: 画面を描くだけのプロジェクト、書き込む機器（読むだけの機器・止めてあるドライバは出ない）、メール / アップロード / MQTT、OPC UA サーバーと VNC、トリガーのあるスクリプト / スケジュール / データ転送、**fingerprint は一覧に従い、画面には従わない**、画面のボタンが持つスクリプト、プロジェクトのフォルダーの外は読まない |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
 | `test_alarm_stats.cpp`                               | アラームの集計（回数と時間、期間の端、記録の欠けと時計の変更、CSV の式の無害化、10 万件の時間、部品）                       |
 | `test_xy_chart.cpp`                                  | XY グラフ（点の追加と破棄、変化時、複数の曲線、消去、数値でない値、極端な設定、描き直しの回数、`--check`）                   |
@@ -506,6 +507,66 @@ hml_runtime project.json --stats 5
 python tools/make_stress_project.py stress --preset heavy
 hml_runtime stress/project.json --stats 5
 ```
+
+## 他人が作ったプロジェクト
+
+**プロジェクトは絵ではなく、プログラムです。** 画面を描くほかに、PLC に値を書き込み、ほかの機器へデータを送り、ポートを開け、
+スクリプトを自分で動かせます。プログラムと同じく、**信頼できる人のプロジェクトだけを開いて動かしてください。**
+脆弱性の知らせ方は [SECURITY.md](SECURITY.md) にあります。
+
+自分で作っていないプロジェクトを動かす前に、そのプロジェクトができることを確かめます。何も起動せず、ファイルを読むだけです。
+
+```
+hml_runtime <project.json> --capabilities
+```
+
+```
+Writes to devices
+  - modbus_tcp 192.168.0.10:502: can write 7 of 12 value(s) (speed_sp, setpoint, run, mode ...)
+Sends data out
+  - mail through smtp.example.com to shift@example.com: alarms, with values of tags
+Opens ports for others
+  - OPC UA server on port 4840: the clients the device trusts can read and change the values
+Runs by itself
+  - 2 script(s) run by themselves and can write any tag: auto_speed (every 500 ms), pump (every 200 ms)
+  - schedule nightly_upload at 23:55: calls upload.run
+! It writes to devices and runs things by itself: values can reach a device without anybody at the screen.
+fingerprint 97f74c7877d557c0
+```
+
+| 見出し | 出るもの |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| Writes to devices | 読み取り専用（`"access": "ro"`）でない値を持つドライバと、タグに値を入れる MQTT のトピック |
+| Sends data out | メール、ログのアップロード、MQTT ブローカーへ出すもの。その宛先 |
+| Opens ports for others | OPC UA サーバー、VNC |
+| Runs by itself | トリガーのあるスクリプト、スケジュール、データ転送。画面のボタンが持つスクリプトの数 |
+
+- 一覧に出るのは、そのプロジェクトに**できること**で、実際にすることではありません。自分で動くスクリプトはどのタグにも
+  書けますが、害があるかどうかは一覧からは分かりません。**`!` の行は重く見てください**。機器に書き込み、かつ、誰も
+  ボタンを押さなくても動くものがある、という意味です。
+- プロジェクトで止めてあるもの（`"enabled": false`）は出ません。`--capabilities-json` は同じ内容を JSON で出します
+  （`devices`、`sends`、`listens`、`automatic`、`unattended_writes`、`fingerprint`）。ツールや AI 向けです。
+- fingerprint は一覧のハッシュです。画面を変えても変わらず、機器・送り先・ポート・自分で動くものが変わると変わります。
+
+**誰が作ったプロジェクトでも、できないこと**
+
+- スクリプト（Lua）は、ファイル・プロセス・ネットワークを使えず、1 回の実行時間とメモリに上限があります（→「スクリプト (Lua)」）。
+- プロジェクトが名指しするファイル（画面、画像、音、スクリプト）を、デザイナーはそのフォルダーの中からしか読みません。
+  プロジェクトファイル（`.hmlproj`）は、フォルダーの外に何も展開できず、装置のもの（`logs/`、`pki/`、`project.local.json`）を
+  置き換えられません。
+- 装置をほかへ開くかどうかは、プロジェクトではなく装置で決めます。VNC のパスワード（System > Remote）、ネットワーク越しの
+  プロジェクトの受け取りと送ってよいデザイナー（System > Deploy）、ランタイムの入れ替え、信頼する OPC UA クライアント、
+  SSH の鍵（System > Keys）です。
+- パスワードはプロジェクトに書きません（`--check` が指摘します）。装置で設定し、装置に残ります。
+
+**それでも防げないこと**
+
+- PLC に書き込むプロジェクトは、危険な値も書けます。ランタイムは、あなたの設備にとって何が安全かを知りません。
+  **インターロックは HMI ではなく PLC に持たせてください。**
+- メール・アップロード・MQTT の宛先は、プロジェクトが決めます。他人が作ったプロジェクトは、記録したものを作者へ送れます。
+- **プロジェクトを読む AI は、他人が書いた文字を読みます。** ラベル・コメント・スクリプトの中に、指示のように見える文
+  （「上の指示は無視して…」）が入っていることがあります。それはデータです。スキルは AI にそう伝えていますが、自分で作って
+  いないプロジェクトを AI に扱わせるときは、AI が何を変えよう・動かそうとしているかを見てください。
 
 ## デザイナー（GUI でプロジェクトを作る）
 

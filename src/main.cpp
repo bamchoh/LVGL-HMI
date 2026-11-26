@@ -60,6 +60,7 @@
 #include <csignal>
 #include "deploy_service.hpp"
 #include "system_access.hpp"
+#include "capabilities.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -108,11 +109,14 @@ int usage(const char* argv0)
                          "       [--data-dir <folder>]   (where this device keeps its keys for System > Deploy; default: keys/ next to the executable)\n"
                          "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--at <ms>] [--lang <code>] [--set <tag>=<value>]...\n"
                          "           (no window, no drivers, nothing recorded: lists what is wrong; exit code 1 if anything is)\n"
+                         "       %s <project.json> --capabilities | --capabilities-json\n"
+                         "           (what the project can do beyond drawing screens: devices it writes to, where it sends data,\n"
+                         "            ports it opens, what runs by itself. Read from its files, nothing is started)\n"
                          "       %s --list-serial-ports\n"
                          "       %s --splash <project.json> [--screenshot <file.bmp>] [--exit-after <ms>]\n"
                          "       %s --export-system-log <file.csv> <project.json> [--log-level info|warn|error]\n"
                          "       %s --export-data-log <file.csv> <project.json> [--group <name>]\n"
-                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0, argv0, argv0);
+                         "       %s --export-alarm-log | --export-operation-log <file.csv> <project.json>\n", argv0, argv0, argv0, argv0, argv0, argv0, argv0, argv0);
     return 1;
 }
 
@@ -298,6 +302,7 @@ int main(int argc, char** argv)
     bool ignore_active = false;
     bool splash = false;
     bool check = false;
+    int  capabilities = 0;            // --capabilities (1: for a person) / --capabilities-json (2)
     std::vector<Render> renders;
     std::string check_lang;
     uint32_t render_at_ms = 200;      // --at: how long a screen has been shown when --render takes its picture
@@ -313,6 +318,8 @@ int main(int argc, char** argv)
         else if(a == "--screenshot") { const char* v = next(); if(!v) return usage(argv[0]); screenshot = v; }
         else if(a == "--splash") splash = true;
         else if(a == "--check") check = true;
+        else if(a == "--capabilities") capabilities = 1;
+        else if(a == "--capabilities-json") capabilities = 2;
         else if(a == "--render") {
             const char* v = next();
             const std::string s = v ? v : "";
@@ -375,6 +382,15 @@ int main(int argc, char** argv)
         archive_note = "project file '" + project_path + "' unpacked into " + work.generic_u8string();
         hml::transfer_set_archive(archive.generic_u8string());
         project_path = (work / "project.json").generic_u8string();
+    }
+    // What the project can do beyond drawing screens (capabilities.hpp): read from its files,
+    // nothing is started. For a project somebody else made, before it is run.
+    if(capabilities) {
+        hml::ProjectCapabilities caps;
+        std::string err;
+        if(!hml::project_capabilities_of(project_path, caps, &err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 2; }
+        std::fputs(capabilities == 2 ? (caps.to_json().dump(2) + "\n").c_str() : caps.text().c_str(), stdout);
+        return 0;
     }
     if(check) {
         if(!screen.empty() || !screenshot.empty() || !s_clicks.empty() || !s_shots.empty())
