@@ -2,7 +2,7 @@
 // The backend (SDL window / Linux fbdev / Linux DRM) is selected at build time, see platform.hpp.
 //
 //   hml_runtime [project.json] [--screen <name>] [--exit-after <ms>] [--screenshot <file.bmp>]
-//               [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.bmp>]...
+//               [--reload-after <ms>] [--click <x>,<y>,<ms>[,<hold ms>]]... [--shot-at <ms>,<file.bmp>]...
 //   hml_runtime --splash [project.json] [--screenshot <file.bmp>] [--exit-after <ms>]
 //   hml_runtime --export-system-log <file.csv> [project.json] [--log-level info|warn|error]
 //   hml_runtime --export-data-log <file.csv> [project.json] [--group <name>]
@@ -59,6 +59,7 @@
 #include "vnc.hpp"
 #include <csignal>
 #include "deploy_service.hpp"
+#include "system_access.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -71,7 +72,7 @@ volatile bool s_reload = false;
 volatile int  s_restart = -1;      // -1 none, otherwise a hml::RestartTarget
 
 // ---- scripted pointer clicks (--click) ----
-struct Click { int32_t x, y; uint32_t at_ms; int reads = 0; };       // reads: how often LVGL saw it pressed
+struct Click { int32_t x, y; uint32_t at_ms; uint32_t hold_ms = 80; int reads = 0; };   // reads: how often LVGL saw it pressed
 struct Shot { uint32_t at_ms; std::string path; bool done = false; };
 std::vector<Click> s_clicks;
 std::vector<Shot>  s_shots;
@@ -84,7 +85,8 @@ void script_pointer_read(lv_indev_t*, lv_indev_data_t* data)
     // A click is pressed from its time on until LVGL has read it pressed at least twice and for
     // 80 ms: a busy main loop (screenshots of a large animated screen) must not lose it.
     for(Click& c : s_clicks) {
-        if(now < c.at_ms || (c.reads >= 2 && now >= c.at_ms + 80)) continue;
+        // (--click x,y,ms,hold_ms: held that long, e.g. the corner that opens the system settings)
+        if(now < c.at_ms || (c.reads >= 2 && now >= c.at_ms + c.hold_ms)) continue;
         data->point.x = c.x;
         data->point.y = c.y;
         data->state = LV_INDEV_STATE_PRESSED;
@@ -101,7 +103,7 @@ bool file_exists(const std::string& p)
 int usage(const char* argv0)
 {
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.png|bmp>]\n"
-                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.png|bmp>]...\n"
+                         "       [--reload-after <ms>] [--click <x>,<y>,<ms>[,<hold ms>]]... [--shot-at <ms>,<file.png|bmp>]...\n"
                          "       [--stats <seconds>] [--ignore-active] [--lang <code>] [--set <tag>=<value>]...\n"
                          "       [--data-dir <folder>]   (where this device keeps its keys for System > Deploy; default: keys/ next to the executable)\n"
                          "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--at <ms>] [--lang <code>] [--set <tag>=<value>]...\n"
@@ -344,7 +346,7 @@ int main(int argc, char** argv)
         else if(a == "--click") {
             const char* v = next();
             Click c{};
-            if(!v || std::sscanf(v, "%d,%d,%u", &c.x, &c.y, &c.at_ms) != 3) { std::fprintf(stderr, "bad --click (want x,y,ms): %s\n", v ? v : ""); return 1; }
+            if(!v || std::sscanf(v, "%d,%d,%u,%u", &c.x, &c.y, &c.at_ms, &c.hold_ms) < 3) { std::fprintf(stderr, "bad --click (want x,y,ms or x,y,ms,hold_ms): %s\n", v ? v : ""); return 1; }
             s_clicks.push_back(c);
         }
         else if(a == "--shot-at") {
@@ -466,6 +468,7 @@ int main(int argc, char** argv)
         if(!dir.empty()) hml::deploy_service().set_runtime_path(dir + "/" + exe);
     }
     hml::deploy_service().start();
+    hml::system_access().start();                    // a finger held in the corner opens the system settings
     hml::scheduler().start();
     hml::sound().start();
     hml::mail().start();

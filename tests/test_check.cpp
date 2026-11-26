@@ -348,6 +348,31 @@ TEST_CASE("check: MQTT JSON messages: pointers, tags, topics")
     CHECK(has(lines, "subscribe[1]: \"fields\" is {"));
 }
 
+TEST_CASE("check: system_access: the corner and the time; a project that leaves no way to the system settings")
+{
+    Proj p;
+    const char* screen_plain = R"json({ "name": "a", "children": [ { "type": "button", "text": "x", "on_click": { "action": "back" } } ] })json";
+    const char* screen_system = R"json({ "name": "a", "children": [ { "type": "button", "text": "x", "on_click": { "action": "system" } } ] })json";
+    auto project = [&](const char* sa) {
+        p.write("project.json", std::string(R"json({ "start_screen": "a", "screens": [ "screens/a.json" ], "tags": [])json") + sa + " }");
+    };
+    p.write("screens/a.json", screen_plain);
+    project("");                                                  // the default: the corner is there
+    CHECK_FALSE(has(p.check(), "system_access"));
+    project(R"json(, "system_access": { "hold": "bottom_left", "hold_s": 5 })json");
+    CHECK_FALSE(has(p.check(), "system_access"));
+    project(R"json(, "system_access": { "hold": "centre", "hold_s": 30, "hold_ms": 1 })json");
+    auto lines = p.check();
+    CHECK(has(lines, "system_access: hold: \"centre\" is not"));
+    CHECK(has(lines, "system_access: hold_s is 2..10"));
+    CHECK(has(lines, "system_access: unknown key \"hold_ms\""));
+
+    project(R"json(, "system_access": { "hold": "none" })json");
+    CHECK(has(p.check(), "the system settings cannot be opened on the device"));
+    p.write("screens/a.json", screen_system);                     // a button of the project opens them
+    CHECK_FALSE(has(p.check(), "system_access"));
+}
+
 TEST_CASE("check: remote: a password in the project is not used; unknown keys")
 {
     Proj p;
