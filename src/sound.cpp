@@ -532,16 +532,21 @@ public:
     // the output is opened after the pages are made, and can fail later: the page follows
     bool poll() override { return sound().output_name() != shown_output_ || sound().last_error() != shown_error_; }
 
+    std::vector<PageAction> actions() const override
+    {
+        // ("Silence alarm" is there while the alarm sound is: a tag of the runtime, not of this page)
+        return { { "Test", "test", PageAction::Kind::Neutral, "", "" }, { "Silence alarm", "silence", PageAction::Kind::Danger, kAlarmTag, "" } };
+    }
+
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
-        auto call = [&](const std::string& cmd) { return json{ { "action", "call" }, { "fn", "system.do" }, { "arg", id() + ":" + cmd } }; };
         auto row = [&](json children) {
             return json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                          { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 4 }, { "pad_column", compact ? 8 : 12 } } }, { "children", std::move(children) } };
         };
         auto text = [&](const char* t, int w) { return json{ { "type", "label" }, { "text", t }, { "w", w }, { "style", { { "font", font }, { "text_color", muted } } } }; };
-        const int lw = compact ? 90 : 140, bh = compact ? 40 : 48;
+        const int lw = compact ? 90 : 140;
         json rows = json::array();
         rows.push_back(row(json::array({ text("Mute", lw), json{ { "type", "switch" }, { "bind", kMuteTag } } })));
         rows.push_back(row(json::array({ text("Volume", lw),
@@ -551,10 +556,7 @@ public:
                                                { "style", { { "font", font }, { "text_align", "right" } } } } })));
         rows.push_back(row(json::array({ text("Output", lw), json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dots" },
                                                                     { "bind", { { "text", SystemSettings::tag_name(id(), "output") } } }, { "style", { { "font", font } } } } })));
-        rows.push_back(row(json::array({
-            json{ { "type", "button" }, { "text", "Test" }, { "w", compact ? 110 : 140 }, { "h", bh }, { "style_label", { { "font", font } } }, { "on_click", call("test") } },
-            json{ { "type", "button" }, { "text", "Silence alarm" }, { "w", compact ? 150 : 190 }, { "h", bh }, { "style", { { "bg_color", "#c62828" } } }, { "style_label", { { "font", font } } },
-                  { "bind", { { "visible", kAlarmTag } } }, { "on_click", call("silence") } } })));
+        // (Test / Silence alarm: the bar at the bottom)
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", SystemSettings::tag_name(id(), "state") } } },
                              { "style", { { "font", font }, { "text_color", "#ffb74d" } } } });
         return rows;

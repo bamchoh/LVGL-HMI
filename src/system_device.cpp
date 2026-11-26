@@ -189,6 +189,9 @@ public:
         return changed;
     }
 
+    // what writes to the device is in the bar at the bottom, not in the list
+    std::vector<PageAction> actions() const override { return { { "Write", "write", PageAction::Kind::Danger, "", "has_driver" } }; }
+
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
@@ -218,12 +221,9 @@ public:
             type, count })));
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("help") } } },
                              { "style", { { "font", font }, { "text_color", muted } } } });
-        json write = json{ { "type", "button" }, { "text", "Write" }, { "w", compact ? 80 : 110 }, { "h", compact ? 34 : 44 }, { "style", { { "bg_color", "#c62828" } } },
-                           { "style_label", { { "font", font } } }, { "on_click", call("write") }, { "bind", { { "enabled", tag("has_driver") } } } };
-        rows.push_back(row(json::array({
+        rows.push_back(row(json::array({                             // (Write: the bar at the bottom)
             json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 24 }, { "placeholder", "value to write" },
-                  { "bind", tag("value") }, { "style", { { "font", font }, { "pad", 6 } } } },
-            write })));
+                  { "bind", tag("value") }, { "style", { { "font", font }, { "pad", 6 } } } } })));
         rows.push_back(json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
                              { "style", { { "bg_color", "#22303f" }, { "radius", 6 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 4 } } },
                              { "children", json::array({

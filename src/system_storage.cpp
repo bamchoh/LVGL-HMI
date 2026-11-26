@@ -187,28 +187,31 @@ public:
             return json{ { "type", "dropdown" }, { "flex_grow", 1 }, { "bind", { { "value", tag(key) }, { "options", tag(std::string(key) + "__options") } } },
                          { "style", { { "font", font } } }, { "on_change", call("refresh") } };
         };
-        const int lw = compact ? 70 : 100, bw = compact ? 150 : 220;
+        const int lw = compact ? 70 : 100;
 
+        // (what acts - backup, install ... - is in the bar at the bottom: actions())
         json rows = json::array();
         rows.push_back(row(json::array({ label("Project", lw),
             json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dots" }, { "bind", { { "text", tag("project") } } }, { "style", { { "font", font + 2 }, { "text_color", "#ffffff" } } } } })));
         rows.push_back(row(json::array({ label("Location", lw), dropdown("location"), button("Refresh", "#2c3e50", "refresh", compact ? 70 : 100) })));
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("hint") }, { "visible", tag("no_location") } } },
                              { "style", { { "font", font }, { "text_color", "#ffcc80" } } } });
-        rows.push_back(row(json::array({ button("Backup to this location", "#1565c0", "backup", bw, "has_location"),
-                                         button("Remove safely", "#455a64", "eject", compact ? 130 : 180, "has_location") })));
         rows.push_back(row(json::array({ label("Project file", lw), dropdown("file") })));
-        rows.push_back(row(json::array({ button("Install this project", "#c62828", "install", bw, "has_file"),
-                                         button("Previous project", "#455a64", "rollback", compact ? 130 : 180, "has_previous") })));
-        rows.push_back(json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
-                             { "bind", { { "visible", tag("confirm") } } },
-                             { "style", { { "bg_color", "#4a1c1c" }, { "radius", 6 }, { "border_width", 0 }, { "pad", 8 }, { "pad_row", 6 } } },
-                             { "children", json::array({
-                                 json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("confirm_text") } } },
-                                       { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
-                                 row(json::array({ button("Yes", "#c62828", "yes", compact ? 90 : 120), button("Cancel", "#455a64", "no", compact ? 90 : 120) })),
-                             }) } });
         return rows;
+    }
+
+    std::vector<PageAction> actions() const override
+    {
+        return {
+            { "Backup", "backup", PageAction::Kind::Primary, "", "has_location" },
+            { "Remove safely", "eject", PageAction::Kind::Neutral, "", "has_location" },
+            { "Install", "install", PageAction::Kind::Danger, "", "has_file" },
+            { "Previous", "rollback", PageAction::Kind::Neutral, "", "has_previous" },
+        };
+    }
+    std::vector<PageDialog> dialogs() const override
+    {
+        return { { "confirm", "confirm_text", { "Yes", "yes", PageAction::Kind::Danger, "", "" }, { "Cancel", "no", PageAction::Kind::Neutral, "", "" }, false } };
     }
 
 private:

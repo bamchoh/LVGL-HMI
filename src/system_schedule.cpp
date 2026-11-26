@@ -136,6 +136,9 @@ public:
         return true;
     }
 
+    // Save (of the schedule that is picked) is in the bar at the bottom, not in the list
+    std::vector<PageAction> actions() const override { return { { "Save", "save", PageAction::Kind::Danger, "selected", "" } }; }
+
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
@@ -170,11 +173,11 @@ public:
             row(json::array({ name, json{ { "type", "label" }, { "text", "On" }, { "style", { { "font", font }, { "text_color", muted } } } },
                               json{ { "type", "switch" }, { "bind", tag("enabled") } }, button("x", "#455a64", "close", compact ? 34 : 44) })),
             row(json::array({ json{ { "type", "datetime_input" }, { "mode", "time" }, { "bind", tag("at") } }, json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", 1 }, { "style", { { "bg_opa", 0 }, { "border_width", 0 } } } },
-                              button("Save", "#c62828", "save", compact ? 90 : 120) }), "daily"),
+                              }), "daily"),
             row(std::move(days), "daily"),
             row(json::array({ json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 16 }, { "accepted_chars", "0123456789-: " }, { "placeholder", "YYYY-MM-DD HH:MM" },
                                     { "bind", tag("at") }, { "style", { { "font", font }, { "pad", 6 } } } },
-                              button("Save", "#c62828", "save", compact ? 90 : 120) }), "once"),
+                              }), "once"),
         });
         rows.push_back(std::move(form));
 
