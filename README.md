@@ -700,9 +700,8 @@ and the designer sends the project file over an encrypted connection (TLS 1.2). 
 - Checked with the tests (a designer and a device in one process, hostile senders), by hand on Windows with both ends on one PC,
   and on a Raspberry Pi 4 (480x320, fbdev) with its SSH server stopped (port 22 refused connections): a project sent from a
   Windows PC was accepted on the touch screen of the Pi (Add a designer, Accept), installed, and the runtime restarted with it.
-  Replacing the runtime was checked on the same Pi: refused without the permission, and with it the runtime and the project
-  were put in place with one restart, the runtime before kept as `hml_runtime.prev`. There the permission was written into
-  `deploy.json` by hand: **the Runtime button was pressed on Windows only, not on the touch screen of the Pi.**
+  Replacing the runtime was checked on the same Pi: refused without the permission; after Runtime was pressed on its touch
+  screen, the runtime and the project were put in place with one restart, the runtime before kept as `hml_runtime.prev`.
 
 - **Display language**: the selector in the toolbar switches between Japanese and English (the language of the OS the first time). In Japanese, the properties are
   shown with names such as "背景色" (background color) and "文字色" (text color), and hovering the mouse shows the JSON key name (`bg_color` and so on). The saved JSON does not change.
