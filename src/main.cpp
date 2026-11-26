@@ -57,6 +57,8 @@
 #include "schedule.hpp"
 #include "sound.hpp"
 #include "vnc.hpp"
+#include <csignal>
+#include "deploy_service.hpp"
 #include "serial_ports.hpp"
 #include "ui.hpp"
 #include "users.hpp"
@@ -101,6 +103,7 @@ int usage(const char* argv0)
     std::fprintf(stderr, "usage: %s <project.json> [--screen <name>] [--exit-after <ms>] [--screenshot <file.png|bmp>]\n"
                          "       [--reload-after <ms>] [--click <x>,<y>,<ms>]... [--shot-at <ms>,<file.png|bmp>]...\n"
                          "       [--stats <seconds>] [--ignore-active] [--lang <code>] [--set <tag>=<value>]...\n"
+                         "       [--data-dir <folder>]   (where this device keeps its keys for System > Deploy; default: keys/ next to the executable)\n"
                          "       %s <project.json> --check [--render <screen>[+<popup>],<file.png>]... [--at <ms>] [--lang <code>] [--set <tag>=<value>]...\n"
                          "           (no window, no drivers, nothing recorded: lists what is wrong; exit code 1 if anything is)\n"
                          "       %s --list-serial-ports\n"
@@ -273,6 +276,11 @@ int main(int argc, char** argv)
 {
     // Every line out at once, also into a pipe (the designer shows the log of the runtime it started).
     std::setvbuf(stdout, nullptr, _IONBF, 0);
+#ifndef _WIN32
+    // A viewer or a designer that goes away while something is being sent to it must not end
+    // the runtime (the write fails instead).
+    std::signal(SIGPIPE, SIG_IGN);
+#endif
     // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
     //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
     if(argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) { usage(argv[0]); return 0; }
@@ -282,6 +290,7 @@ int main(int argc, char** argv)
         return 0;
     }
     std::string project_path, screenshot, screen, export_log, export_level = "info";
+    std::string data_dir;             // --data-dir: where this device keeps its keys (deploy without SSH); "" = <exe>/keys
     std::string export_kind, export_file, export_group;      // --export-data-log / -alarm-log / -operation-log
     uint32_t exit_after = 0, reload_after = 0, stats_s = 0;
     bool ignore_active = false;
@@ -331,6 +340,7 @@ int main(int argc, char** argv)
         else if(a == "--group") { const char* v = next(); if(!v) return usage(argv[0]); export_group = v; }
         else if(a == "--log-level") { const char* v = next(); if(!v) return usage(argv[0]); export_level = v; }
         else if(a == "--screen") { const char* v = next(); if(!v) return usage(argv[0]); screen = v; }
+        else if(a == "--data-dir") { const char* v = next(); if(!v) return usage(argv[0]); data_dir = v; }
         else if(a == "--click") {
             const char* v = next();
             Click c{};
@@ -444,6 +454,10 @@ int main(int argc, char** argv)
     // "remote": the screen in a VNC viewer
     // (who may connect is the device's: "remote" of project.local.json, System > Remote)
     hml::vnc_server().start(hml::project().section("remote"), hml::project().local_remote(), disp, info.title, hml::project().local_overlay_path());
+    // projects from the designer without SSH: only when it was switched on at this device
+    // (System > Deploy). Its keys and settings are the device's: --data-dir, else <exe>/keys
+    hml::deploy_service().open(hml::device_data_dir(data_dir));
+    hml::deploy_service().start();
     hml::scheduler().start();
     hml::sound().start();
     hml::mail().start();
@@ -537,6 +551,7 @@ int main(int argc, char** argv)
 
     HML_INFO("shutting down");
     hml::vnc_server().stop();
+    hml::deploy_service().stop();
     hml::transfers().clear();
     hml::drivers().stop_all();
     hml::scripts().clear();

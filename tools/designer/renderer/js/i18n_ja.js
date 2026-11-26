@@ -139,6 +139,18 @@ Object.assign(I18N.TEXT_JA, {
   'remove the settings changed on the target (project.local.json)': 'ターゲットで変更された設定（project.local.json）を消す',
   'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.': 'ssh / scp を鍵認証で使います（パスワードは聞きません）。ターゲットの logs/ は残ります。',
   'Enter the target (host) and the user.': 'ターゲット（ホスト）とユーザーを入力してください。', 'Enter the target (host) first.': '先にターゲット（ホスト）を入力してください。',
+  'method': '方法', 'SSH (ssh / scp)': 'SSH（ssh / scp）', 'Direct (to the runtime, no SSH)': '直接（ランタイムへ。SSH なし）',
+  'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts.':
+    'プロジェクトを、暗号化した通信でランタイムへ直接送ります。ターゲットに SSH サーバーは要りません。先にターゲットの画面で System > Deploy > Receive projects をオンにしてください。ターゲットの logs/ と、ターゲットで変更した設定は残ります。ランタイムは再起動します。',
+  'This designer': 'このデザイナー', 'The target': 'ターゲット',
+  'A target that sees this designer for the first time asks its operator: on its screen switch on System > Deploy > Add a designer, deploy, and accept it there if it shows this fingerprint.':
+    'このデザイナーを初めて見るターゲットは、操作者に確認を求めます。ターゲットの画面で System > Deploy > Add a designer をオンにしてからデプロイし、同じ指紋が表示されていたら Accept を押してください。',
+  'This is the target that was confirmed before.': '前に確認したターゲットです。',
+  'This is NOT the target that was confirmed before at this address (reinstalled, or another device). Deploy only if its screen (System > Deploy) shows this fingerprint.':
+    'このアドレスで前に確認したターゲットとは違います（入れ直したか、別の装置です）。ターゲットの画面（System > Deploy）に同じ指紋が出ているときだけデプロイしてください。',
+  'This target is new to this designer. Deploy only if its screen (System > Deploy) shows this fingerprint.':
+    'このデザイナーが初めて見るターゲットです。ターゲットの画面（System > Deploy）に同じ指紋が出ているときだけデプロイしてください。',
+  'The target shows the same fingerprint: deploy': 'ターゲットにも同じ指紋が出ている: デプロイする',
   'Deployed.': 'デプロイしました。', 'hml_runtime is not running on the target.': 'ターゲットで hml_runtime が動いていません。',
   'The target is running this project.': 'ターゲットはこのプロジェクトを表示しています。',
   'Local settings on the target': 'ターゲットのローカル設定', 'Files': 'ファイル',

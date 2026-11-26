@@ -24,6 +24,8 @@ const host = {
   runLog: from => host.call('hml_runLog', from || 0),
   runStop: () => host.call('hml_runStop'),
   deploy: o => host.call('hml_deploy', o),
+  directInfo: o => host.call('hml_directInfo', o),
+  directDeploy: o => host.call('hml_directDeploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
   serialPorts: o => host.call('hml_serialPorts', o || {}),
   folderInfo: dir => host.call('hml_folderInfo', dir || ''),
@@ -891,11 +893,14 @@ const App = {
     const all = (saved.deploy && typeof saved.deploy === 'object' && !Array.isArray(saved.deploy)) ? saved.deploy : {};
     const rts = this.info.targetRuntimes || [];
     const found = rts.find(p => /aarch64|arm/i.test(p)) || rts[0] || '';   // a Raspberry Pi build first
-    const d = Object.assign({ host: '', user: '', port: 22, key: '', remoteDir: 'hml', runtime: '', sendRuntime: false, restart: true, activate: true },
+    const d = Object.assign({ method: 'ssh', directPort: 4856, host: '', user: '', port: 22, key: '', remoteDir: 'hml', runtime: '', sendRuntime: false, restart: true, activate: true },
       all['*'] || {}, (st.path && all[st.path]) || {});
     const text = (v, ph, cls) => U.el('input', { type: 'text', value: v || '', placeholder: ph || '', class: cls || '', spellcheck: false });
     const check = v => U.el('input', { type: 'checkbox', checked: !!v });
     const f = {
+      method: U.el('select', null, U.el('option', { value: 'ssh', selected: d.method !== 'direct' }, 'SSH (ssh / scp)'),
+        U.el('option', { value: 'direct', selected: d.method === 'direct' }, 'Direct (to the runtime, no SSH)')),
+      directPort: U.el('input', { type: 'number', value: d.directPort || 4856, min: 1, max: 65535, class: 'short' }),
       host: text(d.host, '192.168.0.10 or raspberrypi.local'), user: text(d.user, 'pi'),
       port: U.el('input', { type: 'number', value: d.port || 22, min: 1, max: 65535, class: 'short' }),
       key: text(d.key, 'default key (~/.ssh/id_*)'), remoteDir: text(d.remoteDir, 'hml'),
@@ -954,37 +959,89 @@ const App = {
         : 'Users were edited on the target (' + r.localUsers + ' user(s)): they stay in effect after a deploy, the project\'s user list is not used there.'));
       if (st.dirty) info.append(U.el('div', { class: 'hint' }, 'Unsaved changes are not part of this comparison (Deploy saves first).'));
     };
+    // Direct: who the target says it is (nothing is sent). A target seen for the first time, or
+    // another one than before at this address, has to be confirmed by the user.
+    const directLook = async () => {
+      const v = values();
+      info.innerHTML = '';
+      if (!v.host) { out.append(U.el('div', { class: 'warn' }, 'Enter the target (host) first.')); return null; }
+      info.append(U.el('div', { class: 'hint' }, 'Asking ' + v.host + ':' + v.directPort + ' …'));
+      const r = await host.directInfo(v);
+      info.innerHTML = '';
+      if (!r || !r.ok) { info.append(U.el('div', { class: 'warn' }, 'Check failed: ' + ((r && r.error) || 'unknown error'))); return null; }
+      info.append(U.el('h4', null, 'This designer'), U.el('pre', null, r.mine),
+        U.el('div', { class: 'hint' }, 'A target that sees this designer for the first time asks its operator: on its screen switch on System > Deploy > Add a designer, deploy, and accept it there if it shows this fingerprint.'),
+        U.el('h4', null, 'The target'), U.el('pre', null, r.device),
+        U.el('div', { class: r.known ? 'hint' : 'warn' }, r.known ? 'This is the target that was confirmed before.'
+          : r.changed ? 'This is NOT the target that was confirmed before at this address (reinstalled, or another device). Deploy only if its screen (System > Deploy) shows this fingerprint.'
+          : 'This target is new to this designer. Deploy only if its screen (System > Deploy) shows this fingerprint.'));
+      return r;
+    };
+    const directDeploy = async () => {
+      const v = values();
+      const look = await directLook();
+      if (!look) return;
+      let trust = '';
+      if (!look.known) {
+        const yes = await new Promise(res => {
+          const bar = U.el('div', { class: 'row' },
+            U.el('button', { class: 'mini', onclick: () => res(true) }, 'The target shows the same fingerprint: deploy'),
+            U.el('button', { class: 'mini', onclick: () => res(false) }, 'Cancel'));
+          info.append(bar);
+        });
+        info.lastChild.remove();
+        if (!yes) return;
+        trust = look.device;
+      }
+      out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.host + ':' + v.directPort + ' … (a target that does not know this designer yet waits for its operator)'));
+      const r = await host.directDeploy(Object.assign({}, v, { project: M.runPath(), name: st.name, trust }));
+      out.innerHTML = '';
+      if (r && r.ok) out.append(U.el('div', { class: 'ok' }, 'Deployed.'));
+      else out.append(U.el('div', { class: 'warn' }, 'Deploy failed: ' + ((r && r.error) || 'unknown error')));
+      if (r && r.log) out.append(U.el('pre', null, r.log));
+    };
     const runCheck = async () => {
       const v = values();
+      if (direct()) { last = null; if (v.host) await directLook(); else renderCheck(); return; }
       if (!v.host || !v.user || !st.path) { last = null; renderCheck(); return; }
       info.innerHTML = ''; info.append(U.el('div', { class: 'hint' }, 'Checking ' + v.user + '@' + v.host + ' …'));
       last = await host.deployCheck(Object.assign({}, v, { project: M.runPath(), name: st.name }));
       renderCheck();
     };
     const name = () => (st.path ? (st.name || U.basename(U.dirname(st.path))) : '(unsaved)');
+    const direct = () => f.method.value === 'direct';
     const update = () => {
+      for (const el of body.querySelectorAll('[data-method]')) el.style.display = el.dataset.method === f.method.value ? '' : 'none';   // (rows are flex: "hidden" alone does not hide them)
+      if (direct()) { dest.textContent = 'Project → ' + (f.host.value.trim() || 'host') + ':' + (Number(f.directPort.value) || 4856) + ' (TLS) → replaces the project the target runs'; return; }
       const dir = (f.remoteDir.value.trim() || 'hml').replace(/\/+$/, '');
       dest.textContent = 'Project → ' + (f.user.value.trim() || 'user') + '@' + (f.host.value.trim() || 'host') + ':' + dir + '/projects/' + name() + '/'
         + (f.sendRuntime.checked ? ',  runtime → ' + dir + '/hml_runtime' : '');
       f.runtime.disabled = !f.sendRuntime.checked;
     };
-    for (const k of Object.keys(f)) f[k].addEventListener('input', update);
+    for (const k of Object.keys(f)) f[k].addEventListener('input', () => update());
+    const only = (method, el) => { el.dataset.method = method; return el; };
     const body = U.el('div', { class: 'deploy' },
-      row('target (host)', f.host), row('user', f.user), row('port', f.port),
-      row('private key', f.key, browse('key', f.key),
-        U.el('button', { class: 'mini', title: 'Register this key on the target (the target\'s screen must be in key management mode: System > Keys)', onclick: () => registerKey() }, 'Register…')),
-      row('remote folder', f.remoteDir),
-      row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
-      row('run on target', f.activate, U.el('span', { class: 'dim' }, 'make this the project the target shows (it keeps doing so after a reboot)')),
-      row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing')),
-      row('local settings', f.clearLocal, U.el('span', { class: 'dim' }, 'remove the settings changed on the target (project.local.json)')),
+      row('method', f.method),
+      row('target (host)', f.host),
+      only('ssh', row('user', f.user)), only('ssh', row('port', f.port)),
+      only('direct', row('port', f.directPort)),
+      only('ssh', row('private key', f.key, browse('key', f.key),
+        U.el('button', { class: 'mini', title: 'Register this key on the target (the target\'s screen must be in key management mode: System > Keys)', onclick: () => registerKey() }, 'Register…'))),
+      only('ssh', row('remote folder', f.remoteDir)),
+      only('ssh', row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime))),
+      only('ssh', row('run on target', f.activate, U.el('span', { class: 'dim' }, 'make this the project the target shows (it keeps doing so after a reboot)'))),
+      only('ssh', row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing'))),
+      only('ssh', row('local settings', f.clearLocal, U.el('span', { class: 'dim' }, 'remove the settings changed on the target (project.local.json)'))),
       dest,
-      U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.'),
+      only('ssh', U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.')),
+      only('direct', U.el('div', { class: 'hint' }, 'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts.')),
       out, info);
     f.clearLocal.addEventListener('input', renderCheck);
+    f.method.addEventListener('input', () => { last = null; info.innerHTML = ''; out.innerHTML = ''; });
     f.activate.addEventListener('input', renderCheck);
     update();
     const values = () => ({
+      method: f.method.value, directPort: Number(f.directPort.value) || 4856,
       host: f.host.value.trim(), user: f.user.value.trim(), port: Number(f.port.value) || 22, key: f.key.value.trim(),
       remoteDir: f.remoteDir.value.trim() || 'hml', runtime: f.runtime.value.trim(), sendRuntime: f.sendRuntime.checked, restart: f.restart.checked,
       activate: f.activate.checked,
@@ -1021,12 +1078,13 @@ const App = {
       if (busy) return false;
       const v = values();
       out.innerHTML = '';
-      if (!v.host || !v.user) { out.append(U.el('div', { class: 'warn' }, 'Enter the target (host) and the user.')); return false; }
+      if (direct() ? !v.host : (!v.host || !v.user)) { out.append(U.el('div', { class: 'warn' }, direct() ? 'Enter the target (host) first.' : 'Enter the target (host) and the user.')); return false; }
       if (!(await this.save(false))) return false;
       update();
       all['*'] = v; all[st.path] = v;
       host.settings({ deploy: all });
       busy = true;
+      if (direct()) { await directDeploy(); busy = false; return false; }
       info.innerHTML = '';
       out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.user + '@' + v.host + ' …'));
       const r = await host.deploy(Object.assign({}, v, { project: M.runPath(), name: st.name, runtime: v.sendRuntime ? v.runtime : '', clearLocal: f.clearLocal.checked }));
