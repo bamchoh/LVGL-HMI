@@ -78,6 +78,20 @@ void make_project(const TempDir& t)
 
 } // namespace
 
+TEST_CASE("project archive: what counts as a path inside a project")
+{
+    std::string n;
+    CHECK(hml::project_rel_path("screens/main.json", &n));
+    CHECK(n == "screens/main.json");
+    CHECK(hml::project_rel_path("screens\\sub\\..\\main.json", &n));
+    CHECK(n == "screens/main.json");
+    CHECK(hml::project_rel_path("./a.json", &n));
+    CHECK(n == "a.json");
+    for(const char* bad : { "", ".", "..", "../x.json", "screens/../../x.json", "..\\..\\Users\\x\\notes.json", "/etc/passwd", "\\\\server\\share\\x.json",
+                            "\\Windows\\x.json", "C:/Windows/x.json", "C:\\Windows\\x.json", "c:x.json", "screens/a.json:stream" })
+        CHECK_MESSAGE(!hml::project_rel_path(bad), bad);
+}
+
 TEST_CASE("project file: the name")
 {
     CHECK(is_project_archive("D:/work/line1.hmlproj"));
