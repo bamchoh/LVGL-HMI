@@ -685,11 +685,12 @@ and the designer sends the project file over an encrypted connection (TLS 1.2). 
   recorded in the log and the operation log (`deploy`).
 - From the command line: `hml_designer --deploy <project.json> --direct --host <target> [--direct-port 4856] [--data-dir <folder>]`.
   A target seen for the first time is only named; run again with `--trust <its fingerprint>` once it matches the target's screen.
+  With `--check` nothing is sent: it prints the two fingerprints and whether the target is the one confirmed before.
 - Checked with the tests (a designer and a device in one process, hostile senders), by hand on Windows with both ends on one PC
   (accepting on the screen included), and on a Raspberry Pi 4 (480x320, fbdev): a project sent from a Windows PC this way was
   installed and the runtime restarted with it. On the Pi the designer was written into `deploy.json` by hand instead of being
-  accepted on the screen, and its SSH server was running (this way does not use it).
-  **Accepting on the screen of real hardware, and a device with the SSH server stopped, are not yet checked.**
+  accepted on the screen. The same deploy was repeated with the SSH server of the Pi stopped (port 22 refused connections).
+  **Accepting on the screen of real hardware is not yet checked.**
 
 - **Display language**: the selector in the toolbar switches between Japanese and English (the language of the OS the first time). In Japanese, the properties are
   shown with names such as "背景色" (background color) and "文字色" (text color), and hovering the mouse shows the JSON key name (`bg_color` and so on). The saved JSON does not change.

@@ -1900,12 +1900,6 @@ int app_main(const std::vector<std::string>& args)
             o["name"] = target_name(upath(deploy_project));
         }
         if(!deploy_opts.contains("clearLocal")) o.erase("clearLocal");     // never from a remembered tick
-        if(deploy_check) {                                                 // --check: look only, print the result as JSON
-            json c = h.check(o);
-            std::fputs((c.dump(2, ' ', false, json::error_handler_t::replace) + "\n").c_str(), stdout);
-            std::fflush(stdout);
-            return c.value("ok", false) ? 0 : 1;
-        }
         // --direct: to the runtime itself, no SSH (--direct-port <n>, --data-dir <folder> for this
         // designer's keys). A device seen for the first time is only named: run again with
         // --trust <its fingerprint> once it is the same as on the device's screen (System > Deploy).
@@ -1925,6 +1919,7 @@ int app_main(const std::vector<std::string>& args)
                                      "and run again with --trust <fingerprint>\n");
                 return 1;
             }
+            std::fprintf(stdout, "%s\n", i.value("known", false) ? "the device is the one that was confirmed before" : "the device is confirmed with --trust");
             std::fflush(stdout);
             if(deploy_check) return 0;
             json r = h.direct_deploy(o);
@@ -1933,6 +1928,12 @@ int app_main(const std::vector<std::string>& args)
             std::fputs(text.c_str(), stdout);
             std::fflush(stdout);
             return r.value("ok", false) ? 0 : 1;
+        }
+        if(deploy_check) {                                                 // --check: look only, print the result as JSON
+            json c = h.check(o);
+            std::fputs((c.dump(2, ' ', false, json::error_handler_t::replace) + "\n").c_str(), stdout);
+            std::fflush(stdout);
+            return c.value("ok", false) ? 0 : 1;
         }
         json r = h.deploy(o);
         std::string text = r.value("log", std::string());
