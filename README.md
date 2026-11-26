@@ -1708,6 +1708,9 @@ Apart from project.json, the runtime generates a built-in "System" menu screen (
 - **A strip at the right edge of every list is empty** (22 px at 480x320, 30 px at 800x480): the place to put a finger down
   to scroll.
 - What is chosen or pressed has the `primary` colour of the project's theme. The screens themselves are always dark.
+- **On a wide display the content is a column in the middle** (at most 880 px wide; 1040 px from a width of 1100 px on, where
+  texts and rows are also a size larger), not stretched from edge to edge. The bars at the top and at the bottom go over the
+  whole width; what is in them follows the column. Up to 880 px (480x320, 800x480) the whole width is used.
 
 The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Device, Schedule, Sound …) follow the same
 rule:
