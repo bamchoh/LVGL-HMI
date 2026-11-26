@@ -113,7 +113,7 @@ build.cmd Debug
 | `test_trend.cpp` | Trend (minimum, maximum and last of each interval, a short peak does not disappear, bool, string and tag names containing a dot, writing the summary of each minute, the combination of summaries and records agrees with the result from the records alone, SQL injection in names, the speed with 1,000,000 records, moving and zooming the widget, the legend, a group that does not exist) |
 | `test_logs.cpp` | Data log (every trigger), alarms (raise / clear), operation log (widgets, actions, masking of passwords), CSV export |
 | `test_key_service.cpp` | Key management (SHA-256 / fingerprints, validation of public keys, editing authorized_keys, the enrollment protocol, the Keys page) |
-| `test_deploy.cpp` | Deploying without SSH (certificates made once and kept, the key file for its owner only, off by default and the port closed, **a designer that is not accepted learns nothing and sends nothing**, accepting on the device, the file arrives unchanged, a failed install is told to the designer, another device at the address stops the deploy, garbage / damaged / oversized / stalled senders, the System > Deploy page installs and restarts) |
+| `test_deploy.cpp` | Deploying without SSH (certificates made once and kept, the key file for its owner only, off by default and the port closed, **a designer that is not accepted learns nothing and sends nothing**, accepting on the device, the file arrives unchanged, a failed install is told to the designer, another device at the address stops the deploy, garbage / damaged / oversized / stalled senders, the System > Deploy page installs and restarts, **the runtime is taken only from a designer the device allows to, and only one that starts there**, runtime and project with one restart) |
 | `test_popup.cpp` | Popups (open, modal, stacking, closing by name, closing with back, closing on a screen change, goto opens one too, a screen that is not a popup is not opened, no updates while closed, levels, 1000 opens and closes do not add widgets) |
 | `test_screen_saver.cpp` | Screen saver (the screen goes off after the time, 0 never turns it off, **the touch that turns it on does not press a button** (checked with a mock touch panel), switching by a tag, logout, turning on at an alarm / the setting not to, it covers popups too, changing the time on the device and `project.local.json`) |
 | `test_schedule.cpp` | Schedules (time of day and weekdays, one run on a given date, end of month, end of year, leap day, **nothing runs twice or is skipped when the clock is set forward / back**, schedules that passed while stopped and `catch_up`, they remain after a restart, changing and saving on the device, broken settings, a load of 200 entries, the operation log, the System > Schedule page, `--check`) |
@@ -680,7 +680,18 @@ and the designer sends the project file over an encrypted connection (TLS 1.2). 
     `known_devices.json`).
   The private keys are not encrypted: anybody who can read these files can pose as that end. Deleting `device.*` or
   `designer.*` gives a new identity, which the other end has to accept again.
-- The runtime is not replaced this way ("send runtime" is SSH only), and the project always becomes the one the target runs.
+- The project always becomes the one the target runs.
+- **Replacing the runtime itself** ("send runtime"; `--runtime <file>` on the command line) needs one more permission, given on
+  the target for each designer: **System > Deploy > Runtime** in the row of the designer (it asks first; pressing it again takes
+  the permission away at once). It is off for every designer until then, and a project cannot give it. Whoever may replace the
+  program can do anything on the device: give it only to a PC you trust as much as the device itself, and leave it off on
+  devices in the field.
+  - The target compares what arrives with its checksum and starts it once (`--help`) before putting it in place: a runtime built
+    for another kind of device, or a damaged one, changes nothing. The runtime that is replaced stays next to it as
+    `hml_runtime.prev` (to go back: rename it by hand).
+  - Runtime and project go over one connection, the runtime first; the target restarts once, at the end. If the runtime is
+    refused, the project is not sent either.
+  - The runtime is not signed: the target cannot tell an official build from any other. That is planned for devices in the field.
 - A project of at most 512 MB. One designer at a time. Connections, accepted and removed designers and installed projects are
   recorded in the log and the operation log (`deploy`).
 - From the command line: `hml_designer --deploy <project.json> --direct --host <target> [--direct-port 4856] [--data-dir <folder>]`.
@@ -1698,7 +1709,7 @@ Apart from project.json, the runtime generates a built-in "System" menu screen (
 | Tags | A list of the current values of all tags (8 at a time, filtered by a part of the name. Enter `sys.` for the tags of the runtime itself). Pressing a row lets you write a value to that tag (TRUE / FALSE buttons for a bool, a numeric keypad for a number, the keyboard for a string. "x" clears the filter). It is for checking and changing values that have no screen, during commissioning and maintenance. A write follows the limits of the tag, reaches the device through the driver, and is recorded in the operation log as `monitor`. Tags of `sys.` cannot be written |
 | Device | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Device page)" |
 | Storage | Backup to a USB memory (for sites without a network), installing a project file from a USB memory, going back to the previous project → "Updates and backups with a USB memory (the Storage page)" |
-| Deploy | Receiving projects from the designer without SSH: on / off, adding a designer, accepting and removing designers → "Deploying without SSH (Direct)" |
+| Deploy | Receiving projects from the designer without SSH: on / off, adding a designer, accepting and removing designers, which of them may replace the runtime → "Deploying without SSH (Direct)" |
 
 The setting values go into tags named `sys.<page>.<key>`, and Apply calls the `apply()` of each page (the result is in `sys.<page>.status`).
 `project.local.json` is written in the same place as project.json and overrides the scalar values of `drivers` at startup

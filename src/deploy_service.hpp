@@ -9,11 +9,17 @@
 //   - An accepted designer may send a project file. It is written next to the keys, compared
 //     with the checksum it came with, and handed to the UI thread, which checks and installs
 //     it like one from a USB memory (transfer.hpp) and restarts.
+//   - The runtime itself (the program) is taken only from a designer that the operator has
+//     allowed to replace it, one by one (System > Deploy > Runtime; off for every designer
+//     until then): whoever may replace the program can do anything on the device. What
+//     arrives is compared with its checksum and started once ("--help") before it is put in
+//     place, so that a file for another kind of device changes nothing; the runtime it
+//     replaces stays next to it as "<name>.prev".
 //
 // What the device keeps for this lies in its data folder (never in a project, never in
 // ~/.ssh): the folder given with --data-dir, else "keys" next to the executable.
 //   device.crt, device.key     the device's own certificate and private key
-//   deploy.json                { "enabled", "port", "designers": [ { "fingerprint", "name", "added" } ] }
+//   deploy.json                { "enabled", "port", "designers": [ { "fingerprint", "name", "added", "runtime" } ] }
 //   incoming.hmlproj           a project that was received and is being installed
 #pragma once
 #include <atomic>
@@ -32,11 +38,21 @@ std::string device_data_dir(const std::string& given = "");
 
 struct DeployDesigner {
     std::string fingerprint, name, added;      // added: "YYYY-MM-DD HH:MM"
+    bool        runtime = false;               // may replace the runtime of the device
 };
+
+// Where a runtime that arrives is written before it replaces `exe`: next to it (the same file
+// system, so that putting it in place is one rename).
+std::string deploy_staged_runtime(const std::string& exe);
+// Put a runtime that was received (`staged`) in the place of `exe`: it must start here
+// ("<staged> --help" ends with 0), the one it replaces is kept as "<exe>.prev". Returns "" or
+// why not; then `exe` is what it was and `staged` is gone. The caller restarts afterwards.
+std::string deploy_install_runtime(const std::string& staged, const std::string& exe);
 
 class DeployService {
 public:
     static constexpr uint64_t kMaxBytes = 512ull * 1024 * 1024;
+    static constexpr uint64_t kMaxRuntimeBytes = 256ull * 1024 * 1024;
 
     DeployService();
     ~DeployService();
@@ -63,6 +79,11 @@ public:
     // ---- the designers that may send
     std::vector<DeployDesigner> designers() const;
     std::string remove(const std::string& fingerprint);
+    // May this designer replace the runtime? Kept in deploy.json. "" or why not.
+    std::string set_runtime_allowed(const std::string& fingerprint, bool on);
+    // The program file a runtime that arrives replaces ("" = this device cannot: nothing is taken).
+    void set_runtime_path(const std::string& exe);
+    std::string runtime_path() const;
     void set_adding(bool on) { adding_ = on; }       // new designers are offered to the operator
     bool adding() const { return adding_; }
 
@@ -73,8 +94,9 @@ public:
     void set_offer_timeout(int seconds) { offer_timeout_s_ = seconds; }
 
     // ---- a project that arrived (UI thread)
-    struct Received { std::string file, name, from, designer; };
+    struct Received { std::string file, name, from, designer; bool runtime = false; };
     bool received(Received& out) const;              // waits to be installed
+    bool serving() const { return serving_; }        // a designer is connected (more may follow: restart afterwards)
     // Tell the sender how it went ("" = installed) and forget the file.
     void finish(const std::string& error);
     void set_install_timeout(int seconds) { install_timeout_s_ = seconds; }
@@ -98,6 +120,8 @@ private:
     std::atomic<bool> listening_{ false };
     std::atomic<bool> stop_{ false };
     std::atomic<bool> adding_{ false };
+    std::atomic<bool> serving_{ false };
+    std::string runtime_path_;
     std::atomic<int>  port_{ 0 };
     std::atomic<int>  offer_timeout_s_{ 120 };
     std::atomic<int>  install_timeout_s_{ 90 };

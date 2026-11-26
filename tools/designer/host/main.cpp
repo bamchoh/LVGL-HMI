@@ -1614,6 +1614,10 @@ struct Host {
         }
         const std::string expect = known.contains(d.key) && known[d.key].is_string() ? known[d.key].get<std::string>() : std::string();
         if(expect.empty()) return fail("the device is not known yet: its fingerprint has to be confirmed first");
+        // the runtime for the device, when it is to be sent too (the device takes it only from a
+        // designer it allows to: System > Deploy > Runtime)
+        const std::string rt = opt_str(o, "runtime");
+        if(!rt.empty() && !fs::is_regular_file(upath(rt), ec)) return fail("runtime file not found: " + rt);
 
         // ---- pack the project (not the logs recorded here, not this PC's local overrides)
         const fs::path tmp = fs::temp_directory_path(ec) / ("hml_deploy_" + std::to_string(static_cast<long long>(std::time(nullptr))));
@@ -1628,11 +1632,15 @@ struct Host {
         req.port = d.port;
         req.expect_fingerprint = expect;
         req.file = ustr(file);
+        req.runtime_file = rt;
         req.client_name = pc_name();
         req.on_state = [&](const std::string& s) {
-            if(s == "connected") step("connected to " + d.key + " (TLS), the device is the one confirmed: " + expect);
+            if(s == "sending runtime") step("sending the runtime (" + std::to_string((fs::file_size(upath(rt), ec) + 1023) / 1024) + " KB)");
+            else if(s == "runtime received") step("the device has the runtime, trying it and putting it in place");
+            else if(s == "runtime installed") step("the runtime was replaced (the one before is kept as .prev)");
+            else if(s == "connected") step("connected to " + d.key + " (TLS), the device is the one confirmed: " + expect);
             else if(s.rfind("pending", 0) == 0) step("waiting for the operator of the device to accept this designer (" + me.fingerprint + ")");
-            else if(s == "sending") step("accepted, sending the project");
+            else if(s == "sending") step("sending the project");
             else if(s == "received") step("the device has the file, checking and installing it");
         };
         const hml::DeployOutcome out = hml::deploy_send(req, me);

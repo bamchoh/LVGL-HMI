@@ -2,6 +2,7 @@
 // (deploy_service.hpp) with a designer made of deploy_send(), and the page System > Deploy.
 #include <doctest.h>
 #include "deploy_link.hpp"
+#include "active_project.hpp"
 #include "deploy_service.hpp"
 #include "lvgl_fixture.hpp"
 #include "project.hpp"
@@ -450,6 +451,10 @@ TEST_CASE("deploy: garbage, a damaged file, a wrong kind of file, a stalled send
             REQUIRE(c.read_line(line, 200, 5000));
             REQUIRE(line == "READY");
             c.write_line(request);
+            if(!c.read_line(line, 400, wait_ms)) return;
+            answer = line;
+            if(line != "SEND") return;                            // (refused before a byte of the file)
+            answer = "(closed)";
             if(!body.empty()) c.write(body.data(), body.size());
             if(c.read_line(line, 400, wait_ms)) answer = line;
         });
@@ -598,5 +603,265 @@ TEST_CASE("deploy: System > Deploy - switched on, a designer accepted, the proje
     ui().unload_all();
     p.stop_logs();
     p.unload();
+    ds.open("");
+}
+
+// ================================================================ the runtime itself
+
+namespace {
+
+// this test program: something that starts here and answers "--help" with 0, like a runtime
+fs::path self_exe()
+{
+#ifdef _WIN32
+    return fs::u8path(install_dir()) / "hml_tests.exe";
+#else
+    return fs::u8path(install_dir()) / "hml_tests";
+#endif
+}
+#ifdef _WIN32
+const char* kExeName = "hml_runtime.exe";
+#else
+const char* kExeName = "hml_runtime";
+#endif
+
+// a device that already accepts the designer `me`
+void accept_beforehand(Device& d, const DeployIdentity& me)
+{
+    write(d.keys() / "deploy.json", "{ \"enabled\": false, \"port\": 1, \"designers\": [ { \"fingerprint\": \"" + me.fingerprint + "\", \"name\": \"pc\", \"added\": \"2026-01-01 00:00\" } ] }");
+    d.svc.open(d.keys().u8string());
+    REQUIRE(d.svc.designers().size() == 1);
+    CHECK_FALSE(d.svc.designers()[0].runtime);                    // never allowed by itself
+    d.on();
+}
+
+} // namespace
+
+TEST_CASE("deploy: the runtime is replaced only by a designer the device allows to, and only by one that starts here")
+{
+    REQUIRE(fs::exists(self_exe()));
+    Device d;
+    DeployIdentity me;
+    REQUIRE(deploy_make_identity("pc", me));
+    accept_beforehand(d, me);
+    const fs::path exe = d.tmp.dir / "device" / kExeName, prev = fs::path(exe.u8string() + ".prev"), staged = fs::u8path(deploy_staged_runtime(exe.u8string()));
+    write(exe, "OLD RUNTIME");
+    CHECK(staged.parent_path() == exe.parent_path());             // one rename puts it in place
+    CHECK(staged != exe);
+    Temp pc;
+    write(pc.dir / "junk_runtime", std::string(4000, 'j'));
+    write(pc.dir / "p.hmlproj", "abc");
+
+    auto request = [&](const fs::path& runtime, bool with_project) {
+        DeploySend req;
+        req.host = "127.0.0.1";
+        req.port = d.svc.port();
+        req.expect_fingerprint = d.svc.fingerprint();
+        req.runtime_file = runtime.u8string();
+        if(with_project) req.file = (pc.dir / "p.hmlproj").u8string();
+        return req;
+    };
+    // what the page does on the UI thread, here: install what arrives until the sender is done
+    auto serve = [&](Sender& s, std::vector<std::string>* kinds = nullptr) {
+        REQUIRE(until([&] { return s.done.load(); }, [&] {
+            DeployService::Received r;
+            if(!d.svc.received(r)) return;
+            if(kinds) kinds->push_back(r.runtime ? "runtime" : "project");
+            d.svc.finish(r.runtime ? deploy_install_runtime(r.file, d.svc.runtime_path()) : std::string());
+        }));
+        s.join();
+    };
+
+    // the device does not know where its program is: nothing is taken
+    {
+        d.svc.set_runtime_allowed(me.fingerprint, true);
+        DeployOutcome out = deploy_send(request(pc.dir / "junk_runtime", false), me);
+        CHECK_FALSE(out.ok);
+        CHECK(out.error.find("cannot replace its runtime") != std::string::npos);
+        d.svc.set_runtime_allowed(me.fingerprint, false);
+    }
+    d.svc.set_runtime_path(exe.u8string());
+
+    // accepted for projects, not allowed for the runtime: refused before a byte of it is kept,
+    // and the project that would have followed is not installed either
+    {
+        Sender s;
+        s.me = me;
+        s.req = request(self_exe(), true);
+        s.go();
+        std::vector<std::string> kinds;
+        serve(s, &kinds);
+        CHECK_FALSE(s.out.ok);
+        CHECK(s.out.error.find("may not replace the runtime") != std::string::npos);
+        CHECK(kinds.empty());
+        CHECK(read(exe) == "OLD RUNTIME");
+        CHECK_FALSE(fs::exists(staged));
+        CHECK_FALSE(fs::exists(fs::path(staged.u8string() + ".part")));
+    }
+
+    // allowed (kept in deploy.json, off again leaves no trace)
+    CHECK(d.svc.set_runtime_allowed("SHA256:nobody", true) != "");
+    CHECK(d.svc.set_runtime_allowed(me.fingerprint, true) == "");
+    CHECK(d.svc.designers()[0].runtime);
+    CHECK(json::parse(read(d.keys() / "deploy.json"))["designers"][0]["runtime"] == true);
+
+    // a file that does not start on this device: nothing changes, the designer hears why
+    {
+        Sender s;
+        s.me = me;
+        s.req = request(pc.dir / "junk_runtime", true);
+        s.go();
+        std::vector<std::string> kinds;
+        serve(s, &kinds);
+        CHECK_FALSE(s.out.ok);
+        CHECK(s.out.error.find("the runtime was not installed") != std::string::npos);
+        CHECK(s.out.error.find("does not start on this device") != std::string::npos);
+        CHECK(kinds == std::vector<std::string>{ "runtime" });   // the project was not even sent
+        CHECK(read(exe) == "OLD RUNTIME");
+        CHECK_FALSE(fs::exists(prev));
+        CHECK_FALSE(fs::exists(staged));
+    }
+
+    // a damaged one (the checksum of something else)
+    {
+        DeployConn c;
+        std::string err, line;
+        REQUIRE_MESSAGE(c.connect("127.0.0.1", d.svc.port(), me, 5000, &err), err);
+        REQUIRE(c.write_line("HML-DEPLOY 1 pc"));
+        REQUIRE(c.read_line(line, 200, 5000));
+        REQUIRE(line == "READY");
+        c.write_line("RUNTIME 3 " + std::string(64, '0') + " hml_runtime");
+        REQUIRE(c.read_line(line, 400, 8000));
+        REQUIRE(line == "SEND");
+        c.write("abc", 3);
+        REQUIRE(c.read_line(line, 400, 8000));
+        CHECK(line.find("damaged") != std::string::npos);
+        CHECK(read(exe) == "OLD RUNTIME");
+        CHECK_FALSE(fs::exists(staged));
+    }
+
+    // one that starts: put in place, the one before kept, and the project follows on the same connection
+    {
+        Sender s;
+        s.me = me;
+        s.req = request(self_exe(), true);
+        s.go();
+        std::vector<std::string> kinds;
+        serve(s, &kinds);
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK(kinds == std::vector<std::string>{ "runtime", "project" });
+        CHECK(s.saw("runtime installed"));
+        CHECK(s.saw("received"));
+        CHECK(fs::file_size(exe) == fs::file_size(self_exe()));
+        CHECK(deploy_file_sha256(exe) == deploy_file_sha256(self_exe()));
+        CHECK(read(prev) == "OLD RUNTIME");
+        CHECK_FALSE(fs::exists(staged));
+        CHECK(until([&] { return !d.svc.serving(); }));           // (the restart waits for this)
+    }
+    // the runtime alone
+    {
+        write(exe, "OLDER");
+        Sender s;
+        s.me = me;
+        s.req = request(self_exe(), false);
+        s.go();
+        std::vector<std::string> kinds;
+        serve(s, &kinds);
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK(kinds == std::vector<std::string>{ "runtime" });
+        CHECK(read(prev) == "OLDER");
+    }
+
+    // taken away again: refused; the project alone still goes through
+    CHECK(d.svc.set_runtime_allowed(me.fingerprint, false) == "");
+    CHECK_FALSE(json::parse(read(d.keys() / "deploy.json"))["designers"][0].contains("runtime"));
+    {
+        DeployOutcome out = deploy_send(request(self_exe(), false), me);
+        CHECK_FALSE(out.ok);
+        CHECK(out.error.find("may not replace the runtime") != std::string::npos);
+        Sender s;
+        s.me = me;
+        s.req = request("", true);
+        s.go();
+        serve(s);
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+    }
+}
+
+TEST_CASE("deploy: System > Deploy - allowing a designer to replace the runtime asks first; runtime and project, one restart")
+{
+    Temp tmp;
+    const fs::path proj = tmp.dir / "device" / "projects" / "pump", src = tmp.dir / "pc" / "new", keys = tmp.dir / "device" / "keys";
+    const fs::path exe = tmp.dir / "device" / kExeName;
+    make_project(proj, "Old");
+    make_project(src, "New");
+    const fs::path file = tmp.dir / "pc" / "new.hmlproj";
+    std::string err;
+    REQUIRE_MESSAGE(pack_project(src, file, &err), err);
+    write(exe, "OLD RUNTIME");
+    DeployIdentity me;
+    REQUIRE(deploy_make_identity("pc", me));
+    int port = 0;
+    {   // (a free port for the test)
+        Device probe;
+        probe.on();
+        port = probe.svc.port();
+        probe.svc.set_enabled(false);
+    }
+    write(keys / "deploy.json", "{ \"enabled\": true, \"port\": " + std::to_string(port) + ", \"designers\": [ { \"fingerprint\": \"" + me.fingerprint + "\", \"name\": \"pc-7\" } ] }");
+
+    Runtime rt;
+    DeployService& ds = deploy_service();
+    ds.open(keys.u8string());
+    ds.set_runtime_path(exe.u8string());
+    REQUIRE(ds.start());
+    Project p;
+    REQUIRE(p.load((proj / "project.json").generic_u8string()));
+    SystemSettings& sys = system_settings();
+    auto text = [](const char* key) { return tags().find(std::string("sys.deploy.") + key)->get().format(); };
+    auto flag = [](const char* key) { return tags().find(std::string("sys.deploy.") + key)->get_number() != 0; };
+    CHECK(text("d1").find("may replace the runtime") == std::string::npos);
+
+    // asked first; "Cancel" changes nothing
+    sys.command("deploy", "runtime", "1");
+    CHECK(flag("confirm_rt"));
+    CHECK(text("confirm_rt_text").find(me.fingerprint) != std::string::npos);
+    CHECK_FALSE(ds.designers()[0].runtime);
+    sys.command("deploy", "runtime_no");
+    CHECK_FALSE(flag("confirm_rt"));
+    CHECK_FALSE(ds.designers()[0].runtime);
+    sys.command("deploy", "runtime", "1");
+    sys.command("deploy", "runtime_yes");
+    CHECK(ds.designers()[0].runtime);
+    CHECK(text("d1").find("may replace the runtime") != std::string::npos);
+
+    Sender s;
+    s.me = me;
+    s.req.host = "127.0.0.1";
+    s.req.port = ds.port();
+    s.req.file = file.u8string();
+    s.req.runtime_file = self_exe().u8string();
+    s.req.expect_fingerprint = ds.fingerprint();
+    s.go();
+    REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); CHECK(rt.restart_requests == 0); }));   // not while the designer is still sending
+    s.join();
+    CHECK_MESSAGE(s.out.ok, s.out.error);
+    CHECK(deploy_file_sha256(exe) == deploy_file_sha256(self_exe()));
+    CHECK(read(fs::path(exe.u8string() + ".prev")) == "OLD RUNTIME");
+    CHECK(title_of(proj) == "New");
+    REQUIRE(until([&] { return rt.restart_requests > 0; }, [&] { sys.poll(); }));
+    for(int i = 0; i < 6; i++) sys.poll();
+    CHECK(rt.restart_requests == 1);                              // once, for both
+
+    // taken away at once, without a question
+    sys.command("deploy", "runtime", "1");
+    CHECK_FALSE(flag("confirm_rt"));
+    CHECK_FALSE(ds.designers()[0].runtime);
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+    ds.stop();
+    ds.set_runtime_path("");
     ds.open("");
 }

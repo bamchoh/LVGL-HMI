@@ -519,14 +519,19 @@ DeployOutcome deploy_send(const DeploySend& req, const DeployIdentity& me)
     auto state = [&](const std::string& s) { if(req.on_state) req.on_state(s); };
     auto stop = [&](const std::string& why) { out.error = why; return out; };
 
-    std::string file_hash;
-    std::uintmax_t size = 0;
+    struct Item { const char* verb; bool runtime; std::string path, hash; std::uintmax_t size = 0; };
+    std::vector<Item> items;
     if(!req.probe) {
-        std::error_code ec;
-        size = fs::file_size(fs::u8path(req.file), ec);
-        if(ec || size == 0) return stop("cannot read " + req.file);
-        file_hash = deploy_file_sha256(fs::u8path(req.file));
-        if(file_hash.empty()) return stop("cannot read " + req.file);
+        if(!req.runtime_file.empty()) items.push_back({ "RUNTIME", true, req.runtime_file, "", 0 });
+        if(!req.file.empty()) items.push_back({ "PUT", false, req.file, "", 0 });
+        if(items.empty()) return stop("nothing to send");
+        for(Item& it : items) {
+            std::error_code ec;
+            it.size = fs::file_size(fs::u8path(it.path), ec);
+            if(ec || it.size == 0) return stop("cannot read " + it.path);
+            it.hash = deploy_file_sha256(fs::u8path(it.path));
+            if(it.hash.empty()) return stop("cannot read " + it.path);
+        }
     }
 
     DeployConn c;
@@ -556,31 +561,40 @@ DeployOutcome deploy_send(const DeploySend& req, const DeployIdentity& me)
         return stop(line.rfind("ERROR ", 0) == 0 ? "the device: " + line.substr(6) : "unexpected answer from the device");
     }
 
-    std::string base = fs::u8path(req.file).filename().u8string();
-    for(char& ch : base) if(static_cast<unsigned char>(ch) <= 0x20 || ch == 0x7f) ch = '_';
-    state("sending");
-    if(!c.write_line("PUT " + std::to_string(size) + " " + file_hash + " " + base)) return stop("the device closed the connection");
-    {
-        std::ifstream f(fs::u8path(req.file), std::ios::binary);
-        std::vector<char> buf(64 * 1024);
-        std::uintmax_t sent = 0;
-        int shown = -1;
-        while(sent < size) {
-            f.read(buf.data(), static_cast<std::streamsize>(std::min<std::uintmax_t>(buf.size(), size - sent)));
-            const std::streamsize n = f.gcount();
-            if(n <= 0) return stop("cannot read " + req.file);
-            if(!c.write(buf.data(), static_cast<size_t>(n))) return stop(req.cancel && req.cancel->load() ? "stopped" : "the connection broke while sending");
-            sent += static_cast<std::uintmax_t>(n);
-            const int pct = static_cast<int>(sent * 100 / size);
-            if(pct / 10 != shown / 10) { shown = pct; state("sent " + std::to_string(pct)); }
+    for(const Item& it : items) {
+        const std::string what = it.runtime ? "the runtime" : "the project";
+        std::string base = fs::u8path(it.path).filename().u8string();
+        for(char& ch : base) if(static_cast<unsigned char>(ch) <= 0x20 || ch == 0x7f) ch = '_';
+        state(it.runtime ? "sending runtime" : "sending");
+        if(!c.write_line(std::string(it.verb) + " " + std::to_string(it.size) + " " + it.hash + " " + base)) return stop("the device closed the connection");
+        {
+            std::string go;
+            if(!c.read_line(go, 1024, 30000)) return stop("the device did not answer");
+            if(go != "SEND") return stop(go.rfind("ERROR ", 0) == 0 ? "the device: " + go.substr(6) : "unexpected answer from the device");
         }
+        {
+            std::ifstream f(fs::u8path(it.path), std::ios::binary);
+            std::vector<char> buf(64 * 1024);
+            std::uintmax_t sent = 0;
+            int shown = -1;
+            while(sent < it.size) {
+                f.read(buf.data(), static_cast<std::streamsize>(std::min<std::uintmax_t>(buf.size(), it.size - sent)));
+                const std::streamsize n = f.gcount();
+                if(n <= 0) return stop("cannot read " + it.path);
+                if(!c.write(buf.data(), static_cast<size_t>(n))) return stop(req.cancel && req.cancel->load() ? "stopped" : "the connection broke while sending " + what);
+                sent += static_cast<std::uintmax_t>(n);
+                const int pct = static_cast<int>(sent * 100 / it.size);
+                if(!it.runtime && pct / 10 != shown / 10) { shown = pct; state("sent " + std::to_string(pct)); }
+            }
+        }
+        std::string line;
+        if(!c.read_line(line, 1024, 60000)) return stop("the device did not confirm " + what);
+        if(line != "RECEIVED") return stop(line.rfind("ERROR ", 0) == 0 ? "the device: " + line.substr(6) : "unexpected answer from the device");
+        state(it.runtime ? "runtime received" : "received");
+        if(!c.read_line(line, 2048, req.install_timeout_ms)) return stop(what + " arrived, but the device did not say whether it was installed");
+        if(line != "INSTALLED") return stop(line.rfind("ERROR ", 0) == 0 ? what + " was not installed: " + line.substr(6) : "unexpected answer from the device");
+        if(it.runtime) state("runtime installed");
     }
-    std::string line;
-    if(!c.read_line(line, 1024, 60000)) return stop("the device did not confirm the file");
-    if(line != "RECEIVED") return stop(line.rfind("ERROR ", 0) == 0 ? "the device: " + line.substr(6) : "unexpected answer from the device");
-    state("received");
-    if(!c.read_line(line, 2048, req.install_timeout_ms)) return stop("the file arrived, but the device did not say whether it was installed");
-    if(line != "INSTALLED") return stop(line.rfind("ERROR ", 0) == 0 ? "not installed: " + line.substr(6) : "unexpected answer from the device");
     out.ok = true;
     return out;
 }

@@ -994,7 +994,7 @@ const App = {
         trust = look.device;
       }
       out.append(U.el('div', { class: 'hint' }, 'Deploying to ' + v.host + ':' + v.directPort + ' … (a target that does not know this designer yet waits for its operator)'));
-      const r = await host.directDeploy(Object.assign({}, v, { project: M.runPath(), name: st.name, trust }));
+      const r = await host.directDeploy(Object.assign({}, v, { project: M.runPath(), name: st.name, trust, runtime: v.sendRuntime ? v.runtime : '' }));
       out.innerHTML = '';
       if (r && r.ok) out.append(U.el('div', { class: 'ok' }, 'Deployed.'));
       else out.append(U.el('div', { class: 'warn' }, 'Deploy failed: ' + ((r && r.error) || 'unknown error')));
@@ -1012,7 +1012,8 @@ const App = {
     const direct = () => f.method.value === 'direct';
     const update = () => {
       for (const el of body.querySelectorAll('[data-method]')) el.style.display = el.dataset.method === f.method.value ? '' : 'none';   // (rows are flex: "hidden" alone does not hide them)
-      if (direct()) { dest.textContent = 'Project → ' + (f.host.value.trim() || 'host') + ':' + (Number(f.directPort.value) || 4856) + ' (TLS) → replaces the project the target runs'; return; }
+      f.runtime.disabled = !f.sendRuntime.checked;
+      if (direct()) { dest.textContent = 'Project → ' + (f.host.value.trim() || 'host') + ':' + (Number(f.directPort.value) || 4856) + ' (TLS) → replaces the project the target runs' + (f.sendRuntime.checked ? ',  runtime → replaces the runtime of the target' : ''); return; }
       const dir = (f.remoteDir.value.trim() || 'hml').replace(/\/+$/, '');
       dest.textContent = 'Project → ' + (f.user.value.trim() || 'user') + '@' + (f.host.value.trim() || 'host') + ':' + dir + '/projects/' + name() + '/'
         + (f.sendRuntime.checked ? ',  runtime → ' + dir + '/hml_runtime' : '');
@@ -1028,13 +1029,13 @@ const App = {
       only('ssh', row('private key', f.key, browse('key', f.key),
         U.el('button', { class: 'mini', title: 'Register this key on the target (the target\'s screen must be in key management mode: System > Keys)', onclick: () => registerKey() }, 'Register…'))),
       only('ssh', row('remote folder', f.remoteDir)),
-      only('ssh', row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime))),
+      row('send runtime', f.sendRuntime, f.runtime, browse('targetRuntime', f.runtime)),
       only('ssh', row('run on target', f.activate, U.el('span', { class: 'dim' }, 'make this the project the target shows (it keeps doing so after a reboot)'))),
       only('ssh', row('restart runtime', f.restart, U.el('span', { class: 'dim' }, 'restart hml_runtime on the target after installing'))),
       only('ssh', row('local settings', f.clearLocal, U.el('span', { class: 'dim' }, 'remove the settings changed on the target (project.local.json)'))),
       dest,
       only('ssh', U.el('div', { class: 'hint' }, 'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.')),
-      only('direct', U.el('div', { class: 'hint' }, 'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts.')),
+      only('direct', U.el('div', { class: 'hint' }, 'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts. "send runtime" needs one more permission on the target: System > Deploy > Runtime, next to this designer.')),
       out, info);
     f.clearLocal.addEventListener('input', renderCheck);
     f.method.addEventListener('input', () => { last = null; info.innerHTML = ''; out.innerHTML = ''; });
