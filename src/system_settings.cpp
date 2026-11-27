@@ -1,6 +1,7 @@
 #include "system_settings.hpp"
 
 #include <chrono>
+#include <cstring>
 #include "screen_saver.hpp"
 #include "project.hpp"
 #include "serial_ports.hpp"
@@ -318,12 +319,20 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
 // "Saved." and the like are not (a line that is always amber says nothing by being amber).
 bool status_is_problem(const std::string& english)
 {
-    static const char* kStarts[] = { "Not ", "No ", "Wrong", "Locked", "Unknown", "Cannot", "There is no", "Pick ", "Type ", "Switch on",
-                                     "The driver is busy", "The last write", "The tags of the runtime", "The project was not", "The project that waited",
-                                     "A project was received but not", "Backup failed", "not allowed", "unknown" };
-    for(const char* s : kStarts) if(english.rfind(s, 0) == 0) return true;
-    for(const char* s : { "failed", "cannot", "not found", "is needed", "too " }) if(english.find(s) != std::string::npos) return true;
-    return false;
+    // What went well is a short list; everything else a page says after a command is that
+    // something is missing or went wrong. (The other way round - a list of what is wrong - let
+    // "PIN: 4 to 8 digits" through as good news: a new message is amber until it is put here.)
+    if(english.empty()) return false;
+    static const char* kStarts[] = { "Applied", "Saved", "Installed.", "Restarting", "Backup written", "You can take", "Writing",
+                                     "A project was received and installed", "A new runtime was received", "The password was removed",
+                                     "A test mail is on its way", "Change the level", "sent " };
+    for(const char* s : kStarts) if(english.rfind(s, 0) == 0) return false;
+    for(const char* s : { "' changed.", "' added.", "' deleted." })
+        if(english.size() >= std::strlen(s) && english.compare(english.size() - std::strlen(s), std::string::npos, s) == 0) return false;
+    if(english.find(" file(s) are on their way") != std::string::npos) return false;
+    // "temp = 21.5": a value was written ("... is not a value ..." has no " = ")
+    if(english.find(" = ") != std::string::npos && english.find("not") == std::string::npos) return false;
+    return true;
 }
 
 void SystemSettings::translate_status(const std::string& page_id)
