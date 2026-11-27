@@ -903,7 +903,7 @@ void Binding::tag_event(const Value& v, const void* source)
 // value as it was (LV_EVENT_CANCEL), "OK" takes what was typed (LV_EVENT_READY). An "x" was
 // read as "delete", a check mark had to be learnt. The words are in the language of the system
 // screens; the layouts are ours for that (LVGL's own have icons there).
-char s_kb_close[16] = "Close", s_kb_done[16] = "OK";
+char s_kb_close[16] = "Close", s_kb_done[16] = "OK", s_kb_clear[16] = "Clear";
 bool s_kb_light = false;            // the theme of the project is light: the keyboard is too
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
 const char* const kKbMapUpper[] = {
@@ -936,17 +936,22 @@ const int kKbCtrlSpecial[] = {
     HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 5, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3,
 };
+// The number pad: four keys in every row. LVGL takes the gaps between the keys of a row off its
+// width before it shares it out, so rows with another number of keys do not line up (five keys in
+// the last row put its columns a few pixels off). At the right, from what is used most while
+// typing to what ends it: backspace, clear, close, OK - OK in the corner. No cursor keys: a
+// number is short, and "Clear" starts it again.
 const char* const kKbMapNumber[] = {
-    "1", "2", "3", s_kb_close, "\n",
-    "4", "5", "6", s_kb_done, "\n",
-    "7", "8", "9", LV_SYMBOL_BACKSPACE, "\n",
-    "+/-", "0", ".", LV_SYMBOL_LEFT, LV_SYMBOL_RIGHT, "",
+    "1", "2", "3", LV_SYMBOL_BACKSPACE, "\n",
+    "4", "5", "6", s_kb_clear, "\n",
+    "7", "8", "9", s_kb_close, "\n",
+    "+/-", "0", ".", s_kb_done, "",
 };
 const int kKbCtrlNumber[] = {
-    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
-    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
     1, 1, 1, 2,
-    1, 1, 1, 1, 1,
+    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    1, 1, 1, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
 };
 #undef HML_KB_BTN
 
@@ -959,12 +964,13 @@ const lv_buttonmatrix_ctrl_t* ctrl_table(const int (&src)[N])
 }
 
 // What a key of the keyboard is, for its colour.
-enum class KbKey { Letter, Control, Close, Done };
+enum class KbKey { Letter, Control, Clear, Close, Done };
 KbKey kb_key(const char* txt)
 {
     if(!txt) return KbKey::Letter;
     if(txt == s_kb_done || std::strcmp(txt, s_kb_done) == 0) return KbKey::Done;
     if(txt == s_kb_close || std::strcmp(txt, s_kb_close) == 0) return KbKey::Close;
+    if(txt == s_kb_clear || std::strcmp(txt, s_kb_clear) == 0) return KbKey::Clear;
     // backspace, new line, the arrows (symbols of the icon font) and the keys that change the layout
     if(static_cast<unsigned char>(txt[0]) == 0xEF || !std::strcmp(txt, "1#") || !std::strcmp(txt, "ABC") || !std::strcmp(txt, "abc")) return KbKey::Control;
     return KbKey::Letter;
@@ -998,9 +1004,10 @@ void kb_value_changed(lv_event_t* e)
     lv_obj_t* kb = lv_event_get_target_obj(e);
     const uint32_t id = lv_buttonmatrix_get_selected_button(kb);
     const KbKey kind = id == LV_BUTTONMATRIX_BUTTON_NONE ? KbKey::Letter : kb_key(lv_buttonmatrix_get_button_text(kb, id));
+    lv_obj_t* ta = lv_keyboard_get_textarea(kb);
+    if(kind == KbKey::Clear) { if(ta) lv_textarea_set_text(ta, ""); return; }      // (nothing is written yet: "Close" still leaves the value as it was)
     if(kind != KbKey::Close && kind != KbKey::Done) { lv_keyboard_def_event_cb(e); return; }
     const lv_event_code_t code = kind == KbKey::Done ? LV_EVENT_READY : LV_EVENT_CANCEL;
-    lv_obj_t* ta = lv_keyboard_get_textarea(kb);
     if(lv_obj_send_event(kb, code, nullptr) != LV_RESULT_OK) return;       // (as LVGL does for its own keys: the keyboard first, then the field)
     if(ta && lv_obj_is_valid(ta)) lv_obj_send_event(ta, code, nullptr);
 }
@@ -1008,7 +1015,8 @@ void kb_value_changed(lv_event_t* e)
 void install_keyboard_maps(lv_obj_t* kb)
 {
     // the words of the two keys, in the language of the system screens (Japanese only with a font that has it)
-    const bool ja = system_language() == "ja" && font_file_has("閉じる確定");
+    const bool ja = system_language() == "ja" && font_file_has("閉じる確定クリア");
+    lv_snprintf(s_kb_clear, sizeof s_kb_clear, "%s", ja ? "クリア" : "Clear");
     lv_snprintf(s_kb_close, sizeof s_kb_close, "%s", ja ? "閉じる" : "Close");
     lv_snprintf(s_kb_done, sizeof s_kb_done, "%s", ja ? "確定" : "OK");
     // (lv_keyboard_set_map() changes the layouts for every keyboard: set again, the words may have changed)
