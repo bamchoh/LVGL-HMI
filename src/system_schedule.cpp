@@ -137,7 +137,7 @@ public:
     }
 
     // Save (of the schedule that is picked) is in the bar at the bottom, not in the list
-    std::vector<PageAction> actions() const override { return { { "Save", "save", PageAction::Kind::Danger, "selected", "" } }; }
+    std::vector<PageAction> actions() const override { return { { "Save", "save", PageAction::Kind::Primary, "", "selected" } }; }
 
     json custom_rows(bool compact, int font) const override
     {

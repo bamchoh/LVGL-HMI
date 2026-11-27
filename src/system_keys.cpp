@@ -150,7 +150,7 @@ public:
 
         json rows = json::array();
         rows.push_back(row(json::array({
-            json{ { "type", "label" }, { "text", "Key management" }, { "w", compact ? 130 : 180 }, { "style", { { "font", font }, { "text_color", muted } } } },
+            json{ { "type", "label" }, { "text", "Key management" }, { "w", compact ? 150 : 200 }, { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
             json{ { "type", "switch" }, { "bind", tag("mode") }, { "on_change", call("mode") } },
         })));
         rows.push_back(text("state", "#ffffff"));
@@ -170,7 +170,7 @@ public:
         return rows;
     }
 
-    std::vector<PageAction> actions() const override { return { { "Delete", "delete", PageAction::Kind::Danger, "has_sel", "" } }; }
+    std::vector<PageAction> actions() const override { return { { "Delete", "delete", PageAction::Kind::Danger, "", "has_sel" } }; }
     std::vector<PageDialog> dialogs() const override
     {
         return {

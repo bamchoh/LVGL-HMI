@@ -371,6 +371,8 @@ void restyle(json& w, bool top, bool compact, const std::string& accent)
     if(type == "button") {
         st["radius"] = 8;
         st["shadow_width"] = 0;
+        if(const json* h = jget(w, "h"); h && h->is_number() && h->get<double>() < 44) w["h"] = 44;   // (a finger, also on the smallest screen)
+        if(const json* bw = jget(w, "w"); bw && bw->is_number() && bw->get<double>() < 44) w["w"] = 44;
         if(bgc == "#2c3e50" || bgc == "#455a64" || bgc == "#37474f") st["bg_color"] = kNeutral;
         else if(bgc == "#1565c0") st["bg_color"] = accent;
     }
@@ -394,9 +396,12 @@ std::vector<json> SystemSettings::screens(int width, int height) const
 {
     const bool compact = width < 600;
     const bool large = width >= 1100;                // a big screen: everything a size up
-    const int header_h = compact ? 40 : large ? 68 : 56;
-    const int font = compact ? 12 : large ? 16 : 14;
-    const int title_font = compact ? 16 : large ? 24 : 20;
+    // What is touched is at least 48 px high, also on a 3.5 inch screen of 480x320 (48 px are
+    // 7.4 mm there; the usual advice is 7 - 10 mm for a finger). What is read is at least 14 px.
+    const int touch_h = large ? 56 : 48;
+    const int header_h = compact ? 52 : large ? 68 : 56;
+    const int font = large ? 16 : 14;
+    const int title_font = compact ? 18 : large ? 24 : 20;
     const int kb_h = height * (compact ? 60 : 45) / 100;
     const int margin = compact ? 8 : large ? 16 : 12;
     const int gutter = compact ? 22 : large ? 36 : 30;   // the strip at the right edge of a list: for scrolling, nothing to press
@@ -416,14 +421,14 @@ std::vector<json> SystemSettings::screens(int width, int height) const
     // "back", the title and - for a form - Apply: always there, never in what scrolls
     auto header = [&](const std::string& title, const std::string& apply_page) {
         json children = json::array({
-            json{ { "type", "button" }, { "align", "left_mid" }, { "text", LV_SYMBOL_LEFT }, { "w", header_h + 4 }, { "h", header_h - 8 },
+            json{ { "type", "button" }, { "align", "left_mid" }, { "text", LV_SYMBOL_LEFT }, { "w", header_h + 4 }, { "h", header_h - 6 },
                   { "style", { { "bg_color", tile }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                   { "on_click", { { "action", "back" } } } },
             json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", title }, { "style", { { "font", title_font }, { "text_color", text } } } },
         });
         if(!apply_page.empty())
-            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 84 : large ? 150 : 120 }, { "h", header_h - 8 },
-                                     { "style", { { "bg_color", "#2e7d32" }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
+            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 96 : large ? 150 : 120 }, { "h", header_h - 6 },
+                                     { "style", { { "bg_color", accent }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                                      { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", apply_page } } } });
         return json{
             { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", "100%" }, { "h", header_h }, { "scrollable", false },
@@ -441,7 +446,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         std::vector<json> items[kGroupCount];
         const int list_w = col_w - 2 * margin;
         const int tile_w = (list_w - gutter - gap) / 2;
-        const int tile_h = compact ? 50 : large ? 80 : 66;
+        const int tile_h = compact ? 56 : large ? 80 : 66;
         for(const auto& p : pages_) {
             const std::string id = p->id();
             items[group_of(id)].push_back(json{
@@ -463,7 +468,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         // The groups that have pages, as tabs: a strip under the header that belongs to it, the
         // names as text, and a line under the one that is chosen. Pressing a name writes the
         // number of its group into sys.menu.tab.
-        const int tabs_h = compact ? 34 : large ? 52 : 44, line_h = 3;
+        const int tabs_h = compact ? 46 : large ? 52 : 48, line_h = 3;
         json tabs = json::array(), marks = json::array();
         std::vector<int> used;
         for(int g = 0; g < kGroupCount; g++) if(!items[g].empty()) used.push_back(g);
@@ -529,7 +534,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                 { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : large ? 14 : 10 }, { "pad_left", compact ? 10 : large ? 18 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 110 : large ? 240 : 160 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", muted } } } },
+                    json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 130 : large ? 240 : 170 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
                     widget,
                 }) },
             });
@@ -539,12 +544,16 @@ std::vector<json> SystemSettings::screens(int width, int height) const
 
         // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
         const std::vector<PageAction> extra = p->actions();
-        const int footer_h = extra.empty() ? 0 : (compact ? 42 : large ? 66 : 54);
+        const int footer_h = extra.empty() ? 0 : touch_h + 12;
         const int body_h = height - header_h - margin - (footer_h ? footer_h : margin);
         auto action_button = [&](const PageAction& a, int h) {
-            const char* color = a.kind == PageAction::Kind::Danger ? "#c62828" : a.kind == PageAction::Kind::Ok ? "#2e7d32" : a.kind == PageAction::Kind::Primary ? accent.c_str() : "#3a4a5e";
+            // Red is for what cannot be undone; what confirms or saves has the colour of the project;
+            // everything else is neutral. A button that cannot be pressed now has no colour at all.
+            const bool go = a.kind == PageAction::Kind::Ok || a.kind == PageAction::Kind::Primary;
+            const char* color = a.kind == PageAction::Kind::Danger ? "#c62828" : go ? accent.c_str() : "#3a4a5e";
             json b = json{ { "type", "button" }, { "text", a.text }, { "h", h },
-                           { "style", { { "bg_color", color }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", compact ? 10 : 14 }, { "pad_right", compact ? 10 : 14 } } },
+                           { "style", { { "bg_color", color }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", 16 }, { "pad_right", 16 } } },
+                           { "style_disabled", { { "bg_color", "#2a323c" }, { "text_color", "#6f7c8a" } } },
                            { "style_label", { { "font", font + 2 } } },
                            { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":" + a.command } } } };
             json bind = json::object();
@@ -564,26 +573,40 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         });
         if(footer_h) {
             json buttons = json::array();
-            for(const PageAction& a : extra) buttons.push_back(action_button(a, footer_h - 10));
+            auto spacer = [] { return json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", 1 }, { "scrollable", false }, { "clickable", false }, { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 } } } }; };
+            bool apart = false;
+            for(const PageAction& a : extra) {
+                // (a finger that goes for "Save" must not land on "Delete": the rest of the bar is between them)
+                if(a.kind == PageAction::Kind::Danger && !apart && !buttons.empty()) { buttons.push_back(spacer()); apart = true; }
+                buttons.push_back(action_button(a, touch_h));
+            }
             children.push_back(json{ { "type", "panel" }, { "x", 0 }, { "y", height - footer_h }, { "w", "100%" }, { "h", footer_h }, { "scrollable", false },
                                      { "flex", "row" }, { "flex_cross", "center" },
                                      { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", col_x + margin }, { "pad_right", col_x + margin }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", gap } } },
                                      { "children", buttons } });
         }
         // the questions of the page: over the top of the list, not part of it
-        for(const PageDialog& d : p->dialogs())
-            children.push_back(json{ { "type", "panel" }, { "x", col_x + margin }, { "y", header_h + margin }, { "w", col_w - 2 * margin }, { "h", "content" },
+        for(const PageDialog& d : p->dialogs()) {
+            // behind it the page is dimmed and takes no touch: the question is answered first
+            children.push_back(json{ { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", "100%" }, { "h", "100%" }, { "scrollable", false }, { "clickable", true },
+                                     { "bind", { { "visible", tag_name(id, d.visible) } } },
+                                     { "style", { { "bg_color", "#000000" }, { "bg_opa", 60 }, { "radius", 0 }, { "border_width", 0 }, { "pad", 0 } } } });
+            children.push_back(json{ { "type", "panel" }, { "align", "center" }, { "w", std::min(col_w - 2 * margin, 640) }, { "h", "content" },
                                      { "flex", "column" }, { "scrollable", false },
                                      { "bind", { { "visible", tag_name(id, d.visible) } } },
                                      { "style", { { "bg_color", d.warning ? "#4a3a10" : "#4a1c1c" }, { "radius", 10 }, { "border_width", 2 }, { "border_color", d.warning ? "#ffb300" : "#e53935" },
-                                                  { "pad", compact ? 8 : 12 }, { "pad_row", compact ? 6 : 10 } } },
+                                                  { "pad", compact ? 10 : 14 }, { "pad_row", compact ? 8 : 12 } } },
                                      { "children", json::array({
                                          json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag_name(id, d.text) } } },
                                                { "style", { { "font", font }, { "text_color", "#ffffff" } } } },
                                          json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "scrollable", false },
                                                { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 }, { "pad_column", gap } } },
-                                               { "children", json::array({ action_button(d.yes, compact ? 34 : 44), action_button(d.no, compact ? 34 : 44) }) } },
+                                               // "no" at the left, "yes" at the far right: not next to each other
+                                               { "children", json::array({ action_button(d.no, touch_h),
+                                                   json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", 1 }, { "scrollable", false }, { "clickable", false }, { "style", { { "bg_opa", 0 }, { "border_width", 0 }, { "pad", 0 } } } },
+                                                   action_button(d.yes, touch_h) }) } },
                                      }) } });
+        }
         children.push_back(json{ { "type", "keyboard" }, { "align", "bottom_mid" }, { "w", "100%" }, { "h", kb_h },
                                  { "style", { { "pad", compact ? 4 : 6 }, { "pad_gap", compact ? 4 : 6 } } }, { "style_items", { { "font", 18 } } } });
         out.push_back(json{ { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } }, { "children", children } });
@@ -643,7 +666,15 @@ class NetworkPage final : public SettingsPage {
 public:
     std::string id() const override { return "network"; }
     std::string title() const override { return "Network"; }
-    std::string summary() override { return local_ip_addresses(); }
+    std::string summary() override
+    {
+        // (the first address and how many more there are: the tile has one line)
+        const std::string all = local_ip_addresses();
+        const size_t comma = all.find(',');
+        if(comma == std::string::npos) return all;
+        const long more = static_cast<long>(std::count(all.begin(), all.end(), ','));
+        return all.substr(0, comma) + vformat("  (+%ld)", more);
+    }
 #ifdef _WIN32
     bool has_apply() const override { return false; }          // information only on the PC
 #endif
