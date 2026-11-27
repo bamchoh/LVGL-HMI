@@ -7,13 +7,14 @@
 </head>
 <body>
 <div id="toolbar">
+  <!-- the project: new, open, save -->
   <button id="b-new" title="New project (Ctrl+N)">New</button>
   <button id="b-open" title="Open project.json (Ctrl+O)">Open</button>
   <button id="b-recent" title="Recent projects">&#9662;</button>
-  <button id="b-keys" title="Keyboard shortcuts (F1)">?</button>
   <button id="b-save" title="Save (Ctrl+S)">Save</button>
   <button id="b-saveas" title="Save as">Save As</button>
   <span class="sep"></span>
+  <!-- editing and what is looked at -->
   <button id="b-undo" title="Undo (Ctrl+Z)">&#8630;</button>
   <button id="b-redo" title="Redo (Ctrl+Y)">&#8631;</button>
   <span class="sep"></span>
@@ -26,13 +27,22 @@
   <span class="grow"></span>
   <span id="title-label" class="dim"></span>
   <span class="sep"></span>
-  <select id="sel-lang" title="Language of the designer / 表示言語"></select>
-  <button id="b-replace" title="Find and replace tag names and texts, on this screen or in the whole project">Replace</button>
-  <button id="b-json" title="Show the JSON of the current screen">JSON</button>
+  <!-- trying it and sending it: what the work is for -->
   <button id="b-preview" class="primary" title="Render this screen with hml_runtime (saves first)">Preview</button>
   <button id="b-run" title="Launch hml_runtime with this project (saves first)">Run</button>
-  <button id="b-ai" title="Have an AI assistant make screens: what to give it">AI</button>
   <button id="b-deploy" title="Send this project to a target (Raspberry Pi) over SSH and restart the runtime there (saves first)">Deploy</button>
+  <span class="sep"></span>
+  <button id="b-ai" title="Have an AI assistant make screens: what to give it">AI</button>
+  <select id="sel-lang" title="Language of the designer / 表示言語"></select>
+  <!-- what is needed now and then -->
+  <span class="more">
+    <button id="b-more" title="More">&#8943;</button>
+    <div id="more-menu" hidden>
+      <button id="b-replace" title="Find and replace tag names and texts, on this screen or in the whole project">Find and replace</button>
+      <button id="b-json" title="Show the JSON of the current screen">Screen JSON</button>
+      <button id="b-keys" title="Keyboard shortcuts (F1)">Keyboard shortcuts</button>
+    </div>
+  </span>
 </div>
 
 <div id="main">

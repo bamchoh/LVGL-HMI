@@ -189,10 +189,10 @@ const SCHEMA = {
   // Ready-made widgets of the palette: a type with what one usually sets right after adding it.
   // (`goto`: the screen is filled in when it is added - another screen of the project.)
   presets: {
-    btn_goto:   { label: 'Go to a screen', base: 'button', props: { text: 'Next', on_click: { action: 'goto', screen: '' } } },
-    btn_back:   { label: 'Back', base: 'button', props: { text: 'Back', on_click: { action: 'back' } } },
-    btn_system: { label: 'System settings', base: 'button', props: { text: 'System', on_click: { action: 'system' } } },
-    btn_login:  { label: 'Login / logout', base: 'button', props: { text: 'Login', on_click: { action: 'login' } } },
+    btn_goto:   { label: 'Go to a screen', icon: '\u279C', base: 'button', props: { text: 'Next', on_click: { action: 'goto', screen: '' } } },
+    btn_back:   { label: 'Back', icon: '\u21A9', base: 'button', props: { text: 'Back', on_click: { action: 'back' } } },
+    btn_system: { label: 'System settings', icon: '\u2699', base: 'button', props: { text: 'System', on_click: { action: 'system' } } },
+    btn_login:  { label: 'Login / logout', icon: '\u263A', base: 'button', props: { text: 'Login', on_click: { action: 'login' } } },
   },
 
   actions: {
