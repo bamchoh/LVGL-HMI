@@ -904,6 +904,7 @@ void Binding::tag_event(const Value& v, const void* source)
 // read as "delete", a check mark had to be learnt. The words are in the language of the system
 // screens; the layouts are ours for that (LVGL's own have icons there).
 char s_kb_close[16] = "Close", s_kb_done[16] = "OK";
+bool s_kb_light = false;            // the theme of the project is light: the keyboard is too
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
 const char* const kKbMapUpper[] = {
     "1#", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", LV_SYMBOL_BACKSPACE, "\n",
@@ -980,13 +981,15 @@ void kb_draw(lv_event_t* e)
     lv_obj_t* kb = lv_event_get_target_obj(e);
     const KbKey kind = kb_key(lv_buttonmatrix_get_button_text(kb, base->id1));
     const bool held = lv_obj_has_state(kb, LV_STATE_PRESSED) && lv_buttonmatrix_get_selected_button(kb) == base->id1;
+    // (dark: light text on greys; light: dark text on white and a light grey. "OK" has white text on the colour of the project in both)
     if(lv_draw_fill_dsc_t* f = lv_draw_task_get_fill_dsc(task)) {
-        lv_color_t c = kind == KbKey::Done ? lv_theme_get_color_primary(kb) : kind == KbKey::Letter ? lv_color_hex(0x414c59) : lv_color_hex(0x5f6d7d);
-        if(held) c = lv_color_mix(lv_color_white(), c, LV_OPA_30);
+        lv_color_t c = kind == KbKey::Done ? lv_theme_get_color_primary(kb)
+                     : kind == KbKey::Letter ? lv_color_hex(s_kb_light ? 0xffffff : 0x414c59) : lv_color_hex(s_kb_light ? 0xc3ccd6 : 0x5f6d7d);
+        if(held) c = lv_color_mix(s_kb_light ? lv_color_black() : lv_color_white(), c, s_kb_light ? LV_OPA_20 : LV_OPA_30);
         f->color = c;
         f->opa = LV_OPA_COVER;
     }
-    if(lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(task)) l->color = lv_color_hex(0xf4f6f8);
+    if(lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(task)) l->color = lv_color_hex(s_kb_light && kind != KbKey::Done ? 0x16202b : 0xf4f6f8);
 }
 
 // A key was pressed: ours for the two words, LVGL's for everything else.
@@ -1019,6 +1022,7 @@ constexpr size_t kHistoryLen = 16;
 
 } // namespace
 
+void set_keyboard_light(bool light) { s_kb_light = light; }
 const char* keyboard_close_text() { return s_kb_close; }
 const char* keyboard_done_text() { return s_kb_done; }
 
@@ -1233,9 +1237,9 @@ struct Ui::Impl {
             lv_obj_t* echo = lv_label_create(scr->obj);
             lv_obj_set_width(echo, lv_pct(100));
             lv_label_set_long_mode(echo, LV_LABEL_LONG_MODE_CLIP);
-            lv_obj_set_style_bg_color(echo, lv_color_hex(0x1f2a38), LV_PART_MAIN);
+            lv_obj_set_style_bg_color(echo, lv_color_hex(s_kb_light ? 0xffffff : 0x1f2a38), LV_PART_MAIN);   // (as the keyboard: light with a light theme)
             lv_obj_set_style_bg_opa(echo, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_text_color(echo, lv_color_white(), LV_PART_MAIN);
+            lv_obj_set_style_text_color(echo, s_kb_light ? lv_color_hex(0x16202b) : lv_color_white(), LV_PART_MAIN);
             lv_obj_set_style_pad_all(echo, 8, LV_PART_MAIN);
             lv_obj_set_style_text_align(echo, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
             lv_obj_set_clickable(echo, false);
@@ -2069,7 +2073,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_obj_add_event_cb(obj, kb_value_changed, LV_EVENT_VALUE_CHANGED, nullptr);
         lv_obj_set_send_draw_task_events(obj, true);
         lv_obj_add_event_cb(obj, kb_draw, LV_EVENT_DRAW_TASK_ADDED, nullptr);
-        lv_obj_set_style_bg_color(obj, lv_color_hex(0x20262e), 0);
+        lv_obj_set_style_bg_color(obj, lv_color_hex(s_kb_light ? 0xdde3ea : 0x20262e), 0);
         lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(obj, 6, LV_PART_ITEMS);
         lv_obj_set_style_shadow_width(obj, 0, LV_PART_ITEMS);

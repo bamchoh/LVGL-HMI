@@ -98,6 +98,8 @@ const lv_font_t* font_of_size(int size);                               // nullpt
 // (It only looks at the table of the file: no font is made, so it can be asked while loading.)
 bool             font_file_has(const std::string& text);
 // The words on the two keys of the keyboard that end typing ("Close" / "OK", or 閉じる / 確定).
+// The keyboard follows the theme of the project: light keys for a light theme. Set before the screens are built.
+void             set_keyboard_light(bool light);
 const char*      keyboard_close_text();
 const char*      keyboard_done_text();
 // Does this text field of a screen take numbers (numeric_display)? Its keyboard is the number pad.
