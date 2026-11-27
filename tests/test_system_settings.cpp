@@ -159,7 +159,7 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         CHECK(lv_dropdown_get_selected(widget_of_row(4)) == 1);
         CHECK(lv_obj_check_type(widget_of_row(5), &lv_label_class));
         CHECK(std::string(lv_label_get_text(widget_of_row(5))) == "read only");
-        lv_obj_t* apply_btn = nth(nth(pg, 0), 2);                          // header: back, title, Apply
+        lv_obj_t* apply_btn = nth(nth(pg, 0), 3);                          // header: back, title, the clock, Apply
         REQUIRE(apply_btn);
         REQUIRE(lv_obj_check_type(apply_btn, &lv_button_class));
 

@@ -58,17 +58,6 @@ public:
         // the line above the list: what the last command said, else where in the list we are
         info("range", n == 0 ? "no schedules" : n > kRows ? vformat("%d - %d / %d", first_ + 1, std::min(first_ + kRows, n), n) : "");
         flag("head", n == 0 || n > kRows);
-        {   // the day of the week of the device (the days of a schedule are set against it)
-            const std::time_t t = std::time(nullptr);
-            std::tm tm{};
-#if defined(_WIN32)
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
-            static const char* kDays[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-            info("today", kDays[tm.tm_wday % 7]);
-        }
         const int64_t now = static_cast<int64_t>(std::time(nullptr));
         for(int i = 0; i < kRows; i++) {
             const ScheduleItem* s = first_ + i < n ? &list[static_cast<size_t>(first_ + i)] : nullptr;
@@ -171,11 +160,6 @@ public:
             return json{ { "type", "label" }, { "long_mode", "dots" }, { "bind", { { "text", tag(key) } } }, { "style", { { "font", f }, { "text_color", color } } } };
         };
 
-        // The time of the device, beside the time that is set: a schedule is set against the clock
-        // of the device, which need not be the one on the wall.
-        auto now_label = [&] { return json{ { "type", "label" }, { "text", "Now" }, { "style", { { "font", font }, { "text_color", muted } } } }; };
-        auto clock = [&] { return json{ { "type", "label" }, { "bind", { { "text", "sys.datetime" } } }, { "style", { { "font", font }, { "text_color", "#ffffff" } } } }; };
-        auto today = [&] { return json{ { "type", "label" }, { "bind", { { "text", tag("today") } } }, { "style", { { "font", font }, { "text_color", muted } } } }; };
         json rows = json::array();
         // the schedule picked: its time, its days, on / off
         json form = json{ { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "column" }, { "scrollable", false },
@@ -191,12 +175,10 @@ public:
             row(json::array({ name, json{ { "type", "label" }, { "text", "On" }, { "style", { { "font", font }, { "text_color", muted } } } },
                               json{ { "type", "switch" }, { "bind", tag("enabled") } } })),
             row(json::array({ json{ { "type", "datetime_input" }, { "mode", "time" }, { "bind", tag("at") } }, json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", 1 }, { "style", { { "bg_opa", 0 }, { "border_width", 0 } } } },
-                              now_label(), clock(), today(),
                               }), "daily"),
             row(std::move(days), "daily"),
             row(json::array({ json{ { "type", "text_display" }, { "input", true }, { "flex_grow", 1 }, { "max_length", 16 }, { "accepted_chars", "0123456789-: " }, { "placeholder", "YYYY-MM-DD HH:MM" },
                                     { "bind", tag("at") }, { "style", { { "font", font }, { "pad", 6 } } } },
-                              now_label(), clock(), today(),
                               }), "once"),
         });
         rows.push_back(std::move(form));
