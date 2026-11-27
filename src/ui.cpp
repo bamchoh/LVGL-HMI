@@ -963,6 +963,27 @@ const lv_buttonmatrix_ctrl_t* ctrl_table(const int (&src)[N])
     return table;
 }
 
+// A switch or a checkbox changes on a tap - not when the finger slid over it. In a list that
+// scrolls, a slide that is too short to scroll it (seen on the 3.5" panel: 14 px) ended as a
+// press on what was under the finger, and a switch that acts at once ("Receive projects")
+// turned. A finger that has moved more than this since it came down gives the press up.
+constexpr int32_t kTapSlip = 8;
+lv_point_t s_tap_from{};
+void tap_only(lv_event_t* e)
+{
+    lv_indev_t* in = lv_indev_active();
+    if(!in || lv_indev_get_type(in) != LV_INDEV_TYPE_POINTER) return;
+    lv_point_t p;
+    lv_indev_get_point(in, &p);
+    if(lv_event_get_code(e) == LV_EVENT_PRESSED) { s_tap_from = p; return; }
+    if(std::abs(p.x - s_tap_from.x) > kTapSlip || std::abs(p.y - s_tap_from.y) > kTapSlip) {
+        // (the press is taken away - LV_EVENT_PRESS_LOST, no RELEASED, which is what turns a
+        // switch - and nothing new is pressed until the finger is up)
+        lv_indev_reset(in, lv_event_get_target_obj(e));
+        lv_indev_wait_release(in);
+    }
+}
+
 // What a key of the keyboard is, for its colour.
 enum class KbKey { Letter, Control, Clear, Close, Done };
 KbKey kb_key(const char* txt)
@@ -1890,11 +1911,15 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
     else if(iequals(type, "switch")) {
         wk = Widget::Switch;
         obj = lv_switch_create(parent);
+        lv_obj_add_event_cb(obj, tap_only, LV_EVENT_PRESSED, nullptr);
+        lv_obj_add_event_cb(obj, tap_only, LV_EVENT_PRESSING, nullptr);
     }
     else if(iequals(type, "checkbox")) {
         wk = Widget::Checkbox;
         obj = lv_checkbox_create(parent);
         lv_checkbox_set_text(obj, texts().resolve(jstr(w, "text", "")).c_str());
+        lv_obj_add_event_cb(obj, tap_only, LV_EVENT_PRESSED, nullptr);
+        lv_obj_add_event_cb(obj, tap_only, LV_EVENT_PRESSING, nullptr);
     }
     else if(iequals(type, "slider")) {
         wk = Widget::Slider;

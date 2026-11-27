@@ -546,7 +546,7 @@ TEST_CASE("deploy: System > Deploy - switched on, a designer accepted, the proje
     sys.command("deploy", "receive");
     REQUIRE(ds.listening());
     CHECK(flag("receive"));
-    CHECK(text("state").find(ds.fingerprint()) != std::string::npos);
+    CHECK(text("state").find(fingerprint_for_reading(ds.fingerprint())) != std::string::npos);
     sys.command("deploy", "adding");
     CHECK(flag("adding"));
 
@@ -559,7 +559,7 @@ TEST_CASE("deploy: System > Deploy - switched on, a designer accepted, the proje
     s.req.expect_fingerprint = ds.fingerprint();
     s.go();
     REQUIRE(until([&] { return flag("pending"); }, [&] { sys.poll(); }));
-    CHECK(text("pending_text").find(s.me.fingerprint) != std::string::npos);
+    CHECK(text("pending_text").find(fingerprint_for_reading(s.me.fingerprint)) != std::string::npos);
     CHECK(text("pending_text").find("pc-7") != std::string::npos);
     CHECK(title_of(proj) == "Old");
     sys.command("deploy", "accept");
@@ -570,7 +570,7 @@ TEST_CASE("deploy: System > Deploy - switched on, a designer accepted, the proje
     CHECK(title_of(proj) == "New");
     CHECK(read(proj / "project.local.json") == "{ \"drivers\": {} }");     // what the device owns stays
     CHECK(text("status").find("installed") != std::string::npos);
-    CHECK(text("d1").find(s.me.fingerprint) != std::string::npos);
+    CHECK(text("d1").find(fingerprint_for_reading(s.me.fingerprint)) != std::string::npos);
     CHECK(text("count") == "1 accepted designer(s)");
     for(int i = 0; i < 5; i++) sys.poll();
     CHECK(rt.restart_requests == 1);
@@ -825,7 +825,7 @@ TEST_CASE("deploy: System > Deploy - allowing a designer to replace the runtime 
     // asked first; "Cancel" changes nothing
     sys.command("deploy", "runtime", "1");
     CHECK(flag("confirm_rt"));
-    CHECK(text("confirm_rt_text").find(me.fingerprint) != std::string::npos);
+    CHECK(text("confirm_rt_text").find(fingerprint_for_reading(me.fingerprint)) != std::string::npos);
     CHECK_FALSE(ds.designers()[0].runtime);
     sys.command("deploy", "runtime_no");
     CHECK_FALSE(flag("confirm_rt"));
@@ -1025,4 +1025,14 @@ TEST_CASE("deploy: a project that can do other things than the one before waits 
     p.unload();
     ds.stop();
     ds.open("");
+}
+
+TEST_CASE("deploy: a fingerprint is shown in groups of four, with nothing left out")
+{
+    CHECK(fingerprint_for_reading("SHA256:zleUE1/+rhCV") == "SHA256: zleU E1/+ rhCV");
+    CHECK(fingerprint_for_reading("SHA256:abcde") == "SHA256: abcd e");
+    CHECK(fingerprint_for_reading("nocolon") == "nocolon");
+    std::string back;
+    for(char c : fingerprint_for_reading("SHA256:TWpCGiFNpKNOfmI5WsFNWtfgNg8BCxfrNgAS39smkY4")) if(c != ' ') back += c;
+    CHECK(back == "SHA256:TWpCGiFNpKNOfmI5WsFNWtfgNg8BCxfrNgAS39smkY4");
 }

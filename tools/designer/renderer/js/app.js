@@ -107,6 +107,12 @@ const App = {
   },
 
   // The texts that are part of the page itself (toolbar, tabs): shown in the chosen language.
+  // a fingerprint as the device shows it, to be compared by eye: "SHA256:" and groups of four
+  fpRead(fp) {
+    const s = String(fp || ''), i = s.indexOf(':');
+    return i < 0 ? s : s.slice(0, i + 1) + ' ' + (s.slice(i + 1).match(/.{1,4}/g) || []).join(' ');
+  },
+
   staticTexts() {
     for (const b of document.querySelectorAll('#toolbar button, #left-tabs button, #center-tabs button, #runlog-head button, #runlog-head b')) {
       if (b.dataset.i18n === undefined) b.dataset.i18n = b.textContent;
@@ -1025,9 +1031,9 @@ const App = {
       const r = await host.directInfo(v);
       info.innerHTML = '';
       if (!r || !r.ok) { info.append(U.el('div', { class: 'warn' }, 'Check failed: ' + ((r && r.error) || 'unknown error'))); return null; }
-      info.append(U.el('h4', null, 'This designer'), U.el('pre', null, r.mine),
+      info.append(U.el('h4', null, 'This designer'), U.el('pre', null, this.fpRead(r.mine)),
         U.el('div', { class: 'hint' }, 'A target that sees this designer for the first time asks its operator: on its screen switch on System > Deploy > Add a designer, deploy, and accept it there if it shows this fingerprint.'),
-        U.el('h4', null, 'The target'), U.el('pre', null, r.device),
+        U.el('h4', null, 'The target'), U.el('pre', null, this.fpRead(r.device)),
         U.el('div', { class: r.known ? 'hint' : 'warn' }, r.known ? 'This is the target that was confirmed before.'
           : r.changed ? 'This is NOT the target that was confirmed before at this address (reinstalled, or another device). Deploy only if its screen (System > Deploy) shows this fingerprint.'
           : 'This target is new to this designer. Deploy only if its screen (System > Deploy) shows this fingerprint.'));

@@ -37,6 +37,12 @@
 
 namespace hml {
 
+// A fingerprint as it is shown to be compared by eye: "SHA256:" and the rest in groups of four
+// ("SHA256: zleU E1/+ rhCV ..."). Forty-three characters in a row cannot be compared on a small
+// screen; nothing is left out, so it says as much as before. Both sides show it this way.
+std::string fingerprint_for_reading(const std::string& fingerprint);
+
+
 constexpr int kDeployDefaultPort = 4856;
 
 struct DeployIdentity {
