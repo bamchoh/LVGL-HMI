@@ -68,7 +68,7 @@ public:
             std::string next;
             if(s) {
                 if(!s->enabled) next = "off";
-                else if(auto t = schedule_next_due(*s, now)) { const std::string full = LogDb::format_time(*t * 1000); next = full.size() >= 16 ? full.substr(5, 11) : full; }
+                else if(auto t = schedule_next_due(*s, now)) { const std::string full = LogDb::format_time(*t * 1000); next = "Next " + (full.size() >= 16 ? full.substr(5, 11) : full); }
                 else next = "done";
             }
             info("x" + k, next);
@@ -137,7 +137,10 @@ public:
     }
 
     // Save (of the schedule that is picked) is in the bar at the bottom, not in the list
-    std::vector<PageAction> actions() const override { return { { "Save", "save", PageAction::Kind::Primary, "", "selected" } }; }
+    std::vector<PageAction> actions() const override
+    {
+        return { { "Close", "close", PageAction::Kind::Neutral, "selected", "" }, { "Save", "save", PageAction::Kind::Primary, "", "selected" } };
+    }
 
     json custom_rows(bool compact, int font) const override
     {
@@ -171,7 +174,7 @@ public:
                                  { "style_label", { { "font", font } } } });
         form["children"] = json::array({
             row(json::array({ name, json{ { "type", "label" }, { "text", "On" }, { "style", { { "font", font }, { "text_color", muted } } } },
-                              json{ { "type", "switch" }, { "bind", tag("enabled") } }, button("x", "#455a64", "close", compact ? 34 : 44) })),
+                              json{ { "type", "switch" }, { "bind", tag("enabled") } } })),
             row(json::array({ json{ { "type", "datetime_input" }, { "mode", "time" }, { "bind", tag("at") } }, json{ { "type", "panel" }, { "flex_grow", 1 }, { "h", 1 }, { "style", { { "bg_opa", 0 }, { "border_width", 0 } } } },
                               }), "daily"),
             row(std::move(days), "daily"),
@@ -191,7 +194,7 @@ public:
             const std::string k = std::to_string(i);
             json n = label("n" + k, "#ffffff", font + 2); n["w"] = compact ? 110 : 180;
             json t = label("t" + k, "#90caf9", font); t["flex_grow"] = 1;
-            json x = label("x" + k, muted, font); x["w"] = compact ? 92 : 120; x["style"]["text_align"] = "right";
+            json x = label("x" + k, muted, font); x["w"] = compact ? 124 : 160; x["style"]["text_align"] = "right";
             rows.push_back(json{ { "type", "panel" }, { "w", "100%" }, { "h", compact ? 34 : 44 }, { "flex", "row" }, { "flex_cross", "center" }, { "flex_track", "center" }, { "scrollable", false },
                                  { "style", { { "bg_color", "#2c3e50" }, { "radius", 6 }, { "border_width", 0 }, { "pad_left", 8 }, { "pad_right", 8 }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", 6 } } },
                                  { "bind", { { "visible", tag("r" + k + "_used") } } },

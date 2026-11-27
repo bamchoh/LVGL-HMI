@@ -24,7 +24,7 @@ constexpr int kGiveUpTicks = 40;        // an answer that never comes (the drive
 class DevicePage final : public SettingsPage {
 public:
     std::string id() const override { return "device"; }
-    std::string title() const override { return "Device"; }
+    std::string title() const override { return "Addresses"; }   // ("Device" is a tab of the menu)
     bool has_apply() const override { return false; }
 
     static std::vector<std::string> capable()

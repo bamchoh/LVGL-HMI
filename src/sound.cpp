@@ -548,7 +548,7 @@ public:
         auto text = [&](const char* t, int w) { return json{ { "type", "label" }, { "text", t }, { "w", w }, { "style", { { "font", font }, { "text_color", muted } } } }; };
         const int lw = compact ? 90 : 140;
         json rows = json::array();
-        rows.push_back(row(json::array({ text("Mute", lw), json{ { "type", "switch" }, { "bind", kMuteTag } } })));
+        rows.push_back(row(json::array({ text("Mute (no sound)", lw), json{ { "type", "switch" }, { "bind", kMuteTag } } })));
         rows.push_back(row(json::array({ text("Volume", lw),
                                          json{ { "type", "slider" }, { "w", compact ? 250 : 420 }, { "min", 0 }, { "max", 100 }, { "bind", kVolumeTag } },
                                          json{ { "type", "panel" }, { "w", 4 }, { "h", 1 }, { "style", { { "bg_opa", 0 }, { "border_width", 0 } } } },
