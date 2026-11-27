@@ -120,11 +120,15 @@ public:
     void poll();
     // The colour of what is chosen or pressed ("#rrggbb"): the project's primary colour.
     void set_accent(const std::string& color) { accent_ = color; }
+    // A project with a light theme ("theme": { "dark": false }): the system screens are light too.
+    void set_light(bool on) { light_ = on; }
+    bool light() const { return light_; }
 
 private:
     void update_summaries();
     void translate_status(const std::string& page_id);
     void set_status(const std::string& page_id, const std::string& english, bool problem);
+    bool light_ = false;
     std::map<std::string, std::string> status_shown_;            // page -> the status line as it was last written here
     std::string accent_ = "#1e88e5";
     unsigned    summary_ticks_ = 0;
@@ -161,6 +165,9 @@ void register_builtin_pages(SystemSettings& s, Project& proj);
 // The language the system screens are shown in for this project (system_i18n.hpp): set before
 // the pages are asked for their texts.
 void choose_system_language(Project& proj);
+// The colours of a system screen for a light theme. The screens are written with dark colours;
+// this puts the light ones in their place (backgrounds, texts, what is pressed), in one spot.
+void system_light_palette(json& screen);
 
 // Overlay keys of the drivers array: "name" or "type", "#n" appended for duplicates.
 std::vector<std::string> driver_keys(const json* drivers);

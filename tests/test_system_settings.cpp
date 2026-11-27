@@ -988,3 +988,44 @@ TEST_CASE("System: the status line is a warning only when something went wrong")
     p.stop_logs();
     p.unload();
 }
+
+TEST_CASE("System: with a light theme no dark background and no white text on it is left")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    // every colour of a screen, with what it is used for
+    std::function<void(const json&, std::set<std::string>&, std::set<std::string>&)> colours = [&](const json& w, std::set<std::string>& back, std::set<std::string>& text) {
+        if(w.is_array()) { for(const json& c : w) colours(c, back, text); return; }
+        if(!w.is_object()) return;
+        if(w.contains("style") && w["style"].is_object()) {
+            if(const json* c = jget(w["style"], "bg_color"); c && c->is_string()) back.insert(c->get<std::string>());
+            if(jstr(w, "type", "") == "label")
+                if(const json* c = jget(w["style"], "text_color"); c && c->is_string()) text.insert(c->get<std::string>());
+        }
+        if(w.contains("children")) colours(w["children"], back, text);
+    };
+    auto dark = [](const std::string& c) {                       // (the sum of the three parts, 0 .. 765)
+        if(c.size() != 7 || c[0] != '#') return false;
+        const long v = std::strtol(c.c_str() + 1, nullptr, 16);
+        const long r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+        return r < 110 && g < 110 && b < 130;                     // (dark and without a colour: not the red of Delete)
+    };
+    std::set<std::string> back, text;
+    sys.set_light(false);
+    for(const json& s : sys.screens(800, 480)) colours(s, back, text);
+    CHECK(std::any_of(back.begin(), back.end(), dark));          // (as written: dark)
+    back.clear(); text.clear();
+    sys.set_light(true);
+    for(const json& s : sys.screens(800, 480)) colours(s, back, text);
+    std::string left;
+    for(const std::string& c : back) if(dark(c) && c != "#000000") left += " " + c;          // (black: the scrim behind a question)
+    CHECK_MESSAGE(left.empty(), "dark backgrounds left:" << left);
+    CHECK(text.count("#ffffff") == 0);                           // (white text of a label would be on a light background)
+    sys.set_light(false);
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
