@@ -37,6 +37,8 @@ const std::vector<Pattern>& patterns()
         { std::regex(R"(^Port (\d+): this device only \(no password set\)(.*)$)"), "ポート $1: この装置からだけ（パスワード未設定）$2" },
         { std::regex(R"(^(\d+) s$)"), "$1 秒" },
         { std::regex(R"(^Next (.*)$)"), "次回 $1" },
+        { std::regex(R"(^Saved: (.*)  \(off\)$)"), "保存しました: $1（オフ）" },
+        { std::regex(R"(^Saved: (.*)$)"), "保存しました: $1" },
         { std::regex(R"(^(\d\d:\d\d)  weekdays$)"), "$1  平日" },
         { std::regex(R"(^(\d\d:\d\d)  daily$)"), "$1  毎日" },
         { std::regex(R"(^(\d\d:\d\d)  weekends$)"), "$1  土日" },
