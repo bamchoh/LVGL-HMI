@@ -10,6 +10,7 @@
 // (or from anywhere before Project::load() returns).
 #pragma once
 #include <functional>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
@@ -129,6 +130,7 @@ private:
     void translate_status(const std::string& page_id);
     void set_status(const std::string& page_id, const std::string& english, bool problem);
     bool light_ = false;
+    std::map<std::string, std::chrono::steady_clock::time_point> status_until_;   // page -> when its news is put away
     std::map<std::string, std::string> status_shown_;            // page -> the status line as it was last written here
     std::string accent_ = "#1e88e5";
     unsigned    summary_ticks_ = 0;

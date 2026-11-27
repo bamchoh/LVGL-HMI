@@ -1,4 +1,6 @@
 #include "system_settings.hpp"
+
+#include <chrono>
 #include "screen_saver.hpp"
 #include "project.hpp"
 #include "serial_ports.hpp"
@@ -240,6 +242,7 @@ void SystemSettings::refresh(const std::string& page_id)
             else set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
         }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
+        if(!tags().find(tag_name(p->id(), "status_on"))) set_tag(tag_name(p->id(), "status_on"), TagType::Bool, Value::number(0, TagType::Bool));
         if(!tags().find(tag_name(p->id(), "status_warn"))) set_tag(tag_name(p->id(), "status_warn"), TagType::Bool, Value::number(0, TagType::Bool));
         fields_[p->id()] = std::move(fields);
     }
@@ -302,6 +305,7 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
     SettingsPage* p = page(page_id);
     if(!p) { HML_WARN("system: unknown page '%s'", page_id.c_str()); return; }
     if(!system_allowed("command for", page_id)) return;
+    if(cmd == "status_dismiss") { set_status(page_id, "", false); return; }      // (a touch on the message)
     p->command(cmd, arg);
     refresh(page_id);
     translate_status(page_id);
@@ -337,11 +341,23 @@ void SystemSettings::set_status(const std::string& page_id, const std::string& e
     status_shown_[page_id] = text;
     set_tag(tag_name(page_id, "status"), TagType::String, Value::string(text));
     set_tag(tag_name(page_id, "status_warn"), TagType::Bool, Value::number(problem && !english.empty() ? 1 : 0, TagType::Bool));
+    set_tag(tag_name(page_id, "status_on"), TagType::Bool, Value::number(english.empty() ? 0 : 1, TagType::Bool));
+    // News goes away by itself after a few seconds (the strip lies over the end of the list);
+    // what went wrong, and what is still going on ("Writing ..."), stays until it is touched or replaced.
+    const bool stays = english.empty() || problem || english.find("...") != std::string::npos;
+    if(stays) status_until_.erase(page_id);
+    else status_until_[page_id] = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 }
 
 void SystemSettings::poll()
 {
     for(const auto& p : pages_) { if(p->poll()) refresh(p->id()); translate_status(p->id()); }
+    for(auto it = status_until_.begin(); it != status_until_.end();) {
+        if(std::chrono::steady_clock::now() < it->second) { ++it; continue; }
+        const std::string page_id = it->first;
+        it = status_until_.erase(it);
+        set_status(page_id, "", false);
+    }
     // the lines under the names in the menu follow what happens (about once a second, while it is shown)
     if(++summary_ticks_ % 4 == 0 && ui().current_screen().value_or("") == menu_screen()) update_summaries();
 }
@@ -630,6 +646,10 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         std::vector<SettingField> fields = it != fields_.end() ? it->second : p->fields();
         json custom = p->custom_rows(compact, font);
         if(custom.is_array()) { rows = std::move(custom); fields.clear(); restyle(rows, true, compact, accent); }
+        // The names of a page have one width - that of the longest - so that what is set starts at one
+        // line down the page (a width for each name made the fields jump from row to row).
+        int name_w = compact ? 130 : large ? 240 : 170;
+        for(const SettingField& f : fields) name_w = std::max(name_w, label_width(sys_text(f.label), name_w, font, compact ? 190 : 280));
         for(const SettingField& f : fields) {
             const std::string tag = tag_name(id, f.key);
             json widget;
@@ -659,16 +679,12 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                 { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : large ? 14 : 10 }, { "pad_left", compact ? 10 : large ? 18 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "text", sys_text(f.label) }, { "w", label_width(sys_text(f.label), compact ? 130 : large ? 240 : 170, font, compact ? 190 : 280) }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
+                    json{ { "type", "label" }, { "text", sys_text(f.label) }, { "w", name_w }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
                     widget,
                 }) },
             });
         }
-        // what the page says: plain when it is news ("Saved."), in the colour of a warning when something went wrong
-        for(bool warn : { false, true })
-            rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" },
-                                 { "bind", { { "text", tag_name(id, "status") }, { "visible", { { "tag", tag_name(id, "status_warn") }, { "invert", !warn } } } } },
-                                 { "style", { { "font", font }, { "text_color", warn ? "#ffc107" : "#cfd8e3" } } } });
+        // (what the page says is not in the list: see "the message" below)
 
         // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
         const std::vector<PageAction> extra = p->actions();
@@ -712,6 +728,23 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                                      { "flex", "row" }, { "flex_cross", "center" },
                                      { "style", { { "bg_color", bar }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", col_x + margin }, { "pad_right", col_x + margin }, { "pad_top", 0 }, { "pad_bottom", 0 }, { "pad_column", gap } } },
                                      { "children", buttons } });
+        }
+        // The message of the page ("Writing the backup ...", "Saved.", what went wrong): a strip over
+        // the bar at the bottom, where it is seen whatever the list is scrolled to - at the end of
+        // the list it was out of sight on a small screen. Plain when it is news, in the colour of a
+        // warning when something went wrong. A touch puts it away.
+        {
+            json texts = json::array();
+            for(bool warn : { false, true })
+                texts.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "clickable", false },
+                                      { "bind", { { "text", tag_name(id, "status") }, { "visible", { { "tag", tag_name(id, "status_warn") }, { "invert", !warn } } } } },
+                                      { "style", { { "font", font }, { "text_color", warn ? "#ffc107" : "#ffffff" } } } });
+            children.push_back(json{ { "type", "panel" }, { "align", "bottom_mid" }, { "y", -(footer_h + (footer_h ? 4 : margin)) }, { "w", col_w - 2 * margin }, { "h", "content" },
+                                     { "flex", "column" }, { "scrollable", false },
+                                     { "bind", { { "visible", tag_name(id, "status_on") } } },
+                                     { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":status_dismiss" } } },
+                                     { "style", { { "bg_color", "#2c3e50" }, { "radius", 8 }, { "border_width", 1 }, { "border_color", "#455a64" }, { "pad", compact ? 8 : 10 }, { "shadow_width", 12 }, { "shadow_opa", 80 } } },
+                                     { "children", texts } });
         }
         // the questions of the page: over the top of the list, not part of it
         for(const PageDialog& d : p->dialogs()) {
