@@ -244,6 +244,10 @@ const Props = {
     const specific = this.fields(w, sch.props, fk);
     if (sch.series) specific.push(this.seriesEditor(w, fk));
     if (specific.length) el.append(this.section('Widget', true, ...specific));
+    // what it shows and what it does come first: that is what a widget is for. Where it is and
+    // how it looks follow.
+    el.append(this.bindSection(w, fk));
+    el.append(this.eventSection(w, fk));
     el.append(this.section('Position & size', true, ...this.fields(w, common, fk)));
     const layout = this.fields(w, M.isContainer(w) ? SCHEMA.flex : SCHEMA.flex.filter(f => f.k === 'flex_grow'), fk);
     el.append(this.section('Layout', !!w.flex, ...layout));
@@ -251,8 +255,6 @@ const Props = {
     el.append(this.section('Access (users)', w.level !== undefined, ...this.fields(w, SCHEMA.access, fk)));
     el.append(this.section('Animation', w.animate !== undefined, ...this.animateRows(w, fk)));
     el.append(this.styleSection(w, fk));
-    el.append(this.bindSection(w, fk));
-    el.append(this.eventSection(w, fk));
   },
 
   focusFirst() { const i = this.el.querySelector('input,select,textarea'); if (i) i.focus(); },
@@ -385,26 +387,38 @@ const Props = {
   },
 
   // ---- events / actions --------------------------------------------------
+  // An event is a block; each of its actions is a card of its own: the kind of action over the
+  // whole width (it has to be readable: "Open the system settings"), then one line per setting.
+  // The panel is narrow - nothing is put side by side that has to share its width.
   eventSection(w, fk) {
     const blocks = [];
+    const evName = ev => { const t = I18N.value(ev); return t === ev ? ev : t; };
     for (const ev of SCHEMA.events) {
       if (w[ev] === undefined) continue;
       const acts = Array.isArray(w[ev]) ? w[ev] : [w[ev]];
       const commit = () => M.mutate(() => { w[ev] = acts; if (!acts.length) delete w[ev]; });
-      const rows = acts.map((a, i) => {
-        const sel = U.el('select', { onchange: e => { const kind = e.target.value; for (const k of Object.keys(a)) delete a[k]; a.action = kind; commit(); } });
+      const cards = acts.map((a, i) => {
+        const sel = U.el('select', { title: 'what happens', onchange: e => { const kind = e.target.value; for (const k of Object.keys(a)) delete a[k]; a.action = kind; commit(); } });
         for (const k of Object.keys(SCHEMA.actions)) sel.append(U.el('option', { value: k, selected: k === a.action }, I18N.action(k)));
-        const fieldsEls = (SCHEMA.actions[a.action] || []).map(f => U.el('span', { class: 'inline' }, U.el('span', { class: 'dim' }, f.k), this.editor(a, f.k, f, fk + '.' + ev + '.' + i)));
-        const del = U.el('button', { class: 'mini danger', onclick: () => { acts.splice(i, 1); commit(); } }, '×');
-        return U.el('div', { class: 'row act' }, sel, ...fieldsEls, del);
+        const del = U.el('button', { class: 'mini danger', title: 'remove this action', onclick: () => { acts.splice(i, 1); commit(); } }, '×');
+        const up = U.el('button', { class: 'mini', title: 'earlier', disabled: i === 0, onclick: () => { acts.splice(i - 1, 0, acts.splice(i, 1)[0]); commit(); } }, '↑');
+        const head = U.el('div', { class: 'row act-head' }, U.el('span', { class: 'act-no' }, String(i + 1)), sel, acts.length > 1 ? up : null, del);
+        const fields = (SCHEMA.actions[a.action] || []).map(f =>
+          U.el('div', { class: 'row sub' }, U.el('label', { title: f.k }, f.k), this.editor(a, f.k, f, fk + '.' + ev + '.' + i)));
+        return U.el('div', { class: 'act-card' }, head, ...fields);
       });
       const add = U.el('button', { class: 'mini', onclick: () => { acts.push({ action: 'set', tag: M.tagNames()[0] || '', value: true }); commit(); } }, '+ action');
       const delEv = U.el('button', { class: 'mini danger', title: 'remove event', onclick: () => M.mutate(() => delete w[ev]) }, '×');
-      blocks.push(U.el('div', { class: 'ev-block' }, U.el('div', { class: 'row ev-head' }, U.el('b', null, ev), delEv), ...rows, U.el('div', { class: 'row' }, U.el('label'), add)));
+      const name = evName(ev);
+      blocks.push(U.el('div', { class: 'ev-block' },
+        U.el('div', { class: 'row ev-head' }, U.el('b', null, name), name.includes(ev) ? null : U.el('span', { class: 'dim' }, ev), U.el('span', { class: 'grow' }), delEv),
+        ...cards, U.el('div', { class: 'row' }, add)));
     }
-    const addEv = U.el('select', { onchange: e => { const ev = e.target.value; if (ev) M.mutate(() => { w[ev] = [{ action: 'set', tag: M.tagNames()[0] || '', value: true }]; }); } }, U.el('option', { value: '' }, '+ add event…'));
-    for (const ev of SCHEMA.events) if (w[ev] === undefined) addEv.append(U.el('option', { value: ev }, I18N.value(ev)));
-    return this.section('Events / actions', blocks.length > 0, ...blocks, U.el('div', { class: 'row' }, U.el('label'), addEv));
+    const addEv = U.el('select', { class: 'add-event', onchange: e => { const ev = e.target.value; if (ev) M.mutate(() => { w[ev] = [{ action: 'set', tag: M.tagNames()[0] || '', value: true }]; }); } },
+      U.el('option', { value: '' }, I18N.t('+ add event…')));
+    for (const ev of SCHEMA.events) if (w[ev] === undefined) { const n = evName(ev); addEv.append(U.el('option', { value: ev }, n.includes(ev) ? n : n + '  (' + ev + ')')); }
+    // (a button without an event does nothing: its section is open, so that "+ add event" is seen)
+    return this.section('Events / actions', blocks.length > 0 || w.type === 'button', ...blocks, U.el('div', { class: 'row' }, addEv));
   },
 
   // ---- chart series ------------------------------------------------------
