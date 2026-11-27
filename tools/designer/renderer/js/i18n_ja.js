@@ -285,6 +285,7 @@ Object.assign(I18N.TEXT_JA, {
 I18N.PATTERNS_JA.push([/^duplicate tag names: (.*)$/, '重複しているタグ名: $1']);
 I18N.PATTERNS_JA.push([/^(\d+) texts$/, '$1 個のテキスト'], [/^ (\d+) items$/, ' $1 項目'], [/^(\d+) items$/, '$1 項目']);
 Object.assign(I18N.TEXT_JA, { 'Widgets': '部品', 'Level': 'レベル', 'Screen': '画面',
+  'Recorded': '記録する', 'Not recorded': '記録しない',
   'More': 'その他', 'Find and replace': '検索と置換', 'Screen JSON': '画面の JSON', 'Find a widget…': '部品を探す…',
   'This screen is empty': 'この画面はまだ空です',
   'Click a widget in the list at the left, or drag it here. "Ready-made buttons" already do something.': '左の一覧の部品をクリックするか、ここへドラッグして置きます。「よく使うボタン」は動作を設定済みです。' });
