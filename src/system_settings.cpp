@@ -242,6 +242,7 @@ void SystemSettings::refresh(const std::string& page_id)
             else set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
         }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
+        if(!tags().find(tag_name(p->id(), "status_kind"))) set_tag(tag_name(p->id(), "status_kind"), TagType::Int, Value::number(0, TagType::Int));
         if(!tags().find(tag_name(p->id(), "status_on"))) set_tag(tag_name(p->id(), "status_on"), TagType::Bool, Value::number(0, TagType::Bool));
         if(!tags().find(tag_name(p->id(), "status_warn"))) set_tag(tag_name(p->id(), "status_warn"), TagType::Bool, Value::number(0, TagType::Bool));
         fields_[p->id()] = std::move(fields);
@@ -344,7 +345,9 @@ void SystemSettings::set_status(const std::string& page_id, const std::string& e
     set_tag(tag_name(page_id, "status_on"), TagType::Bool, Value::number(english.empty() ? 0 : 1, TagType::Bool));
     // News goes away by itself after a few seconds (the strip lies over the end of the list);
     // what went wrong, and what is still going on ("Writing ..."), stays until it is touched or replaced.
-    const bool stays = english.empty() || problem || english.find("...") != std::string::npos;
+    const bool busy = !problem && english.find("...") != std::string::npos;
+    set_tag(tag_name(page_id, "status_kind"), TagType::Int, Value::number(english.empty() ? 0 : problem ? 2 : busy ? 3 : 1, TagType::Int));
+    const bool stays = english.empty() || problem || busy;
     if(stays) status_until_.erase(page_id);
     else status_until_[page_id] = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 }
@@ -421,12 +424,14 @@ const Pair kBack[] = {
     { "#2c3e50", "#d3dbe5" }, { "#3a4a5e", "#d3dbe5" }, { "#455a64", "#d3dbe5" }, { "#37474f", "#d3dbe5" },
     { "#2f4a6b", "#bbdefb" },
     { "#4a3a10", "#fff3cd" }, { "#4a1c1c", "#fde0e0" },
+    { "#12372a", "#d1e7dd" }, { "#1f7a4d", "#a3cfbb" }, { "#3d3208", "#fff3cd" }, { "#997404", "#ffe69c" }, { "#0d2f52", "#cfe2ff" }, { "#1c5fa8", "#9ec5fe" },   // the message of a page
 };
 // what is read
 const Pair kText[] = {
     { "#ffffff", "#16202b" }, { "#eef3f8", "#263442" }, { "#cfd8e3", "#263442" },
     { "#9fb3c8", "#5b6b7c" }, { "#8fa3b8", "#5b6b7c" }, { "#6f7c8a", "#5b6b7c" },
     { "#90caf9", "#1565c0" }, { "#a5d6a7", "#2e7d32" },
+    { "#8fd9b0", "#0a3622" }, { "#ffda6a", "#664d03" }, { "#9ec5fe", "#052c65" },
     { "#ffc107", "#9a5b00" }, { "#ffcc80", "#9a5b00" }, { "#ffb74d", "#9a5b00" }, { "#ffb300", "#9a5b00" },
 };
 template <size_t N> const char* find(const Pair (&t)[N], const std::string& c)
@@ -565,8 +570,16 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             json{ { "type", "button" }, { "align", "left_mid" }, { "text", LV_SYMBOL_LEFT }, { "w", header_h + 4 }, { "h", header_h - 6 },
                   { "style", { { "bg_color", tile }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                   { "on_click", { { "action", "back" } } } },
-            json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", sys_text(title) }, { "style", { { "font", title_font }, { "text_color", text } } } },
         });
+        // The clock of the device, in the head of every system screen: what is set here (a
+        // schedule, the time a screen goes dark) is set against it. The date too where there is room.
+        const int apply_w = apply_page.empty() ? 0 : (compact ? 96 : large ? 150 : 120);
+        const int clock_w = compact ? 72 : large ? 200 : 170;
+        const int title_w = std::max(60, col_w - 2 * margin - (header_h + 16) - clock_w - 8 - (apply_w ? apply_w + 8 : 0));
+        children.push_back(json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "w", title_w }, { "long_mode", "dots" }, { "text", sys_text(title) },
+                                 { "style", { { "font", title_font }, { "text_color", text } } } });
+        children.push_back(json{ { "type", "label" }, { "align", "right_mid" }, { "x", -(apply_w ? apply_w + 8 : 0) }, { "bind", { { "text", compact ? "sys.time" : "sys.datetime" } } },
+                                 { "style", { { "font", font }, { "text_color", "#9fb3c8" } } } });
         if(!apply_page.empty())
             children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", sys_text("Apply") }, { "w", compact ? 96 : large ? 150 : 120 }, { "h", header_h - 6 },
                                      { "style", { { "bg_color", accent }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
@@ -734,16 +747,20 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         // the list it was out of sight on a small screen. Plain when it is news, in the colour of a
         // warning when something went wrong. A touch puts it away.
         {
-            json texts = json::array();
-            for(bool warn : { false, true })
-                texts.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "clickable", false },
-                                      { "bind", { { "text", tag_name(id, "status") }, { "visible", { { "tag", tag_name(id, "status_warn") }, { "invert", !warn } } } } },
-                                      { "style", { { "font", font }, { "text_color", warn ? "#ffc107" : "#ffffff" } } } });
+            // (tinted, as alerts are elsewhere: the colour says at a glance which of the three it is, the words say what)
+            const std::string kind = tag_name(id, "status_kind");
+            auto by_kind = [&](const char* ok, const char* problem, const char* busy) {
+                return json{ { "tag", kind }, { "map", { { "1", ok }, { "2", problem }, { "3", busy }, { "default", ok } } } };
+            };
+            json texts = json::array({ json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "clickable", false },
+                                             { "bind", { { "text", tag_name(id, "status") }, { "text_color", by_kind("#8fd9b0", "#ffda6a", "#9ec5fe") } } },
+                                             { "style", { { "font", font }, { "text_color", "#8fd9b0" } } } } });
             children.push_back(json{ { "type", "panel" }, { "align", "bottom_mid" }, { "y", -(footer_h + (footer_h ? 4 : margin)) }, { "w", col_w - 2 * margin }, { "h", "content" },
                                      { "flex", "column" }, { "scrollable", false },
-                                     { "bind", { { "visible", tag_name(id, "status_on") } } },
+                                     { "bind", { { "visible", tag_name(id, "status_on") }, { "bg_color", by_kind("#12372a", "#3d3208", "#0d2f52") },
+                                                 { "border_color", by_kind("#1f7a4d", "#997404", "#1c5fa8") } } },
                                      { "on_click", { { "action", "call" }, { "fn", "system.do" }, { "arg", id + ":status_dismiss" } } },
-                                     { "style", { { "bg_color", "#2c3e50" }, { "radius", 8 }, { "border_width", 1 }, { "border_color", "#455a64" }, { "pad", compact ? 8 : 10 }, { "shadow_width", 12 }, { "shadow_opa", 80 } } },
+                                     { "style", { { "bg_color", "#12372a" }, { "radius", 8 }, { "border_width", 1 }, { "border_color", "#1f7a4d" }, { "pad", compact ? 8 : 10 }, { "shadow_width", 12 }, { "shadow_opa", 80 } } },
                                      { "children", texts } });
         }
         // the questions of the page: over the top of the list, not part of it
