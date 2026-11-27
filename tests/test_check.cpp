@@ -404,3 +404,22 @@ TEST_CASE("check: OPC UA server: security, certificate files, no password in the
     CHECK(has(lines, "the password is in the project file"));
     CHECK_FALSE(has(lines, "drivers[1]"));                     // "none" is said at run time and in the designer
 }
+
+TEST_CASE("check: system_language is ja or en, and ja wants a font file")
+{
+    Proj p;
+    p.write("screens/a.json", R"json({ "name": "a", "children": [ { "type": "button", "on_click": { "action": "system" } } ] })json");
+    auto project = [&](const std::string& more) {
+        p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ])json" + more + " }");
+    };
+    project("");
+    CHECK_FALSE(has(p.check(), "system_language"));
+    project(R"json(, "system_language": "en")json");
+    CHECK_FALSE(has(p.check(), "system_language"));
+    project(R"json(, "system_language": "fr")json");
+    CHECK(has(p.check(), "\"ja\" or \"en\""));
+    project(R"json(, "system_language": "ja")json");
+    CHECK(has(p.check(), "needs a font file"));
+    project(R"json(, "system_language": "ja", "font": { "file": "assets/x.otf" })json");
+    CHECK_FALSE(has(p.check(), "needs a font file"));
+}

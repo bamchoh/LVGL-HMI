@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "src/misc/lv_text_private.h"
 #include "texts.hpp"
 #include "font_cmap.hpp"
 #include <map>
@@ -113,6 +114,15 @@ void set_font_file(const std::string& path)
 }
 
 bool has_font_file() { return !s_font_file.empty(); }
+
+bool font_file_has(const std::string& text)
+{
+    if(s_font_file.empty() || s_font_failed) return false;
+    const char* p = text.c_str();
+    uint32_t i = 0;
+    while(uint32_t c = lv_text_encoded_next(p, &i)) if(!s_cmap.has(c)) return false;
+    return true;
+}
 
 const lv_font_t* font_of_size(int size)
 {
@@ -2327,6 +2337,14 @@ size_t Ui::build_pending(size_t max)
         else left++;
     }
     return left;
+}
+
+bool Ui::replace_source(const json& screen)
+{
+    auto name = jstr_opt(screen, "name");
+    if(!name) return false;
+    for(auto& s : impl_->screens) if(s->name == *name) { s->source = screen; return true; }
+    return false;
 }
 
 void Ui::rebuild_all()

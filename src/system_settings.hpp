@@ -123,6 +123,7 @@ public:
 
 private:
     void update_summaries();
+    void translate_status(const std::string& page_id);
     std::string accent_ = "#1e88e5";
     unsigned    summary_ticks_ = 0;
     std::vector<std::unique_ptr<SettingsPage>> pages_;
@@ -155,6 +156,9 @@ std::unique_ptr<SettingsPage> make_device_page();
 bool has_device_driver(const json* drivers);
 void add_driver_pages(SystemSettings& s, Project& proj);
 void register_builtin_pages(SystemSettings& s, Project& proj);
+// The language the system screens are shown in for this project (system_i18n.hpp): set before
+// the pages are asked for their texts.
+void choose_system_language(Project& proj);
 
 // Overlay keys of the drivers array: "name" or "type", "#n" appended for duplicates.
 std::vector<std::string> driver_keys(const json* drivers);

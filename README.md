@@ -128,6 +128,7 @@ build.cmd Debug
 | `test_texts.cpp` | Languages (resolving `@ID`, falling back to the default language, `@@`, an ID that does not exist, switching with `sys.lang` and reverting an invalid value, the language of widgets, options and alarms, the screens are rebuilt on switching), fonts (can be made at any size, missing characters come from the built-in font, reading `cmap` and `hmtx`, broken / truncated / random font files, drawing every screen of the demo) |
 | `test_users.cpp` | Users (login, lockout, automatic logout, levels of widgets and screens, the login screen, editing users on the device) |
 | `test_system_access.cpp` | Opening the system settings by holding a corner (a tap stays a tap, letting go early, the countdown, **the button under the finger gets no click**, other places / sliding out do not count, the corner and the time of the project, `"none"`, the login with users, the touch that wakes the dark screen) |
+| `test_system_i18n.cpp` | The system screens in Japanese: every fixed text has an entry, the language follows the project and its switching |
 | `test_project_archive.cpp` | Project files (the list of member files, creating and extracting, rejection of paths that leave the project, protection of the per-PC files) |
 | `test_script.cpp` | Lua scripts (reading and writing tags, every trigger, the sandbox, timeouts, **a script that takes too much memory fails and nothing else does**, hot reload) |
 | `tools/designer/test/model.test.js` | util / schema / model of the designer (`node --test`, no dependency packages) |
@@ -1840,6 +1841,13 @@ go before the end does nothing.
 - The corner is a square of 1/8 of the shorter side of the screen, at least 48 px (480x320: 48 px, 800x480: 60 px).
 - It is the same door as `{ "action": "system" }`: with `users`, the login for `users.system_level` comes first. Without `users`
   anybody at the device can open the settings this way - as with a button. Add users, or set `"hold": "none"`, where that matters.
+
+**The language of the system screens.** They are shown in Japanese or in English, following the project: the language the
+project is shown in (`texts`; switching it with `set_language` switches the system screens too), or - in a project without
+languages - Japanese when the title of the project is written in Japanese. `"system_language": "ja"` or `"en"` in
+`project.json` fixes it. Japanese needs a font file of the project (`font.file`) that has the characters; without one the
+screens stay in English instead of showing empty boxes. Names that come from the project or the machine (tags, drivers, host
+names, fingerprints) are shown as they are.
 - When the menu opens, the rest of that touch is dropped: a button under the finger gets no click. What a widget does while it is
   held (`repeat`, a long press) has happened by then: do not put such a widget into that corner, or choose another corner.
 - The touch that wakes a dark screen does not count, nor a touch that slides out of the corner, nor one on the system screens.
