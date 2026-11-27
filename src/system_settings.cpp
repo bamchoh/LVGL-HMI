@@ -3,6 +3,8 @@
 #include "project.hpp"
 #include "serial_ports.hpp"
 #include "tag.hpp"
+#include "system_i18n.hpp"
+#include "texts.hpp"
 #include "ui.hpp"
 #include "users.hpp"
 #include "util.hpp"
@@ -219,7 +221,7 @@ void SystemSettings::create_tags()
 
 void SystemSettings::update_summaries()
 {
-    for(const auto& p : pages_) set_tag(tag_name(p->id(), "summary"), TagType::String, Value::string(p->summary()));
+    for(const auto& p : pages_) set_tag(tag_name(p->id(), "summary"), TagType::String, Value::string(sys_text(p->summary())));
 }
 
 void SystemSettings::refresh(const std::string& page_id)
@@ -233,7 +235,9 @@ void SystemSettings::refresh(const std::string& page_id)
                 for(const std::string& o : f.options) joined += (joined.empty() ? "" : "\n") + o;
                 set_tag(tag_name(p->id(), f.key + "__options"), TagType::String, Value::string(joined));
             }
-            set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
+            // (what a page only shows is a text: in the language of the system screens)
+            if(f.type == SettingField::Type::Info) set_tag(tag_name(p->id(), f.key), TagType::String, Value::string(sys_text(f.value)));
+            else set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
         }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
         fields_[p->id()] = std::move(fields);
@@ -275,7 +279,7 @@ std::string SystemSettings::apply(const std::string& page_id)
     }
     std::string msg = p->apply(values);
     refresh(page_id);
-    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(msg.empty() ? "Applied" : msg));
+    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(sys_text(msg.empty() ? "Applied" : msg)));
     if(msg.empty()) HML_INFO("system: page '%s' applied", page_id.c_str());
     else HML_WARN("system: page '%s': %s", page_id.c_str(), msg.c_str());
     return msg;
@@ -299,11 +303,23 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
     if(!system_allowed("command for", page_id)) return;
     p->command(cmd, arg);
     refresh(page_id);
+    translate_status(page_id);
+}
+
+// What a page says in its status line is written by the page, in English: here it is put into
+// the language of the system screens (once: a text that is translated already is not in the table).
+void SystemSettings::translate_status(const std::string& page_id)
+{
+    if(system_language() == "en") return;
+    Tag* t = tags().find(tag_name(page_id, "status"));
+    if(!t) return;
+    const std::string now = t->get().str, to = sys_text(now);
+    if(to != now) t->set_string(to, nullptr);
 }
 
 void SystemSettings::poll()
 {
-    for(const auto& p : pages_) if(p->poll()) refresh(p->id());
+    for(const auto& p : pages_) { if(p->poll()) refresh(p->id()); translate_status(p->id()); }
     // the lines under the names in the menu follow what happens (about once a second, while it is shown)
     if(++summary_ticks_ % 4 == 0 && ui().current_screen().value_or("") == menu_screen()) update_summaries();
 }
@@ -363,6 +379,8 @@ void restyle(json& w, bool top, bool compact, const std::string& accent)
     static const char* kTile = "#222d3b";
     static const char* kNeutral = "#3a4a5e";
     const std::string type = jstr(w, "type", "");
+    for(const char* key : { "text", "placeholder" })
+        if(const json* t = jget(w, key); t && t->is_string()) w[key] = sys_text(t->get<std::string>());
     if(!w.contains("style") || !w["style"].is_object()) w["style"] = json::object();
     json& st = w["style"];
     const std::string bgc = jstr(st, "bg_color", ""), tc = jstr(st, "text_color", "");
@@ -424,10 +442,10 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             json{ { "type", "button" }, { "align", "left_mid" }, { "text", LV_SYMBOL_LEFT }, { "w", header_h + 4 }, { "h", header_h - 6 },
                   { "style", { { "bg_color", tile }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                   { "on_click", { { "action", "back" } } } },
-            json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", title }, { "style", { { "font", title_font }, { "text_color", text } } } },
+            json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "text", sys_text(title) }, { "style", { { "font", title_font }, { "text_color", text } } } },
         });
         if(!apply_page.empty())
-            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Apply" }, { "w", compact ? 96 : large ? 150 : 120 }, { "h", header_h - 6 },
+            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", sys_text("Apply") }, { "w", compact ? 96 : large ? 150 : 120 }, { "h", header_h - 6 },
                                      { "style", { { "bg_color", accent }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                                      { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", apply_page } } } });
         return json{
@@ -458,7 +476,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                     { { "action", "call" }, { "fn", "system.refresh" }, { "arg", id } },
                     { { "action", "goto" }, { "screen", page_screen(id) }, { "anim", "slide_left" } } }) },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "w", "100%" }, { "h", font + 8 }, { "long_mode", "dots" }, { "text", std::string(icon_of(id)) + "  " + p->title() },
+                    json{ { "type", "label" }, { "w", "100%" }, { "h", font + 8 }, { "long_mode", "dots" }, { "text", std::string(icon_of(id)) + "  " + sys_text(p->title()) },
                           { "style", { { "font", font + 2 }, { "text_color", text } } } },
                     json{ { "type", "label" }, { "w", "100%" }, { "h", font + 4 }, { "long_mode", "dots" }, { "bind", { { "text", tag_name(id, "summary") } } },
                           { "style", { { "font", font }, { "text_color", muted } } } },
@@ -473,7 +491,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         std::vector<int> used;
         for(int g = 0; g < kGroupCount; g++) if(!items[g].empty()) used.push_back(g);
         for(int g : used) {
-            tabs.push_back(json{ { "type", "button" }, { "text", kGroups[g].title }, { "flex_grow", 1 }, { "h", tabs_h }, { "checkable", true },
+            tabs.push_back(json{ { "type", "button" }, { "text", sys_text(kGroups[g].title) }, { "flex_grow", 1 }, { "h", tabs_h }, { "checkable", true },
                                  { "bind", { { "checked", { { "tag", "sys.menu.tab" }, { "eq", g } } } } },
                                  { "style", { { "bg_color", bar }, { "radius", 0 }, { "shadow_width", 0 }, { "text_color", muted } } },
                                  { "style_checked", { { "bg_color", bar }, { "text_color", "#ffffff" } } },
@@ -534,7 +552,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                 { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : large ? 14 : 10 }, { "pad_left", compact ? 10 : large ? 18 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "text", f.label }, { "w", compact ? 130 : large ? 240 : 170 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
+                    json{ { "type", "label" }, { "text", sys_text(f.label) }, { "w", compact ? 130 : large ? 240 : 170 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
                     widget,
                 }) },
             });
@@ -551,7 +569,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
             // everything else is neutral. A button that cannot be pressed now has no colour at all.
             const bool go = a.kind == PageAction::Kind::Ok || a.kind == PageAction::Kind::Primary;
             const char* color = a.kind == PageAction::Kind::Danger ? "#c62828" : go ? accent.c_str() : "#3a4a5e";
-            json b = json{ { "type", "button" }, { "text", a.text }, { "h", h },
+            json b = json{ { "type", "button" }, { "text", sys_text(a.text) }, { "h", h },
                            { "style", { { "bg_color", color }, { "radius", 8 }, { "shadow_width", 0 }, { "pad_left", 16 }, { "pad_right", 16 } } },
                            { "style_disabled", { { "bg_color", "#2a323c" }, { "text_color", "#6f7c8a" } } },
                            { "style_label", { { "font", font + 2 } } },
@@ -965,9 +983,27 @@ void add_driver_pages(SystemSettings& s, Project& proj)
     }
 }
 
+void choose_system_language(Project& proj)
+{
+    // what the project says, else the language it is shown in, else - no languages - Japanese
+    // for a project whose title is written in Japanese
+    std::string want = jstr(proj.root(), "system_language", "");
+    if(want.empty()) {
+        if(!texts().languages().empty()) want = texts().language();
+        else {
+            const std::string& title = proj.info().title;
+            want = std::any_of(title.begin(), title.end(), [](char c) { return static_cast<unsigned char>(c) >= 0xE3; }) ? "ja" : "en";   // (kana and kanji start with E3..E9 in UTF-8)
+        }
+    }
+    // only when the project's font can show it: without the characters there would be empty boxes
+    if(want == "ja" && !font_file_has("システム設定を開く適用戻る")) want = "en";
+    set_system_language(want);
+}
+
 void register_builtin_pages(SystemSettings& s, Project& proj)
 {
     s.clear();
+    choose_system_language(proj);
     {   // what is chosen or pressed has the colour of the project
         const lv_color_t c = proj.info().primary;
         s.set_accent(vformat("#%02x%02x%02x", c.red, c.green, c.blue));

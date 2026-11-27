@@ -665,6 +665,13 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
 
+    // ---- system_language: the language of the system screens
+    if(const json* sl = jget(root, "system_language")) {
+        if(!sl->is_string() || (sl->get<std::string>() != "ja" && sl->get<std::string>() != "en")) c.add("system_language", "\"system_language\" is \"ja\" or \"en\"");
+        else if(sl->get<std::string>() == "ja" && jstr(jget(root, "font") && jget(root, "font")->is_object() ? *jget(root, "font") : json::object(), "file", "").empty())
+            c.add("system_language", "\"ja\" needs a font file with Japanese characters (\"font\": { \"file\": ... }): without one the system screens stay in English");
+    }
+
     // ---- system_access: the corner that opens the system settings; a project that leaves no way to them
     {
         std::string hold = "top_left";

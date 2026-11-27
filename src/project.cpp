@@ -363,6 +363,10 @@ void Project::rebuild_screens()
     if(lv_display_t* d = lv_display_get_default()) apply_theme(d);
     std::string current = ui().current_screen().value_or("");
     std::vector<std::string> history = ui().history();
+    // the system screens follow the language: their texts are made again
+    choose_system_language(*this);
+    system_settings().create_tags();
+    for(const json& s : system_settings().screens(info_.width, info_.height)) ui().replace_source(s);
     ui().rebuild_all();
     if(!current.empty()) ui().show_screen(current, "none", true);
     ui().set_history(history);

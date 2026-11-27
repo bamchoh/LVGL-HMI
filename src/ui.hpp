@@ -54,6 +54,9 @@ public:
     // comes up instead and continues to it after a login (false is returned).
     // replace: the screen being left is not added to the history ("back" skips it).
     bool show_screen(const std::string& name, const std::string& anim, bool replace = false);
+    // Another definition for a screen that is there (the system screens in another language):
+    // used by the next rebuild_all(). False when there is no such screen.
+    bool replace_source(const json& screen);
     bool back();                                              // in a popup: closes it
     void clear_history();
     // Popups: screens with "popup": true, shown over the current screen until closed (or until
@@ -91,6 +94,9 @@ const lv_font_t* font_from_json(const json* v);                        // 16 or 
 void             set_font_file(const std::string& path);
 bool             has_font_file();
 const lv_font_t* font_of_size(int size);                               // nullptr without a font file
+// Has the project's font file every character of this text (UTF-8)? False without a font file.
+// (It only looks at the table of the file: no font is made, so it can be asked while loading.)
+bool             font_file_has(const std::string& text);
 // Does this text field of a screen take numbers (numeric_display)? Its keyboard is the number pad.
 bool             ui_number_pad(lv_obj_t* textarea);
 

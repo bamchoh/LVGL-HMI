@@ -61,6 +61,7 @@ public:
     const json* drivers_config() const { return jget(root_, "drivers"); }
     const json* section(const char* name) const { return jget(root_, name); }   // any top-level object of project.json
     std::string local_overlay_path() const { return info_.dir + "/project.local.json"; }
+    const json& root() const { return root_; }                                    // project.json as it was read
     const json* local_remote() const { return local_remote_.is_null() ? nullptr : &local_remote_; }   // "remote" of project.local.json
 
     // Build (or rebuild) every screen from its JSON file and show the start screen
