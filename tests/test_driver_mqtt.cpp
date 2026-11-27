@@ -726,7 +726,7 @@ TEST_CASE("mqtt: JSON messages: several tags in one message out, fields of a mes
     REQUIRE(wait_for(rt, [&] { return mode->get().str == "manual"; }));
     CHECK(sp->get_number() == 220);                                     // 999 is outside 150..260: refused
     CHECK(rpm->get_number() == 135.5);                                  // null: unchanged
-    CHECK(log.has("999 is outside 150..260"));
+    CHECK(wait_for(rt, [&] { return log.has("999 is outside 150..260"); }));   // (the line is written by the driver's thread: it may come a moment after the tag)
     broker.send(mqtt::publish("plant/p1/line1/cmd", "not json", 0, false, 0));
     broker.send(mqtt::publish("plant/p1/line1/cmd", R"({"oven":{"setpoint":{"v":1}}})", 0, false, 0));
     CHECK(wait_for(rt, [&] { return log.has("not a JSON object") && log.has("refused: not a value"); }));
