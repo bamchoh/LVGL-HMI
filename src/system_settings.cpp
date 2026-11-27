@@ -311,7 +311,7 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
     p->command(cmd, arg);
     // A row was picked on a page whose form is at the top of its list: on a small screen the
     // list may be scrolled so far that the form is out of sight, and nothing would seem to happen.
-    if(cmd == "select" && p->form_on_top())
+    if(p->picks_row(cmd))
         if(auto cur = ui().current_screen(); cur && *cur == page_screen(page_id))
             if(lv_obj_t* scr = lv_screen_active(); scr && lv_obj_get_child_count(scr) > 1) lv_obj_scroll_to_y(lv_obj_get_child(scr, 1), 0, LV_ANIM_ON);
     refresh(page_id);
