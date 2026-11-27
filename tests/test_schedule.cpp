@@ -414,11 +414,11 @@ TEST_CASE("System > Schedule: the schedules with their next run; time, days and 
 
     CHECK(text("n1") == "start");
     CHECK(text("t1") == "08:00  weekdays");
-    CHECK(text("x1").size() == 11);                              // the next run: MM-DD HH:MM
+    CHECK(text("x1").size() == 16);                              // the next run: MM-DD HH:MM
     CHECK(text("n2") == "night");
     CHECK(text("x2") == "off");
     CHECK(text("t3") == "2031-12-01 09:00");
-    CHECK(text("x3") == "12-01 09:00");
+    CHECK(text("x3") == "Next 12-01 09:00");
     CHECK_FALSE(on("r4_used"));
     CHECK_FALSE(on("selected"));
     CHECK_FALSE(on("more"));

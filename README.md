@@ -1809,12 +1809,12 @@ Apart from project.json, the runtime generates a built-in "System" menu screen (
   texts and rows are also a size larger), not stretched from edge to edge. The bars at the top and at the bottom go over the
   whole width; what is in them follows the column. Up to 880 px (480x320, 800x480) the whole width is used.
 
-The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Device, Schedule, Sound …) follow the same
+The pages that are more than a list of settings (Deploy, Keys, Storage, Users, Tags, Addresses, Schedule, Sound …) follow the same
 rule:
 
 - **A row is chosen first, then acted on.** A designer, a key or a user is a row: pressing it only chooses it (it is shown in
   another colour; pressing it again lets go). What can be done with it - Runtime, Remove, Delete - then appears in the bar at
-  the bottom. Writing a value (Tags, Device), Save (Users, Schedule), Backup / Install (Storage) and the test sound are in that
+  the bottom. Writing a value (Tags, Addresses), Save (Users, Schedule), Backup / Install (Storage) and the test sound are in that
   bar too.
 - **A question is not part of the list.** "Remove this designer?", "Install this project?", a new designer or a new key that
   waits for an answer: shown in a frame over the top of the page, with its two buttons.
@@ -1869,7 +1869,7 @@ names, fingerprints) are shown as they are.
 | Remote | Remote access (VNC) on / off, its password, view only, the state (when there is `remote`) → "Remote display and remote operation (VNC)" |
 | Schedule | The list of schedules and the time of the next run. Press a schedule to change its time, weekdays and on / off (when there is `schedules`) → "Schedules (actions that run by the clock)" |
 | Tags | A list of the current values of all tags (8 at a time, filtered by a part of the name. Enter `sys.` for the tags of the runtime itself). Pressing a row lets you write a value to that tag (TRUE / FALSE buttons for a bool, a numeric keypad for a number, the keyboard for a string. "x" clears the filter). It is for checking and changing values that have no screen, during commissioning and maintenance. A write follows the limits of the tag, reaches the device through the driver, and is recorded in the operation log as `monitor`. Tags of `sys.` cannot be written |
-| Device | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Device page)" |
+| Addresses | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Addresses page)" |
 | Storage | Backup to a USB memory (for sites without a network), installing a project file from a USB memory, going back to the previous project → "Updates and backups with a USB memory (the Storage page)" |
 | Deploy | Receiving projects from the designer without SSH: on / off, adding a designer, accepting and removing designers, which of them may replace the runtime → "Deploying without SSH (Direct)" |
 
@@ -1879,7 +1879,7 @@ The setting values go into tags named `sys.<page>.<key>`, and Apply calls the `a
 Only the items whose value differs from project.json are saved. Setting an item back to the value of project.json and pressing Apply removes that item, and
 when nothing is left the whole file is deleted (items that were not changed follow a later rewrite of project.json).
 
-### The device monitor (the Device page)
+### The device monitor (the Addresses page)
 
 This page is for checking and changing the values of addresses that have neither a screen nor a tag, during commissioning and maintenance. Select a driver,
 enter an address in the notation of that driver, and the page keeps reading that value while it is open.

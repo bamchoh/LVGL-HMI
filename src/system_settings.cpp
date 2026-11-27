@@ -372,6 +372,23 @@ const char* icon_of(const std::string& id)
 // get the same look as the others here, in one place: their rows become tiles, their buttons
 // and texts take the colours of the system screens. What a row contains and in which order is
 // the page's and is not touched.
+// The width a name of a setting needs in the language of the system screens: a Japanese name
+// is wider than the English one the row was laid out for (a kana or kanji is as wide as the
+// font is high), and a name that breaks in the middle of a word reads badly. Never less than
+// asked for, and no more than `most` (then it wraps, as before).
+int label_width(const std::string& text, int asked, int font, int most)
+{
+    if(system_language() == "en") return asked;
+    int wide = 0, narrow = 0;
+    for(size_t i = 0; i < text.size(); i++) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        if((c & 0xC0) == 0x80) continue;                          // (not the first byte of a character)
+        if(c >= 0xE3) wide++; else narrow++;
+    }
+    const int need = wide * font + narrow * (font * 6 / 10) + 6;
+    return std::max(asked, std::min(need, most));
+}
+
 void restyle(json& w, bool top, bool compact, const std::string& accent)
 {
     if(w.is_array()) { for(json& c : w) restyle(c, top, compact, accent); return; }
@@ -381,6 +398,8 @@ void restyle(json& w, bool top, bool compact, const std::string& accent)
     const std::string type = jstr(w, "type", "");
     for(const char* key : { "text", "placeholder" })
         if(const json* t = jget(w, key); t && t->is_string()) w[key] = sys_text(t->get<std::string>());
+    if(type == "label" && w.contains("text") && w.contains("w") && w["w"].is_number())
+        w["w"] = label_width(w["text"].get<std::string>(), w["w"].get<int>(), 14, compact ? 170 : 240);
     if(!w.contains("style") || !w["style"].is_object()) w["style"] = json::object();
     json& st = w["style"];
     const std::string bgc = jstr(st, "bg_color", ""), tc = jstr(st, "text_color", "");
@@ -552,7 +571,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 { "type", "panel" }, { "w", "100%" }, { "h", "content" }, { "flex", "row" }, { "flex_cross", "center" }, { "scrollable", false },
                 { "style", { { "bg_color", tile }, { "radius", 8 }, { "border_width", 0 }, { "pad", compact ? 6 : large ? 14 : 10 }, { "pad_left", compact ? 10 : large ? 18 : 14 }, { "pad_column", 8 } } },
                 { "children", json::array({
-                    json{ { "type", "label" }, { "text", sys_text(f.label) }, { "w", compact ? 130 : large ? 240 : 170 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
+                    json{ { "type", "label" }, { "text", sys_text(f.label) }, { "w", label_width(sys_text(f.label), compact ? 130 : large ? 240 : 170, font, compact ? 190 : 280) }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", text } } } },
                     widget,
                 }) },
             });

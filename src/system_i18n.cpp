@@ -36,6 +36,10 @@ const std::vector<Pattern>& patterns()
         { std::regex(R"(^Port (\d+): other machines can connect(.*)$)"), "ポート $1: ほかの機器からつなげます$2" },
         { std::regex(R"(^Port (\d+): this device only \(no password set\)(.*)$)"), "ポート $1: この装置からだけ（パスワード未設定）$2" },
         { std::regex(R"(^(\d+) s$)"), "$1 秒" },
+        { std::regex(R"(^Next (.*)$)"), "次回 $1" },
+        { std::regex(R"(^(\d\d:\d\d)  weekdays$)"), "$1  平日" },
+        { std::regex(R"(^(\d\d:\d\d)  daily$)"), "$1  毎日" },
+        { std::regex(R"(^(\d\d:\d\d)  weekends$)"), "$1  土日" },
         // the login screen
         { std::regex(R"(^Logged in, but this needs (.*) or higher\.$)"), "ログインしましたが、$1 以上のレベルが必要です。" },
         { std::regex(R"(^(.*) or higher is needed\.$)"), "$1 以上のレベルが必要です。" },
