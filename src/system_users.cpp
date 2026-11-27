@@ -300,7 +300,7 @@ public:
 
     std::vector<PageAction> actions() const override
     {
-        return { { "Save", "save", PageAction::Kind::Ok, "", "" }, { "Delete", "delete", PageAction::Kind::Danger, "has_sel", "" } };
+        return { { "Save", "save", PageAction::Kind::Primary, "", "" }, { "Delete", "delete", PageAction::Kind::Danger, "", "has_sel" } };
     }
     std::vector<PageDialog> dialogs() const override
     {

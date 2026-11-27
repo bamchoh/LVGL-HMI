@@ -58,9 +58,8 @@ public:
         flag("receive", ds.listening());
         if(!ds.available()) info("state", "Not available: the runtime has no place for its keys (start it with --data-dir <folder>).");
         else if(ds.listening())
-            info("state", vformat("On: an accepted designer can send a project to %s port %d.\nThis device: %s",
-                                  local_ip_addresses().c_str(), ds.port(), ds.fingerprint().c_str()));
-        else info("state", "Off: no project can be sent to this device over the network (the port is closed).");
+            info("state", vformat("On, port %d at %s\nThis device: %s", ds.port(), local_ip_addresses().c_str(), ds.fingerprint().c_str()));
+        else info("state", "Off: the port is closed, no project can be sent to this device.");
 
         flag("ask", ds.ask());
         // a project that arrived and can do more than the one before: the operator decides
@@ -233,7 +232,7 @@ public:
         };
         auto toggle = [&](const char* label, const std::string& key) {
             return row(json::array({
-                json{ { "type", "label" }, { "text", label }, { "w", compact ? 130 : 180 }, { "style", { { "font", font }, { "text_color", muted } } } },
+                json{ { "type", "label" }, { "text", label }, { "w", compact ? 150 : 200 }, { "long_mode", "wrap" }, { "style", { { "font", font }, { "text_color", "#ffffff" } } } },   // (the name of a switch is what is read first)
                 json{ { "type", "switch" }, { "bind", tag(key) }, { "on_change", call(key) } },
             }));
         };
@@ -264,8 +263,9 @@ public:
     std::vector<PageAction> actions() const override
     {
         return {
-            { "Runtime", "runtime", PageAction::Kind::Neutral, "has_sel", "" },
-            { "Remove", "delete", PageAction::Kind::Danger, "has_sel", "" },
+            // (always there, greyed until a designer is chosen: the bar says what can be done)
+            { "Runtime", "runtime", PageAction::Kind::Neutral, "", "has_sel" },
+            { "Remove", "delete", PageAction::Kind::Danger, "", "has_sel" },
         };
     }
     std::vector<PageDialog> dialogs() const override

@@ -890,7 +890,7 @@ TEST_CASE("system pages: nothing in a list that scrolls changes anything by one 
         // the bar at the bottom and the questions are beside the list, not in it
         const SettingsPage* sp = sys.page(page);
         REQUIRE(sp);
-        const size_t expect = 2 + (sp->actions().empty() ? 0 : 1) + sp->dialogs().size() + 1;
+        const size_t expect = 2 + (sp->actions().empty() ? 0 : 1) + 2 * sp->dialogs().size() + 1;   // (a question: what dims the page, and its frame)
         CHECK_MESSAGE(kids.size() == expect, "page '" << page << "'");
         with_bar += sp->actions().empty() ? 0 : 1;
         with_question += sp->dialogs().empty() ? 0 : 1;
