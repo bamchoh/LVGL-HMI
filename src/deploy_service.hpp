@@ -9,6 +9,11 @@
 //   - An accepted designer may send a project file. It is written next to the keys, compared
 //     with the checksum it came with, and handed to the UI thread, which checks and installs
 //     it like one from a USB memory (transfer.hpp) and restarts.
+//   - A project that can do more or other things than the one it replaces (capabilities.hpp:
+//     another device to write to, another address to send to, another port, another script
+//     that runs by itself) is not installed by itself: the operator sees the list and decides
+//     (System > Deploy; "Ask before ..." can be switched off there). What was agreed to is
+//     remembered by its fingerprint, so the next project with the same list just goes in.
 //   - The runtime itself (the program) is taken only from a designer that the operator has
 //     allowed to replace it, one by one (System > Deploy > Runtime; off for every designer
 //     until then): whoever may replace the program can do anything on the device. What
@@ -19,7 +24,7 @@
 // What the device keeps for this lies in its data folder (never in a project, never in
 // ~/.ssh): the folder given with --data-dir, else "keys" next to the executable.
 //   device.crt, device.key     the device's own certificate and private key
-//   deploy.json                { "enabled", "port", "designers": [ { "fingerprint", "name", "added", "runtime" } ] }
+//   deploy.json                { "enabled", "port", "ask", "approved", "designers": [ { "fingerprint", "name", "added", "runtime" } ] }
 //   incoming.hmlproj           a project that was received and is being installed
 #pragma once
 #include <atomic>
@@ -93,6 +98,15 @@ public:
     void reject();
     void set_offer_timeout(int seconds) { offer_timeout_s_ = seconds; }
 
+    // ---- a project that can do more than the one before: ask the operator first?
+    bool ask() const { return ask_; }
+    std::string set_ask(bool on);
+    // The fingerprint of what the operator agreed to last ("" = nothing yet: what runs now counts).
+    std::string approved() const;
+    std::string set_approved(const std::string& fingerprint);
+    // The page is asking the operator about what arrived: the designer is told that it waits.
+    void set_asking(bool on) { asking_ = on; }
+
     // ---- a project that arrived (UI thread)
     struct Received { std::string file, name, from, designer; bool runtime = false; };
     bool received(Received& out) const;              // waits to be installed
@@ -121,10 +135,13 @@ private:
     std::atomic<bool> stop_{ false };
     std::atomic<bool> adding_{ false };
     std::atomic<bool> serving_{ false };
+    std::atomic<bool> asking_{ false };
+    bool        ask_ = true;
+    std::string approved_;
     std::string runtime_path_;
     std::atomic<int>  port_{ 0 };
     std::atomic<int>  offer_timeout_s_{ 120 };
-    std::atomic<int>  install_timeout_s_{ 90 };
+    std::atomic<int>  install_timeout_s_{ 300 };     // (the operator may have to answer first)
     std::intptr_t listen_sock_ = -1;
 
     bool  has_offer_ = false;

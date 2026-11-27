@@ -133,6 +133,8 @@ void DeployService::open(const std::string& data_dir)
     std::lock_guard<std::mutex> lock(mutex_);
     dir_ = data_dir;
     enabled_ = false;
+    ask_ = true;
+    approved_.clear();
     port_cfg_ = kDeployDefaultPort;
     designers_.clear();
     has_identity_ = false;
@@ -144,6 +146,8 @@ void DeployService::open(const std::string& data_dir)
     const json j = json::parse(ss.str(), nullptr, false, true);
     if(!j.is_object()) { HML_WARN("deploy: %s/deploy.json cannot be read: receiving projects is off", dir_.c_str()); return; }
     enabled_ = jbool(j, "enabled", false);
+    ask_ = jbool(j, "ask", true);
+    approved_ = jstr(j, "approved", "");
     const int port = static_cast<int>(jnum(j, "port", kDeployDefaultPort));
     if(port >= 1 && port <= 65535) port_cfg_ = port;
     if(const json* list = jget(j, "designers"); list && list->is_array())
@@ -161,7 +165,8 @@ std::string DeployService::save()
         if(d.runtime) one["runtime"] = true;
         list.push_back(one);
     }
-    const json j = { { "enabled", enabled_ }, { "port", port_cfg_ }, { "designers", list } };
+    json j = { { "enabled", enabled_ }, { "port", port_cfg_ }, { "ask", ask_ }, { "designers", list } };
+    if(!approved_.empty()) j["approved"] = approved_;
     std::string err;
     if(!write_file_atomic((fs::u8path(dir_) / "deploy.json").u8string(), j.dump(2) + "\n", &err)) return err;
     return "";
@@ -323,6 +328,37 @@ std::string DeployService::set_runtime_allowed(const std::string& fingerprint, b
     HML_INFO("deploy: designer %s %s %s replace the runtime", name.c_str(), fingerprint.c_str(), on ? "may now" : "may no longer");
     operation_log().record("deploy", "runtime from designer", on ? "not allowed" : "allowed", (on ? "allowed: " : "not allowed: ") + name + " " + fingerprint);
     return "";
+}
+
+std::string DeployService::set_ask(bool on)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if(on == ask_) return "";
+        if(dir_.empty()) return "No place for the settings.";
+        ask_ = on;
+        const std::string err = save();
+        if(!err.empty()) { ask_ = !on; return err; }
+    }
+    operation_log().record("deploy", "ask before a project that can do more", on ? "off" : "on", on ? "on" : "off");
+    return "";
+}
+
+std::string DeployService::approved() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return approved_;
+}
+
+std::string DeployService::set_approved(const std::string& fingerprint)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if(dir_.empty() || fingerprint == approved_) return "";
+    const std::string old = approved_;
+    approved_ = fingerprint;
+    const std::string err = save();
+    if(!err.empty()) approved_ = old;
+    return err;
 }
 
 void DeployService::set_runtime_path(const std::string& exe)
@@ -566,14 +602,27 @@ void DeployService::serve(std::intptr_t client, const std::string& from)
         // ---- the UI thread checks and installs it
         std::string answer;
         {
-            std::unique_lock<std::mutex> lock(mutex_);
-            const bool done = cv_.wait_for(lock, std::chrono::seconds(install_timeout_s_.load()), [&] { return finished_ || stop_.load(); });
-            if(done && finished_) answer = finish_error_.empty() ? "INSTALLED" : "ERROR " + finish_error_;
+            const auto until = Clock::now() + std::chrono::seconds(install_timeout_s_.load());
+            bool told = false;
+            for(;;) {
+                bool tell = false;
+                {
+                    std::unique_lock<std::mutex> lock(mutex_);
+                    cv_.wait_for(lock, std::chrono::milliseconds(200), [&] { return finished_ || stop_.load(); });
+                    if(finished_ || stop_ || Clock::now() > until) break;
+                    tell = asking_ && !told;
+                }
+                // (the operator of the device is being asked: the designer hears that it waits for a person)
+                if(tell) { told = true; if(!c.write_line("ASKING")) break; }
+            }
+            std::lock_guard<std::mutex> lock(mutex_);
+            if(finished_) answer = finish_error_.empty() ? "INSTALLED" : "ERROR " + finish_error_;
             else answer = "ERROR the device did not install it in time";
             if(!finished_) fs::remove(file, ec);
             has_received_ = false;
             finished_ = false;
         }
+        asking_ = false;
         for(char& ch : answer) if(ch == '\n' || ch == '\r') ch = ' ';
         if(!c.write_line(answer) || answer != "INSTALLED") return;
     }

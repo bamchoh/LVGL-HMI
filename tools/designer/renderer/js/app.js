@@ -24,6 +24,7 @@ const host = {
   runLog: from => host.call('hml_runLog', from || 0),
   runStop: () => host.call('hml_runStop'),
   deploy: o => host.call('hml_deploy', o),
+  capabilities: p => host.call('hml_capabilities', p),
   directInfo: o => host.call('hml_directInfo', o),
   directDeploy: o => host.call('hml_directDeploy', o),
   deployCheck: o => host.call('hml_deployCheck', o),
@@ -589,6 +590,7 @@ const App = {
     const r = await host.readProject(path);
     if (!r || !r.ok) { this.toast('open failed: ' + (r && r.error)); return; }
     try { M.loadFromHost(r); } catch (e) { this.toast('parse error: ' + e.message, 6000); return; }
+    this.rememberTrust();
     await this.loadLocal();
     this.remember(path);
     this.offerRecovery();
@@ -630,6 +632,7 @@ const App = {
     const r = await host.readProject(st.path, true);
     if (!r || !r.ok) { this.toast('reload failed: ' + (r && r.error), 6000); return; }
     try { M.loadFromHost(r); } catch (e) { this.toast('The files were changed, but cannot be read: ' + e.message, 8000); return; }
+    this.rememberTrust();                            // (changed from outside: what it can do may be another list now)
     const i = M.st.screens.findIndex(s => s.data.name === cur);
     if (i >= 0) M.st.cur = i;
     if (wasArchive) M.st.dirty = true;
@@ -812,8 +815,44 @@ const App = {
   },
 
   // ---- preview / run -----------------------------------------------------
+  // ---- a project that came from somewhere else -------------------------------------------
+  // Run and Preview start the project on this PC: its scripts run, its drivers connect and
+  // write. What a project can do (hml_runtime --capabilities) is shown before a project is
+  // started here for the first time, and again when that list has changed while the project
+  // was not open here. A project made or changed in this designer is the user's own: what they
+  // add to it is not asked about.
+  async rememberTrust() {
+    const st = M.st;
+    st.trusted = false;
+    if (!st.path) return;
+    const c = await host.capabilities(M.runPath());
+    const saved = (await host.settings()) || {};
+    st.trusted = !!(c && c.ok && saved.approved && saved.approved[st.path] === c.fingerprint);
+  },
+  async mayStart() {
+    const st = M.st;
+    const c = await host.capabilities(M.runPath());
+    if (!c || !c.ok) return true;                    // (an older runtime: it cannot tell)
+    const saved = (await host.settings()) || {};
+    const approved = (saved.approved && typeof saved.approved === 'object') ? saved.approved : {};
+    const agree = () => { approved[st.path] = c.fingerprint; host.settings({ approved }); st.trusted = true; };
+    const nothing = !(c.devices.length || c.sends.length || c.listens.length || c.automatic.length);
+    if (st.trusted || nothing || approved[st.path] === c.fingerprint) { agree(); return true; }
+    return new Promise(resolve => {
+      const list = (title, items) => items.length ? [U.el('h4', null, title), U.el('ul', null, ...items.map(x => U.el('li', null, x)))] : [];
+      const body = U.el('div', { class: 'deploy' },
+        U.el('div', { class: 'hint' }, 'This project was not started on this PC before. A project is a program: starting it runs what is listed here, on this PC and on the devices it connects to. Start it only if you know where it comes from.'),
+        ...list('Writes to devices', c.devices), ...list('Sends data out', c.sends), ...list('Opens ports for others', c.listens), ...list('Runs by itself', c.automatic),
+        c.unattended_writes ? U.el('div', { class: 'warn' }, 'It writes to devices and runs things by itself: values can reach a device without anybody pressing a button.') : null);
+      this.modal({ title: 'Start this project?', body, buttons: [
+        { label: 'Cancel', onclick: () => resolve(false) },
+        { label: 'Start', primary: true, onclick: () => { agree(); resolve(true); } }] });
+    });
+  },
+
   async preview() {
     if (!(await this.save(false))) return;
+    if (!(await this.mayStart())) return;            // (the preview runs the project for a moment, too)
     const scr = M.screen(); if (!scr) return;
     const body = U.el('div', null, U.el('div', { class: 'hint' }, 'Rendering with hml_runtime…'));
     const close = this.modal({ title: 'Preview: ' + scr.name, body, buttons: [{ label: 'Close' }] });
@@ -1100,6 +1139,7 @@ const App = {
   },
   async run() {
     if (!(await this.save(false))) return;
+    if (!(await this.mayStart())) return;
     const r = await host.launch(M.runPath());       // (a runtime started before is closed first)
     if (!r || !r.ok) { this.toast('run failed: ' + (r && r.error)); return; }
     this.runLogStart(r.run);

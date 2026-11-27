@@ -2,6 +2,8 @@
 //
 //   Receive projects  [switch]     while on, an accepted designer can send a project (no SSH needed)
 //   Add a designer    [switch]     for a few minutes a new designer may ask to be accepted
+//   Ask before a project that can do more  [switch]   a project with another list of what it can do
+//                                  (capabilities.hpp) waits for [Install] / [Reject] here
 //   (a designer asks)              sender, name, fingerprint         [Accept] [Reject]
 //   Accepted designers             one row each: press it to choose it. Then, in the bar at the bottom:
 //                                  [Runtime] -> confirmation   [Remove] -> confirmation
@@ -60,6 +62,13 @@ public:
                                   local_ip_addresses().c_str(), ds.port(), ds.fingerprint().c_str()));
         else info("state", "Off: no project can be sent to this device over the network (the port is closed).");
 
+        flag("ask", ds.ask());
+        // a project that arrived and can do more than the one before: the operator decides
+        flag("arrived", !held_.file.empty());
+        info("arrived_text", held_.file.empty() ? "" : "The project '" + held_.name + "' arrived from " + held_.designer.substr(0, held_.designer.find(' ')) + " (" + held_.from +
+                                                       "). It can do other things than the project that runs now:\n" + held_caps_.brief() +
+                                                       (held_caps_.unattended_writes() ? "\n! Values can reach a device without anybody at the screen." : "") +
+                                                       "\nInstall it only if you expect this.");
         flag("adding", ds.adding());
         if(ds.adding()) {
             const uint32_t left = remaining();
@@ -138,6 +147,21 @@ public:
         }
         else if(cmd == "runtime_yes") { if(!confirm_rt_.empty()) err = ds.set_runtime_allowed(confirm_rt_, true); confirm_rt_.clear(); }
         else if(cmd == "runtime_no") confirm_rt_.clear();
+        else if(cmd == "ask") err = ds.set_ask(!ds.ask());
+        else if(cmd == "install_yes") {                               // the operator has seen what it can do
+            if(!held_.file.empty()) { install(held_, held_caps_.fingerprint()); held_ = DeployService::Received{}; ds.set_asking(false); }
+            return;                                                   // (install() has set the status)
+        }
+        else if(cmd == "install_no") {
+            if(!held_.file.empty()) {
+                HML_INFO("deploy: the operator did not allow the project '%s' from %s", held_.name.c_str(), held_.from.c_str());
+                operation_log().record("deploy", "project refused", held_.name + " from " + held_.designer + " (" + held_.from + ")", "");
+                ds.finish("the operator of the device did not allow this project (it can do other things than the one that runs there)");
+                held_ = DeployService::Received{};
+                ds.set_asking(false);
+                err = "The project was not installed.";
+            }
+        }
         else HML_WARN("system: deploy: unknown command '%s'", cmd.c_str());
         if(!err.empty()) HML_WARN("system: deploy: %s", err.c_str());
         set_status(err);
@@ -151,22 +175,34 @@ public:
         if(restart_ && !ds.serving() && ++restart_ticks_ >= 3) { restart_ = false; restart_ticks_ = 0; ui().request_restart(RestartTarget::App); return false; }
 
         DeployService::Received r;
-        if(ds.received(r)) {
-            const TransferTarget t = target();
-            const char* what = r.runtime ? "runtime" : "project";
-            const std::string msg = r.runtime ? deploy_install_runtime(r.file, ds.runtime_path()) : transfer_install(t, r.file);
-            ds.finish(msg);
-            if(msg.empty()) {
-                operation_log().record("deploy", r.runtime ? "install runtime" : "install project", r.runtime ? "" : t.name, r.name + " from " + r.designer + " (" + r.from + ")");
-                HML_INFO("deploy: %s '%s' installed, restarting", what, r.name.c_str());
-                set_status(r.runtime ? "A new runtime was received and put in place. Restarting ..." : "A project was received and installed. Restarting ...");
-                restart_ = true;
-                restart_ticks_ = 0;
+        const bool waiting = ds.received(r);
+        if(!held_.file.empty()) {                                     // the operator is being asked
+            if(waiting && r.file == held_.file) return false;
+            // (the designer gave up, or nobody answered in time: the question goes away)
+            held_ = DeployService::Received{};
+            ds.set_asking(false);
+            set_status("The project that waited for an answer was not installed (nobody answered in time).");
+            return true;
+        }
+        if(waiting) {
+            if(r.runtime) { install(r, ""); return true; }
+            // what can it do? The same list as what was agreed to (or as what runs now) goes in
+            // by itself; another list is the operator's to look at.
+            ProjectCapabilities caps;
+            const std::string why = transfer_capabilities(target(), r.file, caps);
+            if(!why.empty()) { ds.finish(why); set_status("A project was received but not installed: " + why); return true; }
+            if(ds.ask() && !caps.empty() && caps.fingerprint() != agreed()) {
+                held_ = r;
+                held_caps_ = caps;
+                ds.set_asking(true);
+                HML_INFO("deploy: the project '%s' from %s can do other things than the one before: waiting for the operator", r.name.c_str(), r.from.c_str());
+                set_status("");
+                // the operator must see it wherever they are
+                const std::string screen = SystemSettings::page_screen(id());
+                if(ui().current_screen().value_or("") != screen) ui().show_screen(screen, "none");
+                return true;
             }
-            else {
-                HML_WARN("deploy: %s '%s' from %s was not installed: %s", what, r.name.c_str(), r.from.c_str(), msg.c_str());
-                set_status(std::string(r.runtime ? "A runtime" : "A project") + " was received but not installed: " + msg);
-            }
+            install(r, caps.fingerprint());
             return true;
         }
 
@@ -208,6 +244,7 @@ public:
         rows.push_back(text("state", "#ffffff"));
         rows.push_back(toggle("Add a designer", "adding"));
         rows.push_back(text("adding_text", "#ffffff"));
+        rows.push_back(toggle("Ask before a project that can do more", "ask"));
         rows.push_back(text("count", muted));
         // a designer: press its row to choose it, then Runtime / Remove below
         for(int i = 1; i <= kSlots; i++) {
@@ -235,6 +272,7 @@ public:
     {
         const PageAction cancel_rm{ "Cancel", "delete_no", PageAction::Kind::Neutral, "", "" }, cancel_rt{ "Cancel", "runtime_no", PageAction::Kind::Neutral, "", "" };
         return {
+            { "arrived", "arrived_text", { "Install", "install_yes", PageAction::Kind::Danger, "", "" }, { "Reject", "install_no", PageAction::Kind::Neutral, "", "" }, true },
             { "pending", "pending_text", { "Accept", "accept", PageAction::Kind::Ok, "", "" }, { "Reject", "reject", PageAction::Kind::Danger, "", "" }, true },
             { "confirm", "confirm_text", { "Remove", "delete_yes", PageAction::Kind::Danger, "", "" }, cancel_rm, false },
             { "confirm_rt", "confirm_rt_text", { "Allow", "runtime_yes", PageAction::Kind::Danger, "", "" }, cancel_rt, false },
@@ -242,6 +280,37 @@ public:
     }
 
 private:
+    // Put what arrived in place, tell the designer, restart. approve: the fingerprint of what
+    // the project can do, remembered as agreed to ("" = a runtime: nothing to remember).
+    void install(const DeployService::Received& r, const std::string& approve)
+    {
+        DeployService& ds = deploy_service();
+        const TransferTarget t = target();
+        const char* what = r.runtime ? "runtime" : "project";
+        const std::string msg = r.runtime ? deploy_install_runtime(r.file, ds.runtime_path()) : transfer_install(t, r.file);
+        ds.finish(msg);
+        if(msg.empty()) {
+            if(!approve.empty()) ds.set_approved(approve);
+            operation_log().record("deploy", r.runtime ? "install runtime" : "install project", r.runtime ? "" : t.name, r.name + " from " + r.designer + " (" + r.from + ")");
+            HML_INFO("deploy: %s '%s' installed, restarting", what, r.name.c_str());
+            set_status(r.runtime ? "A new runtime was received and put in place. Restarting ..." : "A project was received and installed. Restarting ...");
+            restart_ = true;
+            restart_ticks_ = 0;
+        }
+        else {
+            HML_WARN("deploy: %s '%s' from %s was not installed: %s", what, r.name.c_str(), r.from.c_str(), msg.c_str());
+            set_status(std::string(r.runtime ? "A runtime" : "A project") + " was received but not installed: " + msg);
+        }
+    }
+    // The fingerprint of what was agreed to: what the operator said yes to last, else (nothing
+    // was ever asked) what the project that runs now can do - it was put here by the owner.
+    std::string agreed() const
+    {
+        const std::string a = deploy_service().approved();
+        if(!a.empty()) return a;
+        ProjectCapabilities now;
+        return project_capabilities_of(proj_.info().path, now) ? now.fingerprint() : std::string();
+    }
     // the designer a command is about: the row given ("2"), else the one chosen on the page
     std::string slot_or_selected(const std::string& arg) const
     {
@@ -276,6 +345,8 @@ private:
 
     Project& proj_;
     std::vector<DeployDesigner> list_;    // as last shown: the slots of the Remove buttons
+    DeployService::Received held_;        // a project the operator is being asked about ("" = none)
+    ProjectCapabilities held_caps_;       // what it can do
     std::string selected_;                // fingerprint of the designer chosen on the page (its row was pressed)
     std::string confirm_;                 // fingerprint waiting for "Remove?" confirmation
     std::string confirm_rt_;              // fingerprint waiting for "Allow to replace the runtime?"

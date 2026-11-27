@@ -591,7 +591,13 @@ DeployOutcome deploy_send(const DeploySend& req, const DeployIdentity& me)
         if(!c.read_line(line, 1024, 60000)) return stop("the device did not confirm " + what);
         if(line != "RECEIVED") return stop(line.rfind("ERROR ", 0) == 0 ? "the device: " + line.substr(6) : "unexpected answer from the device");
         state(it.runtime ? "runtime received" : "received");
-        if(!c.read_line(line, 2048, req.install_timeout_ms)) return stop(what + " arrived, but the device did not say whether it was installed");
+        const auto answer_by = Clock::now() + std::chrono::milliseconds(req.install_timeout_ms);
+        for(;;) {
+            const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(answer_by - Clock::now()).count();
+            if(left <= 0 || !c.read_line(line, 2048, static_cast<int>(left))) return stop(what + " arrived, but the device did not say whether it was installed");
+            if(line != "ASKING") break;
+            state("asking");
+        }
         if(line != "INSTALLED") return stop(line.rfind("ERROR ", 0) == 0 ? what + " was not installed: " + line.substr(6) : "unexpected answer from the device");
         if(it.runtime) state("runtime installed");
     }
