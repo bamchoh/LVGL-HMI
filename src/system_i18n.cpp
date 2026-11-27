@@ -36,6 +36,19 @@ const std::vector<Pattern>& patterns()
         { std::regex(R"(^Port (\d+): other machines can connect(.*)$)"), "ポート $1: ほかの機器からつなげます$2" },
         { std::regex(R"(^Port (\d+): this device only \(no password set\)(.*)$)"), "ポート $1: この装置からだけ（パスワード未設定）$2" },
         { std::regex(R"(^(\d+) s$)"), "$1 秒" },
+        // the login screen
+        { std::regex(R"(^Logged in, but this needs (.*) or higher\.$)"), "ログインしましたが、$1 以上のレベルが必要です。" },
+        { std::regex(R"(^(.*) or higher is needed\.$)"), "$1 以上のレベルが必要です。" },
+        { std::regex(R"(^Locked\. Try again in (\d+) s\.$)"), "ロック中です。$1 秒後にもう一度試してください。" },
+        { std::regex(R"(^Wrong PIN \((\d+) more tries\)\.$)"), "PIN が違います（あと $1 回）。" },
+        // what went wrong, with the reason as it came
+        { std::regex(R"(^Not installed: ([\s\S]*)$)"), "入れ替えられませんでした: $1" },
+        { std::regex(R"(^Not changed: ([\s\S]*)$)"), "変更できませんでした: $1" },
+        { std::regex(R"(^Not removed: ([\s\S]*)$)"), "削除できませんでした: $1" },
+        { std::regex(R"(^Not written: ([\s\S]*)$)"), "書き込めませんでした: $1" },
+        { std::regex(R"(^Backup failed: ([\s\S]*)$)"), "バックアップに失敗しました: $1" },
+        { std::regex(R"(^Backup written to ([\s\S]*)$)"), "バックアップを書き出しました: $1" },
+        { std::regex(R"(^A project was received but not installed: ([\s\S]*)$)"), "プロジェクトを受け取りましたが、入れ替えられませんでした: $1" },
     };
     return p;
 }
