@@ -887,6 +887,22 @@ TEST_CASE("system pages: nothing in a list that scrolls changes anything by one 
         REQUIRE(kids.size() >= 3);                                // header, list, ..., keyboard
         std::vector<std::string> in_list;
         buttons(kids[1], page, in_list);
+        // a page with a form at the top of its list: what its rows do is what it says picks a row (the list goes back to its top then)
+        if(page == "users" || page == "monitor" || page == "schedule") {
+            int picks = 0;
+            std::function<void(const json&)> rows = [&](const json& w) {
+                if(w.is_array()) { for(const json& c : w) rows(c); return; }
+                if(!w.is_object()) return;
+                if(const json* oc = jget(w, "on_click"); oc && oc->is_object() && jstr(w, "type", "") == "panel") {
+                    std::string cmd = jstr(*oc, "arg", "");
+                    if(cmd.rfind(page + ":", 0) == 0) cmd = cmd.substr(page.size() + 1);
+                    if(sys.page(page)->picks_row(cmd.substr(0, cmd.find(':')))) picks++;
+                }
+                if(w.contains("children")) rows(w["children"]);
+            };
+            rows(kids[1]);
+            CHECK_MESSAGE(picks > 0, "page '" << page << "': no row of the list picks a row");
+        }
         for(const std::string& cmd : in_list) CHECK_MESSAGE(harmless.count(cmd) == 1, "page '" << page << "': a button for '" << cmd << "' is in the list that scrolls");
         // the bar at the bottom and the questions are beside the list, not in it
         const SettingsPage* sp = sys.page(page);

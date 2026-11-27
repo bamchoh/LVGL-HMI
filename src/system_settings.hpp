@@ -63,9 +63,10 @@ public:
     // Return "" on success, otherwise a message shown on the page.
     virtual std::string apply(const std::map<std::string, std::string>& values) = 0;
     virtual bool has_apply() const { return true; }
-    // Is what a picked row can be changed with at the top of the list (Users, Tags, Schedule)?
-    // Then the list goes back to its top when a row is picked.
-    virtual bool form_on_top() const { return false; }
+    // Does this command pick a row whose form is at the top of the list (Users, Tags, Schedule)?
+    // Then the list goes back to its top, so that the form is seen. (The page says which command
+    // it is: Users calls it "edit", the others "select".)
+    virtual bool picks_row(const std::string& cmd) const { (void)cmd; return false; }
     // More buttons under the form: { text, command } - a press calls command(<command>, "").
     virtual std::vector<std::pair<std::string, std::string>> buttons() const { return {}; }
     // The same with more to say (when it is shown, what kind it is). Default: buttons().

@@ -260,7 +260,7 @@ public:
         if(Tag* t = tags().find(SystemSettings::tag_name(id(), "status"))) t->set_string(msg, nullptr);
     }
 
-    bool form_on_top() const override { return true; }
+    bool picks_row(const std::string& cmd) const override { return cmd == "edit"; }
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
