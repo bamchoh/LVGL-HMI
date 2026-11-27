@@ -130,7 +130,18 @@ const App = {
     this.autosave();
     this.renderTabs();
     Canvas.render(); Tree.render(); Props.render(); Panels.render(); this.toolbar(); this.status();
+    this.emptyHint();
     if (fk) { const e = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]'); if (e) e.focus(); }
+  },
+  // An empty screen says what to do next (a new project starts with one).
+  emptyHint() {
+    const wrap = document.getElementById('canvas-wrap'), scr = M.screen();
+    let h = document.getElementById('canvas-empty');
+    if (!scr || (scr.children || []).length || scr.template) { if (h) h.remove(); return; }
+    if (!h) { h = U.el('div', { id: 'canvas-empty' }); wrap.append(h); }
+    h.innerHTML = '';
+    h.append(U.el('b', null, I18N.t('This screen is empty')),
+      U.el('span', null, I18N.t('Click a widget in the list at the left, or drag it here. "Ready-made buttons" already do something.')));
   },
   select(path) { M.st.sel = path; M.st.more = []; this.selectionChanged(); },
   selectionChanged() { Canvas.render(); Tree.render(); Props.render(); this.status(); },
@@ -577,6 +588,7 @@ const App = {
       M.newProject(title.value.trim() || 'New HMI', Number(w.value) || 800, Number(h.value) || 480);
       if (chosen && chosen.touch && Number(w.value) === chosen.width && Number(h.value) === chosen.height) M.st.project.display.touch = U.clone(chosen.touch);
       this.refresh();
+      setTimeout(() => this.zoomFit(), 50);          // (the whole screen in view, as after opening a project)
       if ((await this.save(true)) && jp.checked && (await this.addBundledFont())) await this.save(false);
     } }] });
   },

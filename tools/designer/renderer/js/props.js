@@ -228,7 +228,7 @@ const Props = {
 
     if (isRoot) {
       const name = U.el('input', { type: 'text', value: w.name || '', dataset: { fk: fk + '.name' }, onchange: e => M.renameScreen(M.st.cur, e.target.value) });
-      el.append(U.el('div', { class: 'props-head' }, 'Screen'));
+      el.append(U.el('div', { class: 'props-head' }, I18N.t('Screen')));
       el.append(this.section('Screen', true, this.row('name', name), ...this.fields(w, [{ k: 'scrollable', t: 'bool' },
         { k: 'level', t: 'number', hint: 'minimum user level to open this screen (0 / empty = everybody); the login screen is shown first. Needs users (Users tab)' },
         { k: 'popup', t: 'bool', hint: 'shown over the current screen by the action "popup" (closed by "close", "back" or a screen change), never as a screen of its own' },
