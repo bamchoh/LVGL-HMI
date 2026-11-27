@@ -56,3 +56,38 @@ TEST_CASE("on_release: a command held while pressed goes OFF also when the finge
     CHECK(cmd->get_number() == 0);
 }
 }
+
+TEST_SUITE("reliability") {
+TEST_CASE("a switch and a checkbox change on a tap, not when the finger slid over them")
+{
+    Runtime rt;
+    Tag* sw = rt.tag("sw", TagType::Bool, 0);
+    Tag* cb = rt.tag("cb", TagType::Bool, 0);
+    json scr = json::parse(R"json({ "name": "s", "children": [
+        { "type": "switch", "x": 40, "y": 40, "w": 80, "h": 40, "bind": "sw" },
+        { "type": "checkbox", "x": 40, "y": 140, "text": "check", "bind": "cb" } ] })json");
+    REQUIRE(ui().build_screen(scr, ""));
+    REQUIRE(ui().show_screen("s", "none"));
+    Finger f;
+    rt.advance(50);
+    auto touch = [&](int x, int y, int dx, int dy) {
+        f.point = { x, y }; f.pressed = true; rt.advance(60);
+        for(int i = 1; i <= 4; i++) { f.point = { x + dx * i / 4, y + dy * i / 4 }; rt.advance(30); }
+        f.pressed = false; rt.advance(100);
+    };
+    touch(80, 60, 0, 0);                                          // a tap
+    CHECK(sw->get_number() == 1);
+    touch(80, 60, 5, 3);                                          // a tap that trembles
+    CHECK(sw->get_number() == 0);
+    touch(80, 60, 20, 0);                                         // the finger slid sideways: nothing
+    CHECK(sw->get_number() == 0);
+    touch(80, 60, 0, 14);                                         // ... or down
+    CHECK(sw->get_number() == 0);
+    touch(80, 60, 0, 0);                                          // and a tap works as before afterwards
+    CHECK(sw->get_number() == 1);
+    touch(60, 150, 0, 0);
+    CHECK(cb->get_number() == 1);
+    touch(60, 150, 18, 0);
+    CHECK(cb->get_number() == 1);
+}
+}

@@ -53,6 +53,19 @@ static const int kSendFlags = 0;
 namespace fs = std::filesystem;
 
 namespace hml {
+
+std::string fingerprint_for_reading(const std::string& fingerprint)
+{
+    const size_t colon = fingerprint.find(':');
+    if(colon == std::string::npos) return fingerprint;
+    std::string out = fingerprint.substr(0, colon + 1);
+    for(size_t i = colon + 1, n = 0; i < fingerprint.size(); i++, n++) {
+        if(n % 4 == 0) out += ' ';
+        out += fingerprint[i];
+    }
+    return out;
+}
+
 namespace {
 
 using Clock = std::chrono::steady_clock;

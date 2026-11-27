@@ -2,8 +2,11 @@
 """Tap the touch screen of the device from a shell (stdlib only): UI checks without a finger.
 
     python3 tap.py [--project <project.json>] X,Y[,WAIT_MS] ...
+    python3 tap.py [--project <project.json>] "X1,Y1>X2,Y2[,WAIT_MS]" ...      a drag (quote the ">")
 
-X,Y are screen coordinates; WAIT_MS is the pause after the tap (default 400). Example, on the
+X,Y are screen coordinates; WAIT_MS is the pause after the tap (default 400). A drag presses at
+the first point, moves to the second in small steps (--drag-ms, default 350) and lets go there:
+for scrolling a list, and for seeing what a finger that slips does to what is under it. Example, on the
 3.5" LCD project: go to "Setup" (bottom right), then press "Log in":
 
     python3 tools/rpi/tap.py --project projects/lcd35/project.json 435,298,900 363,84
@@ -54,7 +57,8 @@ def find_device():
 
 def main():
     ap = argparse.ArgumentParser(description="Inject taps into the touch screen's input device.")
-    ap.add_argument("taps", nargs="+", metavar="X,Y[,WAIT_MS]")
+    ap.add_argument("taps", nargs="+", metavar="X,Y[,WAIT_MS] | X1,Y1>X2,Y2[,WAIT_MS]")
+    ap.add_argument("--drag-ms", type=int, default=350, help="how long a drag takes (default 350)")
     ap.add_argument("--project", help="project.json to take the display size and touch settings from")
     ap.add_argument("--device", help="input device (default: display.input of the project, else the first touch device)")
     ap.add_argument("--size", metavar="WxH", help="screen size, e.g. 480x320")
@@ -84,12 +88,18 @@ def main():
         sys.exit("calibration: four numbers (min_x, min_y, max_x, max_y)")
     min_x, min_y, max_x, max_y = calib
 
-    taps = []
+    taps = []                           # (x, y, wait, x2, y2): x2 is None for a tap
     for t in args.taps:
-        p = t.split(",")
-        if len(p) not in (2, 3):
-            sys.exit("a tap is X,Y or X,Y,WAIT_MS: " + t)
-        taps.append((int(p[0]), int(p[1]), int(p[2]) if len(p) == 3 else 400))
+        to = None
+        if ">" in t:
+            t, to = t.split(">", 1)
+        p = t.split(",") + (to.split(",") if to else [])
+        if to and len(p) in (4, 5):
+            taps.append((int(p[0]), int(p[1]), int(p[4]) if len(p) == 5 else 400, int(p[2]), int(p[3])))
+        elif not to and len(p) in (2, 3):
+            taps.append((int(p[0]), int(p[1]), int(p[2]) if len(p) == 3 else 400, None, None))
+        else:
+            sys.exit("a tap is X,Y[,WAIT_MS], a drag X1,Y1>X2,Y2[,WAIT_MS]: " + t)
 
     try:
         f = open(device, "wb", buffering=0)
@@ -99,12 +109,25 @@ def main():
     def send(events):
         f.write(b"".join(EVENT.pack(0, 0, t, c, v) for t, c, v in events) + EVENT.pack(0, 0, EV_SYN, 0, 0))
 
+    def raw(sx, sy):
+        # what the runtime does backwards: screen -> calibrated raw -> (swapped) panel axes
+        cx = round(min_x + sx * (max_x - min_x) / max(1, width - 1))
+        cy = round(min_y + sy * (max_y - min_y) / max(1, height - 1))
+        return (cy, cx) if swap else (cx, cy)
+
     with f:
-        for sx, sy, wait in taps:
-            # what the runtime does backwards: screen -> calibrated raw -> (swapped) panel axes
-            cx = round(min_x + sx * (max_x - min_x) / max(1, width - 1))
-            cy = round(min_y + sy * (max_y - min_y) / max(1, height - 1))
-            raw_x, raw_y = (cy, cx) if swap else (cx, cy)
+        for sx, sy, wait, tx, ty in taps:
+            raw_x, raw_y = raw(sx, sy)
+            if tx is not None:
+                # a drag: down, a report every 15 ms or so on the way, up at the end
+                steps = max(2, args.drag_ms // 15)
+                for i in range(steps + 1):
+                    x, y = raw(sx + (tx - sx) * i / steps, sy + (ty - sy) * i / steps)
+                    send([(EV_ABS, ABS_X, x + (i & 1)), (EV_ABS, ABS_Y, y + (i & 1)), (EV_ABS, ABS_PRESSURE, 180 + (i & 1)), (EV_KEY, BTN_TOUCH, 1)])
+                    time.sleep(args.drag_ms / 1000 / steps)
+                send([(EV_ABS, ABS_PRESSURE, 0), (EV_KEY, BTN_TOUCH, 0)])
+                time.sleep(wait / 1000)
+                continue
             # Two reports one count apart: the kernel drops values that did not change, and a
             # tap on the same spot as the last one would otherwise carry no position at all.
             for jitter in (0, 1):

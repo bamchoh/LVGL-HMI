@@ -58,7 +58,7 @@ public:
         flag("receive", ds.listening());
         if(!ds.available()) info("state", "Not available: the runtime has no place for its keys (start it with --data-dir <folder>).");
         else if(ds.listening())
-            info("state", vformat("On, port %d at %s\nThis device: %s", ds.port(), local_ip_addresses().c_str(), ds.fingerprint().c_str()));
+            info("state", vformat("On, port %d at %s\nThis device: %s", ds.port(), local_ip_addresses().c_str(), fingerprint_for_reading(ds.fingerprint()).c_str()));
         else info("state", "Off: the port is closed, no project can be sent to this device.");
 
         flag("ask", ds.ask());
@@ -78,7 +78,7 @@ public:
         DeployService::Offer offer;
         const bool pending = ds.pending(offer);
         flag("pending", pending);
-        info("pending_text", pending ? "A new designer asks to send projects to this device:\n" + offer.name + " (" + offer.from + ")\n" + offer.fingerprint +
+        info("pending_text", pending ? "A new designer asks to send projects to this device:\n" + offer.name + " (" + offer.from + ")\n" + fingerprint_for_reading(offer.fingerprint) +
                                        "\nAccept it only if the designer shows the same fingerprint."
                                      : "");
 
@@ -320,7 +320,7 @@ private:
     }
     static std::string describe(const DeployDesigner& d)
     {
-        return d.name + (d.added.empty() ? "" : "  (" + d.added + ")") + "\n" + d.fingerprint + (d.runtime ? "\nmay replace the runtime" : "");
+        return d.name + (d.added.empty() ? "" : "  (" + d.added + ")") + "\n" + fingerprint_for_reading(d.fingerprint) + (d.runtime ? "\nmay replace the runtime" : "");
     }
     TransferTarget target() const
     {
