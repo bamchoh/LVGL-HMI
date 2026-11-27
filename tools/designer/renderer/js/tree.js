@@ -16,9 +16,15 @@ const Tree = {
     if (sel) sel.scrollIntoView({ block: 'nearest' });
   },
 
+  // The name of a kind of widget, as the palette says it ("Button" / "ボタン"): one word for one
+  // thing everywhere. (The key of the JSON, "button", is in the tooltip of the row.)
+  typeName(type) {
+    const t = SCHEMA.types[type || 'panel'];
+    return t ? I18N.t(t.label) : (type || 'panel');
+  },
   label(w, isRoot) {
-    if (isRoot) return 'screen “' + (w.name || '') + '”';
-    const t = w.type || 'panel';
+    if (isRoot) return I18N.t('Screen') + ' “' + (w.name || '') + '”';
+    const t = this.typeName(w.type);
     if (w.text !== undefined && w.text !== '') return t + ' “' + String(w.text).slice(0, 24) + '”';
     if (typeof w.bind === 'string') return t + ' ⇄ ' + w.bind;
     if (w.bind && typeof w.bind === 'object') {
@@ -62,7 +68,7 @@ const Tree = {
         else App.select(path);
       },
       ondblclick: e => { e.stopPropagation(); if (!isRoot) Props.focusFirst(); },
-    }, U.el('span', { class: 'tr-icon' }, this.icon(w, isRoot)), U.el('span', { class: 'tr-label' }, this.label(w, isRoot)),
+    }, U.el('span', { class: 'tr-icon' }, this.icon(w, isRoot)), U.el('span', { class: 'tr-label', title: isRoot ? 'screen' : 'type: ' + (w.type || 'panel') }, this.label(w, isRoot)),
       M.flag(w, 'locked') ? U.el('span', { class: 'tr-mark', title: 'Locked on the canvas' }, '🔒') : null,
       M.flag(w, 'hidden') ? U.el('span', { class: 'tr-mark', title: 'Hidden on the canvas (designer only)' }, '🚫') : null);
     li.append(row);
