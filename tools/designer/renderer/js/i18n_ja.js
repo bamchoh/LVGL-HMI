@@ -13,7 +13,7 @@ Object.assign(I18N.TEXT_JA, {
   'Launch hml_runtime with this project (saves first)': 'このプロジェクトを hml_runtime で起動（先に保存します）',
   'Send this project to a target (Raspberry Pi) over SSH and restart the runtime there (saves first)': 'このプロジェクトを SSH でターゲット（Raspberry Pi）へ送り、ランタイムを再起動（先に保存します）',
   'Language of the designer / 表示言語': '表示言語 / Language of the designer',
-  'Screen editor (Ctrl+1)': '画面の編集 (Ctrl+1)', 'Tag list (Ctrl+2)': 'タグ一覧 (Ctrl+2)', 'Drivers (Ctrl+3)': 'ドライバ (Ctrl+3)',
+  'Screen editor (Ctrl+1)': '画面の編集 (Ctrl+1)', 'Tag list (Ctrl+2)': 'タグ一覧 (Ctrl+2)', 'Drivers (Ctrl+3)': 'ドライバー (Ctrl+3)',
   'Lua scripts (Ctrl+4)': 'Lua スクリプト (Ctrl+4)', 'Data log, alarms, operation log, system log (Ctrl+5)': '変数ロギング・アラーム・操作ログ・システムログ (Ctrl+5)',
   'Users, levels and login (Ctrl+6)': 'ユーザー・レベル・ログイン (Ctrl+6)',
   'Duplicate (Ctrl+D)': '複製 (Ctrl+D)', 'Delete (Del)': '削除 (Del)', 'Move up (earlier = drawn below)': '前へ（前にあるほど下に描かれる）',
@@ -55,9 +55,9 @@ Object.assign(I18N.TEXT_JA, {
   'Modbus RTU client (serial) (modbus_rtu)': 'Modbus RTU クライアント（シリアル） (modbus_rtu)',
   'Modbus ASCII client (serial) (modbus_ascii)': 'Modbus ASCII クライアント（シリアル） (modbus_ascii)', 'OPC UA server (opcua_server)': 'OPC UA サーバー (opcua_server)',
   'Items': '項目', 'Register map': 'レジスタの割り付け', 'Published tags (empty = all tags, read/write)': '公開するタグ（空 = すべてのタグを読み書き可で公開）',
-  'raw JSON': 'JSON を直接編集', 'Select a driver on the left.': '左の一覧からドライバを選んでください。',
-  'No drivers. Add one on the left (simulator, Modbus TCP, OPC UA server ...).': 'ドライバがありません。左で追加してください（シミュレーター、Modbus TCP、OPC UA サーバーなど）。',
-  'Unknown driver type; edit the JSON below.': '未対応のドライバです。下の JSON を直接編集してください。',
+  'raw JSON': 'JSON を直接編集', 'Select a driver on the left.': '左の一覧からドライバーを選んでください。',
+  'No drivers. Add one on the left (simulator, Modbus TCP, OPC UA server ...).': 'ドライバーがありません。左で追加してください（シミュレーター、Modbus TCP、OPC UA サーバーなど）。',
+  'Unknown driver type; edit the JSON below.': '未対応のドライバーです。下の JSON を直接編集してください。',
   'serial port: /dev/ttyUSB0 on the device, COM4 on Windows. Leave empty and fill in host / port to go through a serial gateway (TCP)':
     'シリアルポート。装置では /dev/ttyUSB0、Windows では COM4 など。空欄にしてホスト / ポートを入れると、シリアル–イーサネット変換器（TCP）経由になります',
   'unit (slave) address; a row of the map may name another one': 'ユニット（スレーブ）番号。割り付けの行ごとに別の番号を指定できます',
@@ -88,7 +88,7 @@ Object.assign(I18N.TEXT_JA, {
   'What the operator did on the screens: values written from widgets and by set / toggle / inc / dec actions (old and new value), screen changes, scripts and calls started from widget events. Text typed into a password field is never stored. Export: hml_runtime --export-operation-log out.csv project.json, or call "operation_log.export".':
     'オペレーターが画面で行った操作を記録します。部品や set / toggle / inc / dec の動作によるタグへの書き込み（変更前後の値）、画面の切り替え、イベントから実行したスクリプトや call。パスワード欄に入力した内容は記録しません。書き出し: hml_runtime --export-operation-log out.csv project.json、または call "operation_log.export"。',
   'Runtime messages: script errors, driver connects / disconnects, project load messages, Lua log() / warn(). Export: hml_runtime --export-system-log out.csv project.json, or call "system_log.export".':
-    'ランタイムのメッセージを記録します。スクリプトのエラー、ドライバの接続 / 切断、プロジェクト読み込み時のメッセージ、Lua の log() / warn()。書き出し: hml_runtime --export-system-log out.csv project.json、または call "system_log.export"。',
+    'ランタイムのメッセージを記録します。スクリプトのエラー、ドライバーの接続 / 切断、プロジェクト読み込み時のメッセージ、Lua の log() / warn()。書き出し: hml_runtime --export-system-log out.csv project.json、または call "system_log.export"。',
 
   // ---- users
   ' user management': ' ユーザー管理を使う',
@@ -163,10 +163,10 @@ Object.assign(I18N.TEXT_JA, {
   'Deployed.': 'デプロイしました。', 'hml_runtime is not running on the target.': 'ターゲットで hml_runtime が動いていません。',
   'The target is running this project.': 'ターゲットはこのプロジェクトを表示しています。',
   'Local settings on the target': 'ターゲットのローカル設定', 'Files': 'ファイル',
-  'None: every driver setting comes from this project.': 'ありません。ドライバ設定はすべてこのプロジェクトの値が使われます。',
+  'None: every driver setting comes from this project.': 'ありません。ドライバー設定はすべてこのプロジェクトの値が使われます。',
   'These will be removed by this deploy; the project\'s values take effect.': 'このデプロイで削除され、プロジェクトの値が有効になります。',
   'These were changed on the target and stay in effect after a deploy (the project\'s values are not used):': 'ターゲットで変更された設定です。デプロイしてもこちらが優先されます（プロジェクトの値は使われません）:',
-  'driver': 'ドライバ', 'setting': '項目', 'on the target': 'ターゲットでの値', 'in this project': 'このプロジェクトの値', '(no such driver)': '(該当するドライバなし)',
+  'driver': 'ドライバー', 'setting': '項目', 'on the target': 'ターゲットでの値', 'in this project': 'このプロジェクトの値', '(no such driver)': '(該当するドライバーなし)',
   'The target has the same files as this project.': 'ターゲットのファイルは、このプロジェクトと同じです。',
   'The target has the same files as this project (as last saved).': 'ターゲットのファイルは、このプロジェクト（最後に保存した状態）と同じです。',
   'Unsaved changes are not part of this comparison (Deploy saves first).': '保存していない変更は、この比較に含まれていません（デプロイは先に保存します）。',
@@ -262,7 +262,7 @@ Object.assign(I18N.TEXT_JA, {
 Object.assign(I18N.TEXT_JA, {
   'Keyboard shortcuts': 'キーボード操作', 'Keyboard shortcuts (F1)': 'キーボード操作の一覧 (F1)',
   'New / open / save (Ctrl+Shift+S: save as)': '新規 / 開く / 保存（Ctrl+Shift+S: 別名で保存）', 'Undo / redo': '元に戻す / やり直し',
-  'Screen editor, tags, drivers, scripts, logs, users': '画面の編集・タグ・ドライバ・スクリプト・ログ・ユーザー',
+  'Screen editor, tags, drivers, scripts, logs, users': '画面の編集・タグ・ドライバー・スクリプト・ログ・ユーザー',
   'Add a widget to the selection, or take it out': '部品を選択に追加 / 選択から外す', 'Select everything in the same panel': '同じパネル内の部品をすべて選択',
   'Copy / cut / paste widgets (also onto another screen)': '部品のコピー / 切り取り / 貼り付け（別の画面へも可）', 'Duplicate': '複製',
   'Move by 1 px (with Shift: 10 px)': '1 px 移動（Shift で 10 px）', 'Move without snapping to other widgets': 'ほかの部品に吸着させずに移動',
@@ -280,7 +280,7 @@ Object.assign(I18N.TEXT_JA, {
   'Tag "{0}" is used here ({1})': 'タグ「{0}」の使用箇所 ({1})',
   'Next / previous screen tab': '次 / 前の画面タブ', 'Drag on the background': '背景をドラッグ', 'Select the widgets inside the rectangle': '囲んだ部品を選択',
   'Right click': '右クリック', 'Menu: copy, paste, order …': 'メニュー（コピー、貼り付け、重なり順 …）',
-  'No tags yet. Tags are the named values that widgets bind to and drivers read / write.': 'タグがまだありません。タグは名前の付いた値で、部品が連動し、ドライバが読み書きします。',
+  'No tags yet. Tags are the named values that widgets bind to and drivers read / write.': 'タグがまだありません。タグは名前の付いた値で、部品が連動し、ドライバーが読み書きします。',
 });
 I18N.PATTERNS_JA.push([/^duplicate tag names: (.*)$/, '重複しているタグ名: $1']);
 I18N.PATTERNS_JA.push([/^(\d+) texts$/, '$1 個のテキスト'], [/^ (\d+) items$/, ' $1 項目'], [/^(\d+) items$/, '$1 項目']);
@@ -319,7 +319,7 @@ Object.assign(I18N.TEXT_JA, {
   'One recipe per line: name, then one value per item. Copy this into a spreadsheet, or paste lines from one here (commas or tabs) and press Import: the recipes of the book are replaced. Cells that a spreadsheet would read as a formula get a leading apostrophe.':
     '1 行に 1 レシピ: 名前、続けて項目ごとの値。表計算ソフトへコピーするか、表計算ソフトの行をここへ貼り付けて（カンマ区切りでもタブ区切りでも可）「取り込む」を押すと、このブックのレシピが置き換わります。表計算ソフトが数式と読むセルには、先頭にアポストロフィを付けます。',
   '{0} recipe(s) imported': '{0} 個のレシピを取り込みました',
-  'Screen editor, tags, drivers, scripts, logs, users, recipes': '画面の編集・タグ・ドライバ・スクリプト・ログ・ユーザー・レシピ',
+  'Screen editor, tags, drivers, scripts, logs, users, recipes': '画面の編集・タグ・ドライバー・スクリプト・ログ・ユーザー・レシピ',
   'recipes: a level is set, but user management is off (Users tab)': 'レシピ: 必要レベルが設定されていますが、ユーザー管理がオフです（ユーザー タブ）',
 });
 I18N.PATTERNS_JA.push(
@@ -426,7 +426,7 @@ Object.assign(I18N.TEXT_JA, {
 I18N.PATTERNS_JA.push(
   [/^(.*): no TLS: user name, password and values can be read on the network$/, '$1: TLS なし: ユーザー名・パスワード・値がネットワーク上で読めます'],
   [/^(.*): the broker's certificate is not checked \(verify off\)$/, '$1: ブローカーの証明書を確認していません（verify がオフ）'],
-  [/^(.*): the password is in project.json; better enter it on the device \(System > Driver\)$/, '$1: パスワードが project.json にあります。装置で入力してください（システム > ドライバ）'],
+  [/^(.*): the password is in project.json; better enter it on the device \(System > Driver\)$/, '$1: パスワードが project.json にあります。装置で入力してください（システム > ドライバー）'],
   [/^(.*): "(.*)": wildcards \(\+ #\) are not allowed$/, '$1: 「$2」: ワイルドカード（+ #）は使えません'],
 );
 // ---- alarm widgets
@@ -572,7 +572,7 @@ Object.assign(I18N.TEXT_JA, {
   'One text per line: id, then one column per language (the first line names them). Copy this into a spreadsheet for the translators, or paste their lines here (commas or tabs) and press Import: the texts are replaced, new languages are added.':
     '1 行に 1 テキスト: ID、続けて言語ごとの列（1 行目に言語コード）。表計算ソフトへコピーして翻訳者に渡し、戻ってきた行をここへ貼り付けて（カンマ区切りでもタブ区切りでも可）「取り込む」を押すと、テキストが置き換わります。新しい言語は追加されます。',
   '{0} text(s) imported': '{0} 個のテキストを取り込みました',
-  'Screen editor, tags, drivers, scripts, logs, users, recipes, texts': '画面の編集・タグ・ドライバ・スクリプト・ログ・ユーザー・レシピ・多言語テキスト',
+  'Screen editor, tags, drivers, scripts, logs, users, recipes, texts': '画面の編集・タグ・ドライバー・スクリプト・ログ・ユーザー・レシピ・多言語テキスト',
   'a language code of the project, or "next"': 'プロジェクトの言語コード、または "next"（次の言語）',
 });
 I18N.PATTERNS_JA.push(
@@ -610,7 +610,7 @@ Object.assign(I18N.TEXT_JA, {
   'icons added: {0}': 'アイコンを入れました: {0}',
   'Simulation': 'シミュレーション',
   'Values for a demo or for trying screens without a device, kept apart from the drivers: changing them never touches the connection to the PLC. Same items as the simulator driver; "when" (a tag) makes an item run only while it is true, mode "follow" moves towards "target" (a tag or a number) at "rate" a second and to "idle" while "when" is false, "noise" adds a little randomness. The tag sys.sim.active is 1 while values are simulated: show it on the screens ("SIMULATION").':
-    'デモや、機器なしで画面を試すための値です。ドライバとは別なので、変えても PLC との接続には触れません。項目はシミュレーターのドライバと同じです。「when」（タグ）はそれが真の間だけ動かし、mode「follow」は「target」（タグか数値）へ 1 秒に「rate」ずつ近づき、when が偽の間は「idle」へ戻ります。「noise」は少し揺らします。タグ sys.sim.active はシミュレーション中 1 です。画面に出してください（「SIMULATION」）。',
+    'デモや、機器なしで画面を試すための値です。ドライバーとは別なので、変えても PLC との接続には触れません。項目はシミュレーターのドライバーと同じです。「when」（タグ）はそれが真の間だけ動かし、mode「follow」は「target」（タグか数値）へ 1 秒に「rate」ずつ近づき、when が偽の間は「idle」へ戻ります。「noise」は少し揺らします。タグ sys.sim.active はシミュレーション中 1 です。画面に出してください（「SIMULATION」）。',
 });
 I18N.PATTERNS_JA.push([/^Japanese text is used \((.*)\), but the project has no font for it: it is shown as empty boxes\. Project tab > Font$/,
   '日本語の文字が使われていますが、プロジェクトにフォントがありません（□ で表示されます）。プロジェクト タブ > フォント']);

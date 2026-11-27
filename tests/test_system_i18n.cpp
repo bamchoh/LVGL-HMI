@@ -86,7 +86,7 @@ TEST_CASE("system i18n: a text is translated only in Japanese, a text without an
     set_system_language("ja");
     CHECK(system_language() == "ja");
     CHECK(sys_text("Apply") == "適用");
-    CHECK(sys_text("Driver: plc") == "ドライバ: plc");
+    CHECK(sys_text("Driver: plc") == "ドライバー: plc");
     CHECK(sys_text("3 key(s)") == "鍵 3 個");
     CHECK(sys_text("pump_1") == "pump_1");
     CHECK(sys_text("Admin or higher is needed.") == "Admin 以上のレベルが必要です。");

@@ -34,9 +34,9 @@ Modbus、SLMP（MELSEC）、FINS（オムロン）、OPC UA、MQTT で PLC に�
    レイアウトとタッチの決まり、そのまま動く見本があります。デザイナーと一緒に配られます。
 3. **ランタイムが確かめます。** `hml_runtime --check --render` は、ウィンドウを出さず、機器にもつながずに、間違い
    （知らないキー、ないタグ、訳のない文字）の一覧と、各画面の画像を出します。AI は両方を見て自分で直します。
-4. **頼めば接続も書きます。** アドレス表（CSV、表計算、PLC のラベル一覧）を渡すと、AI がタグとドライバの割り付けを書きます
+4. **頼めば接続も書きます。** アドレス表（CSV、表計算、PLC のラベル一覧）を渡すと、AI がタグとドライバーの割り付けを書きます
    （`tools/skill/hml-screens/reference/drivers-guide.md`）。読むだけから始め、書き込みは許した所だけ、パスワードはファイルに書きません。
-   `--check` は各ドライバ自身にアドレスを読ませ、ないデバイス、2 回使われたタグやアドレス、数値のレジスタに文字列、などを知らせます。
+   `--check` は各ドライバー自身にアドレスを読ませ、ないデバイス、2 回使われたタグやアドレス、数値のレジスタに文字列、などを知らせます。
    接続を試すのはあなたです（AI は実機につなぎません）。
 5. **デザイナーが追いかけます。** AI が変えたファイルを読み直し、問題一覧を出します。位置も見た目も、あとから手で直せます。
 
@@ -57,7 +57,7 @@ Modbus、SLMP（MELSEC）、FINS（オムロン）、OPC UA、MQTT で PLC に�
 ランタイムは、JSON で書いた画面定義を LVGL (v9.6) で描画し、タグ（プロセス変数）とウィジェットを
 双方向にバインドします。PC 上では SDL2 ウィンドウで、Raspberry Pi などの
 Linux ボードでは framebuffer / DRM + evdev（タッチパネル）で動作します。
-データソースはドライバ方式で、シミュレーション、Modbus TCP クライアント、OPC UA サーバー
+データソースはドライバー方式で、シミュレーション、Modbus TCP クライアント、OPC UA サーバー
 （タグを OPC UA 変数として公開）を同梱しています。
 ランタイム本体は C++17 で書かれています（LVGL 本体は C ライブラリのまま利用）。
 
@@ -90,11 +90,11 @@ build.cmd Debug
 | `test_util.cpp`, `test_jsonutil.cpp`, `test_tag.cpp` | ヘルパー、JSON アクセサ、タグストア（型変換・リミット・通知）                                                               |
 | `test_project.cpp`, `test_demo_projects.cpp`         | project.json の読み込み・バリデーション、同梱プロジェクトが全画面ビルドできること                                           |
 | `test_ui.cpp`, `test_screenshot.cpp`                 | 全ウィジェット種別、スタイル、バインディング（双方向含む）、アクション、画面遷移、BMP 出力                                  |
-| `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバの登録 / 起動 / 停止、シミュレーション波形                                                                          |
+| `test_driver_registry.cpp`, `test_driver_sim.cpp`    | ドライバーの登録 / 起動 / 停止、シミュレーション波形                                                                          |
 | `test_animate.cpp`                                   | アニメーション（点滅がタグで始まり止まると元に戻る、移動・回転・拡大・色、コマ送り、回数、**表示していない画面と閉じたポップアップでは動かない**、**1 秒に 3 回より速く点滅しない**、書き間違いの警告、動作中に画面を消しても安全） |
 | `test_images.cpp`                                    | 画像（PNG / JPEG / BMP / GIF、`fit`、JPEG / BMP は元の大きさだけ、背景画像、タグに連動する画像、**壊れた・ない・大きすぎる・プロジェクトの外のファイルを表示しない**（タグで指定された場合も）） |
 | `test_check.cpp`                                     | プロジェクトの検査（`--check`: 正しいプロジェクトは 0 件、ランタイムが黙って無視する 26 種類の間違いを場所付きで検出、フォントにない文字、壊れたファイル、出荷プロジェクトと Skill の見本が 0 件）、PNG のスクリーンショット |
-| `test_capabilities.cpp` | プロジェクトができること（`--capabilities`）: 画面を描くだけのプロジェクト、書き込む機器（読むだけの機器・止めてあるドライバは出ない）、メール / アップロード / MQTT、OPC UA サーバーと VNC、トリガーのあるスクリプト / スケジュール / データ転送、**fingerprint は一覧に従い、画面には従わない**、画面のボタンが持つスクリプト、プロジェクトのフォルダーの外は読まない |
+| `test_capabilities.cpp` | プロジェクトができること（`--capabilities`）: 画面を描くだけのプロジェクト、書き込む機器（読むだけの機器・止めてあるドライバーは出ない）、メール / アップロード / MQTT、OPC UA サーバーと VNC、トリガーのあるスクリプト / スケジュール / データ転送、**fingerprint は一覧に従い、画面には従わない**、画面のボタンが持つスクリプト、プロジェクトのフォルダーの外は読まない |
 | `test_driver_fins.cpp`                               | FINS（アドレスの書き方、FINS/TCP とコマンドのバイト列、壊れた応答、模擬サーバーとの読み書き・終了コード・再接続）           |
 | `test_alarm_stats.cpp`                               | アラームの集計（回数と時間、期間の端、記録の欠けと時計の変更、CSV の式の無害化、10 万件の時間、部品）                       |
 | `test_xy_chart.cpp`                                  | XY グラフ（点の追加と破棄、変化時、複数の曲線、消去、数値でない値、極端な設定、描き直しの回数、`--check`）                   |
@@ -109,7 +109,7 @@ build.cmd Debug
 | `test_driver_opcua_client.cpp`                       | OPC UA クライアント（同じプロセスの open62541 サーバーを相手に: ノードの読み込みとサブスクリプション、`rw` の行だけ書き込み、**署名と暗号化**、**別の証明書のサーバーを拒否**、verify なしの警告、信頼する証明書がないと起動しない、平文で暗号化専用サーバーにつながらない、ユーザー名とパスワード（間違いの拒否、ログに出ない）、型に入らない値を書かない、サーバーの停止と復帰、停止がすぐ終わる、装置の証明書を 1 度だけ作る） |
 | `test_driver_modbus.cpp`                             | テスト内の疑似 Modbus TCP サーバーに対するエンドツーエンド（全エリア・全データ型・書き込み・再接続）                        |
 | `test_driver_modbus_serial.cpp`                      | Modbus RTU / ASCII（フレームと CRC・LRC、複数ユニット、壊れた応答、無応答からの復帰、疑似シリアルポート） |
-| `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバを読み書き                                                             |
+| `test_driver_opcua.cpp`                              | open62541 クライアント API で OPC UA サーバードライバーを読み書き                                                             |
 | `test_system_log.cpp`                                | システムログ（SQLite への記録、繰り返しの集約、保持件数、CSV エクスポート、スレッドからの書き込み）                         |
 | `test_recipe.cpp`                                    | レシピ（読み込み・選択・書き込み・保存・値の変更・削除、範囲外なら何も書かない、書き込み後の確認、装置での保存と再起動後の読み戻し、壊れたファイル・書けないとき、CSV の数式エスケープと取り込みの検証・大きさの上限、名前とブック名（パスにならない）、ランダムなバイト列、レベル、レシピ表の部品と確認ダイアログ）、`write_file_atomic` |
 | `test_alarm_view.cpp`                                | アラームの確認（発生・復帰・確認の全順序）、再起動後の状態、履歴のページ送りと絞り込み、古い DB への列追加、確認のレベルと記録、一覧とバナー、1000 件の性能、SQL インジェクション・制御文字・不正な UTF-8 |
@@ -134,7 +134,7 @@ build.cmd Debug
 | `test_project_archive.cpp`                           | プロジェクトファイル（構成ファイルの一覧、作成と展開、プロジェクト外へ出るパスの拒否、PC ごとのファイルの保護）     |
 | `test_script.cpp`                                    | Lua スクリプト（タグの読み書き、各トリガー、サンドボックス、タイムアウト、**メモリを使いすぎたスクリプトだけが失敗する**、ホットリロード） |
 | `tools/designer/test/model.test.js`                  | デザイナーの util / schema / model（`node --test`、依存パッケージなし）                                                     |
-| `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバ）し、スクリーンショットと終了コードを確認 |
+| `smoke_runtime.cmake`                                | 実行ファイル `hml_runtime` をデモプロジェクトでヘッドレス起動（SDL dummy ドライバー）し、スクリーンショットと終了コードを確認 |
 
 ```
 test.cmd                         # ビルドして hml_tests を実行
@@ -252,7 +252,7 @@ sudo ./build-fbdev/bin/hml_runtime projects/demo/project.json
 - コンソールのカーソル点滅が画面に残る場合は `echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink`。
 - 画面サイズは framebuffer の解像度が使われます。`project.json` の `display.width/height` は
   画面 JSON の座標基準なので、Pi の解像度に合わせておくか `rotation` と合わせて調整してください。
-- fbdev/drm ドライバはカーネルが返す物理サイズから DPI を計算しますが、HDMI ではでたらめな値
+- fbdev/drm ドライバーはカーネルが返す物理サイズから DPI を計算しますが、HDMI ではでたらめな値
   （Pi 4 で 1280 px = 70 mm → 464 dpi）が返ることがあり、テーマの余白や角丸が数倍に膨らみます。
   ランタイムは `display.dpi`（既定 130）で必ず上書きするので、通常は何もしなくて大丈夫です。
 - 入力は `/dev/input/event*` を自動検出します（タッチ / マウス / キーボード）。特定のデバイスだけ
@@ -361,7 +361,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 
 | キー / オプション           | 動作                                                                                                              |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `F5`                        | 画面 JSON をホットリロード（タグ・ドライバは維持、表示中の画面を保つ）。Linux fbdev/drm では `SIGHUP` / `SIGUSR1` |
+| `F5`                        | 画面 JSON をホットリロード（タグ・ドライバーは維持、表示中の画面を保つ）。Linux fbdev/drm では `SIGHUP` / `SIGUSR1` |
 | `Esc`                       | 終了。Linux fbdev/drm では `Ctrl-C` (`SIGINT` / `SIGTERM`)                                                        |
 | `SIGUSR2`（Linux fbdev/drm）| ランタイムを再起動（終了処理をしてから同じコマンドラインで起動し直す）。デザイナーの Deploy が使う                |
 | `--screen <name>`           | 起動時に表示する画面を指定                                                                                        |
@@ -369,7 +369,7 @@ build\bin\hml_runtime.exe projects\demo\project.json
 | `--check`                   | プロジェクトの間違いを一覧にして終了（下記「プロジェクトの検査」）。`--render` `--lang` `--set` と組み合わせられる |
 | `--exit-after <ms>`         | 指定時間後に自動終了（CI / 自動テスト用）                                                                         |
 | `--stats <seconds>`          | メインループの負荷を指定秒ごとにログに出す（1 秒あたりの周回数、占有率、最長の 1 周の時間）。負荷の確認用 →「負荷の確認」 |
-| `--list-serial-ports`        | その機械のシリアルポートを一覧表示して終了（project.json は不要）→「ドライバ: modbus_rtu / modbus_ascii」 |
+| `--list-serial-ports`        | その機械のシリアルポートを一覧表示して終了（project.json は不要）→「ドライバー: modbus_rtu / modbus_ascii」 |
 | `--reload-after <ms>`       | 指定時間後にホットリロードを実行（テスト用）                                                                      |
 | `--export-system-log <file.csv>` | システムログを CSV に書き出して終了（`--log-level warn` などで絞り込み）→「システムログ」                    |
 | `--export-data-log <file.csv>` | 変数ロギングのグループを CSV に書き出して終了（`--group <name>`）。`--export-alarm-log` / `--export-operation-log` も同様 →「ロギング」 |
@@ -447,7 +447,7 @@ hml_runtime project.json --check
 hml_runtime project.json --check --render main,main.png --render main+temp_detail,popup.png --lang en --set temp=34.5
 ```
 
-プロジェクトを動かさずに、間違いを 1 行ずつ（`ファイル: 場所: 内容`）出します。**ウィンドウを出さず、ドライバを起動せず
+プロジェクトを動かさずに、間違いを 1 行ずつ（`ファイル: 場所: 内容`）出します。**ウィンドウを出さず、ドライバーを起動せず
 （機器につながない）、プロジェクトのフォルダーに何も書きません。** 間違いがなければ `no problems` で終了コード 0、
 あれば件数を出して 1 です。デザイナーなしで（スクリプトや AI から）プロジェクトを確かめるためのものです。
 
@@ -466,7 +466,7 @@ project.json: drivers[0] (plc): map: unknown tag "pressur"
 | ランタイムのタグ | そのプロジェクトのランタイムにない `sys.` のタグ（つづりの間違い、`sound` がないのに `sys.sound.*`） |
 | 動作 | 知らない動作・キー、ないタグ・画面・スクリプト・言語・アニメーション、ポップアップでない画面への `popup` |
 | 参照 | `texts` にない `"@ID"`、ない画像・フォントのファイル、トレンドのグループとタグ、レシピのブック、アラームの設定がない |
-| ドライバ | 表（`map`、`items`、`publish` …）と `status_tag` のないタグ |
+| ドライバー | 表（`map`、`items`、`publish` …）と `status_tag` のないタグ |
 | 文字 | フォント（と組み込みフォント）にない文字 |
 | `runtime:` の行 | 実際に読み込んで全画面を作ったときにランタイムが出した警告とエラー |
 
@@ -537,7 +537,7 @@ fingerprint 97f74c7877d557c0
 
 | 見出し | 出るもの |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| Writes to devices | 読み取り専用（`"access": "ro"`）でない値を持つドライバと、タグに値を入れる MQTT のトピック |
+| Writes to devices | 読み取り専用（`"access": "ro"`）でない値を持つドライバーと、タグに値を入れる MQTT のトピック |
 | Sends data out | メール、ログのアップロード、MQTT ブローカーへ出すもの。その宛先 |
 | Opens ports for others | OPC UA サーバー、VNC |
 | Runs by itself | トリガーのあるスクリプト、スケジュール、データ転送。画面のボタンが持つスクリプトの数 |
@@ -559,7 +559,7 @@ fingerprint 97f74c7877d557c0
   「Ask before a project that can do more」でオフにできます。
 - **USB メモリから入れるとき。** System > Storage の「Replace the project with …?」に、その USB メモリのプロジェクトが
   できることと、今と違う一覧かどうかが出ます。
-- **デザイナーで実行・プレビューする前。** どちらも PC の上でプロジェクトを動かします。スクリプトが動き、ドライバが接続して
+- **デザイナーで実行・プレビューする前。** どちらも PC の上でプロジェクトを動かします。スクリプトが動き、ドライバーが接続して
   書き込みます。この PC でまだ動かしたことのないプロジェクト（もらったフォルダーを開いた、リポジトリから取ってきた）は、
   先に一覧を **動かす** と **キャンセル** と一緒に出します。このデザイナーで作ったプロジェクトと、ここで動かしたことがあり、
   そのあとデザイナーで変えただけのプロジェクトは、たずねません。
@@ -601,7 +601,7 @@ build\bin\hml_designer.exe line1.hmlproj                  # プロジェクト�
 | 場所                                   | 内容                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 左: Widgets                            | パレット。クリックすると選択中のパネル（または画面）に追加                                                                                                         |
-| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバ設定（sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正                          |
+| 左: Screens / Tags / Drivers / Project | 画面の追加・削除・開始画面、タグ表、ドライバー設定（sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server のフォーム + raw JSON）、表示サイズ・テーマ・タッチ補正                          |
 | 中央: キャンバス                       | ドラッグで移動、右下のハンドルでサイズ変更、矢印キーで 1 px（Shift で 10 px）移動。flex レイアウトの子は親の設定に従うので移動不可                                 |
 | 右: ツリー + プロパティ                | 階層と順序（▲▼ で前後、⇥⇤ でパネルに出し入れ）、位置 / サイズ / フラグ / スタイル（セレクタごと）/ バインド / イベント（アクション列）                             |
 | Preview                                | 保存してから `hml_runtime` をウィンドウなし（`SDL_VIDEODRIVER=dummy`）で起動し、その画面のスクリーンショットを表示。キャンバスは近似表示なので、最終確認はこちらで |
@@ -686,7 +686,7 @@ build\bin\hml_designer.exe line1.hmlproj                  # プロジェクト�
 ダイアログを開いたとき（接続先が入力済みの場合）と **Check** を押したときに、何も送らずにターゲットの状態を調べて表示します。
 
 - **ターゲットで動いているプロジェクト**（このプロジェクトか、別のプロジェクトか、ランタイムが動いていないか）
-- **ターゲットのローカル設定**: ターゲットのシステム設定画面で変更されたドライバ設定は `project.local.json` に保存され、
+- **ターゲットのローカル設定**: ターゲットのシステム設定画面で変更されたドライバー設定は `project.local.json` に保存され、
   デプロイしてもそちらが優先されます。該当する項目を「ターゲットでの値」と「このプロジェクトの値」を並べた表で表示します。
   プロジェクトの値に戻したいときは「local settings」にチェックを入れてデプロイします。
 - **ファイルの差分**: 変更されたファイル、新しいファイル、ターゲットにだけ残っているファイルの一覧（ファイル単位）
@@ -875,7 +875,7 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
   範囲外の値を読んだときは、タグごとに 1 回、警告をログに出します。
 - `screens` はファイルパス（project.json からの相対）か、画面オブジェクトを直接書けます。
 
-### ドライバ: sim（シミュレーション）
+### ドライバー: sim（シミュレーション）
 
 ```json
 {
@@ -923,19 +923,19 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 { "tag": "production_count", "mode": "counter", "min": 0, "max": 999999, "period_ms": 3000, "when": "line_running" }
 ```
 
-#### ドライバと分けたシミュレーション（`simulation`）
+#### ドライバーと分けたシミュレーション（`simulation`）
 
 ```json
 "simulation": { "items": [ { "tag": "oven_temperature", "mode": "sine", "min": 208, "max": 212, "period_ms": 30000 } ] }
 ```
 
-- `sim` ドライバと同じ項目を、project.json の別の場所に書きます。ドライバ（PLC との接続）に触らずにデモを作り・変えられます。
+- `sim` ドライバーと同じ項目を、project.json の別の場所に書きます。ドライバー（PLC との接続）に触らずにデモを作り・変えられます。
   `"enabled": false` で止まります。デザイナーでは Drivers タブの「Simulation」です。
-- タグ `sys.sim.active`: プロジェクトが値をシミュレーションしているとき（この設定か、有効な `sim` ドライバがあるとき）1。本物の値と取り違えないよう、画面に出します:
+- タグ `sys.sim.active`: プロジェクトが値をシミュレーションしているとき（この設定か、有効な `sim` ドライバーがあるとき）1。本物の値と取り違えないよう、画面に出します:
   `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" } }`。
-- PLC がつながっていない間だけ動かすなら、項目に `"when": { "tag": "plc_online", "eq": false }`（ドライバの `status_tag`）を付けます。
+- PLC がつながっていない間だけ動かすなら、項目に `"when": { "tag": "plc_online", "eq": false }`（ドライバーの `status_tag`）を付けます。
 
-### ドライバ: modbus_tcp
+### ドライバー: modbus_tcp
 
 ```json
 {
@@ -981,7 +981,7 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 - 起動時にタグの初期値を PLC に書き込むことはありません（PLC 側の値が優先されます）。
 - 切断時は指数バックオフ（0.5s → 5s）で再接続します。
 
-### ドライバ: modbus_rtu / modbus_ascii（シリアル）
+### ドライバー: modbus_rtu / modbus_ascii（シリアル）
 
 シリアルポート（RS-232 / RS-485、USB シリアル変換を含む）で Modbus RTU または Modbus ASCII のクライアント（マスター）として
 通信します。`map` の書き方やデータ型は `modbus_tcp` と同じです。
@@ -1025,14 +1025,14 @@ PC のファイルを読み書きできる AI（Claude Code、Claude のデス�
 
 - **装置の画面**: システム設定の Driver ページでは、`device` をその装置で見つかったポートの一覧から選べます。
   ページを開いたときに調べ直すので、あとから挿した変換器も出ます。「ports found」に説明つきの一覧も表示されます。
-- **デザイナー**: ドライバ設定の **Find serial ports …** で、ターゲットのポート（Deploy の接続設定を使って調べます）と
+- **デザイナー**: ドライバー設定の **Find serial ports …** で、ターゲットのポート（Deploy の接続設定を使って調べます）と
   この PC のポートを、説明つきで一覧表示します。ターゲットのポートを選ぶと `device` に、PC のポートを選ぶと下記の
   「device on this PC」に入ります。
 - **コマンド**: `hml_runtime --list-serial-ports` が、その機械のポートを 1 行に 1 つ表示します
   （`デバイス名 <TAB> 変わらない名前 <TAB> 説明`）。
 
 **同じプロジェクトを PC でも動かすとき**（デザイナーの Run / Preview など）は、プロジェクトを分ける必要はありません。
-PC でのポート名は、デザイナーのドライバ設定の **device on this PC** に書きます。これは PC 側の `project.local.json` に保存され、
+PC でのポート名は、デザイナーのドライバー設定の **device on this PC** に書きます。これは PC 側の `project.local.json` に保存され、
 その PC で動かすときだけ `device` の代わりに使われます。デプロイでは送られないので、ターゲットには影響しません。
 
 別の OS の名前のまま動かした場合（Windows で `/dev/ttyUSB0` など）は、その旨と、その機械にあるポートの一覧がログに出ます。
@@ -1045,7 +1045,7 @@ PC でのポート名は、デザイナーのドライバ設定の **device on t
 - Linux では、ランタイムを動かすユーザーがシリアルポートに読み書きできる必要があります（通常は `dialout` グループ）。
 - 応答のチェックサム（RTU は CRC-16、ASCII は LRC）が合わないフレームは捨てます。
 
-### ドライバ: slmp（三菱電機 MELSEC: SLMP / MC プロトコル）
+### ドライバー: slmp（三菱電機 MELSEC: SLMP / MC プロトコル）
 
 SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP）で MELSEC の CPU または Ethernet ユニットと読み書きします。
 
@@ -1090,7 +1090,7 @@ SLMP（MC プロトコルの 3E / 4E フレーム、バイナリコード、TCP�
 - SLMP は暗号化も認証もない平文のプロトコルです。PLC とは閉じたネットワークで使い、`write_ranges` で書き込める
   範囲を絞ってください。UDP と MC プロトコルのシリアル（4C フレーム）にはまだ対応していません。
 
-### ドライバ: fins（オムロン: FINS/TCP）
+### ドライバー: fins（オムロン: FINS/TCP）
 
 FINS/TCP でオムロンの PLC（CS / CJ / CP / NJ / NX）のメモリを読み書きします。
 
@@ -1137,7 +1137,7 @@ FINS/TCP でオムロンの PLC（CS / CJ / CP / NJ / NX）のメモリを読み
   範囲を絞ってください。FINS/UDP とシリアル（Host Link）にはまだ対応していません。
 - 確認は、テスト内の模擬の相手と PLC シミュレーター Karakuri の FINS サーバーで行っています。**実機での確認はまだです。**
 
-### ドライバ: mqtt（MQTT クライアント）
+### ドライバー: mqtt（MQTT クライアント）
 
 MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）、指令を受け取って（subscribe）タグに書き込みます。
 **既定で TLS（1.2 / 1.3）を使い、ブローカーの証明書とホスト名を確認します。** 実装は mbedTLS（Apache-2.0）です。
@@ -1205,7 +1205,7 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
   値の場所にオブジェクトや配列があれば書きません。外から書けるのは `fields` に書いたタグだけです。JSON でないメッセージは捨てます。
 - `--check` は、`/` で始まらないポインタ、ないタグ、トピックのないメッセージ、ワイルドカードを知らせます。
 
-### ドライバ: opcua_client（OPC UA クライアント）
+### ドライバー: opcua_client（OPC UA クライアント）
 
 ほかの OPC UA サーバー（PLC、SCADA など）のノードをタグにします。**既定で署名と暗号化（Sign & Encrypt）を使い、
 サーバーの証明書を確認します。** 実装は open62541（MPL-2.0）で、暗号は mbedTLS です。
@@ -1247,11 +1247,11 @@ MQTT 3.1.1 でブローカーに接続し、タグの値を送り（publish）�
   （プロジェクトファイルから信頼する証明書を仕込むこともできません）。
 - 接続できない理由を調べるときは、環境変数 `HML_OPCUA_LOG=info`（または `debug`）で open62541 のログを増やせます。
 
-### ドライバ: opcua_server（OPC UA サーバー）
+### ドライバー: opcua_server（OPC UA サーバー）
 
 タグを OPC UA の変数ノードとして公開します。SCADA や他の HMI、Python (asyncua) などの
 OPC UA クライアントから読み書きでき、クライアントからの書き込みはそのままタグに反映されて
-画面と他のドライバ（Modbus など）に伝わります。実装は open62541 (MPL-2.0) です。
+画面と他のドライバー（Modbus など）に伝わります。実装は open62541 (MPL-2.0) です。
 
 ```json
 {
@@ -1734,7 +1734,7 @@ project.json に `users` を書いたときだけ有効で、書かなければ�
 
   `level` はそのウィジェット自身にかかります。パネルに付けた場合、`hide` は中身ごと隠れますが、
   `disable` は中のウィジェットには及ばないので、操作させたくないウィジェットそれぞれに付けてください。
-- **システム設定画面**は `system_level` 以上でないと開けません（鍵の管理やドライバ設定を含む全ページ）。
+- **システム設定画面**は `system_level` 以上でないと開けません（鍵の管理やドライバー設定を含む全ページ）。
 
 **ログイン**
 
@@ -1787,7 +1787,7 @@ Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトで
 - **メニューはスクロールしません。** ページは分類（Device / Connection / Notify / Service。ページのない分類は出ません）に
   分かれていて、上のタブで選んだ分類だけが、2 列のタイルで並びます。480x320 の画面に 6 ページまで収まります。タイルには
   ページ名の下に、今の状態が 1 行で出ます（プロジェクト名、IP アドレス、「Off」、「Receiving, 1 designer(s)」など）。
-  6 ページを超える分類（ドライバが多いとき）だけがスクロールします。
+  6 ページを超える分類（ドライバーが多いとき）だけがスクロールします。
 - **押すと何かが起きるものは、スクロールする所に置きません。** ページでは、「戻る」・題名・**Apply** が上のバーに、
   ページのほかのボタン（テストメール、「Remove the password」など）が下のバーにあります。その間の設定の一覧には、
   ボタンがありません。
@@ -1839,7 +1839,7 @@ Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトで
 `set_language` で切り替えると、システム設定画面も切り替わります）に従い、言語を持たないプロジェクトでは、
 プロジェクトのタイトルが日本語なら日本語にします。`project.json` に `"system_language": "ja"` か `"en"` を書くと
 固定できます。日本語にするには、その文字を持つプロジェクトのフォント（`font.file`）が必要です。無いときは、
-文字化けさせずに英語のまま表示します。プロジェクトや機器から来る名前（タグ、ドライバ、ホスト名、指紋）はそのままです。
+文字化けさせずに英語のまま表示します。プロジェクトや機器から来る名前（タグ、ドライバー、ホスト名、指紋）はそのままです。
   装置の前にいる人は誰でもこの方法で設定を開けます（ボタンを置いた場合と同じ）。困る場合は、ユーザーを足すか `"hold": "none"` にします。
 - メニューが開いたとき、そのタッチの残りは捨てられます。指の下のボタンはクリックになりません。ただし、押している間に動く部品
   （`repeat`、長押し）は、その時点までに動いています。そういう部品をその隅に置かないか、別の隅を選んでください。
@@ -1853,14 +1853,14 @@ Logout ボタンが出ます。`{ "action": "logout" }` でもログアウトで
 | Network | NetworkManager (`nmcli`) のある Linux で、インターフェース、DHCP / 固定 IP、アドレス (CIDR)、ゲートウェイ、DNS を設定。Apply で `nmcli connection modify` + `up` を実行（一般ユーザーでは polkit が認証を求めるので `sudo -n` で再試行。`tools/rpi/hml.sudoers` を入れておく）。接続中の IP を変えると SSH が切れます。Windows では表示のみ |
 | Keys | SSH の鍵の管理（Linux の fbdev / drm バックエンドで表示）。デプロイに使う鍵の登録・削除 →「鍵の管理」 |
 | Users | ユーザーの追加・変更・削除（project.json に `users` があるとき）→「ユーザー管理」 |
-| Driver: … | project.json の各ドライバ（1 ドライバ 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバを再起動 |
+| Driver: … | project.json の各ドライバー（1 ドライバー 1 ページ）。`enabled` と、`host` / `port` / `poll_ms` などのスカラー設定を編集。Apply で `project.local.json` に保存し、全ドライバーを再起動 |
 | Sound | 消音、音量、試しに鳴らす、出力先の表示（`sound` があるとき）→「音」 |
 | Transfers | 機器間のデータ転送の状態と、動いていない理由（`transfers` があるとき。表示のみ）→「機器間のデータ転送」 |
 | Upload | ログの送信: 送り先ごとのオン / オフ、ログイン、今すぐ送る、送信の状態（`uploads` があるとき）→「ログを外に出す」 |
 | Mail | メール通知のオン / オフ、宛先、ログイン、テスト送信、送信の状態（`mail` があるとき）→「メールで知らせる」 |
 | Remote | 遠隔操作（VNC）のオン / オフ、パスワード、見るだけ、状態（`remote` があるとき）→「遠隔表示と遠隔操作（VNC）」 |
 | Schedule | スケジュールの一覧と次の実行時刻。予定を押して時刻・曜日・オン / オフを変える（`schedules` があるとき）→「スケジュール」 |
-| Tags | すべてのタグの今の値を一覧で見る（8 件ずつ、名前の一部で絞り込み。`sys.` と入れるとランタイム自身のタグ）。行を押すと、そのタグに値を書き込める（bool は TRUE / FALSE のボタン、数値は数字のキーパッド、文字列はキーボード。絞り込みは「x」で消す）。立ち上げと保守で、画面を作っていない値を確かめる・変えるためのもの。書き込みはタグの上下限に従い、ドライバを通って機器にも届き、操作ログに `monitor` として残る。`sys.` のタグには書き込めない |
+| Tags | すべてのタグの今の値を一覧で見る（8 件ずつ、名前の一部で絞り込み。`sys.` と入れるとランタイム自身のタグ）。行を押すと、そのタグに値を書き込める（bool は TRUE / FALSE のボタン、数値は数字のキーパッド、文字列はキーボード。絞り込みは「x」で消す）。立ち上げと保守で、画面を作っていない値を確かめる・変えるためのもの。書き込みはタグの上下限に従い、ドライバーを通って機器にも届き、操作ログに `monitor` として残る。`sys.` のタグには書き込めない |
 | Addresses | **タグを割り付けていない PLC のアドレス**を読み書きする（Modbus、SLMP、FINS のドライバーがあるプロジェクトに出る）→「デバイスモニター」 |
 | Storage | USB メモリ（ネットワークのない現場用）へのバックアップ、USB メモリのプロジェクトファイルのインストール、ひとつ前のプロジェクトに戻す →「USB メモリでの更新とバックアップ」 |
 | Deploy | SSH なしでデザイナーからプロジェクトを受け取る: オン / オフ、デザイナーの追加、承認と削除、ランタイムを入れ替えてよいデザイナー →「SSH なしでデプロイする（Direct）」 |
@@ -2541,7 +2541,7 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 
 ### レシピ (`recipes`)
 
-品種ごとの設定値など、タグの値の組に名前を付けておき、まとめて書き込みます（ドライバを通して PLC へ）。
+品種ごとの設定値など、タグの値の組に名前を付けておき、まとめて書き込みます（ドライバーを通して PLC へ）。
 
 ```json
 "recipes": {
@@ -2611,7 +2611,7 @@ hml_runtime --export-alarm-log alarms.csv projects/demo/project.json
 - 同じタグへの書き込みが 1 秒以内に続いたとき（スライダーのドラッグ、+ ボタンの連打）は 1 行にまとめ、
   最初の変更前の値と最後の変更後の値を記録します。
 - パスワード入力欄に入力した内容は記録しません（`***` になります）。
-- 値が変わらなかった書き込み、スクリプトの中でのタグ書き込み、ドライバ（PLC）からの変化は記録しません。
+- 値が変わらなかった書き込み、スクリプトの中でのタグ書き込み、ドライバー（PLC）からの変化は記録しません。
 
 ```
 hml_runtime --export-operation-log operations.csv projects/demo/project.json
@@ -2795,7 +2795,7 @@ hml_runtime --export-operation-log operations.csv projects/demo/project.json
 
 ## システムログ
 
-スクリプトのエラー、ドライバの接続・切断、プロジェクトの読み込み結果など、ランタイムがコンソールに出す
+スクリプトのエラー、ドライバーの接続・切断、プロジェクトの読み込み結果など、ランタイムがコンソールに出す
 メッセージ（`[hml INFO ]` / `[hml WARN ]` / `[hml ERROR]`）を SQLite データベースに記録し、あとから CSV で
 取り出せます。project.json に `system_log` を書くと有効になります（書かなければ記録しません）。
 
@@ -2861,24 +2861,24 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 | `src/script.[ch]pp`            | `hml::ScriptEngine`: Lua スクリプト（トリガー、タグ / 画面 API、サンドボックス、タイムアウト）      |
 | `src/project.[ch]pp`           | `hml::Project`: project.json の読み込み、画面構築とホットリロード                                   |
 | `src/driver.[ch]pp`            | `hml::Driver` 基底クラスと `hml::DriverRegistry`（登録 / 起動 / 停止）                              |
-| `src/driver_sim.cpp`           | シミュレーションドライバ                                                                            |
+| `src/driver_sim.cpp`           | シミュレーションドライバー                                                                            |
 | `src/driver_modbus.cpp`        | Modbus TCP クライアント（std::thread で別スレッド）                                                 |
 | `src/modbus_link.[ch]pp`       | Modbus の通信路（TCP / シリアルポート）とフレーム（MBAP / RTU の CRC-16 / ASCII の LRC）          |
 | `src/serial_ports.[ch]pp`      | その機械のシリアルポートの一覧（Linux: sysfs と by-id、Windows: SetupAPI）                         |
 | `src/project_archive.[ch]pp`   | プロジェクトファイル（`.hmlproj`）の作成と展開、プロジェクトを構成するファイルの一覧（デザイナーと共用） |
 | `src/driver_opcua.cpp`         | OPC UA サーバー（open62541、DataSource コールバックでタグを公開）                                   |
 | `src/driver_opcua_client.cpp`  | OPC UA クライアント（open62541 + mbedTLS、サブスクリプションで読み、`rw` の行だけ書く）             |
-| `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバ |
+| `src/mqtt.[ch]pp` / `src/driver_mqtt.cpp` | MQTT 3.1.1 のパケット（入出力なし）と接続（TCP / mbedTLS の TLS）、MQTT クライアントドライバー |
 | `src/check.[ch]pp` / `src/check_schema.inc` | プロジェクトの検査（`hml_runtime --check`）。知っている部品・キーの一覧は `schema.js` から生成 |
 | `src/jsonutil.[ch]pp`          | nlohmann/json と、欠損キー・型違いを既定値で吸収するアクセサ（`jstr` / `jnum` / `jbool`）           |
 | `src/util.[ch]pp`              | ログ（`HML_INFO` など）、`iequals`、単調時計                                                        |
 | `legacy_c/`                    | 書き直し前の C 版（参照用、ビルド対象外。不要なら削除可）                                           |
-| `lv_conf.h`                    | LVGL 設定（`HML_BACKEND_*` でドライバ切替、フォント、ウィジェット有効化）                           |
+| `lv_conf.h`                    | LVGL 設定（`HML_BACKEND_*` でドライバー切替、フォント、ウィジェット有効化）                           |
 | `build.cmd` / `build.sh`       | Windows (MSVC) / Linux・Raspberry Pi (gcc, クロスコンパイル対応) のビルドスクリプト                 |
 | `test.cmd` / `tests/`          | 単体テスト（doctest）: `test_jsonutil.cpp`, `test_tag.cpp`。`hml_tests` にビルドされ CTest にも登録 |
 | `cmake/toolchain-*.cmake`      | aarch64 / armhf クロスコンパイル用ツールチェーンファイル                                            |
 | `tools/modbus_server.py`       | テスト用 Modbus TCP サーバー（標準ライブラリのみ）                                                  |
-| `tools/karakuri_check.py`      | PLC シミュレーター Karakuri を相手にしたドライバの接続確認（SLMP / FINS / Modbus / OPC UA）         |
+| `tools/karakuri_check.py`      | PLC シミュレーター Karakuri を相手にしたドライバーの接続確認（SLMP / FINS / Modbus / OPC UA）         |
 | `tools/opcua_client_test.py`   | OPC UA 動作確認クライアント（asyncua）                                                              |
 | `tools/bmp2png.py`             | スクリーンショット BMP → PNG 変換                                                                   |
 | `tools/designer/host/main.cpp` | デザイナーのホスト（webview、ファイルダイアログ、ランタイム起動）                                   |
@@ -2891,7 +2891,7 @@ DB Browser for SQLite でも直接見られます（テーブル `log`）。
 （`std::thread` / `std::mutex` / `std::function`）にしか依存しません。
 Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動きます。それ以外の RTOS /
 ベアメタルへは、`platform.hpp` を実装するファイルを 1 つ追加して対象ボードの表示・入力
-ドライバを呼び出します（`std::thread` が無い環境では `driver_modbus.cpp` のスレッド部分も
+ドライバーを呼び出します（`std::thread` が無い環境では `driver_modbus.cpp` のスレッド部分も
 その OS の API に置き換えます）。JSON ファイルの読み込みは `std::ifstream` なので、
 ファイルシステムの無いターゲットでは `project.cpp` の `read_file()` を差し替えてください。
 
@@ -2899,7 +2899,7 @@ Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動
 
 - **ウィジェットを追加**: `ui.cpp` の `Ui::Impl::build_widget()` に `type` の分岐を 1 つ足します。
   バインド対象にするなら `Widget` 列挙と `Binding::apply_value()` / `on_widget_changed()` にも追加します。
-- **ドライバを追加**: `hml::Driver` を継承したクラスを書き、`DriverRegistry::register_builtins()`
+- **ドライバーを追加**: `hml::Driver` を継承したクラスを書き、`DriverRegistry::register_builtins()`
   にファクトリを登録します（`driver_sim.cpp` が最小の例です）。
 - **アクションを追加**: `ui.cpp` の `ActionKind` と `parse_action()` / `run_actions()` に追加します。
 - **Lua の関数を追加**: `script.cpp` の `ScriptEngine::Impl::ensure_state()` の `funcs` に登録します
@@ -2908,7 +2908,7 @@ Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動
 ### スレッドモデル
 
 - LVGL と UI バインディング、Lua スクリプトは常にメインスレッドで動作します。
-- ドライバは任意のスレッドから `Tag::set_number()` / `set_string()` を呼べます。変更はメインループの
-  `TagStore::dispatch()` で購読者（ウィジェット・ドライバ）に配信されます。
+- ドライバーは任意のスレッドから `Tag::set_number()` / `set_string()` を呼べます。変更はメインループの
+  `TagStore::dispatch()` で購読者（ウィジェット・ドライバー）に配信されます。
 - 各書き込みには「書き込み元」が付くため、スライダー自身の書き込みがスライダーに戻って
-  ドラッグ中に跳ねる、Modbus ドライバが自分で読んだ値を PLC に書き戻す、といったループは起きません。
+  ドラッグ中に跳ねる、Modbus ドライバーが自分で読んだ値を PLC に書き戻す、といったループは起きません。

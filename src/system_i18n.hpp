@@ -15,7 +15,7 @@ void set_system_language(const std::string& lang);   // "ja" or anything else = 
 const std::string& system_language();
 
 // The text in the language of the system screens: an entry of the table, a pattern with values
-// in it ("Driver: plc" -> "ドライバ: plc"), or the text itself.
+// in it ("Driver: plc" -> "ドライバー: plc"), or the text itself.
 std::string sys_text(const std::string& english);
 // Is there a translation for this text (the table or a pattern)? For the test that looks for
 // texts that were forgotten.

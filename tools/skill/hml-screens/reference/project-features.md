@@ -207,7 +207,7 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 - 機器の値（実際の温度など）を、機器がつながったあとも書き続けないよう、PLC のつながりを示すタグがあれば
   `"when": { "tag": "plc_online", "eq": false }` を付ける。
 - 表示: `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" }, "style": { "text_color": "#f5b942" } }`
-  をヘッダー（テンプレート）に置く。`sys.sim.active` は、`simulation` か有効な `sim` ドライバがあるとき 1。
+  をヘッダー（テンプレート）に置く。`sys.sim.active` は、`simulation` か有効な `sim` ドライバーがあるとき 1。
 - `--check --render` では動かない（値は `init`。`--set` で確かめる）。動きを見るのは「押したあとの様子を確かめたいとき」の手順で
   （コピーの `drivers` を消しても `simulation` は残る）。
 
