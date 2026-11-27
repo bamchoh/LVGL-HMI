@@ -106,6 +106,10 @@ button.pal[hidden] { display: none; }
 table.grid { border-collapse: collapse; width: 100%; }
 table.grid th { text-align: left; color: var(--dim); font-weight: normal; font-size: 11px; padding: 2px 3px; }
 table.grid td { padding: 1px 2px; }
+/* a cell the row does not use: out of the way while empty, marked when a value in it is ignored */
+table.grid td.unused { opacity: .3; }
+table.grid td.unused:hover, table.grid td.unused:focus-within { opacity: 1; }
+table.grid td.ignored input, table.grid td.ignored select { text-decoration: line-through; color: var(--dim); }
 table.grid td input, table.grid td select { width: 100%; }
 
 /* full-size Tags / Drivers pages in the center area */
