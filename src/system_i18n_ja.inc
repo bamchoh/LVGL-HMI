@@ -83,6 +83,8 @@
 { "Off", "オフ" },
 { "Idle", "待機中" },
 { "never", "消さない" },
+{ "nothing sent yet", "まだ送っていません" },
+{ "no transfers", "データ転送はありません" },
 { "Remote access (VNC)", "遠隔操作（VNC）" },
 { "View only", "見るだけ" },
 { "Receive projects", "プロジェクトを受け取る" },

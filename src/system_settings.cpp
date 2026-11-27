@@ -401,7 +401,7 @@ struct Pair { const char* dark; const char* light; };
 const Pair kBack[] = {
     { "#10151c", "#eef1f5" }, { "#141a22", "#eef1f5" }, { "#19212c", "#eef1f5" },
     { "#1b2430", "#dde4ec" }, { "#1f2a38", "#dde4ec" },
-    { "#222d3b", "#ffffff" }, { "#22303f", "#ffffff" }, { "#2b3848", "#cfd8e3" }, { "#2a323c", "#ffffff" },
+    { "#222d3b", "#ffffff" }, { "#22303f", "#ffffff" }, { "#2b3848", "#cfd8e3" }, { "#2a323c", "#e3e8ee" },
     { "#2c3e50", "#d3dbe5" }, { "#3a4a5e", "#d3dbe5" }, { "#455a64", "#d3dbe5" }, { "#37474f", "#d3dbe5" },
     { "#2f4a6b", "#bbdefb" },
     { "#4a3a10", "#fff3cd" }, { "#4a1c1c", "#fde0e0" },
@@ -410,7 +410,7 @@ const Pair kBack[] = {
 const Pair kText[] = {
     { "#ffffff", "#16202b" }, { "#eef3f8", "#263442" }, { "#cfd8e3", "#263442" },
     { "#9fb3c8", "#5b6b7c" }, { "#8fa3b8", "#5b6b7c" }, { "#6f7c8a", "#5b6b7c" },
-    { "#90caf9", "#1565c0" },
+    { "#90caf9", "#1565c0" }, { "#a5d6a7", "#2e7d32" },
     { "#ffc107", "#9a5b00" }, { "#ffcc80", "#9a5b00" }, { "#ffb74d", "#9a5b00" }, { "#ffb300", "#9a5b00" },
 };
 template <size_t N> const char* find(const Pair (&t)[N], const std::string& c)
@@ -437,7 +437,7 @@ void walk(json& w, bool on_colour)
                 if(checked && iequals(c->get<std::string>(), "#1565c0")) st[key] = "#90caf9";   // (chosen: light blue under dark text)
                 else if(const char* to = find(kBack, c->get<std::string>())) st[key] = to;
             }
-        if(coloured) continue;
+        if(coloured && it.key() != "style_disabled") continue;       // (a button that cannot be pressed is grey, whatever its colour)
         if(const json* c = jget(st, "text_color"); c && c->is_string())
             if(const char* to = find(kText, c->get<std::string>())) st["text_color"] = to;
     }
