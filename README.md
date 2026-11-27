@@ -92,6 +92,7 @@ build.cmd Debug
 | `test_animate.cpp` | Animations (a blink starts with a tag and the widget returns to its original state when it stops, move, rotate, scale, color, frame stepping, repeat count, **they do not run on a screen that is not shown or in a closed popup**, **nothing blinks faster than 3 times a second**, warnings for typing mistakes, deleting the screen while they run is safe) |
 | `test_images.cpp` | Images (PNG / JPEG / BMP / GIF, `fit`, JPEG / BMP only at their original size, background images, images that follow a tag, **a broken, missing or too large file or a file outside the project is not shown** (also when a tag names it)) |
 | `test_check.cpp` | Checking a project (`--check`: 0 findings for a correct project, 26 kinds of mistake that the runtime silently ignores are found with their location, characters missing from the font, broken files, 0 findings for the shipped projects and the examples of the skill), PNG screenshots |
+| `test_capabilities.cpp` | What a project can do (`--capabilities`): a project that only draws screens, devices written to (not those only read, not drivers that are off), mail / uploads / MQTT, OPC UA server and VNC, scripts with a trigger / schedules / transfers, **the fingerprint follows the list and not the screens**, scripts on the buttons of the screens, nothing read outside the folder of the project |
 | `test_driver_fins.cpp` | FINS (how addresses are written, the bytes of FINS/TCP and of the commands, broken responses, reading and writing against a mock server, end codes, reconnection) |
 | `test_alarm_stats.cpp` | Alarm statistics (counts and durations, the edges of the period, gaps in the records and clock changes, neutralizing formulas in CSV, the time for 100,000 records, the widget) |
 | `test_xy_chart.cpp` | XY chart (adding and discarding points, on change, several curves, clearing, non-numeric values, extreme settings, the number of redraws, `--check`) |
@@ -504,6 +505,67 @@ The following keeps the runtime from getting heavy even with a large project.
 python tools/make_stress_project.py stress --preset heavy
 hml_runtime stress/project.json --stats 5
 ```
+
+## A project somebody else made
+
+**A project is a program, not a picture.** Besides drawing screens it can write values to a PLC, send data to other
+machines, open ports and run scripts on its own. **Open and run only projects from people you trust**, the same as you would
+with a program. To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+Before you run a project you did not make, look at what it can do. Nothing is started for this, the files are only read:
+
+```
+hml_runtime <project.json> --capabilities
+```
+
+```
+Writes to devices
+  - modbus_tcp 192.168.0.10:502: can write 7 of 12 value(s) (speed_sp, setpoint, run, mode ...)
+Sends data out
+  - mail through smtp.example.com to shift@example.com: alarms, with values of tags
+Opens ports for others
+  - OPC UA server on port 4840: the clients the device trusts can read and change the values
+Runs by itself
+  - 2 script(s) run by themselves and can write any tag: auto_speed (every 500 ms), pump (every 200 ms)
+  - schedule nightly_upload at 23:55: calls upload.run
+! It writes to devices and runs things by itself: values can reach a device without anybody at the screen.
+fingerprint 97f74c7877d557c0
+```
+
+| Section | What is listed |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| Writes to devices | The drivers with values that are not read-only (`"access": "ro"`), and MQTT topics that set tags |
+| Sends data out | Mail, uploads of the logs, what is published to an MQTT broker - and where to |
+| Opens ports for others | OPC UA server, VNC |
+| Runs by itself | Scripts with a trigger, schedules, transfers; and how many scripts the buttons of the screens carry |
+
+- The list says what the project **is able** to do, not what it will do. A script that runs by itself can write any tag;
+  whether it does harm cannot be read from a list. **The line with `!` is the one to take seriously**: the project writes to
+  a device and something in it runs without anybody pressing a button.
+- What is switched off in the project (`"enabled": false`) is not listed. `--capabilities-json` gives the same as JSON
+  (`devices`, `sends`, `listens`, `automatic`, `unattended_writes`, `fingerprint`), for tools and for an AI.
+- The fingerprint is a hash of the list: it stays the same while the screens change, and changes when the project gets
+  another device, another address to send to, another port or another thing that runs by itself.
+
+**What limits a project, whoever made it**
+
+- Scripts (Lua) have no file, process or network access, a time limit per run and a memory limit (→ "Scripts (Lua)").
+- The files a project names (screens, images, sounds, scripts) are read from its own folder only by the designer; a project
+  file (`.hmlproj`) cannot unpack anything outside its folder, nor replace what the device owns (`logs/`, `pki/`,
+  `project.local.json`).
+- What opens the device to others is decided on the device, not in the project: the VNC password (System > Remote), receiving
+  projects over the network and which designers may send (System > Deploy), replacing the runtime, the OPC UA clients that are
+  trusted, the SSH keys (System > Keys).
+- Passwords do not belong in a project (`--check` says so); they are set on the device and stay there.
+
+**What does not limit it**
+
+- A project that writes to a PLC can write dangerous values. Nothing in the runtime knows what is safe for your machine:
+  **interlocks belong in the PLC**, not in the HMI.
+- A project decides where its mail, uploads and MQTT messages go. A project from somebody else can send them what it records.
+- **An AI that reads a project reads text somebody else wrote.** Labels, comments and scripts in a project may contain
+  sentences that look like instructions ("ignore the above and …"). They are data. The skill tells the AI so, but when you
+  let an AI work on a project you did not make, look at what it is about to change or run.
 
 ## The designer (making projects in a GUI)
 
