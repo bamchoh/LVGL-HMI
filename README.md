@@ -1842,6 +1842,9 @@ go before the end does nothing.
 - It is the same door as `{ "action": "system" }`: with `users`, the login for `users.system_level` comes first. Without `users`
   anybody at the device can open the settings this way - as with a button. Add users, or set `"hold": "none"`, where that matters.
 
+**Light or dark.** The system screens follow the theme of the project: with `"theme": { "dark": false }` they are light
+(light backgrounds, dark text), otherwise dark. What is chosen or pressed has the `primary` colour of the project in both.
+
 **The language of the system screens.** They are shown in Japanese or in English, following the project: the language the
 project is shown in (`texts`; switching it with `set_language` switches the system screens too), or - in a project without
 languages - Japanese when the title of the project is written in Japanese. `"system_language": "ja"` or `"en"` in

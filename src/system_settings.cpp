@@ -240,6 +240,7 @@ void SystemSettings::refresh(const std::string& page_id)
             else set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
         }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
+        if(!tags().find(tag_name(p->id(), "status_warn"))) set_tag(tag_name(p->id(), "status_warn"), TagType::Bool, Value::number(0, TagType::Bool));
         fields_[p->id()] = std::move(fields);
     }
 }
@@ -279,7 +280,7 @@ std::string SystemSettings::apply(const std::string& page_id)
     }
     std::string msg = p->apply(values);
     refresh(page_id);
-    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(sys_text(msg.empty() ? "Applied" : msg)));
+    set_status(page_id, msg.empty() ? "Applied" : msg, !msg.empty());
     if(msg.empty()) HML_INFO("system: page '%s' applied", page_id.c_str());
     else HML_WARN("system: page '%s': %s", page_id.c_str(), msg.c_str());
     return msg;
@@ -308,13 +309,34 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
 
 // What a page says in its status line is written by the page, in English: here it is put into
 // the language of the system screens (once: a text that is translated already is not in the table).
+// Also: is it something that went wrong? Then the line is shown in the colour of a warning;
+// "Saved." and the like are not (a line that is always amber says nothing by being amber).
+bool status_is_problem(const std::string& english)
+{
+    static const char* kStarts[] = { "Not ", "No ", "Wrong", "Locked", "Unknown", "Cannot", "There is no", "Pick ", "Type ", "Switch on",
+                                     "The driver is busy", "The last write", "The tags of the runtime", "The project was not", "The project that waited",
+                                     "A project was received but not", "Backup failed", "not allowed", "unknown" };
+    for(const char* s : kStarts) if(english.rfind(s, 0) == 0) return true;
+    for(const char* s : { "failed", "cannot", "not found", "is needed", "too " }) if(english.find(s) != std::string::npos) return true;
+    return false;
+}
+
 void SystemSettings::translate_status(const std::string& page_id)
 {
-    if(system_language() == "en") return;
     Tag* t = tags().find(tag_name(page_id, "status"));
     if(!t) return;
-    const std::string now = t->get().str, to = sys_text(now);
-    if(to != now) t->set_string(to, nullptr);
+    const std::string now = t->get().str;
+    auto shown = status_shown_.find(page_id);
+    if(shown != status_shown_.end() && shown->second == now) return;       // (what was put there by this function)
+    set_status(page_id, now, status_is_problem(now));
+}
+
+void SystemSettings::set_status(const std::string& page_id, const std::string& english, bool problem)
+{
+    const std::string text = sys_text(english);
+    status_shown_[page_id] = text;
+    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(text));
+    set_tag(tag_name(page_id, "status_warn"), TagType::Bool, Value::number(problem && !english.empty() ? 1 : 0, TagType::Bool));
 }
 
 void SystemSettings::poll()
@@ -372,6 +394,70 @@ const char* icon_of(const std::string& id)
 // get the same look as the others here, in one place: their rows become tiles, their buttons
 // and texts take the colours of the system screens. What a row contains and in which order is
 // the page's and is not touched.
+// ---- the light palette
+namespace light {
+struct Pair { const char* dark; const char* light; };
+// what lies behind: the screen, the bars, the rows and tiles, what is pressed
+const Pair kBack[] = {
+    { "#10151c", "#eef1f5" }, { "#141a22", "#eef1f5" }, { "#19212c", "#eef1f5" },
+    { "#1b2430", "#dde4ec" }, { "#1f2a38", "#dde4ec" },
+    { "#222d3b", "#ffffff" }, { "#22303f", "#ffffff" }, { "#2b3848", "#cfd8e3" }, { "#2a323c", "#ffffff" },
+    { "#2c3e50", "#d3dbe5" }, { "#3a4a5e", "#d3dbe5" }, { "#455a64", "#d3dbe5" }, { "#37474f", "#d3dbe5" },
+    { "#2f4a6b", "#bbdefb" },
+    { "#4a3a10", "#fff3cd" }, { "#4a1c1c", "#fde0e0" },
+};
+// what is read
+const Pair kText[] = {
+    { "#ffffff", "#16202b" }, { "#eef3f8", "#263442" }, { "#cfd8e3", "#263442" },
+    { "#9fb3c8", "#5b6b7c" }, { "#8fa3b8", "#5b6b7c" }, { "#6f7c8a", "#5b6b7c" },
+    { "#90caf9", "#1565c0" },
+    { "#ffc107", "#9a5b00" }, { "#ffcc80", "#9a5b00" }, { "#ffb74d", "#9a5b00" }, { "#ffb300", "#9a5b00" },
+};
+template <size_t N> const char* find(const Pair (&t)[N], const std::string& c)
+{
+    for(const Pair& p : t) if(iequals(c, p.dark)) return p.light;
+    return nullptr;
+}
+void walk(json& w, bool on_colour)
+{
+    if(w.is_array()) { for(json& c : w) walk(c, on_colour); return; }
+    if(!w.is_object()) return;
+    // A button with a colour of its own (the accent, red, green) keeps its white text; a button
+    // that was a dark grey becomes a light grey, and its text dark.
+    const bool button = jstr(w, "type", "") == "button";
+    const std::string bg = w.contains("style") && w["style"].is_object() ? jstr(w["style"], "bg_color", "") : "";
+    const bool grey = !bg.empty() && find(kBack, bg);
+    const bool coloured = button ? !grey : (on_colour && bg.empty());
+    for(auto it = w.begin(); it != w.end(); ++it) {
+        if(it.key().rfind("style", 0) != 0 || !it.value().is_object()) continue;
+        json& st = it.value();
+        const bool checked = it.key() == "style_checked";
+        for(const char* key : { "bg_color", "border_color" })
+            if(const json* c = jget(st, key); c && c->is_string()) {
+                if(checked && iequals(c->get<std::string>(), "#1565c0")) st[key] = "#90caf9";   // (chosen: light blue under dark text)
+                else if(const char* to = find(kBack, c->get<std::string>())) st[key] = to;
+            }
+        if(coloured) continue;
+        if(const json* c = jget(st, "text_color"); c && c->is_string())
+            if(const char* to = find(kText, c->get<std::string>())) st["text_color"] = to;
+    }
+    // colours that follow a tag ("bind": { "bg_color": { "map": { ... } } }): the row that is chosen, the mark of a tab
+    if(w.contains("bind") && w["bind"].is_object())
+        for(auto it = w["bind"].begin(); it != w["bind"].end(); ++it) {
+            const bool text = it.key() == "text_color";
+            if((!text && it.key() != "bg_color" && it.key() != "border_color") || !it.value().is_object() || !it.value().contains("map")) continue;
+            for(auto& m : it.value()["map"].items())
+                if(m.value().is_string())
+                    if(const char* to = text ? find(kText, m.value().get<std::string>()) : find(kBack, m.value().get<std::string>())) m.value() = to;
+        }
+    if(button && grey) {
+        if(!w.contains("style_label") || !w["style_label"].is_object()) w["style_label"] = json::object();
+        if(!w["style_label"].contains("text_color")) w["style_label"]["text_color"] = "#16202b";
+    }
+    if(w.contains("children")) walk(w["children"], coloured);
+}
+} // namespace light
+
 // The width a name of a setting needs in the language of the system screens: a Japanese name
 // is wider than the English one the row was laid out for (a kana or kanji is as wide as the
 // font is high), and a name that breaks in the middle of a word reads badly. Never less than
@@ -428,6 +514,8 @@ void restyle(json& w, bool top, bool compact, const std::string& accent)
 }
 
 } // namespace
+
+void system_light_palette(json& screen) { light::walk(screen, false); }
 
 std::vector<json> SystemSettings::screens(int width, int height) const
 {
@@ -576,8 +664,11 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 }) },
             });
         }
-        rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag_name(id, "status") } } },
-                             { "style", { { "font", font }, { "text_color", "#ffc107" } } } });
+        // what the page says: plain when it is news ("Saved."), in the colour of a warning when something went wrong
+        for(bool warn : { false, true })
+            rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" },
+                                 { "bind", { { "text", tag_name(id, "status") }, { "visible", { { "tag", tag_name(id, "status_warn") }, { "invert", !warn } } } } },
+                                 { "style", { { "font", font }, { "text_color", warn ? "#ffc107" : "#cfd8e3" } } } });
 
         // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
         const std::vector<PageAction> extra = p->actions();
@@ -648,6 +739,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                                  { "style", { { "pad", compact ? 4 : 6 }, { "pad_gap", compact ? 4 : 6 } } }, { "style_items", { { "font", 18 } } } });
         out.push_back(json{ { "name", page_screen(id) }, { "level", level }, { "scrollable", false }, { "style", { { "bg_color", bg }, { "pad", 0 } } }, { "children", children } });
     }
+    if(light_) for(json& scr : out) system_light_palette(scr);
     return out;
 }
 
@@ -1015,6 +1107,7 @@ void choose_system_language(Project& proj)
         }
     }
     // only when the project's font can show it: without the characters there would be empty boxes
+    system_settings().set_light(!proj.info().dark);
     if(want == "ja" && !font_file_has("システム設定を開く適用戻る")) want = "en";
     set_system_language(want);
 }

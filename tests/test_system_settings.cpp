@@ -9,6 +9,7 @@
 #include "serial_ports.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -143,8 +144,8 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_t* pg = lv_screen_active();
         lv_obj_t* content = nth(pg, 1);
         REQUIRE(content);
-        // 6 field rows + status label. Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
-        REQUIRE(lv_obj_get_child_count(content) == 7);
+        // 6 field rows + the status line (two labels: plain, and as a warning). Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
+        REQUIRE(lv_obj_get_child_count(content) == 8);
         for(uint32_t i = 0; i < lv_obj_get_child_count(content); i++) CHECK_FALSE(lv_obj_check_type(lv_obj_get_child(content, static_cast<int32_t>(i)), &lv_button_class));
         auto widget_of_row = [&](int32_t row) { return nth(lv_obj_get_child(content, row), 1); };
         CHECK(lv_obj_check_type(widget_of_row(0), &lv_textarea_class));
@@ -947,6 +948,83 @@ TEST_CASE("system screens: on a wide display the content is a column in the midd
             CHECK(l.first > 50);
         }
     }
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
+
+TEST_CASE("System: the status line is a warning only when something went wrong")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    auto warn = [&](const std::string& page) { Tag* t = tags().find("sys." + page + ".status_warn"); return t && t->get().truthy(); };
+    auto say = [&](const std::string& page, const std::string& text) {
+        Tag* t = tags().find("sys." + page + ".status");
+        REQUIRE(t);
+        t->set_string(text, nullptr);
+        sys.poll();
+    };
+    say("storage", "Installed. Restarting ...");
+    CHECK_FALSE(warn("storage"));
+    say("storage", "There is no project file (.hmlproj) at this location.");
+    CHECK(warn("storage"));
+    say("storage", "Backup written to /media/usb/demo.hmlproj");
+    CHECK_FALSE(warn("storage"));
+    say("storage", "Backup failed: the disk is full");
+    CHECK(warn("storage"));
+    say("storage", "");
+    CHECK_FALSE(warn("storage"));
+    // Apply: what the page answers decides
+    REQUIRE(users().login("admin", "0000") == Users::LoginResult::Ok);
+    CHECK(sys.apply("display").empty());
+    CHECK_FALSE(warn("display"));
+    tags().find("sys.display.after_s")->set_number(-5, nullptr);
+    CHECK_FALSE(sys.apply("display").empty());
+    CHECK(warn("display"));
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
+
+TEST_CASE("System: with a light theme no dark background and no white text on it is left")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    // every colour of a screen, with what it is used for
+    std::function<void(const json&, std::set<std::string>&, std::set<std::string>&)> colours = [&](const json& w, std::set<std::string>& back, std::set<std::string>& text) {
+        if(w.is_array()) { for(const json& c : w) colours(c, back, text); return; }
+        if(!w.is_object()) return;
+        if(w.contains("style") && w["style"].is_object()) {
+            if(const json* c = jget(w["style"], "bg_color"); c && c->is_string()) back.insert(c->get<std::string>());
+            if(jstr(w, "type", "") == "label")
+                if(const json* c = jget(w["style"], "text_color"); c && c->is_string()) text.insert(c->get<std::string>());
+        }
+        if(w.contains("children")) colours(w["children"], back, text);
+    };
+    auto dark = [](const std::string& c) {                       // (the sum of the three parts, 0 .. 765)
+        if(c.size() != 7 || c[0] != '#') return false;
+        const long v = std::strtol(c.c_str() + 1, nullptr, 16);
+        const long r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+        return r < 110 && g < 110 && b < 130;                     // (dark and without a colour: not the red of Delete)
+    };
+    std::set<std::string> back, text;
+    sys.set_light(false);
+    for(const json& s : sys.screens(800, 480)) colours(s, back, text);
+    CHECK(std::any_of(back.begin(), back.end(), dark));          // (as written: dark)
+    back.clear(); text.clear();
+    sys.set_light(true);
+    for(const json& s : sys.screens(800, 480)) colours(s, back, text);
+    std::string left;
+    for(const std::string& c : back) if(dark(c) && c != "#000000") left += " " + c;          // (black: the scrim behind a question)
+    CHECK_MESSAGE(left.empty(), "dark backgrounds left:" << left);
+    CHECK(text.count("#ffffff") == 0);                           // (white text of a label would be on a light background)
+    sys.set_light(false);
+
     ui().unload_all();
     p.stop_logs();
     p.unload();

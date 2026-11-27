@@ -169,6 +169,7 @@ std::vector<json> login_screens(int width, int height)
                   }) } },
         }) },
     });
+    if(system_settings().light()) for(json& scr : out) system_light_palette(scr);
     return out;
 }
 
