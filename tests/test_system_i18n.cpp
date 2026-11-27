@@ -64,6 +64,7 @@ TEST_CASE("system i18n: every fixed text of the system screens of the demo proje
     int n = 0;
     for(const std::string& t : texts) {
         if(!has_letters(t)) continue;                             // numbers, symbols, icons
+        if(t[0] >= '0' && t[0] <= '9' && !sys_text_known(t)) continue;   // (an address of this machine: "10.1.0.57 (eth0)")
         if(static_cast<unsigned char>(t[0]) >= 0x80) continue;   // (an icon and a title: the title is looked at by itself)
         // names and values that are not language: tags, files, addresses, fingerprints, versions
         if(t.find("SHA256:") != std::string::npos || t.find('/') != std::string::npos || t.find("HML ") == 0) continue;
