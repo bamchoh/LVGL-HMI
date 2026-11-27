@@ -240,6 +240,7 @@ void SystemSettings::refresh(const std::string& page_id)
             else set_tag(tag_name(p->id(), f.key), field_tag_type(f.type), field_value(f));
         }
         if(!tags().find(tag_name(p->id(), "status"))) set_tag(tag_name(p->id(), "status"), TagType::String, Value::string(""));
+        if(!tags().find(tag_name(p->id(), "status_warn"))) set_tag(tag_name(p->id(), "status_warn"), TagType::Bool, Value::number(0, TagType::Bool));
         fields_[p->id()] = std::move(fields);
     }
 }
@@ -279,7 +280,7 @@ std::string SystemSettings::apply(const std::string& page_id)
     }
     std::string msg = p->apply(values);
     refresh(page_id);
-    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(sys_text(msg.empty() ? "Applied" : msg)));
+    set_status(page_id, msg.empty() ? "Applied" : msg, !msg.empty());
     if(msg.empty()) HML_INFO("system: page '%s' applied", page_id.c_str());
     else HML_WARN("system: page '%s': %s", page_id.c_str(), msg.c_str());
     return msg;
@@ -308,13 +309,34 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
 
 // What a page says in its status line is written by the page, in English: here it is put into
 // the language of the system screens (once: a text that is translated already is not in the table).
+// Also: is it something that went wrong? Then the line is shown in the colour of a warning;
+// "Saved." and the like are not (a line that is always amber says nothing by being amber).
+bool status_is_problem(const std::string& english)
+{
+    static const char* kStarts[] = { "Not ", "No ", "Wrong", "Locked", "Unknown", "Cannot", "There is no", "Pick ", "Type ", "Switch on",
+                                     "The driver is busy", "The last write", "The tags of the runtime", "The project was not", "The project that waited",
+                                     "A project was received but not", "Backup failed", "not allowed", "unknown" };
+    for(const char* s : kStarts) if(english.rfind(s, 0) == 0) return true;
+    for(const char* s : { "failed", "cannot", "not found", "is needed", "too " }) if(english.find(s) != std::string::npos) return true;
+    return false;
+}
+
 void SystemSettings::translate_status(const std::string& page_id)
 {
-    if(system_language() == "en") return;
     Tag* t = tags().find(tag_name(page_id, "status"));
     if(!t) return;
-    const std::string now = t->get().str, to = sys_text(now);
-    if(to != now) t->set_string(to, nullptr);
+    const std::string now = t->get().str;
+    auto shown = status_shown_.find(page_id);
+    if(shown != status_shown_.end() && shown->second == now) return;       // (what was put there by this function)
+    set_status(page_id, now, status_is_problem(now));
+}
+
+void SystemSettings::set_status(const std::string& page_id, const std::string& english, bool problem)
+{
+    const std::string text = sys_text(english);
+    status_shown_[page_id] = text;
+    set_tag(tag_name(page_id, "status"), TagType::String, Value::string(text));
+    set_tag(tag_name(page_id, "status_warn"), TagType::Bool, Value::number(problem && !english.empty() ? 1 : 0, TagType::Bool));
 }
 
 void SystemSettings::poll()
@@ -576,8 +598,11 @@ std::vector<json> SystemSettings::screens(int width, int height) const
                 }) },
             });
         }
-        rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag_name(id, "status") } } },
-                             { "style", { { "font", font }, { "text_color", "#ffc107" } } } });
+        // what the page says: plain when it is news ("Saved."), in the colour of a warning when something went wrong
+        for(bool warn : { false, true })
+            rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" },
+                                 { "bind", { { "text", tag_name(id, "status") }, { "visible", { { "tag", tag_name(id, "status_warn") }, { "invert", !warn } } } } },
+                                 { "style", { { "font", font }, { "text_color", warn ? "#ffc107" : "#cfd8e3" } } } });
 
         // the other buttons of the page: in a bar of their own at the bottom, not in what scrolls
         const std::vector<PageAction> extra = p->actions();

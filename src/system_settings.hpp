@@ -124,6 +124,8 @@ public:
 private:
     void update_summaries();
     void translate_status(const std::string& page_id);
+    void set_status(const std::string& page_id, const std::string& english, bool problem);
+    std::map<std::string, std::string> status_shown_;            // page -> the status line as it was last written here
     std::string accent_ = "#1e88e5";
     unsigned    summary_ticks_ = 0;
     std::vector<std::unique_ptr<SettingsPage>> pages_;

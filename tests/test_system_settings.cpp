@@ -9,6 +9,7 @@
 #include "serial_ports.hpp"
 #include "system_settings.hpp"
 #include "ui.hpp"
+#include "users.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -143,8 +144,8 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_t* pg = lv_screen_active();
         lv_obj_t* content = nth(pg, 1);
         REQUIRE(content);
-        // 6 field rows + status label. Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
-        REQUIRE(lv_obj_get_child_count(content) == 7);
+        // 6 field rows + the status line (two labels: plain, and as a warning). Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
+        REQUIRE(lv_obj_get_child_count(content) == 8);
         for(uint32_t i = 0; i < lv_obj_get_child_count(content); i++) CHECK_FALSE(lv_obj_check_type(lv_obj_get_child(content, static_cast<int32_t>(i)), &lv_button_class));
         auto widget_of_row = [&](int32_t row) { return nth(lv_obj_get_child(content, row), 1); };
         CHECK(lv_obj_check_type(widget_of_row(0), &lv_textarea_class));
@@ -947,6 +948,42 @@ TEST_CASE("system screens: on a wide display the content is a column in the midd
             CHECK(l.first > 50);
         }
     }
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+}
+
+TEST_CASE("System: the status line is a warning only when something went wrong")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    SystemSettings& sys = system_settings();
+    auto warn = [&](const std::string& page) { Tag* t = tags().find("sys." + page + ".status_warn"); return t && t->get().truthy(); };
+    auto say = [&](const std::string& page, const std::string& text) {
+        Tag* t = tags().find("sys." + page + ".status");
+        REQUIRE(t);
+        t->set_string(text, nullptr);
+        sys.poll();
+    };
+    say("storage", "Installed. Restarting ...");
+    CHECK_FALSE(warn("storage"));
+    say("storage", "There is no project file (.hmlproj) at this location.");
+    CHECK(warn("storage"));
+    say("storage", "Backup written to /media/usb/demo.hmlproj");
+    CHECK_FALSE(warn("storage"));
+    say("storage", "Backup failed: the disk is full");
+    CHECK(warn("storage"));
+    say("storage", "");
+    CHECK_FALSE(warn("storage"));
+    // Apply: what the page answers decides
+    REQUIRE(users().login("admin", "0000") == Users::LoginResult::Ok);
+    CHECK(sys.apply("display").empty());
+    CHECK_FALSE(warn("display"));
+    tags().find("sys.display.after_s")->set_number(-5, nullptr);
+    CHECK_FALSE(sys.apply("display").empty());
+    CHECK(warn("display"));
+
     ui().unload_all();
     p.stop_logs();
     p.unload();
