@@ -139,6 +139,12 @@ Object.assign(I18N.TEXT_JA, {
   'remove the settings changed on the target (project.local.json)': 'ターゲットで変更された設定（project.local.json）を消す',
   'Uses ssh / scp with key authentication (no password prompt). logs/ on the target are kept.': 'ssh / scp を鍵認証で使います（パスワードは聞きません）。ターゲットの logs/ は残ります。',
   'Enter the target (host) and the user.': 'ターゲット（ホスト）とユーザーを入力してください。', 'Enter the target (host) first.': '先にターゲット（ホスト）を入力してください。',
+  'Start this project?': 'このプロジェクトを動かしますか？', 'Start': '動かす',
+  'This project was not started on this PC before. A project is a program: starting it runs what is listed here, on this PC and on the devices it connects to. Start it only if you know where it comes from.':
+    'このプロジェクトは、この PC でまだ動かしたことがありません。プロジェクトはプログラムです。動かすと、下に並んだことが、この PC と、つながる機器の上で実行されます。出どころが分かっているときだけ動かしてください。',
+  'Writes to devices': '機器に書き込む', 'Sends data out': '外へデータを送る', 'Opens ports for others': 'ほかからつなげるポートを開く', 'Runs by itself': '自分で動く',
+  'It writes to devices and runs things by itself: values can reach a device without anybody pressing a button.':
+    '機器に書き込み、かつ自分で動くものがあります。誰もボタンを押さなくても、値が機器に届くことがあります。',
   'method': '方法', 'SSH (ssh / scp)': 'SSH（ssh / scp）', 'Direct (to the runtime, no SSH)': '直接（ランタイムへ。SSH なし）',
   'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts. "send runtime" needs one more permission on the target: System > Deploy > Runtime, next to this designer.':
     'プロジェクトを、暗号化した通信でランタイムへ直接送ります。ターゲットに SSH サーバーは要りません。先にターゲットの画面で System > Deploy > Receive projects をオンにしてください。ターゲットの logs/ と、ターゲットで変更した設定は残ります。ランタイムは再起動します。「ランタイムも送る」には、ターゲット側でもう 1 つ許可が要ります（System > Deploy で、このデザイナーの行の Runtime）。',

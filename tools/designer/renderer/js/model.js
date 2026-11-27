@@ -25,6 +25,7 @@ const M = {
     st.project = this.blankProject(title, w, h);
     st.screens = [{ file: 'screens/main.json', data: this.blankScreen('main') }];
     st.cur = 0; st.sel = []; st.dirty = true; st.undo = []; st.redo = [];
+    st.trusted = true;                               // made here: the user's own (App.mayStart)
   },
 
   // The project can be a folder (path = .../project.json, dir = that folder) or one file

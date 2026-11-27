@@ -12,6 +12,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "capabilities.hpp"
 
 namespace hml {
 
@@ -60,6 +61,10 @@ std::string transfer_backup(const TransferTarget& t, const std::string& location
 // Check a project file and put it in the place of the running project. The runtime has to be
 // restarted afterwards. Returns "" or why it was not installed (nothing is changed then).
 std::string transfer_install(const TransferTarget& t, const std::string& project_file);
+
+// What the project in a project file can do (capabilities.hpp): the file is unpacked beside the
+// project, read, and removed again. Returns "" or why it could not be looked at.
+std::string transfer_capabilities(const TransferTarget& t, const std::string& project_file, ProjectCapabilities& out);
 
 // The project that the last install replaced ("" = none), and going back to it.
 std::string transfer_previous(const TransferTarget& t);

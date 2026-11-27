@@ -1642,12 +1642,34 @@ struct Host {
             else if(s.rfind("pending", 0) == 0) step("waiting for the operator of the device to accept this designer (" + me.fingerprint + ")");
             else if(s == "sending") step("sending the project");
             else if(s == "received") step("the device has the file, checking and installing it");
+            else if(s == "asking") step("the device asks its operator first: this project can do other things than the one that runs there (System > Deploy on its screen)");
         };
         const hml::DeployOutcome out = hml::deploy_send(req, me);
         if(!out.ok) return fail(out.error);
         step("installed: the runtime restarts with the project");
         return json{ { "ok", true }, { "log", log } };
     }
+    // What a project can do beyond drawing screens (hml_runtime --capabilities-json): asked
+    // before a project that came from somewhere else is run on this PC.
+    json capabilities(const std::string& project)
+    {
+        if(runtime.empty()) return err("hml_runtime not found");
+        const fs::path proj = upath(project);
+        ProcResult pr = run_capture(runtime, { ustr(proj), "--capabilities-json" }, {}, proj.parent_path(), 15000);
+        if(!pr.error.empty()) return err(pr.error);
+        json j = json::parse(pr.output, nullptr, false, true);
+        if(pr.code != 0 || !j.is_object() || !j.contains("fingerprint")) return err("this hml_runtime cannot tell what a project can do (it is older than the designer)");
+        j["ok"] = true;
+        return j;
+    }
+    void capabilities_async(const std::string& id, const std::string& project)
+    {
+        std::thread([this, id, project] {
+            std::string dump = capabilities(project).dump(-1, ' ', false, json::error_handler_t::replace);
+            w->dispatch([this, id, dump] { w->resolve(id, 0, dump); });
+        }).detach();
+    }
+
     void direct_async(const std::string& id, const json& opts, bool info_only)
     {
         std::thread([this, id, opts, info_only] {
@@ -1765,6 +1787,9 @@ struct Host {
         w->bind("hml_deploy", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);
             deploy_async(id, a.size() > 0 && a[0].is_object() ? a[0] : json::object());
+        }, nullptr);
+        w->bind("hml_capabilities", [this, args_of, str](const std::string& id, const std::string& req, void*) {
+            capabilities_async(id, str(args_of(req), 0));
         }, nullptr);
         w->bind("hml_directInfo", [this, args_of](const std::string& id, const std::string& req, void*) {
             json a = args_of(req);

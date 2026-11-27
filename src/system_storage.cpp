@@ -5,6 +5,7 @@
 #include "project.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
+#include "deploy_service.hpp"
 #include "transfer.hpp"
 #include "ui.hpp"
 #include "util.hpp"
@@ -70,7 +71,7 @@ public:
         const std::string prev = transfer_previous(target());
         flag("has_previous", !prev.empty());
         flag("confirm", !confirm_.empty());
-        info("confirm_text", confirm_ == "install" ? "Replace the project with '" + file_ + "'? The runtime restarts."
+        info("confirm_text", confirm_ == "install" ? "Replace the project with '" + file_ + "'? The runtime restarts." + install_note_
                              : confirm_ == "rollback" ? "Go back to the project that was replaced last? The runtime restarts." : "");
         info("hint", locations_.empty() ? (mount_problem_.empty() ? "No USB memory is found. Plug one in." : mount_problem_) : "");
         flag("no_location", locations_.empty());
@@ -123,7 +124,19 @@ public:
             // (the location may have changed the list: look again before asking)
             files_ = transfer_project_files(location_);
             if(picked_file().empty()) msg = "There is no project file (.hmlproj) at this location.";
-            else confirm_ = "install";
+            else {
+                // what can it do? Said in the question, so that it is seen before "Yes"
+                confirm_ = "install";
+                install_note_.clear();
+                install_fp_.clear();
+                ProjectCapabilities caps, now;
+                if(transfer_capabilities(t, picked_file(), caps).empty()) {
+                    install_fp_ = caps.fingerprint();
+                    const bool same = project_capabilities_of(proj_.info().path, now) && now.fingerprint() == install_fp_;
+                    install_note_ = "\nIt can: " + caps.brief() + (caps.unattended_writes() ? "\n! Values can reach a device without anybody at the screen." : "") +
+                                    (same || caps.empty() ? "" : "\n(Other things than the project that runs now.)");
+                }
+            }
         }
         else if(cmd == "rollback") {
             if(transfer_previous(t).empty()) msg = "There is no previous project.";
@@ -136,7 +149,12 @@ public:
             if(what == "install") {
                 const std::string file = picked_file();
                 msg = transfer_install(t, file);
-                if(msg.empty()) { operation_log().record("system", "install project", t.name, base_name(file)); restart_ = true; msg = "Installed. Restarting ..."; }
+                if(msg.empty()) {
+                    operation_log().record("system", "install project", t.name, base_name(file));
+                    if(!install_fp_.empty()) deploy_service().set_approved(install_fp_);     // (the operator has seen the list and said yes)
+                    restart_ = true;
+                    msg = "Installed. Restarting ...";
+                }
                 else msg = "Not installed: " + msg;
             }
             else if(what == "rollback") {
@@ -222,6 +240,7 @@ private:
     std::string confirm_;               // "install" / "rollback" while the question is shown
     bool        restart_ = false;
     int         restart_ticks_ = 0, ticks_ = 0;
+    std::string install_note_, install_fp_;   // what the project file picked can do: for the question, and to remember
 };
 
 } // namespace

@@ -330,6 +330,20 @@ std::string transfer_install(const TransferTarget& t, const std::string& project
     return "";
 }
 
+std::string transfer_capabilities(const TransferTarget& t, const std::string& project_file, ProjectCapabilities& out)
+{
+    std::error_code ec;
+    const fs::path file = fs::u8path(project_file), dir = fs::u8path(t.dir);
+    if(!fs::is_regular_file(file, ec)) return "the file is not there any more";
+    const fs::path tmp = dir.parent_path() / (dir.filename().u8string() + ".peek");
+    fs::remove_all(tmp, ec);
+    std::string err;
+    if(!unpack_project(file, tmp, &err)) { fs::remove_all(tmp, ec); return "not a project file: " + err; }
+    const bool ok = project_capabilities_of(u8(tmp / "project.json"), out, &err);
+    fs::remove_all(tmp, ec);
+    return ok ? "" : err;
+}
+
 std::string transfer_previous(const TransferTarget& t)
 {
     std::error_code ec;

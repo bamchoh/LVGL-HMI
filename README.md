@@ -114,7 +114,7 @@ build.cmd Debug
 | `test_trend.cpp` | Trend (minimum, maximum and last of each interval, a short peak does not disappear, bool, string and tag names containing a dot, writing the summary of each minute, the combination of summaries and records agrees with the result from the records alone, SQL injection in names, the speed with 1,000,000 records, moving and zooming the widget, the legend, a group that does not exist) |
 | `test_logs.cpp` | Data log (every trigger), alarms (raise / clear), operation log (widgets, actions, masking of passwords), CSV export |
 | `test_key_service.cpp` | Key management (SHA-256 / fingerprints, validation of public keys, editing authorized_keys, the enrollment protocol, the Keys page) |
-| `test_deploy.cpp` | Deploying without SSH (certificates made once and kept, the key file for its owner only, off by default and the port closed, **a designer that is not accepted learns nothing and sends nothing**, accepting on the device, the file arrives unchanged, a failed install is told to the designer, another device at the address stops the deploy, garbage / damaged / oversized / stalled senders, the System > Deploy page installs and restarts, **the runtime is taken only from a designer the device allows to, and only one that starts there**, runtime and project with one restart) |
+| `test_deploy.cpp` | Deploying without SSH (certificates made once and kept, the key file for its owner only, off by default and the port closed, **a designer that is not accepted learns nothing and sends nothing**, accepting on the device, the file arrives unchanged, a failed install is told to the designer, another device at the address stops the deploy, garbage / damaged / oversized / stalled senders, the System > Deploy page installs and restarts, **a project that can do other things than the one before waits for the operator (reject, install, the same list again goes in by itself, nobody answers, asking switched off)**, **the runtime is taken only from a designer the device allows to, and only one that starts there**, runtime and project with one restart) |
 | `test_popup.cpp` | Popups (open, modal, stacking, closing by name, closing with back, closing on a screen change, goto opens one too, a screen that is not a popup is not opened, no updates while closed, levels, 1000 opens and closes do not add widgets) |
 | `test_screen_saver.cpp` | Screen saver (the screen goes off after the time, 0 never turns it off, **the touch that turns it on does not press a button** (checked with a mock touch panel), switching by a tag, logout, turning on at an alarm / the setting not to, it covers popups too, changing the time on the device and `project.local.json`) |
 | `test_schedule.cpp` | Schedules (time of day and weekdays, one run on a given date, end of month, end of year, leap day, **nothing runs twice or is skipped when the clock is set forward / back**, schedules that passed while stopped and `catch_up`, they remain after a restart, changing and saving on the device, broken settings, a load of 200 entries, the operation log, the System > Schedule page, `--check`) |
@@ -547,6 +547,24 @@ fingerprint 97f74c7877d557c0
 - The fingerprint is a hash of the list: it stays the same while the screens change, and changes when the project gets
   another device, another address to send to, another port or another thing that runs by itself.
 
+**Where the list is shown without asking for it**
+
+- **The device, when a project arrives.** A project sent from the designer without SSH (→ "Deploying without SSH (Direct)") whose
+  list is another one than that of the project it replaces is not installed by itself: the screen of the device changes to
+  System > Deploy and shows where the project comes from and what it can do, with **Install** and **Reject**. The designer
+  waits and says so. What was agreed to is remembered by its fingerprint: the next project with the same list - the usual
+  case, when only screens were changed - goes in without a question. A project that only draws screens is never asked about.
+  "Ask before a project that can do more" on that page switches this off for a device where nobody is there to answer.
+- **The device, from a USB memory.** The question "Replace the project with …?" on System > Storage says what the project
+  on the USB memory can do, and whether that is another list than now.
+- **The designer, before Run and Preview.** Both start the project on the PC: its scripts run, its drivers connect and write.
+  A project that was not started on this PC before - opened from a folder somebody sent, pulled from a repository - shows its
+  list first, with **Start** and **Cancel**. A project made in this designer, and one that was started here before and has
+  only been changed in the designer since, is not asked about.
+
+The SSH deploy and a project copied onto the device by hand are not asked about: whoever can do that can change everything
+on the device anyway.
+
 **What limits a project, whoever made it**
 
 - Scripts (Lua) have no file, process or network access, a time limit per run and a memory limit (→ "Scripts (Lua)").
@@ -728,7 +746,10 @@ and the designer sends the project file over an encrypted connection (TLS 1.2). 
 3. A designer the target has not seen before must be accepted there: switch on **Add a designer** (it turns itself off after
    5 minutes, or once a designer was accepted), deploy, and press **Accept** if the fingerprint on the target is the one the
    designer shows as "This designer". From then on this designer can deploy without anybody at the target.
-4. The target checks the project like one from a USB memory (→ "Updates and backups with a USB memory"), puts it in the place of
+4. If the project can do other things than the one that runs on the target (another device to write to, another address to send
+   to, another port, another script that runs by itself), the target asks its operator first (→ "A project somebody else made").
+   The designer shows that it waits.
+5. The target checks the project like one from a USB memory (→ "Updates and backups with a USB memory"), puts it in the place of
    the project it runs and restarts. `logs/`, `pki/` and `project.local.json` of the target stay; the project that was replaced
    is kept as "previous project".
 

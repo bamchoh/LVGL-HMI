@@ -19,6 +19,7 @@
 //   device:   "SEND"  |  "ERROR <why>"                      (nothing is sent to a device that will not take it)
 //   designer: the bytes
 //   device:   "RECEIVED"                                    complete and unchanged
+//             "ASKING"                                      (the operator is asked first: the project can do more than the one before)
 //             "INSTALLED"  |  "ERROR <why>"                 checked and put in place; the runtime restarts
 //   Before the project, or instead of it, the designer may send the runtime itself:
 //   designer: "RUNTIME <bytes> <sha256 hex> <file name>", and after "SEND" the bytes
@@ -96,9 +97,9 @@ struct DeploySend {
     std::string client_name;             // shown on the device next to the fingerprint
     int         connect_timeout_ms = 8000;
     int         approve_timeout_ms = 150000;   // the operator has to press a button
-    int         install_timeout_ms = 120000;
+    int         install_timeout_ms = 330000;     // (the operator may be asked about what the project can do)
     // "connected", "pending <fp>", "sending runtime", "runtime received", "runtime installed",
-    // "sending", "sent 50", "received" (may be empty)
+    // "sending", "sent 50", "received", "asking" (may be empty)
     std::function<void(const std::string&)> on_state;
     const std::atomic<bool>* cancel = nullptr;
 };

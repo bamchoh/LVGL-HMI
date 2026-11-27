@@ -865,3 +865,164 @@ TEST_CASE("deploy: System > Deploy - allowing a designer to replace the runtime 
     ds.set_runtime_path("");
     ds.open("");
 }
+
+// ================================================================ a project that can do more
+
+namespace {
+
+// a project with a list of what it can do: `extra` goes into project.json (", \"schedules\": ...")
+void make_project_with(const fs::path& dir, const std::string& title, const std::string& extra)
+{
+    write(dir / "project.json", "{ \"title\": \"" + title + "\", \"display\": { \"width\": 800, \"height\": 480 }, \"start_screen\": \"s\", "
+          "\"tags\": [ { \"name\": \"a\", \"type\": \"int\" } ], \"screens\": [\"screens/s.json\"]" + extra + " }");
+    write(dir / "screens" / "s.json", "{ \"name\": \"s\", \"children\": [ { \"type\": \"label\", \"text\": \"" + title + "\" } ] }");
+}
+const char* kSchedule = R"(, "schedules": [ { "name": "start", "at": "06:00", "do": { "action": "set", "tag": "a", "value": 1 } } ])";
+const char* kScript = R"(, "scripts": [ { "name": "auto", "trigger": "interval", "interval_ms": 500, "code": "tag.a = tag.a + 1" } ])";
+
+} // namespace
+
+TEST_CASE("deploy: a project that can do other things than the one before waits for the operator; the same list goes in by itself")
+{
+    Temp tmp;
+    const fs::path proj = tmp.dir / "device" / "projects" / "pump", keys = tmp.dir / "device" / "keys", pc = tmp.dir / "pc";
+    make_project(proj, "Old");                                    // only draws screens
+    std::string err;
+    auto pack = [&](const char* name, const std::string& title, const std::string& extra) {
+        make_project_with(pc / name, title, extra);
+        const fs::path file = pc / (std::string(name) + ".hmlproj");
+        REQUIRE_MESSAGE(pack_project(pc / name, file, &err), err);
+        return file;
+    };
+    const fs::path plain = pack("plain", "Plain", ""), sched = pack("sched", "Sched", kSchedule), sched2 = pack("sched2", "Sched2", kSchedule), script = pack("script", "Script", kScript);
+
+    DeployIdentity me;
+    REQUIRE(deploy_make_identity("pc", me));
+    int port = 0;
+    {
+        Device probe;
+        probe.on();
+        port = probe.svc.port();
+        probe.svc.set_enabled(false);
+    }
+    write(keys / "deploy.json", "{ \"enabled\": true, \"port\": " + std::to_string(port) + ", \"designers\": [ { \"fingerprint\": \"" + me.fingerprint + "\", \"name\": \"pc-7\" } ] }");
+
+    Runtime rt;
+    DeployService& ds = deploy_service();
+    ds.open(keys.u8string());
+    CHECK(ds.ask());                                              // asking is the default
+    CHECK(ds.approved().empty());
+    REQUIRE(ds.start());
+    Project p;
+    REQUIRE(p.load((proj / "project.json").generic_u8string()));
+    REQUIRE(p.build_screens() == 1);                              // (the operator is looking at a screen of the project)
+    SystemSettings& sys = system_settings();
+    auto text = [](const char* key) { return tags().find(std::string("sys.deploy.") + key)->get().format(); };
+    auto flag = [](const char* key) { return tags().find(std::string("sys.deploy.") + key)->get_number() != 0; };
+    auto send = [&](Sender& s, const fs::path& file) {
+        s.me = me;
+        s.req.host = "127.0.0.1";
+        s.req.port = ds.port();
+        s.req.file = file.u8string();
+        s.req.client_name = "pc-7";
+        s.req.expect_fingerprint = ds.fingerprint();
+        s.go();
+    };
+    CHECK(flag("ask"));
+    CHECK_FALSE(flag("arrived"));
+
+    // a project that only draws screens: nothing to ask
+    {
+        Sender s;
+        send(s, plain);
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); }));
+        s.join();
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK_FALSE(s.saw("asking"));
+        CHECK(title_of(proj) == "Plain");
+    }
+    const std::string before = ds.approved();                     // (what went in is what was agreed to: here, "nothing")
+
+    // one that runs something by itself: not installed, the operator is asked, the designer waits
+    {
+        Sender s;
+        send(s, sched);
+        REQUIRE(until([&] { return flag("arrived"); }, [&] { sys.poll(); }));
+        CHECK(text("arrived_text").find("sched.hmlproj") != std::string::npos);
+        CHECK(text("arrived_text").find("pc-7") != std::string::npos);
+        CHECK(text("arrived_text").find("By itself: schedule start at 06:00: writes a") != std::string::npos);
+        CHECK(ui().current_screen().value_or("") == "__system_deploy");       // put in front of the operator
+        CHECK(until([&] { return s.saw("asking"); }, [&] { sys.poll(); }));
+        for(int i = 0; i < 20; i++) { sys.poll(); sleep_ms(10); }
+        CHECK(title_of(proj) == "Plain");
+        CHECK_FALSE(s.done);
+        // "Reject": nothing changes, the designer hears why
+        sys.command("deploy", "install_no");
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); }));
+        s.join();
+        CHECK_FALSE(s.out.ok);
+        CHECK(s.out.error.find("did not allow this project") != std::string::npos);
+        CHECK(title_of(proj) == "Plain");
+        CHECK_FALSE(flag("arrived"));
+        CHECK(ds.approved() == before);
+    }
+    // again, and "Install": in place, and what was agreed to is remembered
+    {
+        Sender s;
+        send(s, sched);
+        REQUIRE(until([&] { return flag("arrived"); }, [&] { sys.poll(); }));
+        sys.command("deploy", "install_yes");
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); }));
+        s.join();
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK(title_of(proj) == "Sched");
+        CHECK_FALSE(flag("arrived"));
+        CHECK(ds.approved().size() == 64);
+        CHECK(ds.approved() != before);
+        CHECK(json::parse(read(keys / "deploy.json"))["approved"] == ds.approved());
+    }
+    // another project with the same list (other screens, another title): no question
+    {
+        Sender s;
+        send(s, sched2);
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); CHECK_FALSE(flag("arrived")); }));
+        s.join();
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK_FALSE(s.saw("asking"));
+        CHECK(title_of(proj) == "Sched2");
+    }
+    // another list again: asked again. Nobody answers and the designer gives up: the question goes away, nothing is installed
+    {
+        ds.set_install_timeout(2);
+        Sender s;
+        send(s, script);
+        REQUIRE(until([&] { return flag("arrived"); }, [&] { sys.poll(); }));
+        CHECK(text("arrived_text").find("1 script(s) run by themselves") != std::string::npos);
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); }));
+        s.join();
+        CHECK_FALSE(s.out.ok);
+        CHECK(until([&] { return !flag("arrived"); }, [&] { sys.poll(); }));
+        CHECK(title_of(proj) == "Sched2");
+        ds.set_install_timeout(300);
+    }
+    // the device's own choice: do not ask (kept in deploy.json)
+    {
+        sys.command("deploy", "ask");
+        CHECK_FALSE(ds.ask());
+        CHECK(json::parse(read(keys / "deploy.json"))["ask"] == false);
+        Sender s;
+        send(s, script);
+        REQUIRE(until([&] { return s.done.load(); }, [&] { sys.poll(); CHECK_FALSE(flag("arrived")); }));
+        s.join();
+        CHECK_MESSAGE(s.out.ok, s.out.error);
+        CHECK(title_of(proj) == "Script");
+        sys.command("deploy", "ask");
+        CHECK(ds.ask());
+    }
+
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+    ds.stop();
+    ds.open("");
+}
