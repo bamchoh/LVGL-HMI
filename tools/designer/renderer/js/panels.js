@@ -322,7 +322,18 @@ const Panels = {
     const tbl = U.el('table', { class: 'grid' });
     tbl.append(U.el('tr', null, ...tdef.columns.map(c => U.el('th', { title: I18N.named(c.k) ? c.k : '' }, I18N.label(c.k))), U.el('th')));
     items.forEach((it, i) => {
-      const cells = tdef.columns.map(c => U.el('td', null, Props.editor(it, c.k, c, fk + '.' + tdef.key + '.' + i)));
+      // a cell this row does not use (a "period_ms" of a follow item, the value of an alarm that is
+      // on when its tag is): dimmed while it is empty, marked when it holds a value that is ignored
+      const used = tdef.uses ? tdef.uses(it) : null;
+      const cells = tdef.columns.map(c => {
+        const td = U.el('td', null, Props.editor(it, c.k, c, fk + '.' + tdef.key + '.' + i));
+        if (used && !used.includes(c.k) && !(tdef.always || []).includes(c.k)) {
+          const filled = it[c.k] !== undefined && it[c.k] !== '' && !(Array.isArray(it[c.k]) && !it[c.k].length);
+          td.className = filled ? 'ignored' : 'unused';
+          td.title = I18N.f(filled ? 'Ignored with {0} "{1}"' : 'Not used with {0} "{1}"', I18N.label(tdef.by), I18N.value(it[tdef.by] === undefined ? '' : it[tdef.by]));
+        }
+        return td;
+      });
       tbl.append(U.el('tr', null, ...cells, U.el('td', null, U.el('button', { class: 'mini danger', onclick: () => M.mutate(() => items.splice(i, 1)) }, '×'))));
     });
     const add = U.el('button', { class: 'mini', onclick: () => M.mutate(() => {
@@ -482,7 +493,9 @@ const Panels = {
     section('alarms', 'Alarms', 'A condition on a tag; every raise and clear is recorded. condition "true" = the tag is on / non-zero; the others compare the tag with value, or with value_tag if given. Export: hml_runtime --export-alarm-log out.csv project.json, or call "alarm_log.export".',
       (o, fk) => [U.el('div', { class: 'drv-fields' }, ...Props.fields(o, [{ k: 'ack_level', t: 'number', hint: 'user level needed to acknowledge an alarm on the device (0 / empty = everybody; needs user management)' }]
           .concat(this.LOG_DB_FIELDS('logs/alarm.db', 100000)), fk)),
-        this.tableEditor(o, { key: 'items', label: 'Alarms', columns: [{ k: 'name', t: 'text' }, { k: 'tag', t: 'tag' }, { k: 'condition', t: 'select', o: SCHEMA.alarmConditions },
+        this.tableEditor(o, { key: 'items', label: 'Alarms', by: 'condition', always: ['name', 'tag', 'condition', 'severity', 'message', 'ack', 'latch', 'delay_ms', 'level', 'group', 'sound'],
+          // "true" / "false" compare with nothing; with a tag to compare with, the value is not read
+          uses: it => ['true', 'false', undefined, ''].includes(it.condition) ? [] : (it.value_tag ? ['value_tag'] : ['value', 'value_tag']), columns: [{ k: 'name', t: 'text' }, { k: 'tag', t: 'tag' }, { k: 'condition', t: 'select', o: SCHEMA.alarmConditions },
           { k: 'value', t: 'text', opt: true }, { k: 'value_tag', t: 'tag', opt: true }, { k: 'severity', t: 'select', o: SCHEMA.alarmSeverities }, { k: 'message', t: 'text', opt: true },
           { k: 'ack', t: 'bool', opt: true }] }, fk),
         U.el('div', { class: 'hint' }, 'ack: the alarm stays in the alarm list until it is acknowledged (default). Show alarms on the screens with the "Alarm list" and "Alarm banner" widgets; tags sys.alarm.active, sys.alarm.unacked, sys.alarm.latest; actions call "alarm.ack" / "alarm.ack_all".')]);

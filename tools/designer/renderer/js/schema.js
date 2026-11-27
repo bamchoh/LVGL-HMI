@@ -215,7 +215,11 @@ const SCHEMA = {
   drivers: {
     sim: {
       label: 'Simulation', fields: [],
-      table: { key: 'items', label: 'Items', columns: [
+      // what each mode reads (driver_sim.cpp): the table dims the cells a row does not use
+      table: { key: 'items', label: 'Items', uses: it => ({
+          sine: ['min', 'max', 'period_ms', 'noise'], triangle: ['min', 'max', 'period_ms', 'noise'], ramp: ['min', 'max', 'period_ms', 'noise'],
+          random: ['min', 'max', 'period_ms', 'noise'], counter: ['min', 'max', 'period_ms'], square: ['period_ms'], cycle: ['values', 'period_ms'],
+          follow: ['min', 'max', 'target', 'rate', 'idle', 'noise'] }[it.mode || 'sine'] || null), always: ['tag', 'mode', 'when'], by: 'mode', columns: [
         { k: 'tag', t: 'tag' }, { k: 'mode', t: 'select', o: ['sine', 'triangle', 'ramp', 'square', 'random', 'counter', 'cycle', 'follow'] },
         { k: 'min', t: 'number' }, { k: 'max', t: 'number' }, { k: 'period_ms', t: 'number' }, { k: 'values', t: 'csv' },
         { k: 'when', t: 'tag', opt: true }, { k: 'target', t: 'text', opt: true }, { k: 'rate', t: 'number', opt: true }, { k: 'idle', t: 'number', opt: true }, { k: 'noise', t: 'number', opt: true }] },
