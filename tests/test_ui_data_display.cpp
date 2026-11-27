@@ -345,9 +345,9 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
     for(lv_keyboard_mode_t mode : { LV_KEYBOARD_MODE_TEXT_LOWER, LV_KEYBOARD_MODE_TEXT_UPPER, LV_KEYBOARD_MODE_SPECIAL, LV_KEYBOARD_MODE_NUMBER }) {
         CAPTURE(static_cast<int>(mode));
         lv_keyboard_set_mode(kb, mode);
-        CHECK(key_index(kb, LV_SYMBOL_CLOSE) >= 0);
+        CHECK(key_index(kb, keyboard_close_text()) >= 0);
         CHECK(key_index(kb, LV_SYMBOL_KEYBOARD) < 0);
-        CHECK(key_index(kb, LV_SYMBOL_OK) >= 0);
+        CHECK(key_index(kb, keyboard_done_text()) >= 0);
     }
 
     SUBCASE("number pad: x discards the typed value and hides the keyboard") {
@@ -355,7 +355,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         send(num, LV_EVENT_CLICKED);
         REQUIRE(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_NUMBER);
         lv_textarea_add_text(num, "99");
-        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, keyboard_close_text())));
         send(kb, LV_EVENT_VALUE_CHANGED);                    // what a tap on that key produces
         CHECK(lv_obj_is_hidden(kb));
         CHECK(n->get_number() == doctest::Approx(7));
@@ -365,7 +365,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         send(num, LV_EVENT_FOCUSED);
         send(num, LV_EVENT_CLICKED);
         lv_textarea_add_text(num, "42");
-        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_OK)));
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, keyboard_done_text())));
         send(kb, LV_EVENT_VALUE_CHANGED);
         CHECK(lv_obj_is_hidden(kb));
         CHECK(n->get_number() == doctest::Approx(42));
@@ -375,7 +375,7 @@ TEST_CASE("the keyboard has an explicit close key in every layout; it cancels th
         send(txt, LV_EVENT_CLICKED);
         REQUIRE(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_TEXT_LOWER);
         lv_textarea_add_text(txt, "zzz");
-        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, LV_SYMBOL_CLOSE)));
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key_index(kb, keyboard_close_text())));
         send(kb, LV_EVENT_VALUE_CHANGED);
         CHECK(lv_obj_is_hidden(kb));
         CHECK(ta_text(txt) == "abc");

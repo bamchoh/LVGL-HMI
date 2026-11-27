@@ -1,5 +1,6 @@
 #include "ui.hpp"
 #include "src/misc/lv_text_private.h"
+#include "system_i18n.hpp"
 #include "texts.hpp"
 #include "font_cmap.hpp"
 #include <map>
@@ -96,6 +97,7 @@ const lv_font_t* montserrat(int size)
     return best;
 }
 } // namespace
+
 
 void set_font_file(const std::string& path)
 {
@@ -897,38 +899,45 @@ void Binding::tag_event(const Value& v, const void* source)
     on_tag_changed(v, source);
 }
 
-// LVGL's stock keyboard closes through a key drawn as a keyboard icon. Operators look for an
-// "x", so the lower-case, symbol and number layouts are replaced with copies that show
-// LV_SYMBOL_CLOSE instead (the upper-case layout already has it). Pressing it sends
-// LV_EVENT_CANCEL, i.e. the edit is discarded; the check mark confirms.
+// The two keys that end typing are written out - "Close" puts the keyboard away and leaves the
+// value as it was (LV_EVENT_CANCEL), "OK" takes what was typed (LV_EVENT_READY). An "x" was
+// read as "delete", a check mark had to be learnt. The words are in the language of the system
+// screens; the layouts are ours for that (LVGL's own have icons there).
+char s_kb_close[16] = "Close", s_kb_done[16] = "OK";
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
+const char* const kKbMapUpper[] = {
+    "1#", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", LV_SYMBOL_BACKSPACE, "\n",
+    "abc", "A", "S", "D", "F", "G", "H", "J", "K", "L", LV_SYMBOL_NEW_LINE, "\n",
+    "_", "-", "Z", "X", "C", "V", "B", "N", "M", ".", ",", ":", "\n",
+    s_kb_close, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
+};
 const char* const kKbMapLower[] = {
     "1#", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", LV_SYMBOL_BACKSPACE, "\n",
     "ABC", "a", "s", "d", "f", "g", "h", "j", "k", "l", LV_SYMBOL_NEW_LINE, "\n",
     "_", "-", "z", "x", "c", "v", "b", "n", "m", ".", ",", ":", "\n",
-    LV_SYMBOL_CLOSE, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, "",
+    s_kb_close, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
 };
 const int kKbCtrlLower[] = {
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 5, HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6, HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
     LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1),
-    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 6, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 5, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3,
 };
 const char* const kKbMapSpecial[] = {
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", LV_SYMBOL_BACKSPACE, "\n",
     "abc", "+", "&", "/", "*", "=", "%", "!", "?", "#", "<", ">", "\n",
     "\\", "@", "$", "(", ")", "{", "}", "[", "]", ";", "\"", "'", "\n",
-    LV_SYMBOL_CLOSE, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, "",
+    s_kb_close, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
 };
 const int kKbCtrlSpecial[] = {
     HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | 2,
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
     HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
-    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 6, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 5, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3,
 };
 const char* const kKbMapNumber[] = {
-    "1", "2", "3", LV_SYMBOL_CLOSE, "\n",
-    "4", "5", "6", LV_SYMBOL_OK, "\n",
+    "1", "2", "3", s_kb_close, "\n",
+    "4", "5", "6", s_kb_done, "\n",
     "7", "8", "9", LV_SYMBOL_BACKSPACE, "\n",
     "+/-", "0", ".", LV_SYMBOL_LEFT, LV_SYMBOL_RIGHT, "",
 };
@@ -948,11 +957,59 @@ const lv_buttonmatrix_ctrl_t* ctrl_table(const int (&src)[N])
     return table;
 }
 
+// What a key of the keyboard is, for its colour.
+enum class KbKey { Letter, Control, Close, Done };
+KbKey kb_key(const char* txt)
+{
+    if(!txt) return KbKey::Letter;
+    if(txt == s_kb_done || std::strcmp(txt, s_kb_done) == 0) return KbKey::Done;
+    if(txt == s_kb_close || std::strcmp(txt, s_kb_close) == 0) return KbKey::Close;
+    // backspace, new line, the arrows (symbols of the icon font) and the keys that change the layout
+    if(static_cast<unsigned char>(txt[0]) == 0xEF || !std::strcmp(txt, "1#") || !std::strcmp(txt, "ABC") || !std::strcmp(txt, "abc")) return KbKey::Control;
+    return KbKey::Letter;
+}
+
+// The keys by their kind: letters on one grey, the keys that do something else a step lighter,
+// "OK" alone in the colour of the project - the eye finds where typing ends. A key that is
+// held is lighter still. (Nothing red: red is for what cannot be undone.)
+void kb_draw(lv_event_t* e)
+{
+    lv_draw_task_t* task = lv_event_get_draw_task(e);
+    auto* base = static_cast<lv_draw_dsc_base_t*>(lv_draw_task_get_draw_dsc(task));
+    if(!base || base->part != LV_PART_ITEMS) return;
+    lv_obj_t* kb = lv_event_get_target_obj(e);
+    const KbKey kind = kb_key(lv_buttonmatrix_get_button_text(kb, base->id1));
+    const bool held = lv_obj_has_state(kb, LV_STATE_PRESSED) && lv_buttonmatrix_get_selected_button(kb) == base->id1;
+    if(lv_draw_fill_dsc_t* f = lv_draw_task_get_fill_dsc(task)) {
+        lv_color_t c = kind == KbKey::Done ? lv_theme_get_color_primary(kb) : kind == KbKey::Letter ? lv_color_hex(0x414c59) : lv_color_hex(0x5f6d7d);
+        if(held) c = lv_color_mix(lv_color_white(), c, LV_OPA_30);
+        f->color = c;
+        f->opa = LV_OPA_COVER;
+    }
+    if(lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(task)) l->color = lv_color_hex(0xf4f6f8);
+}
+
+// A key was pressed: ours for the two words, LVGL's for everything else.
+void kb_value_changed(lv_event_t* e)
+{
+    lv_obj_t* kb = lv_event_get_target_obj(e);
+    const uint32_t id = lv_buttonmatrix_get_selected_button(kb);
+    const KbKey kind = id == LV_BUTTONMATRIX_BUTTON_NONE ? KbKey::Letter : kb_key(lv_buttonmatrix_get_button_text(kb, id));
+    if(kind != KbKey::Close && kind != KbKey::Done) { lv_keyboard_def_event_cb(e); return; }
+    const lv_event_code_t code = kind == KbKey::Done ? LV_EVENT_READY : LV_EVENT_CANCEL;
+    lv_obj_t* ta = lv_keyboard_get_textarea(kb);
+    if(lv_obj_send_event(kb, code, nullptr) != LV_RESULT_OK) return;       // (as LVGL does for its own keys: the keyboard first, then the field)
+    if(ta && lv_obj_is_valid(ta)) lv_obj_send_event(ta, code, nullptr);
+}
+
 void install_keyboard_maps(lv_obj_t* kb)
 {
-    static bool done = false;       // lv_keyboard_set_map() changes the layouts for every keyboard
-    if(done) return;
-    done = true;
+    // the words of the two keys, in the language of the system screens (Japanese only with a font that has it)
+    const bool ja = system_language() == "ja" && font_file_has("閉じる確定");
+    lv_snprintf(s_kb_close, sizeof s_kb_close, "%s", ja ? "閉じる" : "Close");
+    lv_snprintf(s_kb_done, sizeof s_kb_done, "%s", ja ? "確定" : "OK");
+    // (lv_keyboard_set_map() changes the layouts for every keyboard: set again, the words may have changed)
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kKbMapUpper, ctrl_table(kKbCtrlLower));
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLower, ctrl_table(kKbCtrlLower));
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_SPECIAL, kKbMapSpecial, ctrl_table(kKbCtrlSpecial));
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_NUMBER, kKbMapNumber, ctrl_table(kKbCtrlNumber));
@@ -961,6 +1018,10 @@ void install_keyboard_maps(lv_obj_t* kb)
 constexpr size_t kHistoryLen = 16;
 
 } // namespace
+
+const char* keyboard_close_text() { return s_kb_close; }
+const char* keyboard_done_text() { return s_kb_done; }
+
 
 // ================================================================ Ui::Impl
 
@@ -2004,20 +2065,14 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_group_remove_obj(obj);                            // pointer-operated: keep it out of the focus group
         lv_obj_remove_state(obj, LV_STATE_FOCUSED);
         lv_obj_set_hidden(obj, true);
-        // The two keys that end typing say which is which by their colour too: red puts the
-        // keyboard away and leaves the value as it was, green takes what was typed.
+        lv_obj_remove_event_cb(obj, lv_keyboard_def_event_cb);
+        lv_obj_add_event_cb(obj, kb_value_changed, LV_EVENT_VALUE_CHANGED, nullptr);
         lv_obj_set_send_draw_task_events(obj, true);
-        lv_obj_add_event_cb(obj, [](lv_event_t* e) {
-            lv_draw_task_t* task = lv_event_get_draw_task(e);
-            auto* base = static_cast<lv_draw_dsc_base_t*>(lv_draw_task_get_draw_dsc(task));
-            if(!base || base->part != LV_PART_ITEMS) return;
-            const char* txt = lv_buttonmatrix_get_button_text(lv_event_get_target_obj(e), base->id1);
-            if(!txt) return;
-            const bool ok = std::strcmp(txt, LV_SYMBOL_OK) == 0, close = std::strcmp(txt, LV_SYMBOL_CLOSE) == 0;
-            if(!ok && !close) return;
-            if(lv_draw_fill_dsc_t* f = lv_draw_task_get_fill_dsc(task)) { f->color = ok ? lv_color_hex(0x2e7d32) : lv_color_hex(0xb3392f); f->opa = LV_OPA_COVER; }
-            if(lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(task)) l->color = lv_color_white();
-        }, LV_EVENT_DRAW_TASK_ADDED, nullptr);
+        lv_obj_add_event_cb(obj, kb_draw, LV_EVENT_DRAW_TASK_ADDED, nullptr);
+        lv_obj_set_style_bg_color(obj, lv_color_hex(0x20262e), 0);
+        lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(obj, 6, LV_PART_ITEMS);
+        lv_obj_set_style_shadow_width(obj, 0, LV_PART_ITEMS);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_READY, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_CANCEL, nullptr);
         if(building) building->keyboard = obj;
