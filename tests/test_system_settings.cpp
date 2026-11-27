@@ -144,8 +144,8 @@ TEST_CASE("pages become tags, screens and an apply round trip")
         lv_obj_t* pg = lv_screen_active();
         lv_obj_t* content = nth(pg, 1);
         REQUIRE(content);
-        // 6 field rows + the status line (two labels: plain, and as a warning). Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
-        REQUIRE(lv_obj_get_child_count(content) == 8);
+        // 6 field rows (the message of the page is not in the list). Nothing in the list that scrolls acts by itself: Apply is in the bar at the top
+        REQUIRE(lv_obj_get_child_count(content) == 6);
         for(uint32_t i = 0; i < lv_obj_get_child_count(content); i++) CHECK_FALSE(lv_obj_check_type(lv_obj_get_child(content, static_cast<int32_t>(i)), &lv_button_class));
         auto widget_of_row = [&](int32_t row) { return nth(lv_obj_get_child(content, row), 1); };
         CHECK(lv_obj_check_type(widget_of_row(0), &lv_textarea_class));
@@ -891,7 +891,7 @@ TEST_CASE("system pages: nothing in a list that scrolls changes anything by one 
         // the bar at the bottom and the questions are beside the list, not in it
         const SettingsPage* sp = sys.page(page);
         REQUIRE(sp);
-        const size_t expect = 2 + (sp->actions().empty() ? 0 : 1) + 2 * sp->dialogs().size() + 1;   // (a question: what dims the page, and its frame)
+        const size_t expect = 2 + (sp->actions().empty() ? 0 : 1) + 1 + 2 * sp->dialogs().size() + 1;   // (the message of the page; a question: what dims the page, and its frame)
         CHECK_MESSAGE(kids.size() == expect, "page '" << page << "'");
         with_bar += sp->actions().empty() ? 0 : 1;
         with_question += sp->dialogs().empty() ? 0 : 1;
@@ -966,6 +966,7 @@ TEST_CASE("System: the status line is a warning only when something went wrong")
         t->set_string(text, nullptr);
         sys.poll();
     };
+    REQUIRE(users().login("admin", "0000") == Users::LoginResult::Ok);
     say("storage", "Installed. Restarting ...");
     CHECK_FALSE(warn("storage"));
     say("storage", "There is no project file (.hmlproj) at this location.");
@@ -974,10 +975,13 @@ TEST_CASE("System: the status line is a warning only when something went wrong")
     CHECK_FALSE(warn("storage"));
     say("storage", "Backup failed: the disk is full");
     CHECK(warn("storage"));
+    CHECK(tags().find("sys.storage.status_on")->get().truthy());     // (the strip over the bar at the bottom is shown)
+    sys.command("storage", "status_dismiss");                        // a touch on it
+    CHECK_FALSE(tags().find("sys.storage.status_on")->get().truthy());
+    CHECK(tags().find("sys.storage.status")->get().str.empty());
     say("storage", "");
     CHECK_FALSE(warn("storage"));
     // Apply: what the page answers decides
-    REQUIRE(users().login("admin", "0000") == Users::LoginResult::Ok);
     CHECK(sys.apply("display").empty());
     CHECK_FALSE(warn("display"));
     tags().find("sys.display.after_s")->set_number(-5, nullptr);

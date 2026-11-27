@@ -272,6 +272,9 @@ TEST_CASE("System > Storage: backup, install after a question, the restart is as
     CHECK(text("hint") == "");
 
     sys.command("storage", "backup");
+    CHECK(text("status").find("Writing the backup") == 0);         // (said first: writing takes a while on a USB memory)
+    sys.poll();
+    sys.poll();
     CHECK(text("status").find("Backup written to ") == 0);
     CHECK(fs::exists(usb / "hml-backup"));
 

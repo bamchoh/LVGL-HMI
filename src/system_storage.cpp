@@ -109,10 +109,10 @@ public:
         const TransferTarget t = target();
         if(cmd == "refresh") confirm_.clear();
         else if(cmd == "backup") {
-            std::string where;
-            msg = transfer_backup(t, location_, &where);
-            if(msg.empty()) { msg = "Backup written to " + where; operation_log().record("system", "backup", "", where); }
-            else msg = "Backup failed: " + msg;
+            // Writing takes seconds on a USB memory and the screen stands still meanwhile: say so
+            // first, and write when that has been drawn (poll()).
+            if(backup_wait_ == 0) backup_wait_ = 2;
+            msg = "Writing the backup ... Do not take the USB memory out.";
         }
         else if(cmd == "eject") {
             const std::string where = location_;
@@ -172,6 +172,15 @@ public:
     // the page is shown, a USB memory that is plugged in or taken out is noticed.
     bool poll() override
     {
+        if(backup_wait_ > 0 && --backup_wait_ == 0) {
+            std::string where, msg = transfer_backup(target(), location_, &where);
+            if(msg.empty()) { msg = "Backup written to " + where; operation_log().record("system", "backup", "", where); }
+            else msg = "Backup failed: " + msg;
+            HML_INFO("system: storage: %s", msg.c_str());
+            if(Tag* st = tags().find(SystemSettings::tag_name(id(), "status"))) st->set_string(msg, nullptr);
+            take_form();
+            return true;
+        }
         if(restart_ && ++restart_ticks_ >= 3) { restart_ = false; restart_ticks_ = 0; ui().request_restart(RestartTarget::App); return false; }
         auto cur = ui().current_screen();
         if(!cur || *cur != SystemSettings::page_screen(id())) return false;
@@ -240,6 +249,7 @@ private:
     std::string confirm_;               // "install" / "rollback" while the question is shown
     bool        restart_ = false;
     int         restart_ticks_ = 0, ticks_ = 0;
+    int         backup_wait_ = 0;       // > 0: a backup was asked for and is written when this reaches 0
     std::string install_note_, install_fp_;   // what the project file picked can do: for the question, and to remember
 };
 
