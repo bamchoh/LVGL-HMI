@@ -149,11 +149,15 @@ ul.tree { padding-left: 0; }
 .tr-row.hidden-w .tr-label { opacity: .5; text-decoration: line-through; }
 #props { flex: 1; overflow: auto; padding: 6px; }
 .props-head { padding: 4px; margin-bottom: 4px; font-size: 13px; }
-details.sec { border: 1px solid var(--line); border-radius: 4px; margin: 6px 0; background: var(--bg); }
+/* a section of the properties: its head is what frames it. No box around the fields - in a
+   panel of 300 px every frame costs width that the fields need (there were four, one in another) */
+details.sec { border: none; border-radius: 4px; margin: 8px 0 10px; background: none; }
 details.sec > summary { padding: 4px 8px; cursor: pointer; background: var(--bg3); border-radius: 4px; font-size: 12px; user-select: none; }
 details.sec[open] > summary { border-radius: 4px 4px 0 0; }
-.sec-body { padding: 4px 8px; }
-.bind-block, .ev-block { border-left: 2px solid var(--line); padding-left: 6px; margin: 6px 0; }
+.sec-body { padding: 4px 2px 2px 4px; }
+.bind-block, .ev-block { margin: 6px 0; }
+.bind-block { border-top: 1px solid var(--line); padding-top: 6px; }
+.bind-block:first-child { border-top: none; padding-top: 0; }
 /* what is bound ("enabled", "text" ...) has to be readable: it shares the line with the tag, half each */
 .bind-head select { width: auto; flex: 1 1 46%; min-width: 0; }
 .bind-head input { flex: 1 1 54%; min-width: 0; }

@@ -368,6 +368,9 @@ I18N.PATTERNS_JA.push([/^(.*): "(.*)" is not a device address$/, '$1: 「$2」�
 Object.assign(I18N.KEYS_JA, { endpoint: 'エンドポイント', security: 'セキュリティ', policy: 'セキュリティポリシー', server_cert: 'サーバー証明書',
   application_uri: 'アプリケーション URI', publish_ms: '更新の間隔 (ms)', node: 'ノード' });
 Object.assign(I18N.VALUES_JA, { sign_encrypt: '署名と暗号化', sign: '署名のみ' });
+// conditions (bind, alarms): the sign and the words; the key stays in parentheses
+Object.assign(I18N.VALUES_JA, { eq: '＝ 等しい', ne: '≠ 等しくない', gt: '＞ より大きい', lt: '＜ より小さい', ge: '≧ 以上', le: '≦ 以下' });
+Object.assign(I18N.TEXT_JA, { '(truthy)': '(オンのとき)' });
 Object.assign(I18N.TEXT_JA, {
   'OPC UA client': 'OPC UA クライアント',
   'sign_encrypt (default)': '署名と暗号化（既定）',

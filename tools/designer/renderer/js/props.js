@@ -244,7 +244,7 @@ const Props = {
     }
 
     const type = w.type || 'panel', sch = SCHEMA.types[type] || { props: [] };
-    el.append(U.el('div', { class: 'props-head' }, U.el('b', null, type), ' ', U.el('span', { class: 'dim' }, '#' + U.pathStr(path))));
+    el.append(U.el('div', { class: 'props-head' }, U.el('b', null, Tree.typeName(type)), ' ', U.el('span', { class: 'dim', title: 'type: ' + type }, type + '  #' + U.pathStr(path))));
     const specific = this.fields(w, sch.props, fk);
     if (sch.series) specific.push(this.seriesEditor(w, fk));
     if (specific.length) el.append(this.section('Widget', true, ...specific));
@@ -365,7 +365,7 @@ const Props = {
       if (['visible', 'hidden', 'enabled', 'disabled', 'checked', 'on'].includes(e.kind)) {
         const op = U.el('select', { onchange: ev => { for (const o of SCHEMA.bindOps) if (o) delete cfg[o]; if (ev.target.value) cfg[ev.target.value] = cfg[ev.target.value] === undefined ? 0 : cfg[ev.target.value]; commit(); } });
         let curOp = SCHEMA.bindOps.find(o => o && cfg[o] !== undefined) || '';
-        for (const o of SCHEMA.bindOps) op.append(U.el('option', { value: o, selected: o === curOp }, o === '' ? '(truthy)' : o));
+        for (const o of SCHEMA.bindOps) op.append(U.el('option', { value: o, selected: o === curOp }, o === '' ? I18N.t('(truthy)') : I18N.value(o)));
         // a constant, or "{tag}" to compare with another tag ({ "tag": "name" } in the JSON)
         const condText = v => (v && typeof v === 'object') ? '{' + (v.tag || '') + '}' : v;
         const val = U.el('input', { type: 'text', value: curOp ? condText(cfg[curOp]) : '', disabled: !curOp, placeholder: 'value or {tag}', dataset: { fk: bfk + '.cond' },
