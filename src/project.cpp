@@ -217,6 +217,7 @@ bool Project::load(const std::string& path)
     const json* theme = jget(root_, "theme");
     const json& t = theme ? *theme : none;
     info_.dark = jbool(t, "dark", true);
+    set_keyboard_light(!info_.dark);
     info_.primary = parse_color(jstr(t, "primary", ""), lv_palette_main(LV_PALETTE_BLUE));
     info_.secondary = parse_color(jstr(t, "secondary", ""), lv_palette_main(LV_PALETTE_RED));
     info_.start_screen = jstr(root_, "start_screen", "");

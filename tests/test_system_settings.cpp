@@ -977,7 +977,7 @@ TEST_CASE("System: the status line is a warning only when something went wrong")
     CHECK(warn("storage"));
     // what a page says that is not known as good news is a warning: nothing that went wrong is shown green
     for(const char* bad : { "PIN: 4 to 8 digits", "a new user needs a PIN (4 to 8 digits)", "Pick a tag first.", "\"abc\" is not a value for a tag of type int.",
-                            "The time is HH:MM.", "Changed, but it could not be saved: disk full", "some new message nobody has listed" }) {
+                            "The time is HH:MM.", "Changed, but it could not be saved: disk full", "speed_sp = 100  (kept inside the limits of the tag)", "some new message nobody has listed" }) {
         say("storage", bad);
         CHECK_MESSAGE(warn("storage"), bad);
     }

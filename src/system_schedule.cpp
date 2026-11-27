@@ -141,6 +141,7 @@ public:
         return { { "Close", "close", PageAction::Kind::Neutral, "selected", "" }, { "Save", "save", PageAction::Kind::Primary, "", "selected" } };
     }
 
+    bool form_on_top() const override { return true; }
     json custom_rows(bool compact, int font) const override
     {
         const char* muted = "#9fb3c8";
