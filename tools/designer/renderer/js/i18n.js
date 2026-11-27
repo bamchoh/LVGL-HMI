@@ -40,7 +40,8 @@ const I18N = {
     image_recolor: '画像の着色',
     // bind / actions
     tag: 'タグ', scale: '倍率', offset: 'オフセット', invert: '反転', two_way: '双方向', map: '値と色の対応', part: '部位',
-    screen: '画面', anim: '切り替え効果', by: '増減量', fn: '関数名', arg: '引数', code: 'コード', what: '対象',
+    screen: '画面', anim: '切り替え効果', by: '増減量', fn: '関数名', arg: '引数', code: 'コード', what: '対象', lang: '言語',
+    when: '動く条件', rate: '変化の速さ', idle: '止まっているときの値', noise: 'ゆらぎ', target: '目標',
     // project / display
     start_screen: '開始画面', dpi: 'DPI', fbdev: 'フレームバッファ', drm: 'DRM デバイス', swap_axes: 'XY を入れ替え',
     calibration: '補正値', splash: 'スプラッシュ画像', splash_bg: 'スプラッシュ背景色', splash_ms: '表示時間 (ms)', console: 'コンソール',

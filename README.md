@@ -787,6 +787,12 @@ and the designer sends the project file over an encrypted connection (TLS 1.2). 
   Replacing the runtime was checked on the same Pi: refused without the permission; after Runtime was pressed on its touch
   screen, the runtime and the project were put in place with one restart, the runtime before kept as `hml_runtime.prev`.
 
+- **Ready-made buttons**: at the top of the widget list are buttons that already do something - go to a screen, back, open the
+  system settings, login / logout. They are ordinary buttons with their event filled in; change it under "Events / actions".
+- **What a widget does comes first**: in the properties, "Bind (tags)" and "Events / actions" are right after the settings of
+  the widget. An event is a block, each of its actions a card: the kind of action over the whole width, one line per setting.
+  Adding an event opens the list of what can happen at once.
+- **An empty field shows its default** (30 days, 5 tries …) in grey, and the names of settings are not cut off.
 - **Display language**: the selector in the toolbar switches between Japanese and English (the language of the OS the first time). In Japanese, the properties are
   shown with names such as "背景色" (background color) and "文字色" (text color), and hovering the mouse shows the JSON key name (`bg_color` and so on). The saved JSON does not change.
 - **Edits show on the canvas at once**: while you pick a color or type a number or text, the canvas changes without waiting for you to confirm (one undo step).

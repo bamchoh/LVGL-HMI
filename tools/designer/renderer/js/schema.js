@@ -186,6 +186,15 @@ const SCHEMA = {
                  numeric_display: 'value', text_display: 'text', password_display: 'text' },
   bindOps: ['', 'eq', 'ne', 'gt', 'lt', 'ge', 'le'],
 
+  // Ready-made widgets of the palette: a type with what one usually sets right after adding it.
+  // (`goto`: the screen is filled in when it is added - another screen of the project.)
+  presets: {
+    btn_goto:   { label: 'Go to a screen', base: 'button', props: { text: 'Next', on_click: { action: 'goto', screen: '' } } },
+    btn_back:   { label: 'Back', base: 'button', props: { text: 'Back', on_click: { action: 'back' } } },
+    btn_system: { label: 'System settings', base: 'button', props: { text: 'System', on_click: { action: 'system' } } },
+    btn_login:  { label: 'Login / logout', base: 'button', props: { text: 'Login', on_click: { action: 'login' } } },
+  },
+
   actions: {
     set:    [{ k: 'tag', t: 'tag' }, { k: 'value', t: 'text' }],
     toggle: [{ k: 'tag', t: 'tag' }],

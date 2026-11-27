@@ -1353,7 +1353,19 @@ const M = {
   redo() { const st = this.st; if (!st.redo.length) return; st.undo.push(this.snapshot()); this.restore(st.redo.pop()); st.dirty = true; App.refresh(); },
 
   // ---- widgets -----------------------------------------------------------
-  newWidget(type) { const t = SCHEMA.types[type] || {}; return Object.assign({ type }, U.clone(t.def) || {}); },
+  newWidget(type) {
+    const preset = SCHEMA.presets && SCHEMA.presets[type];
+    if (preset) {                                    // a ready-made widget of the palette
+      const w = Object.assign(this.newWidget(preset.base), U.clone(preset.props));
+      if (w.on_click && w.on_click.action === 'goto' && !w.on_click.screen) {
+        const cur = (this.screen() || {}).name;
+        w.on_click.screen = this.screenNames().find(n => n !== cur) || cur || '';
+      }
+      return w;
+    }
+    const t = SCHEMA.types[type] || {};
+    return Object.assign({ type }, U.clone(t.def) || {});
+  },
 
   // container that receives new widgets for the current selection
   containerPathFor(path) {
