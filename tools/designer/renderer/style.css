@@ -29,7 +29,14 @@ h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim); }
 .grow { flex: 1; }
 .hint { color: var(--dim); font-size: 12px; margin: 6px 0; }
 .warn { color: #ffb74d; font-size: 12px; margin: 6px 0; }
-.sep { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 8px; }
+/* "more": what is needed now and then, behind one button */
+#toolbar > .more { position: relative; flex: none; }
+#more-menu { position: absolute; right: 0; top: 100%; margin-top: 6px; z-index: 60; min-width: 210px; display: flex; flex-direction: column; gap: 2px;
+  padding: 4px; background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+#more-menu[hidden] { display: none; }
+#more-menu button { text-align: left; border-color: transparent; background: none; padding: 6px 10px; white-space: nowrap; }
+#more-menu button:hover { background: var(--bg3); border-color: transparent; }
 .inline { display: inline-flex; gap: 4px; align-items: center; }
 .inline input, .inline select { width: 80px; }
 
@@ -65,7 +72,11 @@ h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim); }
 
 .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .pal-title { margin: 12px 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
-button.pal { display: flex; align-items: center; gap: 8px; padding: 8px; text-align: left; }
+button.pal { display: flex; align-items: center; gap: 8px; padding: 0 8px; height: 34px; text-align: left; overflow: hidden; }
+button.pal > .pal-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+button.pal > .tr-icon { flex: none; width: 20px; font-size: 16px; line-height: 1; color: var(--fg); opacity: .85; }
+button.pal[hidden] { display: none; }
+#pal-filter { width: 100%; margin: 2px 0 4px; padding: 5px 8px; }
 .tr-icon { display: inline-block; width: 16px; text-align: center; color: var(--dim); font-family: "Segoe UI Symbol", sans-serif; }
 
 .list .item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }

@@ -63,7 +63,8 @@ const Panels = {
     for (const [type, t] of Object.entries(SCHEMA.types)) {
       grid.append(U.el('button', { class: 'pal', draggable: true, onclick: () => App.addWidget(type), disabled: !M.screen(),
         ondragstart: e => { Canvas.dragType = type; e.dataTransfer.setData('text/plain', type); e.dataTransfer.effectAllowed = 'copy'; },
-        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
+        dataset: { find: (type + ' ' + t.label + ' ' + I18N.t(t.label)).toLowerCase() },
+        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), U.el('span', { class: 'pal-name' }, I18N.t(t.label))));
     }
     // buttons that already do something: what one would otherwise set up by hand every time
     const ready = U.el('div', { class: 'palette' });
@@ -71,9 +72,19 @@ const Panels = {
       ready.append(U.el('button', { class: 'pal', draggable: true, dataset: { preset: id }, onclick: () => App.addWidget(id), disabled: !M.screen(),
         title: I18N.t('A button that does this already (change it in "Events / actions")'),
         ondragstart: e => { Canvas.dragType = id; e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'copy'; },
-        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type: p.base })), I18N.t(p.label)));
+        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, p.icon || Tree.icon({ type: p.base })), U.el('span', { class: 'pal-name' }, I18N.t(p.label))));
+      ready.lastChild.dataset.find = (p.base + ' ' + p.label + ' ' + I18N.t(p.label)).toLowerCase();
     }
-    el.append(U.el('h4', { class: 'pal-title' }, 'Ready-made buttons'), ready, U.el('h4', { class: 'pal-title' }, 'Widgets'), grid);
+    // a filter: thirty widgets are more than one finds at a glance. It only hides, nothing is drawn again.
+    const filter = U.el('input', { id: 'pal-filter', type: 'search', value: Panels.palFilter || '', placeholder: I18N.t('Find a widget…'), spellcheck: false });
+    const apply = () => {
+      const q = (Panels.palFilter = filter.value).trim().toLowerCase();
+      for (const b of el.querySelectorAll('button.pal')) b.hidden = !!q && !(b.dataset.find || '').includes(q);
+      for (const g of [ready, grid]) g.previousElementSibling.hidden = !![...g.children].every(b => b.hidden);
+    };
+    filter.oninput = apply;
+    el.append(filter, U.el('h4', { class: 'pal-title' }, 'Ready-made buttons'), ready, U.el('h4', { class: 'pal-title' }, 'Widgets'), grid);
+    apply();
     // the library: parts the user kept, for any project
     const lib = U.el('div', { class: 'library', id: 'library' }, U.el('h4', null, 'Library'));
     const list = U.el('div', { class: 'lib-list' });

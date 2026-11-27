@@ -50,6 +50,11 @@ const App = {
     q('b-open').onclick = () => this.openDialog();
     q('b-recent').onclick = () => this.recentDialog();
     q('b-keys').onclick = () => this.shortcutsDialog();
+    // "more": opens under its button; a choice or a click anywhere else closes it
+    const more = q('more-menu');
+    q('b-more').onclick = e => { e.stopPropagation(); more.hidden = !more.hidden; };
+    document.addEventListener('click', () => { more.hidden = true; });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') more.hidden = true; });
     q('canvas-wrap').addEventListener('dragover', e => Canvas.onDragOver(e));
     q('canvas-wrap').addEventListener('drop', e => Canvas.onDrop(e));
     q('b-save').onclick = () => this.save(false);

@@ -599,7 +599,7 @@ build\bin\hml_designer.exe line1.hmlproj                  # start with a project
 
 | Place | Contents |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Left: Widgets | The palette. A click adds the widget to the selected panel (or the screen) |
+| Left: Widgets | The palette. A click adds the widget to the selected panel (or the screen); the field at the top filters the list by name. "Ready-made buttons" come first |
 | Left: Screens / Tags / Drivers / Project | Adding and deleting screens and the start screen, the tag table, driver settings (forms for sim / modbus_tcp / modbus_rtu / modbus_ascii / opcua_server + raw JSON), display size, theme, touch calibration |
 | Center: canvas | Drag to move, resize with the handle at the bottom right, move 1 px with the arrow keys (10 px with Shift). Children of a flex layout follow the settings of their parent and cannot be moved |
 | Right: tree + properties | Hierarchy and order (▲▼ for forward and back, ⇥⇤ to move into and out of a panel), position / size / flags / style (per selector) / bindings / events (lists of actions) |
@@ -609,11 +609,11 @@ build\bin\hml_designer.exe line1.hmlproj                  # start with a project
 | Center: Logs tab | Settings of the data log (groups), alarms, operation log and system log. Only those that are checked are recorded |
 | Center: Users tab | Users: level names, users (name, level, PIN), settings for automatic logout and lockout → "Users" |
 | Center: Scripts tab | Adding and deleting Lua scripts, editing the trigger (at startup / periodic / tag change / a screen shown or hidden / manual) and the code. Assign one to a widget event with the `script` action |
-| JSON | Edit the JSON of the current screen directly and apply it |
+| ⋯ (More) | What is needed now and then: **Find and replace** (below), **Screen JSON** (edit the JSON of the current screen directly and apply it), **Keyboard shortcuts** (F1) |
 
 ### Find and replace, copies of screens, another display size
 
-- **Replace**: replaces a tag name or text in this screen, in all screens or in the whole project.
+- **Find and replace** (⋯ in the toolbar): replaces a tag name or text in this screen, in all screens or in the whole project.
   When you enter the text to find, **the list of the places that change (which widget of which screen, before and after) comes first**. Nothing changes until you press "Replace".
   - For tag names, it covers all of: the connections of widgets (`bind`), actions, conditions, `tag.name` in Lua, alarms, logs, drivers, transfers and schedules.
     Turn off "Only the whole name / text" to replace part of a name (`line1_` → `line2_`).
