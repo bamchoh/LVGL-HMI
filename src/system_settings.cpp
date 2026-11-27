@@ -309,6 +309,11 @@ void SystemSettings::command(const std::string& page_id, const std::string& cmd,
     if(!system_allowed("command for", page_id)) return;
     if(cmd == "status_dismiss") { set_status(page_id, "", false); return; }      // (a touch on the message)
     p->command(cmd, arg);
+    // A row was picked on a page whose form is at the top of its list: on a small screen the
+    // list may be scrolled so far that the form is out of sight, and nothing would seem to happen.
+    if(cmd == "select" && p->form_on_top())
+        if(auto cur = ui().current_screen(); cur && *cur == page_screen(page_id))
+            if(lv_obj_t* scr = lv_screen_active(); scr && lv_obj_get_child_count(scr) > 1) lv_obj_scroll_to_y(lv_obj_get_child(scr, 1), 0, LV_ANIM_ON);
     refresh(page_id);
     translate_status(page_id);
 }
@@ -330,7 +335,10 @@ bool status_is_problem(const std::string& english)
     for(const char* s : { "' changed.", "' added.", "' deleted." })
         if(english.size() >= std::strlen(s) && english.compare(english.size() - std::strlen(s), std::string::npos, s) == 0) return false;
     if(english.find(" file(s) are on their way") != std::string::npos) return false;
-    // "temp = 21.5": a value was written ("... is not a value ..." has no " = ")
+    // "temp = 21.5": a value was written ("... is not a value ..." has no " = "). But not when it
+    // is another value than the one that was typed (99999 into a tag that goes to 100): the
+    // operator has to see that what is there now is not what was asked for.
+    if(english.find("kept inside the limits") != std::string::npos) return true;
     if(english.find(" = ") != std::string::npos && english.find("not") == std::string::npos) return false;
     return true;
 }

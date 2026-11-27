@@ -46,6 +46,7 @@ const std::vector<Pattern>& patterns()
         { std::regex(R"(^'(.*)' added\.$)"), "「$1」を追加しました。" },
         { std::regex(R"(^'(.*)' deleted\.$)"), "「$1」を削除しました。" },
         { std::regex(R"(^'(.*)' is the last user who can open the system settings$)"), "「$1」は、システム設定を開ける最後のユーザーです" },
+        { std::regex(R"(^(.*) = (.*)  \(kept inside the limits of the tag\)$)"), "$1 = $2（入れた値はタグの範囲の外でした。範囲内の値にしました）" },
         { std::regex(R"re(^"(.*)" is not a value for a tag of type (.*)\.$)re"), "「$1」は、$2 型のタグの値ではありません。" },
         // the login screen
         { std::regex(R"(^Logged in, but this needs (.*) or higher\.$)"), "ログインしましたが、$1 以上のレベルが必要です。" },

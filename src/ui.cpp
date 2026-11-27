@@ -2004,6 +2004,20 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_group_remove_obj(obj);                            // pointer-operated: keep it out of the focus group
         lv_obj_remove_state(obj, LV_STATE_FOCUSED);
         lv_obj_set_hidden(obj, true);
+        // The two keys that end typing say which is which by their colour too: red puts the
+        // keyboard away and leaves the value as it was, green takes what was typed.
+        lv_obj_set_send_draw_task_events(obj, true);
+        lv_obj_add_event_cb(obj, [](lv_event_t* e) {
+            lv_draw_task_t* task = lv_event_get_draw_task(e);
+            auto* base = static_cast<lv_draw_dsc_base_t*>(lv_draw_task_get_draw_dsc(task));
+            if(!base || base->part != LV_PART_ITEMS) return;
+            const char* txt = lv_buttonmatrix_get_button_text(lv_event_get_target_obj(e), base->id1);
+            if(!txt) return;
+            const bool ok = std::strcmp(txt, LV_SYMBOL_OK) == 0, close = std::strcmp(txt, LV_SYMBOL_CLOSE) == 0;
+            if(!ok && !close) return;
+            if(lv_draw_fill_dsc_t* f = lv_draw_task_get_fill_dsc(task)) { f->color = ok ? lv_color_hex(0x2e7d32) : lv_color_hex(0xb3392f); f->opa = LV_OPA_COVER; }
+            if(lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(task)) l->color = lv_color_white();
+        }, LV_EVENT_DRAW_TASK_ADDED, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_READY, nullptr);
         lv_obj_add_event_cb(obj, &Impl::on_keyboard_done, LV_EVENT_CANCEL, nullptr);
         if(building) building->keyboard = obj;
