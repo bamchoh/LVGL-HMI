@@ -145,6 +145,8 @@ Object.assign(I18N.TEXT_JA, {
   'Writes to devices': '機器に書き込む', 'Sends data out': '外へデータを送る', 'Opens ports for others': 'ほかからつなげるポートを開く', 'Runs by itself': '自分で動く',
   'It writes to devices and runs things by itself: values can reach a device without anybody pressing a button.':
     '機器に書き込み、かつ自分で動くものがあります。誰もボタンを押さなくても、値が機器に届くことがあります。',
+  'Ready-made buttons': 'よく使うボタン', 'Go to a screen': '画面へ移動', 'Back': '戻る', 'System settings': 'システム設定', 'Login / logout': 'ログイン / ログアウト',
+  'A button that does this already (change it in "Events / actions")': '動作を設定済みのボタンです（「イベントと動作」で変えられます）',
   'what happens': '何をするか', 'remove this action': 'この動作を消す', 'earlier': '前へ（先に実行）',
   'method': '方法', 'SSH (ssh / scp)': 'SSH（ssh / scp）', 'Direct (to the runtime, no SSH)': '直接（ランタイムへ。SSH なし）',
   'Sends the project to the runtime itself over an encrypted connection: no SSH server is needed on the target. On the target\'s screen switch on System > Deploy > Receive projects first. logs/ and the settings made on the target are kept; the runtime restarts. "send runtime" needs one more permission on the target: System > Deploy > Runtime, next to this designer.':
@@ -281,6 +283,8 @@ Object.assign(I18N.TEXT_JA, {
   'No tags yet. Tags are the named values that widgets bind to and drivers read / write.': 'タグがまだありません。タグは名前の付いた値で、部品が連動し、ドライバが読み書きします。',
 });
 I18N.PATTERNS_JA.push([/^duplicate tag names: (.*)$/, '重複しているタグ名: $1']);
+I18N.PATTERNS_JA.push([/^(\d+) texts$/, '$1 個のテキスト'], [/^ (\d+) items$/, ' $1 項目'], [/^(\d+) items$/, '$1 項目']);
+Object.assign(I18N.TEXT_JA, { 'Widgets': '部品', 'Level': 'レベル' });
 
 // ---- style copy, lock / hide, tag import, recovery
 Object.assign(I18N.TEXT_JA, {

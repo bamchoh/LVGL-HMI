@@ -1889,3 +1889,30 @@ test('M font: Japanese text without a font in the project is a problem', () => {
   M.st.project.font = { file: 'assets/fonts/NotoSansJP-subset.otf' };
   deq(M.problems(), []);
 });
+
+test('M presets: a ready-made button comes with what it does', () => {
+  const { M, SCHEMA } = load();
+  M.newProject('T', 800, 480);
+  // every preset is a known type plus known actions
+  for (const [id, p] of Object.entries(SCHEMA.presets)) {
+    assert.ok(SCHEMA.types[p.base], id + ': base type');
+    assert.ok(SCHEMA.actions[p.props.on_click.action] !== undefined, id + ': action');
+    assert.ok(!SCHEMA.types[id], id + ' must not hide a widget type');
+  }
+  const sys = M.addWidget('btn_system', []);
+  assert.equal(sys.type, 'button');
+  deq(sys.on_click, { action: 'system' });
+  assert.equal(M.selected(), sys);                   // selected, like any widget just added
+  deq(M.addWidget('btn_back', []).on_click, { action: 'back' });
+  deq(M.addWidget('btn_login', []).on_click, { action: 'login' });
+  // "go to a screen": another screen of the project when there is one, never an empty name
+  assert.equal(M.addWidget('btn_goto', []).on_click.screen, 'main');
+  M.addScreen ? M.addScreen('second') : M.st.screens.push({ file: 'screens/second.json', data: M.blankScreen('second') });
+  const other = M.addWidget('btn_goto', []).on_click.screen;
+  assert.notEqual(other, M.screen().name);            // (not the screen the button is on)
+  assert.ok(['main', 'second'].includes(other));
+  // the presets leave the widget types as they are
+  assert.equal(M.newWidget('button').on_click, undefined);
+  // and nothing of it is a problem
+  deq(M.problems().filter(p => /on_click|button/.test(JSON.stringify(p))), []);
+});

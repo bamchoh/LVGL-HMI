@@ -11,6 +11,12 @@ const Panels = {
     this.show('widgets');
   },
   // center area: 'screen' (canvas), 'tags', 'drivers', 'scripts' or 'logs'
+  // The palette and the list of screens are for the canvas. On the other pages (tags, drivers
+  // ...) their place belongs to the page - unless the project settings are what is open there.
+  showLeft() {
+    const left = document.getElementById('left');
+    left.style.display = (this.view === 'screen' || this.tab === 'project') ? '' : 'none';
+  },
   showView(v) {
     if (this.view === v) return;
     this.view = v;
@@ -24,10 +30,12 @@ const Panels = {
     document.getElementById('view-recipes').hidden = v !== 'recipes';
     document.getElementById('view-texts').hidden = v !== 'texts';
     document.getElementById('right').hidden = v !== 'screen';   // widget tree / props only matter on the canvas
+    this.showLeft();
     App.refresh();
   },
   show(tab) {
     this.tab = tab;
+    this.showLeft();
     document.querySelectorAll('#left-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-body').forEach(d => { d.hidden = d.id !== 'tab-' + tab; });
     this.render();
@@ -57,7 +65,15 @@ const Panels = {
         ondragstart: e => { Canvas.dragType = type; e.dataTransfer.setData('text/plain', type); e.dataTransfer.effectAllowed = 'copy'; },
         ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type })), I18N.t(t.label)));
     }
-    el.append(grid);
+    // buttons that already do something: what one would otherwise set up by hand every time
+    const ready = U.el('div', { class: 'palette' });
+    for (const [id, p] of Object.entries(SCHEMA.presets)) {
+      ready.append(U.el('button', { class: 'pal', draggable: true, dataset: { preset: id }, onclick: () => App.addWidget(id), disabled: !M.screen(),
+        title: I18N.t('A button that does this already (change it in "Events / actions")'),
+        ondragstart: e => { Canvas.dragType = id; e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'copy'; },
+        ondragend: () => { Canvas.dragType = null; } }, U.el('span', { class: 'tr-icon' }, Tree.icon({ type: p.base })), I18N.t(p.label)));
+    }
+    el.append(U.el('h4', { class: 'pal-title' }, 'Ready-made buttons'), ready, U.el('h4', { class: 'pal-title' }, 'Widgets'), grid);
     // the library: parts the user kept, for any project
     const lib = U.el('div', { class: 'library', id: 'library' }, U.el('h4', null, 'Library'));
     const list = U.el('div', { class: 'lib-list' });
@@ -402,7 +418,7 @@ const Panels = {
       { k: 'lock_s', t: 'number', hint: 'how long a locked user must wait, in seconds (default 60)' }], fk)));
     if (!Array.isArray(u.list)) u.list = [];
     const tbl = U.el('table', { class: 'grid' });
-    tbl.append(U.el('tr', null, ...['name', 'level', 'PIN', ''].map(h => U.el('th', null, h))));
+    tbl.append(U.el('tr', null, ...[I18N.label('name'), I18N.t('Level'), 'PIN', ''].map(h => U.el('th', null, h))));
     u.list.forEach((x, i) => {
       const lf = fk + '.list.' + i;
       const level = U.el('select', { dataset: { fk: lf + '.level' }, onchange: e => M.mutate(() => { x.level = Number(e.target.value); }) },

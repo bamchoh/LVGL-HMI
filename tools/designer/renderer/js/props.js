@@ -32,6 +32,10 @@ const Props = {
   editor(obj, k, f, fk) {
     const t = f.t || 'text', v = obj[k];
     const attrs = { dataset: { fk: fk + '.' + k } };
+    // An empty field means "the default": say what that is, in the field itself (it was only in
+    // the tooltip: "... (default 30, 0 = keep forever)").
+    const dflt = f.hint && /default ([^,;)]+)/.exec(f.hint);
+    if (dflt) attrs.placeholder = dflt[1].trim();
     const st = { on: false };                       // the state of a live edit of this field
     switch (t) {
       case 'number': {
@@ -105,7 +109,7 @@ const Props = {
       }
       case 'json': return U.el('textarea', Object.assign(attrs, { rows: 4, value: v === undefined ? '' : JSON.stringify(v),
         onchange: e => { try { this.setVal(obj, k, e.target.value.trim() === '' ? undefined : JSON.parse(e.target.value)); } catch (err) { App.toast('JSON: ' + err.message); } } }));
-      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: f.placeholder ? I18N.t(f.placeholder) : undefined,
+      default: return U.el('input', Object.assign(attrs, { type: 'text', value: v === undefined ? '' : v, placeholder: f.placeholder ? I18N.t(f.placeholder) : attrs.placeholder,
         oninput: e => this.live(st, obj, k, e.target.value), onchange: e => this.commit(st, obj, k, e.target.value) }));
     }
   },
@@ -349,7 +353,7 @@ const Props = {
       const tag = U.el('input', { type: 'text', list: 'dl-tags', value: cfg.tag || '', placeholder: 'tag', dataset: { fk: bfk + '.tag' }, onchange: ev => { cfg.tag = ev.target.value.trim(); commit(); } });
       const del = U.el('button', { class: 'mini danger', onclick: () => { entries.splice(i, 1); commit(); } }, '×');
       const head = U.el('div', { class: 'row bind-head' }, kind, tag, del);
-      const opt = (label, input) => U.el('div', { class: 'row sub' }, U.el('label', null, label), input);
+      const opt = (label, input) => U.el('div', { class: 'row sub' }, U.el('label', { title: label }, I18N.label(label)), input);
       const txt = (k, ph) => U.el('input', { type: 'text', value: cfg[k] === undefined ? '' : cfg[k], placeholder: ph || '', dataset: { fk: bfk + '.' + k },
         onchange: ev => { const s = ev.target.value; if (s === '') delete cfg[k]; else cfg[k] = s; commit(); } });
       const num = k => U.el('input', { type: 'number', step: 'any', value: cfg[k] === undefined ? '' : cfg[k], dataset: { fk: bfk + '.' + k },
@@ -404,21 +408,37 @@ const Props = {
         const up = U.el('button', { class: 'mini', title: 'earlier', disabled: i === 0, onclick: () => { acts.splice(i - 1, 0, acts.splice(i, 1)[0]); commit(); } }, '↑');
         const head = U.el('div', { class: 'row act-head' }, U.el('span', { class: 'act-no' }, String(i + 1)), sel, acts.length > 1 ? up : null, del);
         const fields = (SCHEMA.actions[a.action] || []).map(f =>
-          U.el('div', { class: 'row sub' }, U.el('label', { title: f.k }, f.k), this.editor(a, f.k, f, fk + '.' + ev + '.' + i)));
+          U.el('div', { class: 'row sub' }, U.el('label', { title: f.k }, I18N.label(f.k)), this.editor(a, f.k, f, fk + '.' + ev + '.' + i)));
         return U.el('div', { class: 'act-card' }, head, ...fields);
       });
-      const add = U.el('button', { class: 'mini', onclick: () => { acts.push({ action: 'set', tag: M.tagNames()[0] || '', value: true }); commit(); } }, '+ action');
+      const add = U.el('button', { class: 'mini', onclick: () => { acts.push({ action: 'set', tag: M.tagNames()[0] || '', value: true }); commit(); this.openActionList(ev); } }, '+ action');
       const delEv = U.el('button', { class: 'mini danger', title: 'remove event', onclick: () => M.mutate(() => delete w[ev]) }, '×');
       const name = evName(ev);
-      blocks.push(U.el('div', { class: 'ev-block' },
+      blocks.push(U.el('div', { class: 'ev-block', dataset: { ev } },
         U.el('div', { class: 'row ev-head' }, U.el('b', null, name), name.includes(ev) ? null : U.el('span', { class: 'dim' }, ev), U.el('span', { class: 'grow' }), delEv),
         ...cards, U.el('div', { class: 'row' }, add)));
     }
-    const addEv = U.el('select', { class: 'add-event', onchange: e => { const ev = e.target.value; if (ev) M.mutate(() => { w[ev] = [{ action: 'set', tag: M.tagNames()[0] || '', value: true }]; }); } },
+    // A new event starts with the action most often wanted for the widget, and the list of
+    // what can happen opens at once: "what should it do?" is the next question anyway.
+    const firstAction = () => (w.type === 'button' && M.screenNames().length > 1)
+      ? { action: 'goto', screen: M.screenNames().find(n => n !== (M.screen() || {}).name) || '' }
+      : { action: 'set', tag: M.tagNames()[0] || '', value: true };
+    const addEv = U.el('select', { class: 'add-event', onchange: e => { const ev = e.target.value; if (!ev) return; M.mutate(() => { w[ev] = [firstAction()]; }); this.openActionList(ev); } },
       U.el('option', { value: '' }, I18N.t('+ add event…')));
     for (const ev of SCHEMA.events) if (w[ev] === undefined) { const n = evName(ev); addEv.append(U.el('option', { value: ev }, n.includes(ev) ? n : n + '  (' + ev + ')')); }
     // (a button without an event does nothing: its section is open, so that "+ add event" is seen)
     return this.section('Events / actions', blocks.length > 0 || w.type === 'button', ...blocks, U.el('div', { class: 'row' }, addEv));
+  },
+
+  // After the panel was drawn again: the kind of the (last) action of this event, opened as a list.
+  openActionList(ev) {
+    setTimeout(() => {
+      const heads = [...document.querySelectorAll('#props .ev-block')].filter(b => b.dataset.ev === ev);
+      const sel = heads.length ? [...heads[0].querySelectorAll('.act-head > select')].pop() : null;
+      if (!sel) return;
+      sel.focus();
+      try { if (sel.showPicker) sel.showPicker(); } catch (e) { /* (needs a user gesture in some browsers: the focus is enough then) */ }
+    }, 60);
   },
 
   // ---- chart series ------------------------------------------------------
