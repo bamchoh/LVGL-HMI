@@ -42,6 +42,11 @@ const std::vector<Pattern>& patterns()
         { std::regex(R"(^(\d\d:\d\d)  weekdays$)"), "$1  平日" },
         { std::regex(R"(^(\d\d:\d\d)  daily$)"), "$1  毎日" },
         { std::regex(R"(^(\d\d:\d\d)  weekends$)"), "$1  土日" },
+        { std::regex(R"(^'(.*)' changed\.$)"), "「$1」を変更しました。" },
+        { std::regex(R"(^'(.*)' added\.$)"), "「$1」を追加しました。" },
+        { std::regex(R"(^'(.*)' deleted\.$)"), "「$1」を削除しました。" },
+        { std::regex(R"(^'(.*)' is the last user who can open the system settings$)"), "「$1」は、システム設定を開ける最後のユーザーです" },
+        { std::regex(R"re(^"(.*)" is not a value for a tag of type (.*)\.$)re"), "「$1」は、$2 型のタグの値ではありません。" },
         // the login screen
         { std::regex(R"(^Logged in, but this needs (.*) or higher\.$)"), "ログインしましたが、$1 以上のレベルが必要です。" },
         { std::regex(R"(^(.*) or higher is needed\.$)"), "$1 以上のレベルが必要です。" },
