@@ -153,6 +153,7 @@
 { "Change the level, or type a new PIN, then press Save. An empty PIN keeps the old one.", "レベルを変えるか、新しい PIN を入れて「保存」を押してください。PIN を空欄にすると今のままです。" },
 { "Unknown user.", "そのユーザーはいません。" },
 { "(none)", "(なし)" },
+{ "Now", "現在" },
 { "Writing the backup ... Do not take the USB memory out.", "バックアップを書き込んでいます … USB メモリを抜かないでください。" },
 { "Addresses", "アドレス" },
 { "Close", "閉じる" },

@@ -424,7 +424,7 @@ TEST_CASE("System > Schedule: the schedules with their next run; time, days and 
     CHECK_FALSE(on("more"));
 
     sys.command("schedule", "save");                             // nothing picked
-    CHECK(text("range") == "Pick a schedule first.");
+    CHECK(text("status") == "Pick a schedule first.");
     sys.command("schedule", "select", "1");
     CHECK(on("selected"));
     CHECK(on("daily"));
@@ -439,7 +439,7 @@ TEST_CASE("System > Schedule: the schedules with their next run; time, days and 
     tags().find("sys.schedule.at")->set_string("07:30", nullptr);
     set("d6", 1);
     sys.command("schedule", "save");
-    CHECK(text("range").find("Saved: start  07:30") == 0);
+    CHECK(text("status").find("Saved: start  07:30") == 0);
     CHECK_FALSE(on("selected"));
     CHECK(schedule_at_text(scheduler().items()[0]) == "07:30");
     CHECK(scheduler().items()[0].days == 0x7E);
@@ -449,7 +449,7 @@ TEST_CASE("System > Schedule: the schedules with their next run; time, days and 
     sys.command("schedule", "select", "1");
     for(const char* d : { "d0", "d1", "d2", "d3", "d4", "d5", "d6" }) set(d, 0);
     sys.command("schedule", "save");
-    CHECK(text("range").find("day") != std::string::npos);
+    CHECK(text("status").find("day") != std::string::npos);
     CHECK(on("selected"));
     CHECK(scheduler().items()[0].days == 0x7E);
     sys.command("schedule", "close");
@@ -466,7 +466,7 @@ TEST_CASE("System > Schedule: the schedules with their next run; time, days and 
     CHECK_FALSE(on("daily"));
     tags().find("sys.schedule.at")->set_string("10:00", nullptr);
     sys.command("schedule", "save");
-    CHECK(text("range").find("runs once") != std::string::npos);
+    CHECK(text("status").find("runs once") != std::string::npos);
     tags().find("sys.schedule.at")->set_string("2031-12-02 10:00", nullptr);
     sys.command("schedule", "save");
     CHECK(schedule_at_text(scheduler().items()[2]) == "2031-12-02 10:00");
