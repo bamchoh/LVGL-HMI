@@ -232,7 +232,7 @@ void SystemSettings::refresh(const std::string& page_id)
         for(const SettingField& f : fields) {
             if(f.type == SettingField::Type::Select && f.live_options) {       // first the options, then the selection
                 std::string joined;
-                for(const std::string& o : f.options) joined += (joined.empty() ? "" : "\n") + o;
+                for(const std::string& o : f.options) joined += (joined.empty() ? "" : "\n") + sys_text(o);   // (what is chosen is its place in the list, so the words may change)
                 set_tag(tag_name(p->id(), f.key + "__options"), TagType::String, Value::string(joined));
             }
             // (what a page only shows is a text: in the language of the system screens)

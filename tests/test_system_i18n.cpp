@@ -89,6 +89,10 @@ TEST_CASE("system i18n: a text is translated only in Japanese, a text without an
     CHECK(sys_text("Driver: plc") == "ドライバ: plc");
     CHECK(sys_text("3 key(s)") == "鍵 3 個");
     CHECK(sys_text("pump_1") == "pump_1");
+    CHECK(sys_text("Admin or higher is needed.") == "Admin 以上のレベルが必要です。");
+    CHECK(sys_text("Wrong PIN (2 more tries).") == "PIN が違います（あと 2 回）。");
+    CHECK(sys_text("Not installed: the file is damaged") == "入れ替えられませんでした: the file is damaged");
+    CHECK(sys_text("(none)") == "(なし)");
     CHECK(sys_text("") == "");
     set_system_language("fr");                                    // (anything else is English)
     CHECK(system_language() == "en");

@@ -1,6 +1,7 @@
 // The screens of user management (users.hpp):
 //   "__login"            pick a user, type the PIN on a keypad
 //   System > Users       add / change / remove users on the device (a SettingsPage)
+#include "system_i18n.hpp"
 #include "project.hpp"
 #include "system_settings.hpp"
 #include "tag.hpp"
@@ -73,13 +74,13 @@ void refresh_login_tags()
     const auto& list = us.list();
     if(!s_login.user.empty() && std::none_of(list.begin(), list.end(), [](const UserInfo& u) { return iequals(u.name, s_login.user); })) s_login.user.clear();
     if(s_login.user.empty() && list.size() == 1) s_login.user = list[0].name;       // nothing to pick
-    set_text("sys.login.user", s_login.user.empty() ? "Pick a user" : s_login.user);
+    set_text("sys.login.user", s_login.user.empty() ? sys_text("Pick a user") : s_login.user);
     std::string mask;
     for(size_t i = 0; i < s_login.pin.size(); i++) mask += i ? " *" : "*";
     set_text("sys.login.pin", mask.empty() ? "PIN" : mask);
     std::string msg = s_login.message;
     if(msg.empty() && us.required() > 0 && us.level() < us.required()) msg = us.level_name(us.required()) + " or higher is needed.";
-    set_text("sys.login.message", msg);
+    set_text("sys.login.message", sys_text(msg));
     for(int i = 0; i < kSlots; i++) {
         bool used = static_cast<size_t>(i) < list.size();
         set_flag("sys.login.u" + std::to_string(i + 1) + "_used", used);
@@ -148,10 +149,10 @@ std::vector<json> login_screens(int width, int height)
             json{ { "type", "panel" }, { "x", 0 }, { "y", 0 }, { "w", "100%" }, { "h", header_h }, { "scrollable", false },
                   { "style", { { "bg_color", "#1f2a38" }, { "radius", 0 }, { "border_width", 0 }, { "pad_left", 8 }, { "pad_right", 8 }, { "pad_top", 0 }, { "pad_bottom", 0 } } },
                   { "children", json::array({
-                      json{ { "type", "button" }, { "align", "left_mid" }, { "text", "< Back" }, { "h", header_h - 10 }, { "style_label", { { "font", font } } },
+                      json{ { "type", "button" }, { "align", "left_mid" }, { "text", sys_text("< Back") }, { "h", header_h - 10 }, { "style_label", { { "font", font } } },
                             { "on_click", call("user.cancel") } },
-                      json{ { "type", "label" }, { "align", "center" }, { "text", "Login" }, { "style", { { "font", compact ? 16 : 20 }, { "text_color", "#ffffff" } } } },
-                      json{ { "type", "button" }, { "align", "right_mid" }, { "text", "Logout" }, { "h", header_h - 10 }, { "style", { { "bg_color", "#c62828" } } },
+                      json{ { "type", "label" }, { "align", "center" }, { "text", sys_text("Login") }, { "style", { { "font", compact ? 16 : 20 }, { "text_color", "#ffffff" } } } },
+                      json{ { "type", "button" }, { "align", "right_mid" }, { "text", sys_text("Logout") }, { "h", header_h - 10 }, { "style", { { "bg_color", "#c62828" } } },
                             { "style_label", { { "font", font } } }, { "bind", { { "visible", "sys.user.logged_in" } } }, { "on_click", call("user.logout") } },
                   }) } },
             json{ { "type", "panel" }, { "x", pad }, { "y", body_y }, { "w", list_w }, { "h", body_h }, { "flex", "column" }, { "scrollbar", "auto" },

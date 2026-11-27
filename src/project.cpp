@@ -367,6 +367,7 @@ void Project::rebuild_screens()
     choose_system_language(*this);
     system_settings().create_tags();
     for(const json& s : system_settings().screens(info_.width, info_.height)) ui().replace_source(s);
+    for(const json& s : login_screens(info_.width, info_.height)) ui().replace_source(s);
     ui().rebuild_all();
     if(!current.empty()) ui().show_screen(current, "none", true);
     ui().set_history(history);

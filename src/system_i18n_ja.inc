@@ -149,3 +149,10 @@
 { "There is no driver to write with.", "書き込めるドライバがありません。" },
 { "Change the level, or type a new PIN, then press Save. An empty PIN keeps the old one.", "レベルを変えるか、新しい PIN を入れて「保存」を押してください。PIN を空欄にすると今のままです。" },
 { "Unknown user.", "そのユーザーはいません。" },
+{ "(none)", "(なし)" },
+
+// ---- the login screen
+{ "Login", "ログイン" },
+{ "Logout", "ログアウト" },
+{ "< Back", "< 戻る" },
+{ "Pick a user", "ユーザーを選んでください" },
