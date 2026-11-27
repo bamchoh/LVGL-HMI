@@ -99,7 +99,7 @@ const Panels = {
       const isStart = M.st.project.start_screen === s.data.name;
       list.append(U.el('div', { class: 'item' + (i === M.st.cur ? ' sel' : ''), onclick: () => { Panels.showView('screen'); M.selectScreen(i); } },
         U.el('input', { type: 'radio', name: 'start', checked: isStart, title: 'start screen', onclick: e => { e.stopPropagation(); M.mutate(() => { M.st.project.start_screen = s.data.name; }); } }),
-        U.el('span', { class: 'grow' }, s.data.name, U.el('span', { class: 'dim' }, '  ' + s.file)),
+        U.el('span', { class: 'grow scr-name' }, U.el('span', null, s.data.name), U.el('span', { class: 'dim', title: s.file }, s.file)),
         U.el('button', { class: 'mini', title: 'duplicate', dataset: { dup: String(i) }, onclick: e => { e.stopPropagation(); Panels.showView('screen'); M.duplicateScreen(i); App.toast('A copy of the screen was made. "Replace" changes its tags.', 3500); } }, '⧉'),
         U.el('button', { class: 'mini', title: 'rename', onclick: async e => { e.stopPropagation(); const n = await App.prompt('Screen name', s.data.name); if (n) M.renameScreen(i, n); } }, '✎'),
         U.el('button', { class: 'mini danger', title: 'delete', onclick: e => { e.stopPropagation(); if (App.ask('Delete screen "' + s.data.name + '"?')) M.removeScreen(i); } }, '×')));
