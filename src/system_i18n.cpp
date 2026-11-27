@@ -23,7 +23,7 @@ struct Pattern { std::regex re; std::string to; };
 const std::vector<Pattern>& patterns()
 {
     static const std::vector<Pattern> p = {
-        { std::regex(R"(^Driver: (.*)$)"), "ドライバ: $1" },
+        { std::regex(R"(^Driver: (.*)$)"), "ドライバー: $1" },
         { std::regex(R"(^Receiving, (\d+) designer\(s\)$)"), "受け取り中、デザイナー $1 件" },
         { std::regex(R"(^(\d+) accepted designer\(s\)$)"), "承認済みのデザイナー: $1 件" },
         { std::regex(R"(^(\d+) key\(s\)$)"), "鍵 $1 個" },

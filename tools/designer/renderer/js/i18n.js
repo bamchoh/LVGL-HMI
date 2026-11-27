@@ -68,7 +68,7 @@ const I18N = {
     'New': '新規', 'Open': '開く', 'Save': '保存', 'Save As': '別名で保存', 'Screen': '画面', 'Fit': '全体表示',
     'Preview': 'プレビュー', 'Run': '実行', 'Deploy': 'デプロイ', 'JSON': 'JSON',
     // tabs
-    'Widgets': '部品', 'Screens': '画面一覧', 'Project': 'プロジェクト', 'Tags': 'タグ', 'Drivers': 'ドライバ', 'Scripts': 'スクリプト',
+    'Widgets': '部品', 'Screens': '画面一覧', 'Project': 'プロジェクト', 'Tags': 'タグ', 'Drivers': 'ドライバー', 'Scripts': 'スクリプト',
     'Logs': 'ログ', 'Users': 'ユーザー',
     // property panel sections
     'Widget': '部品の設定', 'Position & size': '位置とサイズ', 'Layout': 'レイアウト', 'Layout (flex)': 'レイアウト (flex)', 'Flags': '状態',

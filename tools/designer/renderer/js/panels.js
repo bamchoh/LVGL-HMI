@@ -460,11 +460,18 @@ const Panels = {
   renderLogs() {
     const page = document.getElementById('view-logs'); page.innerHTML = '';
     const p = M.st.project; if (!p) return;
+    // the page is long (four logs, each with its settings): a strip at the top that stays, to see
+    // which logs record and to jump to one
+    const nav = U.el('div', { class: 'page-nav' });
+    page.append(nav);
     const section = (key, title, about, body) => {
       const on = M.logOn(key), fk = 'log.' + key;
+      nav.append(U.el('button', { class: 'nav-chip' + (on ? ' on' : ''), title: I18N.t(on ? 'Recorded' : 'Not recorded'),
+        onclick: () => { const b = document.getElementById('logsec-' + key); if (b) b.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },
+        U.el('span', { class: 'nav-dot' }), I18N.t(title)));
       const head = U.el('div', { class: 'page-head' }, U.el('h3', { style: { margin: 0 } }, title),
         U.el('label', { class: 'log-on' }, U.el('input', { type: 'checkbox', checked: on, dataset: { fk: fk + '.on' }, onchange: e => M.setLog(key, e.target.checked) }), ' record'));
-      const box = U.el('div', { class: 'log-sec' }, head, U.el('div', { class: 'hint' }, about));
+      const box = U.el('div', { class: 'log-sec', id: 'logsec-' + key }, head, U.el('div', { class: 'hint' }, about));
       if (on) box.append(...body(p[key], fk));
       page.append(box);
     };
