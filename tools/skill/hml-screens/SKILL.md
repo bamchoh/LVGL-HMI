@@ -111,10 +111,12 @@ match the size of the neighbouring widgets (if that is smaller than the minimum,
   make `primary` and `secondary` the same as the accent colour.
 - **Only plain ASCII letters, digits and `°` are in the runtime's built-in font.** Everything else needs `font.file` in `project.json`,
   or it is drawn as □: Japanese and Chinese, but also **accented Latin letters (ä ö ü ß é è ñ å …)**, Cyrillic and Greek.
-  `--check` names every character that has no glyph. **Two fonts come with the designer** (`<designer folder>\fonts\`):
+  `--check` names every character that has no glyph. **Three fonts come with the designer** (`<designer folder>\fonts\`):
   - `NotoSans-subset.ttf` with `OFL-NotoSans.txt` - **the languages of Europe**: Latin with all accents (German, French, Spanish, Polish, Czech,
     Hungarian, Turkish, Romanian, the Baltic and Nordic languages), Greek, Cyrillic, the euro sign. 0.2 MB. No arrows, no ≤ ≥ ≠.
   - `NotoSansJP-subset.otf` with `OFL.txt` - **Japanese** (kana, kanji), and the letters of Western Europe (ä é ñ å, but no €, œ, ł, č, ő, Cyrillic, Greek). 1.2 MB.
+  - `NotoSansSC-subset.otf` with `OFL-NotoSansSC.txt` - **Simplified Chinese** (the 6763 hanzi of GB 2312, CJK punctuation). 1.7 MB.
+    Not for Japanese: Chinese and Japanese draw some kanji differently.
 
   When the project has no font and such letters must be shown, put the fitting one into the project: copy the font **and its licence file**
   (always together) into `assets/fonts/` of the project and set `"font": { "file": "assets/fonts/<the file>" }` - the same as the buttons

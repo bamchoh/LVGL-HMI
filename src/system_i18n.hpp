@@ -13,7 +13,7 @@
 namespace hml {
 
 void set_system_language(const std::string& lang);   // a code of system_languages(); anything else = English
-// The languages the system screens have: "en", "ja", "de".
+// The languages the system screens have: "en", "ja", "de", "zh" (Simplified Chinese).
 const std::vector<std::string>& system_languages();
 // Letters the project's font must have for this language to be used ("" = none: English).
 std::string system_language_sample(const std::string& lang);

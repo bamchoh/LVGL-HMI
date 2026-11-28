@@ -598,7 +598,8 @@ const App = {
     const jp = U.el('select', { disabled: !has, dataset: { fk: 'new.font' } },
       U.el('option', { value: '' }, I18N.t('Built-in (English letters only)')),
       U.el('option', { value: 'europe' }, I18N.t('European languages (Noto Sans, 0.2 MB)')),
-      U.el('option', { value: 'ja', selected: I18N.lang === 'ja' && has }, I18N.t('Japanese (Noto Sans JP, 1.2 MB)')));
+      U.el('option', { value: 'ja', selected: I18N.lang === 'ja' && has }, I18N.t('Japanese (Noto Sans JP, 1.2 MB)')),
+      U.el('option', { value: 'sc' }, I18N.t('Simplified Chinese (Noto Sans SC, 1.7 MB)')));
     body.append(U.el('div', { class: 'row' }, U.el('label', null, 'Font'), jp),
       U.el('div', { class: 'hint' }, 'Letters that the font of the project does not have are shown as empty boxes. "European languages": Latin with all accents (ä é ñ ł ő ş …), Greek, Cyrillic, the euro sign. It can be added later on the Project tab.'));
     this.modal({ title: 'New project', body, buttons: [{ label: 'Cancel' }, { label: 'Create', primary: true, onclick: async () => {

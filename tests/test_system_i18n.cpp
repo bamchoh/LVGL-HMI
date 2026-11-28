@@ -150,3 +150,20 @@ TEST_CASE("system i18n: German needs a font with its letters, like Japanese")
     p.unload();
     set_system_language("en");
 }
+
+TEST_CASE("system i18n: Simplified Chinese")
+{
+    set_system_language("zh");
+    CHECK(system_language() == "zh");
+    CHECK(sys_text("Apply") == "\xE5\xBA\x94\xE7\x94\xA8");                          // 应用
+    CHECK(sys_text("Driver: plc") == "\xE9\xA9\xB1\xE5\x8A\xA8\xEF\xBC\x9Aplc");    // 驱动：plc
+    CHECK(sys_text("pump_1") == "pump_1");
+    set_system_language("en");
+    // the font that comes with the designer has what it needs
+    Runtime rt;
+    set_font_file((hmltest::source_dir() / "tools" / "designer" / "fonts" / "NotoSansSC-subset.otf").generic_string());
+    CHECK(font_file_has(system_language_sample("zh")));
+    set_font_file((hmltest::source_dir() / "tools" / "designer" / "fonts" / "NotoSans-subset.ttf").generic_string());
+    CHECK_FALSE(font_file_has(system_language_sample("zh")));
+    set_font_file("");
+}
