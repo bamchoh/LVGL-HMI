@@ -1,3 +1,4 @@
+#include "system_i18n.hpp"
 #include "check.hpp"
 #include "data_transfer.hpp"
 #include "mail.hpp"
@@ -677,9 +678,11 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
 
     // ---- system_language: the language of the system screens
     if(const json* sl = jget(root, "system_language")) {
-        if(!sl->is_string() || (sl->get<std::string>() != "ja" && sl->get<std::string>() != "en")) c.add("system_language", "\"system_language\" is \"ja\" or \"en\"");
-        else if(sl->get<std::string>() == "ja" && jstr(jget(root, "font") && jget(root, "font")->is_object() ? *jget(root, "font") : json::object(), "file", "").empty())
-            c.add("system_language", "\"ja\" needs a font file with Japanese characters (\"font\": { \"file\": ... }): without one the system screens stay in English");
+        const std::string lang = sl->is_string() ? sl->get<std::string>() : std::string();
+        const auto& known = system_languages();
+        if(std::find(known.begin(), known.end(), lang) == known.end()) c.add("system_language", "\"system_language\" is \"en\", \"ja\" or \"de\"");
+        else if(!system_language_sample(lang).empty() && jstr(jget(root, "font") && jget(root, "font")->is_object() ? *jget(root, "font") : json::object(), "file", "").empty())
+            c.add("system_language", "\"" + lang + "\" needs a font file with its letters (\"font\": { \"file\": ... }): without one the system screens stay in English");
     }
 
     // ---- system_access: the corner that opens the system settings; a project that leaves no way to them

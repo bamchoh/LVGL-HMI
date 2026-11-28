@@ -257,7 +257,7 @@ When `project.json` has `languages`, put the text in `texts` and use it with `"@
   when the screen shows them (an alarm table); report it.
 - A button that switches the language: `{ "action": "language", "lang": "next" }`. For its text use a text id whose value in each
   language is the name of the *other* language (`"lang_other": { "de": "English", "en": "Deutsch" }`), or the fixed word "Language".
-- The built-in screens (system settings, login, the keys "Close" / "OK" of the keyboard) are Japanese or English only.
+- The built-in screens (system settings, login, the keys "Close" / "OK" of the keyboard) are in English, German (`de`) or Japanese (`ja`): they follow the language of the project when it is one of these and the font has its letters, and are English otherwise.
 
 ## Special widgets
 

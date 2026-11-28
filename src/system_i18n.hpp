@@ -8,10 +8,15 @@
 // font has the characters (a project without a Japanese font would show empty boxes).
 #pragma once
 #include <string>
+#include <vector>
 
 namespace hml {
 
-void set_system_language(const std::string& lang);   // "ja" or anything else = English
+void set_system_language(const std::string& lang);   // a code of system_languages(); anything else = English
+// The languages the system screens have: "en", "ja", "de".
+const std::vector<std::string>& system_languages();
+// Letters the project's font must have for this language to be used ("" = none: English).
+std::string system_language_sample(const std::string& lang);
 const std::string& system_language();
 
 // The text in the language of the system screens: an entry of the table, a pattern with values
@@ -19,6 +24,6 @@ const std::string& system_language();
 std::string sys_text(const std::string& english);
 // Is there a translation for this text (the table or a pattern)? For the test that looks for
 // texts that were forgotten.
-bool sys_text_known(const std::string& english);
+bool sys_text_known(const std::string& english, const std::string& lang = "ja");
 
 } // namespace hml

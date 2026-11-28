@@ -64,16 +64,17 @@ TEST_CASE("system i18n: every fixed text of the system screens of the demo proje
     int n = 0;
     for(const std::string& t : texts) {
         if(!has_letters(t)) continue;                             // numbers, symbols, icons
-        if(t[0] >= '0' && t[0] <= '9' && !sys_text_known(t)) continue;   // (an address of this machine: "10.1.0.57 (eth0)")
+        if(t[0] >= '0' && t[0] <= '9' && !sys_text_known(t, "ja")) continue;   // (an address of this machine: "10.1.0.57 (eth0)")
         if(static_cast<unsigned char>(t[0]) >= 0x80) continue;   // (an icon and a title: the title is looked at by itself)
         // names and values that are not language: tags, files, addresses, fingerprints, versions
         if(t.find("SHA256:") != std::string::npos || t.find('/') != std::string::npos || t.find("HML ") == 0) continue;
         if(names.count(t)) continue;                              // (a designer this machine has accepted: a name)
         n++;
-        if(!sys_text_known(t)) missing += "\n  " + t;
+        for(const std::string& lang : system_languages())
+            if(!sys_text_known(t, lang)) missing += "\n  [" + lang + "] " + t;
     }
     CHECK(n > 60);
-    CHECK_MESSAGE(missing.empty(), "no Japanese for:" << missing);
+    CHECK_MESSAGE(missing.empty(), "no translation for:" << missing);
 
     ui().unload_all();
     p.stop_logs();
@@ -117,6 +118,33 @@ TEST_CASE("system i18n: the system screens follow the language of the project, a
     p.rebuild_screens();
     CHECK(system_language() == "ja");
 
+    ui().unload_all();
+    p.stop_logs();
+    p.unload();
+    set_system_language("en");
+}
+
+TEST_CASE("system i18n: German")
+{
+    set_system_language("de");
+    CHECK(system_language() == "de");
+    CHECK(sys_text("Apply") == "Übernehmen");
+    CHECK(sys_text("Driver: plc") == "Treiber: plc");
+    CHECK(sys_text("Admin or higher is needed.") == "Admin oder höher ist nötig.");
+    CHECK(sys_text("Backup failed: disk full") == "Sicherung fehlgeschlagen: disk full");
+    CHECK(sys_text("pump_1") == "pump_1");
+    set_system_language("en");
+}
+
+TEST_CASE("system i18n: German needs a font with its letters, like Japanese")
+{
+    Runtime rt;
+    Project p;
+    REQUIRE(p.load((hmltest::source_dir() / "projects" / "demo" / "project.json").generic_string()));
+    // (the demo's font, Noto Sans JP, has the letters of German)
+    REQUIRE(font_file_has(system_language_sample("de")));
+    set_font_file("");                                            // the built-in font: English letters only
+    CHECK_FALSE(font_file_has(system_language_sample("de")));
     ui().unload_all();
     p.stop_logs();
     p.unload();

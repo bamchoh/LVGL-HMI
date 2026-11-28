@@ -220,7 +220,7 @@ public:
         json rows = json::array();
         rows.push_back(row(json::array({ label("Project", lw),
             json{ { "type", "label" }, { "flex_grow", 1 }, { "long_mode", "dots" }, { "bind", { { "text", tag("project") } } }, { "style", { { "font", font + 2 }, { "text_color", "#ffffff" } } } } })));
-        rows.push_back(row(json::array({ label("Location", lw), dropdown("location"), button("Refresh", "#2c3e50", "refresh", compact ? 70 : 100) })));
+        rows.push_back(row(json::array({ label("Location", lw), dropdown("location"), button(LV_SYMBOL_REFRESH, "#2c3e50", "refresh", compact ? 56 : 72)   /* (a sign: the word does not fit in every language) */ })));
         rows.push_back(json{ { "type", "label" }, { "w", "100%" }, { "long_mode", "wrap" }, { "bind", { { "text", tag("hint") }, { "visible", tag("no_location") } } },
                              { "style", { { "font", font }, { "text_color", "#9fb3c8" } } } });   // (a hint, not a warning)
         rows.push_back(row(json::array({ label("Project file", lw), dropdown("file") })));
