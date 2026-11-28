@@ -858,13 +858,15 @@ struct AccessRule {
 struct ChartCtx {
     struct Series { lv_chart_series_t* ser; Tag* tag; double scale; };
     lv_obj_t*           chart = nullptr;
+    double              fine = 1;         // LVGL charts hold whole numbers: a narrow range (0 .. 6 bar) is drawn finer
     lv_timer_t*         timer = nullptr;
     std::vector<Series> series;
 
     void tick()
     {
         for(const Series& s : series) {
-            lv_chart_set_next_value(chart, s.ser, static_cast<int32_t>(std::llround(s.tag->get_number() * s.scale)));
+            const double v = std::clamp(s.tag->get_number() * s.scale * fine, -2.0e9, 2.0e9);
+            lv_chart_set_next_value(chart, s.ser, static_cast<int32_t>(std::llround(v)));
         }
     }
 };
@@ -1876,7 +1878,11 @@ void Ui::Impl::build_chart(lv_obj_t* chart, const json& w)
     std::string type = jstr(w, "chart_type", "line");
     lv_chart_set_type(chart, iequals(type, "bar") ? LV_CHART_TYPE_BAR : iequals(type, "scatter") ? LV_CHART_TYPE_SCATTER : LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(chart, static_cast<uint32_t>(jnum(w, "points", 50)));
-    lv_chart_set_axis_range(chart, LV_CHART_AXIS_PRIMARY_Y, static_cast<int32_t>(jnum(w, "min", 0)), static_cast<int32_t>(jnum(w, "max", 100)));
+    // min / max may have decimals: a range narrower than 1000 is kept 1000 times finer inside
+    // (an LVGL chart holds whole numbers; 3.2 on a 0 .. 6 axis was drawn as 3)
+    const double ymin = jnum(w, "min", 0), ymax = jnum(w, "max", 100);
+    const double fine = std::fabs(ymax - ymin) < 1000 ? 1000 : 1;
+    lv_chart_set_axis_range(chart, LV_CHART_AXIS_PRIMARY_Y, static_cast<int32_t>(std::llround(ymin * fine)), static_cast<int32_t>(std::llround(ymax * fine)));
     lv_chart_set_update_mode(chart, iequals(jstr(w, "update_mode", "shift"), "circular") ? LV_CHART_UPDATE_MODE_CIRCULAR : LV_CHART_UPDATE_MODE_SHIFT);
     lv_chart_set_div_line_count(chart, static_cast<uint8_t>(jnum(w, "hdiv", 5)), static_cast<uint8_t>(jnum(w, "vdiv", 8)));
     if(jbool(w, "no_points", true)) {
@@ -1888,6 +1894,7 @@ void Ui::Impl::build_chart(lv_obj_t* chart, const json& w)
     if(!series || !series->is_array()) return;
     auto c = std::make_unique<ChartCtx>();
     c->chart = chart;
+    c->fine = fine;
     for(const json& s : *series) {
         std::string tagname = jstr(s, "tag", "");
         Tag* tag = tags().find(tagname);

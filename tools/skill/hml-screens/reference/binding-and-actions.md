@@ -309,14 +309,16 @@ colours of `alarm_list`, the history rows, the write button of `recipe_table`) c
 
 ### `trend`
 
-- Inside it has the heading of the period (top) and 5 operation buttons and the legend (bottom). These 2 use about 110px of height and cannot be removed.
+- Inside it has the heading of the period (top) and 5 operation buttons and the legend (bottom). These use about 110px of height; the heading and the buttons cannot be removed.
   **Height 240 or more** (so that the graph part is 130px or more), width 400 or more.
-- `tags`: an array of tag names, or the form that sets colours `[ { "tag": "temp", "color": "#42a5f5" }, { "tag": "level", "color": "#66bb6a" } ]`.
+  The 5 buttons take about 340px. A legend that does not fit next to them goes on a row of its own below (it is not cut), which takes about 30px
+  more height from the graph. `"legend": false` shows no legend (then say what the lines are with a `label`).
+- `tags`: an array of tag names, or the form that sets colours and names `[ { "tag": "temp", "color": "#42a5f5", "label": "Temperature" }, { "tag": "level", "color": "#66bb6a" } ]`.
+  `label` is what the legend and the readout at a touch call the line (`"@ID"` of `texts` works); without it, the tag name.
   When omitted, all tags of the group. When the colour is omitted, theme colours are given in turn (the 2nd line tends to be orange. If it can be confused with a warning, set the colours).
   A tag that is not in `group` cannot be shown (look at `data_log.groups[].tags` in `project.json`).
 - There is 1 vertical axis. Writing both `min` and `max` gives that range; when omitted it is decided automatically from the data shown. Values whose ranges differ greatly
   (temperature 20–30 and level 0–100) on the same axis make one of them flat, so split the widget to suit the look that was asked for, or say so.
-- The legend shows the tag names as they are (cannot be translated). Say what the lines are by putting a title above with a `label`.
 - `labels`: `now` (text of the "back to now" button. `Now` when omitted).
 
 ### `bar_chart`
@@ -332,6 +334,18 @@ colours of `alarm_list`, the history rows, the write button of `recipe_table`) c
   The size and colour of the text are the `style` of the widget (`font`, `text_color`).
 - `--check --render` does not read the log, so the bars are empty (only the times appear). Check how the bars look with the procedure for running a copy (SKILL.md, "When you want to check what happens after a press"), after records have accumulated.
   `--check` finds mistakes in the names of the group and the tag.
+
+### `chart`
+
+- The values of tags while the screen is shown, as lines (or bars: `"chart_type": "bar"`), sampled every `sample_ms` (default 500). It keeps `points` samples
+  (default 50): the time across is `points` × `sample_ms` (5 minutes = `"points": 100, "sample_ms": 3000`). Nothing is stored; it starts empty
+  each time the screen is shown. For history that survives, use `trend` with a group of `data_log`.
+- `min` / `max` is the vertical range (default 0–100) and may have decimals (`"min": 0, "max": 6.5` for bar). `series[].scale` multiplies a value before it is drawn
+  (only needed to put tags of different units on one axis).
+- **It draws no numbers on the axes.** Put the scale as `label` widgets beside it ("6", "3", "0", and "-5 min" / "now" below), and say what the line is with a `label`.
+  `hdiv` / `vdiv` are the numbers of grid lines (default 5 / 8); with labels at 0, 3 and 6, `"hdiv": 3` puts a grid line at each.
+- `--check --render` takes one sample, so the line is not visible in the picture (as with `trend`). How it looks with data can only be seen by running a copy
+  (SKILL.md, "When you want to check what happens after a press").
 
 ### `xy_chart`
 

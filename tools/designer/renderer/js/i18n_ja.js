@@ -464,7 +464,7 @@ Object.assign(I18N.TEXT_JA, {
 });
 
 // ---- trend
-Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表示する期間 (秒)', buckets: '横の点数', refresh_ms: '更新周期 (ms)' });
+Object.assign(I18N.KEYS_JA, { group: 'ロギンググループ', range_s: '表示する期間 (秒)', buckets: '横の点数', refresh_ms: '更新周期 (ms)', legend: '凡例を出す' });
 Object.assign(I18N.TEXT_JA, { 'Trend': 'トレンド', 'Bar chart': '棒グラフ' });
 Object.assign(I18N.KEYS_JA, { bucket_s: '1 本の秒数', start: '始まり', target: '目標', target_color: '目標の線の色', show_values: '数値を出す', label: '時刻の書式' });
 Object.assign(I18N.TEXT_JA, { 'Log view': 'ログ表示', 'Meter': 'メーター', 'Date and time input': '日付・時刻の入力', 'Table': '表' });

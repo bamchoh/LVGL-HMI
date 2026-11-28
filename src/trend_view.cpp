@@ -1,7 +1,8 @@
 // Trend history viewer: the data log of a group as a line chart over a time window.
 //
 //   { "type": "trend", "group": "process", "w": "100%", "h": 300,
-//     "tags": ["temp", { "tag": "pressure", "color": "#e91e63" }],   // default: every tag of the group
+//     "tags": ["temp", { "tag": "pressure", "color": "#e91e63", "label": "Pressure" }],   // default: every tag of the group
+//     "legend": true,                 // the names under the chart (label, else the tag name); false: none
 //     "range_s": 3600,                // the window (default 1 hour); - / + halve and double it
 //     "min": 0, "max": 100,           // y axis (default: from the data)
 //     "buckets": 200,                 // points across the chart (each = min..max of its slice)
@@ -12,7 +13,7 @@
 // order the value moved: the one nearer to the last value of the slice comes second), so that
 // a short peak is never lost however long the window is. ◀ ▶ move half a
 // window, "Now" follows the newest data again. A touch on the chart shows the time and the
-// values there. The data is fetched by a background thread (SQLite does the slicing), so a
+// values there. The legend goes on below the buttons when the row is full (it is never cut). The data is fetched by a background thread (SQLite does the slicing), so a
 // long window does not stop the screen.
 //
 // A slice without a sample breaks the line, except where the group would not have recorded one
@@ -64,6 +65,7 @@ constexpr int32_t kScale = 10000;      // chart values are 0..kScale of the y ra
 struct TrendCtx {
     std::string group;
     std::vector<std::string> tags;
+    std::vector<std::string> names;                            // what the legend and the readout call them
     std::vector<lv_color_t> colors;
     lv_obj_t*   obj = nullptr;
     lv_obj_t*   chart = nullptr;
@@ -175,7 +177,7 @@ struct TrendCtx {
         std::string s = short_time(t);
         for(size_t i = 0; i < tags.size() && i < shown.size(); i++) {
             const TrendBucket& b = shown[i][static_cast<size_t>(k)];
-            s += "   " + tags[i] + " ";
+            s += "   " + names[i] + " ";
             if(!b.has) s += "-";
             else if(b.min == b.max) s += num(b.last);
             else s += num(b.last) + " (" + num(b.min) + ".." + num(b.max) + ")";
@@ -256,12 +258,15 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
             std::string name = t.is_string() ? t.get<std::string>() : jstr(t, "tag", "");
             if(name.empty() || c->tags.size() >= 8) continue;
             c->tags.push_back(name);
+            const std::string label = t.is_object() ? jstr(t, "label", "") : "";
+            c->names.push_back(label.empty() ? name : texts().resolve(label));
             c->colors.push_back(parse_color(t.is_object() ? jstr(t, "color", "") : "", lv_palette_main(kPalette[c->colors.size() % 8])));
         }
     }
     if(c->tags.empty()) for(const std::string& n : data_log().group_tags(c->group)) {
         if(c->tags.size() >= 8) break;
         c->tags.push_back(n);
+        c->names.push_back(n);
         c->colors.push_back(lv_palette_main(kPalette[c->colors.size() % 8]));
     }
     c->range_ms = std::clamp(static_cast<int64_t>(jnum(w, "range_s", 3600) * 1000), int64_t(60000), int64_t(366) * 86400000);
@@ -325,8 +330,9 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     lv_obj_t* foot = lv_obj_create(obj);
     lv_obj_remove_style_all(foot);
     lv_obj_set_size(foot, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(foot, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_flow(foot, LV_FLEX_FLOW_ROW_WRAP);      // a legend that does not fit goes on below
     lv_obj_set_style_pad_column(foot, 6, 0);
+    lv_obj_set_style_pad_row(foot, 2, 0);
     small_button(foot, LV_SYMBOL_LEFT, &TrendCtx::on_back, c);
     small_button(foot, LV_SYMBOL_RIGHT, &TrendCtx::on_fwd, c);
     small_button(foot, LV_SYMBOL_MINUS, &TrendCtx::on_out, c);
@@ -337,12 +343,12 @@ lv_obj_t* build_trend(lv_obj_t* parent, const json& w)
     lv_label_set_text(nl, now_label.c_str());
     lv_obj_center(nl);
     lv_obj_add_event_cb(c->now_btn, &TrendCtx::on_now, LV_EVENT_CLICKED, c);
-    // (the legend: tag names in their colours)
-    for(size_t i = 0; i < c->tags.size(); i++) {
+    // (the legend: the names in their colours)
+    if(jbool(w, "legend", true)) for(size_t i = 0; i < c->tags.size(); i++) {
         lv_obj_t* l = lv_label_create(foot);
-        lv_label_set_text(l, c->tags[i].c_str());
+        lv_label_set_text(l, c->names[i].c_str());
         lv_obj_set_style_text_color(l, c->colors[i], 0);
-        lv_obj_set_style_pad_top(l, 10, 0);
+        lv_obj_set_style_pad_ver(l, 10, 0);
     }
     c->fill = data_log().trend_fill(c->group);
     const auto groups = data_log().groups();

@@ -344,6 +344,27 @@ TEST_CASE("trend widget: draws, moves, zooms, shows values at a touch")
     // the legend has the tag names
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(foot, 5))) == "temp");
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(foot, 6))) == "run");
+    // the whole legend is there, even where it does not fit next to the buttons: on a row of its own
+    {
+        json n = { { "name", "tr2" }, { "children", json::parse(R"~([
+            { "type": "trend", "group": "g", "w": 400, "h": 300, "tags": [{ "tag": "temp", "label": "Line pressure" }, "run"] },
+            { "type": "trend", "group": "g", "w": 400, "h": 300, "tags": ["temp"], "legend": false } ])~") } };
+        lv_obj_t* s2 = ui().build_screen(n, "/base");
+        REQUIRE(s2);
+        REQUIRE(ui().show_screen("tr2", "none"));
+        rt.advance(150);
+        lv_obj_update_layout(s2);
+        lv_obj_t* f = lv_obj_get_child(lv_obj_get_child(s2, 0), 3);
+        lv_obj_t* name = lv_obj_get_child(f, 5);
+        CHECK(std::string(lv_label_get_text(name)) == "Line pressure");
+        lv_area_t a, box;
+        lv_obj_get_coords(name, &a);
+        lv_obj_get_coords(lv_obj_get_parent(f), &box);
+        CHECK(a.x2 <= box.x2);                                 // inside the widget, not cut at its edge
+        CHECK(lv_obj_get_y(name) > lv_obj_get_y(lv_obj_get_child(f, 0)));   // below the buttons
+        CHECK(lv_obj_get_child_count(lv_obj_get_child(lv_obj_get_child(s2, 1), 3)) == 5);   // no legend: the 5 buttons only
+        REQUIRE(ui().show_screen("tr", "none"));
+    }
     // a group that does not exist says so
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(lv_obj_get_child(s, 1), 0))).find("no data log group 'nope'") != std::string::npos);
     ui().unload_all();
