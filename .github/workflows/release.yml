@@ -17,6 +17,11 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    # for the attestation of what was built (below)
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -106,6 +111,17 @@ jobs:
           fi
           ls -la
 
+      # Where a package comes from, for anybody to check: a signed statement (Sigstore, kept by
+      # GitHub) that this file was built by this workflow from this commit of this repository.
+      #   gh attestation verify tsukuraku-1.2.3-windows-x64.zip --repo bamchoh/tsukuraku
+      # It does not make Windows trust the programs (that takes a code-signing certificate, #153).
+      - name: Attest the package
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.tar.gz
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.v.outputs.name }}
@@ -139,4 +155,4 @@ jobs:
           # GitHub shows it as such and does not offer it as "the latest release"
           pre=""; case "$GITHUB_REF_NAME" in v0.*|*-*) pre="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft $pre --title "Tsukuraku ${GITHUB_REF_NAME#v}" --generate-notes \
-            --notes "Downloads: **windows-x64.zip** is the designer and the runtime for a PC (unpack, start hml_designer.exe). **linux-aarch64.tar.gz** is the runtime for a Raspberry Pi (64-bit Raspberry Pi OS 12 or later), **linux-x64.tar.gz** the runtime for a PC with Linux (framebuffer). Each has examples/ and the licences. SHA256SUMS.txt has the checksums. The binaries are not signed."
+            --notes "Downloads: **windows-x64.zip** is the designer and the runtime for a PC (unpack, start hml_designer.exe). **linux-aarch64.tar.gz** is the runtime for a Raspberry Pi (64-bit Raspberry Pi OS 12 or later), **linux-x64.tar.gz** the runtime for a PC with Linux (framebuffer). Each has examples/ and the licences. SHA256SUMS.txt has the checksums. Where a file comes from can be checked with: gh attestation verify <file> --repo $GITHUB_REPOSITORY. The programs carry no code-signing certificate: Windows warns when the designer is started for the first time."

@@ -2940,7 +2940,16 @@ Download the programs from the [releases](https://github.com/bamchoh/tsukuraku/r
 runtime for a PC: unpack it and start `hml_designer.exe`), `linux-aarch64.tar.gz` (the runtime for a Raspberry Pi, 64-bit
 Raspberry Pi OS 12 or later) and `linux-x64.tar.gz` (the runtime for a PC with Linux, framebuffer). Each has `examples/`, the
 licences (`LICENSE`, `NOTICE`, `licenses/`) and this README. `hml_runtime --version` says which version a program is; the device
-shows it on System > About. The binaries are not signed (#153).
+shows it on System > About.
+
+From 0.1.1 on, every package has an **attestation**: a signed statement, kept by GitHub, that the file was built by the release
+workflow of this repository from the commit of its tag. Check a download with the GitHub CLI:
+
+```
+gh attestation verify tsukuraku-0.1.1-windows-x64.zip --repo bamchoh/tsukuraku
+```
+
+The programs carry no code-signing certificate yet (#153), so Windows warns when the designer is started for the first time.
 
 Making a release: push a tag `v1.2.3`. `.github/workflows/release.yml` builds the three packages (`tools/package.py` puts them
 together), and makes a **draft** release with the files and their checksums - it is public only after somebody looks at the draft
