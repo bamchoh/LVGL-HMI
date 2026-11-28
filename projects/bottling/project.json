@@ -1,0 +1,32 @@
+{
+  "title": "Bottling line",
+  "display": { "width": 800, "height": 480 },
+  "theme": { "dark": true, "primary": "#2196f3", "secondary": "#2196f3", "font": 16 },
+  "start_screen": "main",
+  "tags": [
+    { "name": "syrup_level", "type": "float", "init": 50, "min": 0, "max": 100 },
+    { "name": "water_level", "type": "float", "init": 68, "min": 0, "max": 100 },
+    { "name": "co2mix_level", "type": "float", "init": 58, "min": 0, "max": 100 },
+    { "name": "filler_speed", "type": "float", "init": 0, "min": 0, "max": 200 },
+    { "name": "filler_speed_sp", "type": "int", "init": 120, "min": 0, "max": 200 },
+    { "name": "pressure", "type": "float", "init": 3.2, "min": 0, "max": 6 },
+    { "name": "line_running", "type": "bool", "init": true }
+  ],
+  "simulation": { "items": [
+    { "tag": "syrup_level", "mode": "sine", "min": 8, "max": 92, "period_ms": 240000, "noise": 0.3 },
+    { "tag": "water_level", "mode": "sine", "min": 40, "max": 96, "period_ms": 180000, "noise": 0.3 },
+    { "tag": "co2mix_level", "mode": "sine", "min": 25, "max": 90, "period_ms": 300000, "noise": 0.3 },
+    { "tag": "filler_speed", "mode": "follow", "target": "filler_speed_sp", "rate": 20, "when": "line_running", "idle": 0, "noise": 2, "min": 0, "max": 200 },
+    { "tag": "pressure", "mode": "sine", "min": 2.6, "max": 4.3, "period_ms": 90000, "noise": 0.05 }
+  ] },
+  "alarms": {
+    "items": [
+      { "name": "syrup_low", "tag": "syrup_level", "condition": "lt", "value": 15, "severity": "warning", "message": "Syrup level low" },
+      { "name": "water_low", "tag": "water_level", "condition": "lt", "value": 15, "severity": "warning", "message": "Water level low" },
+      { "name": "co2mix_low", "tag": "co2mix_level", "condition": "lt", "value": 15, "severity": "warning", "message": "CO2 mix level low" },
+      { "name": "pressure_high", "tag": "pressure", "condition": "gt", "value": 4.2, "severity": "critical", "message": "Line pressure high" },
+      { "name": "pressure_low", "tag": "pressure", "condition": "lt", "value": 2.0, "severity": "critical", "message": "Line pressure low" }
+    ]
+  },
+  "screens": [ "screens/main.json" ]
+}

@@ -12,6 +12,11 @@ draws them with the runtime, looks at the images and fixes what is wrong. The de
 and you finish it by hand. The same project then runs on a PC and on a touch panel (Raspberry Pi and other Linux boards),
 connected to PLCs over Modbus, SLMP (MELSEC), FINS (OMRON), S7 (Siemens), OPC UA and MQTT.
 
+![A request in a customer's words, the AI's rounds of render and fix, and the finished screen running](docs/images/demo_ai_en.gif)
+
+*One request, 3 min 24 s, 6 rounds of render and fix, no human edits: a new AI that knew the tool only from the skill
+made this screen. Its pictures and notes of every round are in [`projects/bottling/renders`](projects/bottling/renders).*
+
 The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
 
 **New here? [The first five minutes](docs/quickstart.md)**: download, open the demo, let an AI make a screen. Version 0.x - see [Versions](#versions).
@@ -869,6 +874,10 @@ How to use it:
   The result: `--check` found 3 problems (all of them `${name}` of a template used in a color); everything else was right on the first try from what the skill says.
   The points that AI found unclear (the height of a table, the smallest width of an alarm summary, how to place two log views, `decimals` of a meter,
   how to mark the button of the current screen in a template, and others) have gone into the skill.
+- **`projects/bottling`** (2026-11-29) was made from one request in a customer's words by a new AI that had only the skill and the runtime
+  (`--check` / `--render`). It took 3 minutes 24 seconds and 6 rounds; nobody edited the files. The request, the picture of every round
+  and the AI's notes are in `projects/bottling/renders` (`request.txt`, `log.txt`, `step_*.png`). The video at the top of this README
+  is made from them and from a recording of the project running.
   **Not checked**: other AIs and other models, a 480x320 display, the settings of drivers (not covered by the skill).
 - A skill installed on the PC (`~/.claude/skills/hml-screens`) does not update itself. After updating the designer, press
   "Install the skill for Claude Code" in the AI dialog again.

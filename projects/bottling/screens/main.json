@@ -1,0 +1,70 @@
+{
+  "name": "main",
+  "scrollable": false,
+  "style": { "bg_color": "#141a22", "pad": 0 },
+  "children": [
+    { "type": "label", "x": 16, "y": 12, "text": "Bottling line", "style": { "font": 24 } },
+    { "type": "label", "x": 200, "y": 12, "w": 120, "h": 32, "text": "STOPPED",
+      "style": { "radius": 6, "bg_opa": 255, "text_align": "center", "pad_top": 6, "text_color": "#ffffff" },
+      "bind": {
+        "text": { "tag": "line_running", "map": { "true": "RUNNING", "false": "STOPPED" } },
+        "bg_color": { "tag": "line_running", "map": { "true": "#2e7d32", "false": "#546e7a" } } } },
+    { "type": "label", "x": 336, "y": 18, "text": "SIMULATION", "bind": { "visible": "sys.sim.active" }, "style": { "text_color": "#f5b942" } },
+    { "type": "label", "align": "top_right", "x": -16, "y": 18, "bind": { "text": "sys.datetime" }, "style": { "text_color": "#90a4ae" } },
+
+    { "type": "panel", "x": 16, "y": 56, "w": 400, "h": 136, "scrollable": false, "style": { "radius": 8, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "Tank levels", "style": { "text_color": "#90a4ae" } },
+
+        { "type": "label", "y": 28, "text": "Syrup" },
+        { "type": "bar", "x": 112, "y": 32, "w": 192, "h": 16, "min": 0, "max": 100, "bind": "syrup_level" },
+        { "type": "label", "x": 312, "y": 28, "w": 64, "style": { "text_align": "right" }, "bind": { "text": { "tag": "syrup_level", "format": "%.0f %%" } } },
+
+        { "type": "label", "y": 56, "text": "Water" },
+        { "type": "bar", "x": 112, "y": 60, "w": 192, "h": 16, "min": 0, "max": 100, "bind": "water_level" },
+        { "type": "label", "x": 312, "y": 56, "w": 64, "style": { "text_align": "right" }, "bind": { "text": { "tag": "water_level", "format": "%.0f %%" } } },
+
+        { "type": "label", "y": 84, "text": "CO2 mix" },
+        { "type": "bar", "x": 112, "y": 88, "w": 192, "h": 16, "min": 0, "max": 100, "bind": "co2mix_level" },
+        { "type": "label", "x": 312, "y": 84, "w": 64, "style": { "text_align": "right" }, "bind": { "text": { "tag": "co2mix_level", "format": "%.0f %%" } } }
+      ] },
+
+    { "type": "panel", "x": 16, "y": 208, "w": 400, "h": 256, "scrollable": false, "style": { "radius": 8, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "Line pressure, last 5 min", "style": { "text_color": "#90a4ae" } },
+        { "type": "label", "align": "top_right", "bind": { "text": { "tag": "pressure", "format": "%.2f bar" } }, "style": { "font": 24 } },
+        { "type": "label", "y": 36, "w": 32, "text": "6", "style": { "text_align": "right", "text_color": "#90a4ae" } },
+        { "type": "label", "y": 116, "w": 32, "text": "3", "style": { "text_align": "right", "text_color": "#90a4ae" } },
+        { "type": "label", "y": 188, "w": 32, "text": "0", "style": { "text_align": "right", "text_color": "#90a4ae" } },
+        { "type": "chart", "x": 40, "y": 40, "w": 336, "h": 168, "chart_type": "line", "points": 100, "sample_ms": 3000,
+          "min": 0, "max": 60, "hdiv": 5, "vdiv": 4,
+          "series": [ { "tag": "pressure", "color": "#42a5f5", "scale": 10 } ] },
+        { "type": "label", "x": 40, "y": 212, "text": "-5 min", "style": { "text_color": "#90a4ae" } },
+        { "type": "label", "align": "bottom_right", "text": "now", "style": { "text_color": "#90a4ae" } }
+      ] },
+
+    { "type": "panel", "x": 432, "y": 56, "w": 352, "h": 136, "scrollable": false, "style": { "radius": 8, "pad": 12 },
+      "children": [
+        { "type": "label", "text": "Filler speed", "style": { "text_color": "#90a4ae" } },
+        { "type": "panel", "y": 24, "w": "100%", "h": 64, "scrollable": false, "flex": "row", "flex_cross": "end", "flex_track": "end",
+          "style": { "bg_opa": 0, "border_width": 0, "pad": 0, "pad_column": 12 },
+          "children": [
+            { "type": "label", "bind": { "text": { "tag": "filler_speed", "format": "%.0f" } }, "style": { "font": 48 } },
+            { "type": "label", "text": "bottles/min", "style": { "text_color": "#90a4ae", "pad_bottom": 8 } }
+          ] },
+        { "type": "label", "align": "top_right", "y": 0, "bind": { "text": { "tag": "filler_speed_sp", "format": "Setpoint %d /min" } }, "style": { "text_color": "#90a4ae" } },
+        { "type": "bar", "align": "bottom_left", "w": "100%", "h": 8, "min": 0, "max": 200, "bind": "filler_speed" }
+      ] },
+
+    { "type": "label", "x": 432, "y": 208, "text": "Active alarms", "style": { "text_color": "#90a4ae" } },
+    { "type": "alarm_list", "x": 432, "y": 232, "w": 352, "h": 152, "mode": "current", "columns": ["time", "severity", "message"] },
+
+    { "type": "button", "x": 432, "y": 400, "w": 144, "h": 64, "text": "START",
+      "style": { "bg_color": "#2e7d32" }, "style_label": { "font": 24 },
+      "bind": { "enabled": { "tag": "line_running", "invert": true } },
+      "on_click": { "action": "set", "tag": "line_running", "value": true } },
+    { "type": "button", "x": 640, "y": 400, "w": 144, "h": 64, "text": "STOP",
+      "style": { "bg_color": "#c62828" }, "style_label": { "font": 24 },
+      "on_click": { "action": "set", "tag": "line_running", "value": false } }
+  ]
+}

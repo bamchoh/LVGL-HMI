@@ -1,0 +1,15 @@
+The request given on 2026-11-29 to a new Claude Code agent that had only the skill
+(tools/skill/hml-screens) and the runtime for --check / --render - no README, no source code,
+no other project. Nobody edited the files it made.
+
+    We run a small bottling line. I'd like one main screen for the 800x480 panel next to the
+    filler: the levels of our three tanks (syrup, water, CO2 mix), how fast the filler is going
+    in bottles per minute, the line pressure over the last few minutes, Start and Stop buttons
+    for the line, and the alarms that are active. We don't have the PLC connected yet, so make
+    the values move by themselves for now so we can see it working.
+
+It was also asked to copy every picture it rendered here (step_NN_*.png) and to write one line
+per round to log.txt: what it changed and what it saw wrong in the picture.
+
+The video docs/images/demo_ai_en.gif (and _ja) is made from these pictures and a recording of
+the finished project running (taps on STOP at 9 s and START at 16 s).
