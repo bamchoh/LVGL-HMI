@@ -20,7 +20,7 @@ Each release lists, where there is something to say:
   the font of the project has them.
 
 - `"locale": { "date": "dmy" | "mdy", "decimal": "," }` in `project.json`: how dates and decimal numbers are written on the
-  screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form.
+  screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form. In the designer: Project tab > "Dates and numbers".
 
 **Changed**
 

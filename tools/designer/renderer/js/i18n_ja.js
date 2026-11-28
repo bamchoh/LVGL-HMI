@@ -286,6 +286,10 @@ I18N.PATTERNS_JA.push([/^duplicate tag names: (.*)$/, '重複しているタグ�
 I18N.PATTERNS_JA.push([/^(\d+) texts$/, '$1 個のテキスト'], [/^ (\d+) items$/, ' $1 項目'], [/^(\d+) items$/, '$1 項目']);
 Object.assign(I18N.TEXT_JA, { 'Widgets': '部品', 'Level': 'レベル', 'Screen': '画面',
   'Recorded': '記録する', 'Not recorded': '記録しない',
+  'Dates and numbers': '日付と数値の書式',
+  'how a date is written on the screens: ymd 2026-11-28, dmy 28.11.2026, mdy 11/28/2026': '画面に出す日付の書き方: ymd 2026-11-28、dmy 28.11.2026、mdy 11/28/2026',
+  'the decimal sign of numbers on the screens and of the number pad: 12.5 or 12,5': '画面の数値と数字キーボードの小数点: 12.5 か 12,5',
+  'Only what an operator reads and types. Logs, CSV exports and the values of tags keep one form.': '変わるのは、作業者が読む・打つものだけです。ログ、CSV、タグの値は今までの形のままです。',
   'Not used with {0} "{1}"': '{0}「{1}」では使いません', 'Ignored with {0} "{1}"': '{0}「{1}」では無視されます',
   'More': 'その他', 'Find and replace': '検索と置換', 'Screen JSON': '画面の JSON', 'Find a widget…': '部品を探す…',
   'This screen is empty': 'この画面はまだ空です',
