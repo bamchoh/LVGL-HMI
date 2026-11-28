@@ -352,9 +352,25 @@ Object.assign(I18N.TEXT_JA, {
   'D100 / CIO10 / W0.00 / H5 / E0_100 / T1': 'D100 / CIO10 / W0.00 / H5 / E0_100 / T1',
 });
 
+// ---- S7 driver
+Object.assign(I18N.KEYS_JA, { rack: 'ラック', slot: 'スロット' });
+Object.assign(I18N.TEXT_JA, {
+  'Siemens S7 (S7comm, PUT/GET)': 'シーメンス S7 (S7comm、PUT/GET)',
+  'Siemens S7 (S7comm, PUT/GET) (s7)': 'シーメンス S7 (S7comm、PUT/GET) (s7)',
+  'S7-1200 / 1500: permit "PUT/GET communication" in the protection settings of the CPU, and turn "Optimized block access" off for the DBs that are read':
+    'S7-1200 / 1500 では、CPU の保護の設定で「PUT/GET 通信でのアクセスを許可」を有効にし、読み書きする DB の「最適化ブロックアクセス」を外してください',
+  'ISO-on-TCP (default 102)': 'ISO-on-TCP のポート番号（既定 102）',
+  'the rack of the CPU (default 0)': 'CPU のラック番号（既定 0）',
+  'the slot of the CPU: 1 for S7-1200 / 1500 (default), 2 for S7-300': 'CPU のスロット番号: S7-1200 / 1500 は 1（既定）、S7-300 は 2',
+  'only these bytes may be written, e.g. DB1.DBB0-DB1.DBB99, MB0-MB19, DB5 (a whole DB) (empty = everything except the inputs)':
+    'ここに書いたバイトの範囲だけ書き込める。例: DB1.DBB0-DB1.DBB99, MB0-MB19, DB5（DB 全体）（空欄 = 入力以外すべて）',
+  'also write the inputs (I: the CPU overwrites them with what the modules read)': '入力（I: CPU がモジュールから読んだ値で上書きする領域）にも書き込む',
+  'DB1.DBX0.0 / DB1.DBW4 / DB1.DBD6 / MW10 / I0.0 / QB0': 'DB1.DBX0.0 / DB1.DBW4 / DB1.DBD6 / MW10 / I0.0 / QB0',
+});
+
 // ---- SLMP driver
 Object.assign(I18N.KEYS_JA, { frame: 'フレーム', network: 'ネットワーク番号', pc: 'PC 番号', io: '要求先ユニット I/O 番号', station: '要求先局番',
-  write_ranges: '書き込みを許す範囲', allow_system_write: 'SM / SD にも書き込む', length: '文字数' });
+  write_ranges: '書き込みを許す範囲', allow_system_write: 'システム領域にも書き込む', length: '文字数' });
 Object.assign(I18N.TEXT_JA, {
   'Mitsubishi SLMP / MC protocol (MELSEC)': '三菱電機 SLMP / MC プロトコル (MELSEC)',
   'Mitsubishi SLMP / MC protocol (MELSEC) (slmp)': '三菱電機 SLMP / MC プロトコル (MELSEC) (slmp)',

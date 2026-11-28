@@ -796,3 +796,24 @@ TEST_CASE("fins: System > Device and the tags at the same time, hundreds of time
     CHECK(tagv("online") == 1);
     CHECK(srv.connections == 1);                                           // never a reconnect
 }
+
+TEST_CASE("fins: write_ranges that names no valid range allows nothing (it does not turn into everything)")
+{
+    for(const json& ranges : { json::array({ "nonsense" }), json::array(), json("D0-D999") }) {
+        Runtime rt;
+        FakeFinsServer srv;
+        rt.tag("online", TagType::Bool);
+        rt.tag("d0", TagType::Int);
+        json cfg = fins_cfg(srv, json::parse(R"([ { "tag": "d0", "addr": "D0" } ])"));
+        cfg["write_ranges"] = ranges;
+        REQUIRE(start(rt, cfg) == 1);
+        REQUIRE(wait_for([] { return tagv("online") == 1; }));
+        Driver* d = rt.drivers.all().at(0);
+        const int before = srv.writes.load();
+        CHECK_MESSAGE(put(d, "D110", "1").error.find("write_ranges") != std::string::npos, ranges.dump());
+        tags().find("d0")->set_number(7, nullptr);                  // a tag of the map is not written either
+        wait_for([] { return false; }, 400);                       // (time for a write to go out, if one would)
+        CHECK_MESSAGE(srv.writes == before, ranges.dump());
+        rt.drivers.stop_all();
+    }
+}

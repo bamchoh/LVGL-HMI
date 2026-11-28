@@ -10,7 +10,7 @@ Tsukuraku is an **HMI designer and runtime whose screens an AI can draw**. Tell 
 for example "make a production screen with three meters, an XY chart and a table of the states", and it writes the screens,
 draws them with the runtime, looks at the images and fixes what is wrong. The designer you have open reloads the result,
 and you finish it by hand. The same project then runs on a PC and on a touch panel (Raspberry Pi and other Linux boards),
-connected to PLCs over Modbus, SLMP (MELSEC), FINS (OMRON), OPC UA and MQTT.
+connected to PLCs over Modbus, SLMP (MELSEC), FINS (OMRON), S7 (Siemens), OPC UA and MQTT.
 
 The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
 
@@ -96,6 +96,7 @@ build.cmd Debug
 | `test_check.cpp` | Checking a project (`--check`: 0 findings for a correct project, 26 kinds of mistake that the runtime silently ignores are found with their location, characters missing from the font, broken files, 0 findings for the shipped projects and the examples of the skill), PNG screenshots |
 | `test_capabilities.cpp` | What a project can do (`--capabilities`): a project that only draws screens, devices written to (not those only read, not drivers that are off), mail / uploads / MQTT, OPC UA server and VNC, scripts with a trigger / schedules / transfers, **the fingerprint follows the list and not the screens**, scripts on the buttons of the screens, nothing read outside the folder of the project |
 | `test_driver_fins.cpp` | FINS (how addresses are written, the bytes of FINS/TCP and of the commands, broken responses, reading and writing against a mock server, end codes, reconnection) |
+| `test_driver_s7.cpp` | S7 (how addresses are written, the bytes of the connection, setup, read and write packets, **random, cut-off and oversized bytes into every parser**, reading and writing every area and data type against a mock PLC byte for byte, bits written as bits, limits on writing, splitting by the PDU length the PLC answers (240 to 480), 1000 tags in 5 requests, a refused item / a refused request (PUT/GET not permitted), no answer, an answer to another request, 11 kinds of damaged answer, a dropped or refused connection, writes while disconnected do not pile up, what `--check` says about a wrong row) |
 | `test_alarm_stats.cpp` | Alarm statistics (counts and durations, the edges of the period, gaps in the records and clock changes, neutralizing formulas in CSV, the time for 100,000 records, the widget) |
 | `test_xy_chart.cpp` | XY chart (adding and discarding points, on change, several curves, clearing, non-numeric values, extreme settings, the number of redraws, `--check`) |
 | `test_table.cpp` | Table (following the tags, `format` and `map`, extreme numbers of rows and columns and broken settings, the time for 1000 rows, `--check`) |
@@ -183,6 +184,19 @@ Against [Eclipse Mosquitto](https://mosquitto.org/) (not part of CTest): plainte
 localhost:1883), and TLS on a broker the script starts on port 18883 with a throw-away CA (needs `openssl`). It checks the online / offline status
 (last will), a value per topic, a JSON message of several tags (`fields`, `const`, `ts`, sent again on a change) and commands coming in (one value, the fields
 of a JSON message, a value outside `min` / `max` refused).
+
+### Checking the S7 driver against the Snap7 server
+
+```bash
+pip install python-snap7
+python tools/snap7_check.py                           # [--port 1102] [--runtime <hml_runtime>]
+```
+
+The mock PLC of `test_driver_s7.cpp` was written from the same descriptions of S7comm as the driver. This script (not part of CTest) uses another
+implementation, the server of [Snap7](https://snap7.sourceforge.net/) from the Python package `python-snap7`: it starts the server on a local port with
+two DBs and the M, I and Q areas, runs the runtime with a small project, and compares what the tags hold and what arrives in the memory of the server
+(bits, 8 / 16 / 32-bit integers, float, STRING, 500 words in one DB, a DB that does not exist). It says so and ends with exit code 2 when
+`python-snap7` is not installed. A Snap7 server is still not a Siemens PLC: see the note at the driver.
 
 ## Building (Raspberry Pi / Linux)
 
@@ -1143,6 +1157,77 @@ The driver reads and writes the memory of an OMRON PLC (CS / CJ / CP / NJ / NX) 
   ranges with `write_ranges`. FINS/UDP and serial (Host Link) are not supported yet.
 - It has been checked against the simulated peer in the tests and against the FINS server of the PLC simulator Karakuri. **It has not been checked on a real PLC yet.**
 
+### Driver: s7 (Siemens S7: S7comm, PUT/GET)
+
+The driver reads and writes the data blocks, flags, inputs and outputs of a Siemens S7-300 / 400 / 1200 / 1500 with S7comm (the protocol of
+"PUT/GET" communication) over ISO-on-TCP (RFC 1006, TCP port 102).
+
+**It has been tested against a simulated PLC only (the mock PLC in the tests), not against a real Siemens PLC.** Try it on a PLC that
+controls nothing before you rely on it, and start with rows that are `"access": "ro"`.
+
+**What has to be set in the PLC** (S7-1200 / 1500, in TIA Portal; an S7-300 / 400 needs nothing):
+
+- CPU properties > Protection & Security > Connection mechanisms: **"Permit access with PUT/GET communication from remote partner"**. Without it the CPU
+  refuses every read and write; the driver then logs `the PLC refused: the function is not available (class 0x81, code 0x04): on S7-1200 / 1500: permit
+  "PUT/GET communication" ...`, and so does the Addresses page.
+- For every DB that is read or written: properties > Attributes > **"Optimized block access" off**. Only then the DB has the fixed offsets that
+  `DB1.DBW4` names (TIA Portal shows them in the column "Offset" after compiling). An optimized DB is refused with `the object does not exist (code 10)`.
+- The access level of the CPU must allow reading (and writing, where you write): "Full access" or "Read access" without a password. The driver sends no password.
+
+```json
+{
+  "type": "s7",
+  "host": "192.168.0.1", "port": 102, "rack": 0, "slot": 1,
+  "poll_ms": 200, "timeout_ms": 1000, "status_tag": "plc_online",
+  "write_ranges": ["DB1.DBB0-DB1.DBB99", "MB10-MB19"],
+  "map": [
+    { "tag": "run",   "addr": "DB1.DBX0.0" },
+    { "tag": "state", "addr": "DB1.DBB2" },
+    { "tag": "speed", "addr": "DB1.DBW4" },
+    { "tag": "total", "addr": "DB1.DBD6" },
+    { "tag": "temp",  "addr": "DB1.DBD10", "dtype": "float" },
+    { "tag": "name",  "addr": "DB1.DBB20", "dtype": "string", "length": 16 },
+    { "tag": "flag",  "addr": "M10.0" },
+    { "tag": "count", "addr": "MW12" },
+    { "tag": "in3",   "addr": "I0.3", "access": "ro" },
+    { "tag": "lamp",  "addr": "Q0.1", "access": "ro" }
+  ]
+}
+```
+
+| Key | Description |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `host` / `port` | The address of the CPU (or its Ethernet module) and the port of ISO-on-TCP (default 102) |
+| `rack` / `slot` | Where the CPU is: 0 / 1 for S7-1200 / 1500 (default), 0 / 2 for S7-300; for an S7-400 as in its hardware configuration |
+| `write_ranges` | The bytes where writes are allowed: `"DB1.DBB0-DB1.DBB99"`, `"MB10-MB19"`, `"QB0"`, or `"DB5"` for all of DB5. When omitted, everything except the inputs (I) can be written. A list without a valid range allows nothing |
+| `allow_system_write` | Writes to the inputs (I) only when `true` (default `false`: the CPU overwrites them with what the modules read) |
+| `addr` | Written as in STEP 7 / TIA Portal, upper or lower case, with or without a leading `%`. Data blocks: `DB1.DBX0.0` (a bit) `DB1.DBB2` (a byte) `DB1.DBW4` (a word) `DB1.DBD6` (a double word). Flags: `M0.0` `MB1` `MW2` `MD4`. Inputs: `I0.0` `IB0` `IW0` `ID0` (German `E0.0` `EB0` ...). Outputs: `Q0.0` `QB0` `QW0` `QD0` (German `A0.0` `AB0` ...). The number is the byte (0 to 65535), the bit is 0 to 7. Symbolic names (`"Data".speed`), timers, counters and the peripheral areas are not supported |
+| `dtype` | The address says how many bytes, `dtype` how they are read. A bit: bool. A byte (`DBB`): `uint8` (default) `int8`, or `string` (`length` = the declared length of the STRING, 1 to 254). A word (`DBW`): `int16` (default) `uint16`. A double word (`DBD`): `int32` (default) `uint32` `float`. A `dtype` of another size is a mistake: the driver says so (also in `--check`) and uses the default |
+| `scale` / `offset` | Value = raw value × scale + offset (a write calculates backwards) |
+| `access` | `rw` (default) / `ro` / `wo` |
+
+- Every value is big-endian, as the CPU stores it (there is no `swap_words`). S7 types and how to map them: Bool → a bit; Byte / USInt → `DBB`; SInt → `DBB` + `int8`;
+  Int → `DBW`; Word / UInt → `DBW` + `uint16`; DInt → `DBD`; DWord / UDInt → `DBD` + `uint32`; Real → `DBD` + `float`; String[n] → `DBB` + `string` + `"length": n`.
+  LReal, LInt, Time, Date_And_Time and WString are not supported.
+- A **string** is an S7 STRING: the byte the address names holds the declared length, the next one the present length, then the characters (1 byte each, ASCII).
+  The driver reads `length` + 2 bytes and shows as many characters as the present length says (never more than `length`). A write sets the present length and the
+  characters (the rest filled with 0) and leaves the declared length alone.
+- Reads are grouped: neighbouring addresses of one area or one DB become one item (a gap of up to 32 bytes is read through), and as many items as fit go into one
+  "read var" request (at most 20). The driver asks the CPU for a PDU length of 480 bytes and keeps both the request and the answer within the length the CPU
+  answers (240 to 480; an item carries at most that length minus 18 bytes of data, so a longer run is split). **1000 tags** (800 words, 100 floats and 100 bits in two DBs
+  and the flags) are **5 requests**; one cycle took about 1 ms (0.7 to 1.3 ms over six runs) against the mock PLC of the tests on a PC (the PLC and the network decide in practice).
+- Writes use "write var", one value per request: a bit as one bit (the CPU changes only that bit, so the other bits of the byte are not lost), numbers as their bytes.
+  While there is no connection the writes wait in a queue with room for 2048; a tag has one place in it (its newest value).
+- What the PLC refuses is told in words, in the log (once per address) and on the Addresses page: `address out of range (code 5)` (the DB is shorter),
+  `the object does not exist (code 10)` (no such DB, or an optimized one), `access denied (code 3)`, `data type not supported (code 6)`, `data type inconsistent (code 7)`,
+  and the errors of the whole request with their class and code. A refused item does not stop the other items of the same request, the connection stays, and the tag
+  keeps its value. Addresses that are merged into one item are refused together: one address beyond the end of a DB takes its neighbours (up to 32 bytes away) with it.
+- For an answer, the driver checks the TPKT and COTP headers, every length, the PDU reference (the answer belongs to this request), the function and the number of items;
+  an answer that does not match, is cut off midway or does not arrive in time is discarded and the driver reconnects (first after 0.5 seconds, then at growing intervals up to 5 seconds).
+- S7comm is a plain-text protocol with neither encryption nor authentication, and PUT/GET lets everybody on the network read and write the CPU. Use it with the PLC on a
+  closed network, and narrow the writable ranges with `write_ranges`. The newer protocol of S7-1200 / 1500 (S7comm-plus, with symbolic access and TLS) is not supported;
+  for those CPUs the OPC UA client driver is the alternative that has encryption.
+
 ### Driver: mqtt (MQTT client)
 
 The driver connects to a broker with MQTT 3.1.1, sends tag values (publish), and receives commands (subscribe) and writes them to tags.
@@ -1590,7 +1675,7 @@ with the display unit as the relay.
   **Values that are not numbers, NaN, infinity, and values outside the limits of the destination tag are not written.**
 - `change` writes only when the source changes (when the destination is changed by something else, it stays that way).
   `cyclic` looks every period and writes again when the value of the destination differs (it does not send the same value again and again).
-- **Nothing is written while disconnected.** While the driver of either tag (Modbus, SLMP, FINS, MQTT, OPC UA client) is not connected,
+- **Nothing is written while disconnected.** While the driver of either tag (Modbus, SLMP, FINS, S7, MQTT, OPC UA client) is not connected,
   nothing is written, and **after a reconnection the values are read again first, and the transfer resumes with the latest value**. An old value read before the disconnection is never written later
   (a driver that reads cyclically waits until one full round is read; the MQTT / OPC UA clients wait until a value arrives or 2 seconds pass).
   It is the same at startup: the initial value (0) from before the PLC is read is never written to the other side.
@@ -1903,7 +1988,7 @@ names, fingerprints) are shown as they are.
 | Remote | Remote access (VNC) on / off, its password, view only, the state (when there is `remote`) → "Remote display and remote operation (VNC)" |
 | Schedule | The list of schedules and the time of the next run. Press a schedule to change its time, weekdays and on / off (when there is `schedules`) → "Schedules (actions that run by the clock)" |
 | Tags | A list of the current values of all tags (8 at a time, filtered by a part of the name. Enter `sys.` for the tags of the runtime itself). Pressing a row lets you write a value to that tag (TRUE / FALSE buttons for a bool, a numeric keypad for a number, the keyboard for a string. "x" clears the filter). It is for checking and changing values that have no screen, during commissioning and maintenance. A write follows the limits of the tag, reaches the device through the driver, and is recorded in the operation log as `monitor`. Tags of `sys.` cannot be written |
-| Addresses | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP or FINS driver) → "The device monitor (the Addresses page)" |
+| Addresses | Reads and writes **PLC addresses that have no tag assigned** (appears in projects with a Modbus, SLMP, FINS or S7 driver) → "The device monitor (the Addresses page)" |
 | Storage | Backup to a USB memory (for sites without a network), installing a project file from a USB memory, going back to the previous project → "Updates and backups with a USB memory (the Storage page)" |
 | Deploy | Receiving projects from the designer without SSH: on / off, adding a designer, accepting and removing designers, which of them may replace the runtime → "Deploying without SSH (Direct)" |
 
@@ -1923,13 +2008,16 @@ enter an address in the notation of that driver, and the page keeps reading that
 | Modbus (TCP / RTU / ASCII) | `holding:100`, `input:5`, `coil:3`, `discrete:0` (`hr` `ir` `di` can also be written). Another unit is `holding:100@2` |
 | SLMP | `D100`, `W1F`, `R0`, `ZR100`, `M10`, `X1F`, `Y20`, `SM400`, `SD0`, a bit inside a word is `D100.3` (read only) |
 | FINS | `D100`, `CIO10`, `W5`, `H3`, `A440`, `E0_100`, `T5`, `C5`, a bit is `CIO10.03` |
+| S7 | `DB1.DBW4`, `DB1.DBD6`, `DB1.DBB2`, `MW10`, `IB0`, `QB0`, a bit is `DB1.DBX0.0`, `M0.0`, `I0.0`, `Q0.0` |
 
 - **Type** (word addresses): `int16`, `uint16`, `int32`, `uint32`, `float`, `hex`. The word order of 32 bit values is the same as the default of
   the tags of that driver (SLMP and FINS: low word first, Modbus: high word first). Bits and coils are `0` / `1`.
+  For **S7** the address says the size (`DBB` 1 byte, `DBW` 2, `DBD` 4) and the type only how it is read: `int16` / `int32` with a sign, `uint16` / `uint32` without,
+  `hex`, and `float` for a double word.
 - **Count**: 1, 8, 16. The page reads on from that address and lists the values as `+0:` `+1:` ….
 - **Writing**: enter a value and press Write. The limits `write_ranges` and `allow_system_write` of the driver apply here too.
   A write is recorded in the operation log as `device`. The system settings screens as a whole are protected by `system_level`.
-- The reason for a refusal by the PLC (the end codes of FINS and SLMP, the exceptions of Modbus) appears on the page as it is. The communication of the tags does not stop.
+- The reason for a refusal by the PLC (the end codes of FINS and SLMP, the exceptions of Modbus, the return codes of S7 in words) appears on the page as it is. The communication of the tags does not stop.
 - The reads and writes are done by the thread of the driver, between the writes and the reads of the tags. While the page is not open, nothing is sent.
 - OPC UA and MQTT are not covered (they handle nodes and topics, not addresses).
 
@@ -2921,6 +3009,7 @@ DB Browser for SQLite (table `log`).
 | `cmake/toolchain-*.cmake` | Toolchain files for cross-compiling to aarch64 / armhf |
 | `tools/modbus_server.py` | Modbus TCP server for tests (standard library only) |
 | `tools/karakuri_check.py` | Checking the drivers against the PLC simulator Karakuri (SLMP / FINS / Modbus / OPC UA) |
+| `tools/snap7_check.py` | Checking the S7 driver against the Snap7 server (python-snap7) |
 | `tools/opcua_client_test.py` | OPC UA client for checking operation (asyncua) |
 | `tools/bmp2png.py` | Converts screenshots from BMP to PNG |
 | `tools/designer/host/main.cpp` | The host of the designer (webview, file dialogs, starting the runtime) |

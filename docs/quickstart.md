@@ -81,6 +81,6 @@ Text in a language other than English needs a font in the project: **Project** t
 
 ## Where to go from here
 
-- Connect a PLC: the **Drivers** tab (Modbus, SLMP for MELSEC, FINS for OMRON, OPC UA, MQTT) - [README](../README.md#projectjson).
+- Connect a PLC: the **Drivers** tab (Modbus, SLMP for MELSEC, FINS for OMRON, S7 for Siemens, OPC UA, MQTT) - [README](../README.md#projectjson).
 - What a project may do, before you run somebody else's: `hml_runtime <project.json> --capabilities` - [A project somebody else made](../README.md#a-project-somebody-else-made).
 - Found a problem, or something unclear in this page? [Open an issue](https://github.com/bamchoh/tsukuraku/issues) - in English or Japanese.

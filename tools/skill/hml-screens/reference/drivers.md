@@ -165,6 +165,32 @@ Only what is listed here exists. **How to add or change a driver safely: drivers
 | `access` | `rw` / `ro` / `wo` |  |
 | `swap_words` | true / false | optional.  |
 
+## `s7` — Siemens S7 (S7comm, PUT/GET)
+
+| key | value | note |
+| --- | --- | --- |
+| `host` | text | S7-1200 / 1500: permit "PUT/GET communication" in the protection settings of the CPU, and turn "Optimized block access" off for the DBs that are read |
+| `port` | number | ISO-on-TCP (default 102) |
+| `rack` | number | the rack of the CPU (default 0) |
+| `slot` | number | the slot of the CPU: 1 for S7-1200 / 1500 (default), 2 for S7-300 |
+| `poll_ms` | number |  |
+| `timeout_ms` | number | how long to wait for an answer (default 1000) |
+| `status_tag` | tag name |  |
+| `write_ranges` | array of texts | only these bytes may be written, e.g. DB1.DBB0-DB1.DBB99, MB0-MB19, DB5 (a whole DB) (empty = everything except the inputs) |
+| `allow_system_write` | true / false | also write the inputs (I: the CPU overwrites them with what the modules read) |
+
+`map` (Device map): an array of rows. Columns:
+
+| column | value | |
+| --- | --- | --- |
+| `tag` | tag name |  |
+| `addr` | text | e.g. DB1.DBX0.0 / DB1.DBW4 / DB1.DBD6 / MW10 / I0.0 / QB0 |
+| `dtype` | `bool` / `uint8` / `int8` / `int16` / `uint16` / `int32` / `uint32` / `float` / `string` |  |
+| `length` | number | optional.  |
+| `scale` | number |  |
+| `offset` | number |  |
+| `access` | `rw` / `ro` / `wo` |  |
+
 ## `mqtt` — MQTT client
 
 | key | value | note |

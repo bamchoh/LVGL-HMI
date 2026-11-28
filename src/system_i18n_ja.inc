@@ -138,7 +138,7 @@
 { "Off (the project does not use it)", "オフ（プロジェクトが使っていません）" },
 { "Not running", "動いていません" },
 { "The password was removed: only this device itself can connect.", "パスワードを消しました。この装置自身からしかつなげません。" },
-{ "No driver that runs reads addresses (Modbus, SLMP and FINS do).", "アドレスを読めるドライバーが動いていません（Modbus・SLMP・FINS が対応）。" },
+{ "No driver that runs reads addresses (Modbus, SLMP, FINS and S7 do).", "アドレスを読めるドライバーが動いていません（Modbus・SLMP・FINS・S7 が対応）。" },
 { "Pick a tag first.", "先にタグを選んでください。" },
 { "Pick a user first.", "先にユーザーを選んでください。" },
 { "Pick a schedule first.", "先にスケジュールを選んでください。" },
