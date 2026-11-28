@@ -904,6 +904,7 @@ void Binding::tag_event(const Value& v, const void* source)
 // read as "delete", a check mark had to be learnt. The words are in the language of the system
 // screens; the layouts are ours for that (LVGL's own have icons there).
 char s_kb_close[24] = "Close", s_kb_done[24] = "OK", s_kb_clear[24] = "Clear";
+bool s_kb_accents = false;          // the font of the project has the letters with accents: the keyboard offers them
 bool s_kb_light = false;            // the theme of the project is light: the keyboard is too
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
 const char* const kKbMapUpper[] = {
@@ -941,6 +942,50 @@ const int kKbCtrlSpecial[] = {
 // the last row put its columns a few pixels off). At the right, from what is used most while
 // typing to what ends it: backspace, clear, close, OK - OK in the corner. No cursor keys: a
 // number is short, and "Clear" starts it again.
+// The letters with accents of the languages of Western Europe (German, French, Spanish,
+// Portuguese, Italian, the Nordic languages): two more layouts, small and capital, behind the key
+// "äé" of the letter layouts. The key is there only when the font of the project has these
+// letters (the built-in font has not: the keys would be empty boxes).
+#define HML_KB_ACCENTS "\xC3\xA4\xC3\xA9"          /* "äé" */
+#define HML_KB_ACCENTS_UP "\xC3\x84\xC3\x89"       /* "ÄÉ" */
+const char* const kKbMapAccLower[] = {
+    "1#", "ä", "ö", "ü", "ß", "à", "á", "â", "ã", "å", "æ", LV_SYMBOL_BACKSPACE, "\n",
+    HML_KB_ACCENTS_UP, "ç", "è", "é", "ê", "ë", "ì", "í", "î", "ï", LV_SYMBOL_NEW_LINE, "\n",
+    "ñ", "ò", "ó", "ô", "õ", "ø", "œ", "ù", "ú", "û", "ý", "€", "\n",
+    s_kb_close, "abc", LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
+};
+const char* const kKbMapAccUpper[] = {
+    "1#", "Ä", "Ö", "Ü", "ß", "À", "Á", "Â", "Ã", "Å", "Æ", LV_SYMBOL_BACKSPACE, "\n",
+    HML_KB_ACCENTS, "Ç", "È", "É", "Ê", "Ë", "Ì", "Í", "Î", "Ï", LV_SYMBOL_NEW_LINE, "\n",
+    "Ñ", "Ò", "Ó", "Ô", "Õ", "Ø", "Œ", "Ù", "Ú", "Û", "Ý", "¿", "\n",
+    s_kb_close, "abc", LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
+};
+// (the letter layouts again, with the key "äé" beside "Close")
+const char* const kKbMapLowerAcc[] = {
+    "1#", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", LV_SYMBOL_BACKSPACE, "\n",
+    "ABC", "a", "s", "d", "f", "g", "h", "j", "k", "l", LV_SYMBOL_NEW_LINE, "\n",
+    "_", "-", "z", "x", "c", "v", "b", "n", "m", ".", ",", ":", "\n",
+    s_kb_close, HML_KB_ACCENTS, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
+};
+const char* const kKbMapUpperAcc[] = {
+    "1#", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", LV_SYMBOL_BACKSPACE, "\n",
+    "abc", "A", "S", "D", "F", "G", "H", "J", "K", "L", LV_SYMBOL_NEW_LINE, "\n",
+    "_", "-", "Z", "X", "C", "V", "B", "N", "M", ".", ",", ":", "\n",
+    s_kb_close, HML_KB_ACCENTS_UP, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, s_kb_done, "",
+};
+// rows 1 to 3 as in the letter layouts (all of row 3 are letters here); row 4 has one key more
+const int kKbCtrlAcc[] = {
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 5, HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6, HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1),
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 4, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3,
+};
+const int kKbCtrlLowerAcc[] = {
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 5, HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), HML_KB_BTN(4), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6, HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), HML_KB_BTN(3), LV_BUTTONMATRIX_CTRL_CHECKED | 7,
+    LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1), LV_BUTTONMATRIX_CTRL_CHECKED | HML_KB_BTN(1),
+    LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2, LV_BUTTONMATRIX_CTRL_CHECKED | 2, 4, LV_BUTTONMATRIX_CTRL_CHECKED | 2, LV_KEYBOARD_CTRL_BUTTON_FLAGS | 3,
+};
 const char* const kKbMapNumber[] = {
     "1", "2", "3", LV_SYMBOL_BACKSPACE, "\n",
     "4", "5", "6", s_kb_clear, "\n",
@@ -958,9 +1003,12 @@ const int kKbCtrlNumber[] = {
 template <size_t N>
 const lv_buttonmatrix_ctrl_t* ctrl_table(const int (&src)[N])
 {
-    static lv_buttonmatrix_ctrl_t table[N];           // LVGL keeps the pointer: must stay alive
-    for(size_t i = 0; i < N; i++) table[i] = static_cast<lv_buttonmatrix_ctrl_t>(src[i]);
-    return table;
+    // LVGL keeps the pointer: must stay alive. One table for each source (two layouts with the
+    // same number of keys must not share one).
+    static std::map<const int*, std::vector<lv_buttonmatrix_ctrl_t>> tables;
+    std::vector<lv_buttonmatrix_ctrl_t>& table = tables[src];
+    if(table.empty()) for(size_t i = 0; i < N; i++) table.push_back(static_cast<lv_buttonmatrix_ctrl_t>(src[i]));
+    return table.data();
 }
 
 // A switch or a checkbox changes on a tap - not when the finger slid over it. In a list that
@@ -993,7 +1041,8 @@ KbKey kb_key(const char* txt)
     if(txt == s_kb_close || std::strcmp(txt, s_kb_close) == 0) return KbKey::Close;
     if(txt == s_kb_clear || std::strcmp(txt, s_kb_clear) == 0) return KbKey::Clear;
     // backspace, new line, the arrows (symbols of the icon font) and the keys that change the layout
-    if(static_cast<unsigned char>(txt[0]) == 0xEF || !std::strcmp(txt, "1#") || !std::strcmp(txt, "ABC") || !std::strcmp(txt, "abc")) return KbKey::Control;
+    if(static_cast<unsigned char>(txt[0]) == 0xEF || !std::strcmp(txt, "1#") || !std::strcmp(txt, "ABC") || !std::strcmp(txt, "abc") ||
+       !std::strcmp(txt, HML_KB_ACCENTS) || !std::strcmp(txt, HML_KB_ACCENTS_UP)) return KbKey::Control;
     return KbKey::Letter;
 }
 
@@ -1026,6 +1075,12 @@ void kb_value_changed(lv_event_t* e)
     const uint32_t id = lv_buttonmatrix_get_selected_button(kb);
     const KbKey kind = id == LV_BUTTONMATRIX_BUTTON_NONE ? KbKey::Letter : kb_key(lv_buttonmatrix_get_button_text(kb, id));
     lv_obj_t* ta = lv_keyboard_get_textarea(kb);
+    if(id != LV_BUTTONMATRIX_BUTTON_NONE) {
+        // the key that leads to the letters with accents (small / capital): another layout, nothing typed
+        const char* txt = lv_buttonmatrix_get_button_text(kb, id);
+        if(txt && !std::strcmp(txt, HML_KB_ACCENTS)) { lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_1); return; }
+        if(txt && !std::strcmp(txt, HML_KB_ACCENTS_UP)) { lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_2); return; }
+    }
     if(kind == KbKey::Clear) { if(ta) lv_textarea_set_text(ta, ""); return; }      // (nothing is written yet: "Close" still leaves the value as it was)
     if(kind != KbKey::Close && kind != KbKey::Done) { lv_keyboard_def_event_cb(e); return; }
     const lv_event_code_t code = kind == KbKey::Done ? LV_EVENT_READY : LV_EVENT_CANCEL;
@@ -1046,8 +1101,18 @@ void install_keyboard_maps(lv_obj_t* kb)
     word("Close", s_kb_close, sizeof s_kb_close);
     word("OK", s_kb_done, sizeof s_kb_done);
     // (lv_keyboard_set_map() changes the layouts for every keyboard: set again, the words may have changed)
-    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kKbMapUpper, ctrl_table(kKbCtrlLower));
-    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLower, ctrl_table(kKbCtrlLower));
+    // the letters with accents: only with a font that has them
+    s_kb_accents = font_file_has("äöüßàáâãåæçèéêëìíîïñòóôõøœùúûýÄÖÜÀÁÂÃÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕØŒÙÚÛÝ€¿");
+    if(s_kb_accents) {
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kKbMapUpperAcc, ctrl_table(kKbCtrlLowerAcc));
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLowerAcc, ctrl_table(kKbCtrlLowerAcc));
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_USER_1, kKbMapAccLower, ctrl_table(kKbCtrlAcc));
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_USER_2, kKbMapAccUpper, ctrl_table(kKbCtrlAcc));
+    }
+    else {
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kKbMapUpper, ctrl_table(kKbCtrlLower));
+        lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLower, ctrl_table(kKbCtrlLower));
+    }
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_SPECIAL, kKbMapSpecial, ctrl_table(kKbCtrlSpecial));
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_NUMBER, kKbMapNumber, ctrl_table(kKbCtrlNumber));
 }
@@ -1058,6 +1123,7 @@ constexpr size_t kHistoryLen = 16;
 
 void set_keyboard_light(bool light) { s_kb_light = light; ui().set_light_theme(light); }
 const char* keyboard_close_text() { return s_kb_close; }
+const char* keyboard_accents_text() { return s_kb_accents ? HML_KB_ACCENTS : ""; }
 const char* keyboard_done_text() { return s_kb_done; }
 
 

@@ -632,3 +632,69 @@ TEST_CASE("plain textarea keeps writing on every change")
     lv_textarea_add_text(ta, "a");
     CHECK(t->get().str == "a");                              // LVGL sends VALUE_CHANGED itself
 }
+
+TEST_CASE("keyboard: letters with accents are offered when the font of the project has them")
+{
+    Runtime rt;
+    rt.tag("name", TagType::String, 0);
+    const json scr = json::parse(R"json({ "name": "k", "children": [
+        { "type": "text_display", "input": true, "bind": "name", "x": 10, "y": 10, "w": 200 },
+        { "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "50%" } ] })json");
+    auto key = [](lv_obj_t* kb, const char* text) {
+        const char* const* map = lv_buttonmatrix_get_map(kb);
+        int id = 0;
+        for(int i = 0; map[i][0] != '\0'; i++) {
+            if(std::strcmp(map[i], "\n") == 0) continue;
+            if(std::strcmp(map[i], text) == 0) return id;
+            id++;
+        }
+        return -1;
+    };
+    auto find_keyboard = [](lv_obj_t* scr) -> lv_obj_t* {
+        for(uint32_t i = 0; i < lv_obj_get_child_count(scr); i++)
+            if(lv_obj_check_type(lv_obj_get_child(scr, static_cast<int32_t>(i)), &lv_keyboard_class)) return lv_obj_get_child(scr, static_cast<int32_t>(i));
+        return nullptr;
+    };
+
+    SUBCASE("the built-in font has no accents: no such key")
+    {
+        set_font_file("");
+        REQUIRE(ui().build_screen(scr, ""));
+        REQUIRE(ui().show_screen("k", "none"));
+        lv_obj_t* kb = find_keyboard(lv_screen_active());
+        REQUIRE(kb);
+        CHECK(std::string(keyboard_accents_text()).empty());
+        CHECK(key(kb, "\xC3\xA4\xC3\xA9") < 0);
+    }
+    SUBCASE("with the font for European languages: a key that leads to two more layouts")
+    {
+        set_font_file((hmltest::source_dir() / "tools" / "designer" / "fonts" / "NotoSans-subset.ttf").generic_string());
+        REQUIRE(ui().build_screen(scr, ""));
+        REQUIRE(ui().show_screen("k", "none"));
+        lv_obj_t* kb = find_keyboard(lv_screen_active());
+        REQUIRE(kb);
+        REQUIRE(std::string(keyboard_accents_text()) == "\xC3\xA4\xC3\xA9");
+        lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
+        const int acc = key(kb, keyboard_accents_text());
+        REQUIRE(acc >= 0);
+        CHECK(key(kb, "q") >= 0);                                 // (the letters are still there)
+        // pressing it shows the small letters with accents, and types nothing
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(acc));
+        lv_obj_send_event(kb, LV_EVENT_VALUE_CHANGED, nullptr);
+        CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_USER_1);
+        CHECK(key(kb, "\xC3\xBC") >= 0);                          // ü
+        CHECK(key(kb, "\xC3\x9F") >= 0);                          // ß
+        CHECK(key(kb, "q") < 0);
+        // the capitals, and back to the letters
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key(kb, "\xC3\x84\xC3\x89")));
+        lv_obj_send_event(kb, LV_EVENT_VALUE_CHANGED, nullptr);
+        CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_USER_2);
+        CHECK(key(kb, "\xC3\x9C") >= 0);                          // Ü
+        lv_buttonmatrix_set_selected_button(kb, static_cast<uint32_t>(key(kb, "abc")));
+        lv_obj_send_event(kb, LV_EVENT_VALUE_CHANGED, nullptr);
+        CHECK(lv_keyboard_get_mode(kb) == LV_KEYBOARD_MODE_TEXT_LOWER);
+        CHECK(key(kb, "q") >= 0);
+    }
+    ui().unload_all();
+    set_font_file("");
+}
