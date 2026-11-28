@@ -16,6 +16,8 @@ Each release lists, where there is something to say:
 - The system settings screens, the login screen and the keys of the on-screen keyboard in **German** (`"system_language": "de"`, or
   a project whose language is `de`), with a font that has ä ö ü ß.
 - The Windows programs carry their product name and version (Properties > Details).
+- The on-screen keyboard has a key "äé" for the letters with accents of Western Europe (ä ö ü ß é è ñ ç å ø …, capitals, €), when
+  the font of the project has them.
 
 **Changed**
 
