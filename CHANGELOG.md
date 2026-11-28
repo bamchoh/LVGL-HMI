@@ -9,31 +9,46 @@ Each release lists, where there is something to say:
 
 ## Unreleased
 
-**Added**
+Nothing yet.
 
-- Every package of a release has an attestation of where it was built (`gh attestation verify <file> --repo bamchoh/tsukuraku`).
-- `CHANGELOG.md` and `docs/` (the quick start) are in the packages.
-- The system settings screens, the login screen and the keys of the on-screen keyboard in **German** (`"system_language": "de"`, or
-  a project whose language is `de`), with a font that has ä ö ü ß.
-- The Windows programs carry their product name and version (Properties > Details).
-- The on-screen keyboard has a key "äé" for the letters with accents of Western Europe (ä ö ü ß é è ñ ç å ø …, capitals, €), when
-  the font of the project has them.
+## 0.1.1 - 2026-11-28
 
-- `"locale": { "date": "dmy" | "mdy", "decimal": "," }` in `project.json`: how dates and decimal numbers are written on the
-  screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form. In the designer: Project tab > "Dates and numbers".
-
-- Driver **`s7`**: Siemens S7-300 / 400 / 1200 / 1500 over S7comm (PUT/GET, ISO-on-TCP port 102). Addresses as in TIA Portal
-  (`DB1.DBW4`, `M0.0`, `IW2`, `QB0`), bool / 8 / 16 / 32-bit integers / float / STRING, `write_ranges`, the Addresses page.
-  S7-1200 / 1500 need "PUT/GET communication" permitted in the CPU. **Tested against a simulated PLC only, not yet against a real one.**
+For users in Europe: a driver for Siemens S7, German on the device, accented letters, and dates and numbers written the local way.
+One fix that matters for safety (first item).
 
 **Security**
 
-- FINS and SLMP: a `"write_ranges"` that named no valid range (a typing mistake, an empty list) logged "nothing can be
-  written" but let every write through. It allows nothing now, as it says.
+- **FINS and SLMP: a `"write_ranges"` without a valid range let every write through.** `write_ranges` limits what the HMI may write
+  to the PLC. With a list that named no valid range - a typing mistake in every entry, or an empty list - the log said "nothing can
+  be written", and everything was written. Now such a list allows nothing, as it says. If you use `write_ranges`, run
+  `hml_runtime <project.json> --check` and look at the log once: a project that relied on the mistake stops writing.
 
 **Changed**
 
-- The header's "Apply" button of the system screens is as wide as its word; "Refresh" on the USB page is a sign.
+- See above: a project whose `write_ranges` has no valid entry no longer writes to the PLC.
+- The "Apply" button in the head of the system screens is as wide as its word; "Refresh" on the USB page is a sign.
+
+**Added**
+
+- Driver **`s7`**: Siemens S7-300 / 400 / 1200 / 1500 over S7comm (ISO-on-TCP, port 102). Addresses as in TIA Portal
+  (`DB1.DBW4`, `M0.0`, `IW2`, `QB0`; the German `E` / `A` too), bool / 8 / 16 / 32-bit integers / float / STRING, `write_ranges`,
+  the Addresses page. S7-1200 / 1500 need "PUT/GET communication" permitted in the CPU.
+  **Checked against a simulated PLC and against the Snap7 server, not yet against a real Siemens PLC.**
+- **German** for the system settings screens, the login screen and the keys of the on-screen keyboard (`"system_language": "de"`, or
+  a project whose language is `de`), with a font that has ä ö ü ß. The translation has not been read by a native speaker yet.
+- The on-screen keyboard has a key "äé" for the letters with accents of Western Europe (ä ö ü ß é è ñ ç å ø …, capitals, €), when
+  the font of the project has them.
+- `"locale": { "date": "dmy" | "mdy", "decimal": "," }` in `project.json`: how dates and decimal numbers are written on the
+  screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form. In the designer: Project tab > "Dates and numbers".
+- Every package of a release has an attestation of where it was built (`gh attestation verify <file> --repo bamchoh/tsukuraku`).
+- The Windows programs carry their product name and version (Properties > Details).
+- `CHANGELOG.md` and `docs/` (the quick start) are in the packages.
+
+**Known limits**
+
+- As 0.1.0: the programs are not signed; no driver for EtherNet/IP.
+- With `locale`: the rollers of `datetime_input` stay in the order year, month, day; there is no 12-hour clock.
+- The keyboard cannot type the letters of Central and Eastern Europe, Cyrillic or Greek.
 
 ## 0.1.0 - 2026-11-28
 
