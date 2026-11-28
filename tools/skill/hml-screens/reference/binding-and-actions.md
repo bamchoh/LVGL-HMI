@@ -12,7 +12,7 @@
 ```
 
 - `min` / `max` を付けると、画面からの書き込みがその範囲に丸められる。操作できる数値のタグには付ける。
-- `sys.` で始まるタグはランタイムが持つ（`sys.date`、`sys.time`、`sys.datetime`、`sys.screen`（表示中の画面の名前）、`sys.lang`、`sys.user.name`、`sys.user.level`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.screen.off` など）。作らない。
+- `sys.` で始まるタグはランタイムが持つ（`sys.date`、`sys.time`、`sys.datetime`、`sys.screen`（表示中の画面の名前）、`sys.lang`、`sys.languages`（言語の一覧 `ja,en`）、`sys.user.name`、`sys.user.level`、`sys.user.level_name`、`sys.user.logged_in`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.alarm.latest`（いちばん新しい未確認のアラームのメッセージ。なければ発生中のもの）、`sys.alarm.latest_severity`、`sys.screen.off` など）。作らない。
   ここと `project-features.md` にない `sys.` の名前は書かない（`--check` は、そのプロジェクトにない `sys.` のタグを知らせる。
   `sys.sound.*` などは、その機能が `project.json` にあるときだけある）。
 
@@ -398,6 +398,21 @@
 
 `project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
 `"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
+
+- **部品の `level`**: 足りないあいだの扱いが `level_deny`。`level` はその部品自身にだけかかる（パネルに付けた `disable` は中の部品に及ばない。
+  操作させたくない部品それぞれに付ける。`hide` は中身ごと隠れる）。
+- **画面の `level`**: `level_deny` は**画面には無い**（書いても何も変わらない）。足りないユーザーがその画面へ行こうとすると
+  ログイン画面が出て、足りるレベルでログインするとそのまま目的の画面へ進む。だから、そこへ行くボタンには `level` を付けなくてよい。
+- ログアウトしたとき（自動ログアウトを含む）、表示中の画面が見られなくなったら**開始画面へ戻る**。`logout` のあとに `goto` を足さない。
+- ログインしていないとき: `sys.user.name` は空、`sys.user.level` は 0、`sys.user.level_name` は空。「未ログイン」と出すなら
+  `map` に空の文字のキーを書く: `"bind": { "text": { "tag": "sys.user.name", "map": { "": "@not_logged_in" } } }`
+  （`map` に無い値はそのまま出る。「まだ何もない」を表す空の文字は、どのタグでもこの形で言葉に替えられる）。
+- レベルの名前（`users.levels`）は 1 つの言語だけ（`"@ID"` は使えない）。
+- **`--check` の画像は、いちばん高いレベルでログインした状態**（ユーザー名は `preview`）で描かれる。ログインしていないとき・
+  低いレベルのときの見え方は、SKILL.md の「押したあとの様子を確かめたいとき」の手順で、ログイン画面の数字を `--click` で押して確かめる
+  （押す座標は、先に撮った画像から読む）。
+- **あとから `users` を足すとき**: プロジェクトにもう `"level"` を書いた部品・画面や `recipes.level` があると、`users` を足したとたんに
+  効き始める（`users` が無いあいだは無視されているだけで、`--check` も何も言わない）。足す前に `"level"` を探し、何が制限されるようになるかを報告する。
 
 ## 画面の外の機能を画面から使う
 

@@ -1652,7 +1652,7 @@ that has those characters into the project.
   or by Lua, the screens are rebuilt and displayed in that language (the displayed screen and the "back" history stay as they are. The state of
   the scripts is also kept). `sys.languages` has the list (`ja,en`).
 - The alarm record keeps the message in the language of that moment.
-- The built-in system settings screens and the login screen stay in English.
+- The built-in system settings screens and the login screen are shown in Japanese or English, following the language of the project ("System settings screens").
 - When there is a font file, the glyphs of each size are made from that file (TinyTTF), and characters that are not in the file (such as the `LV_SYMBOL_*`
   icons) are displayed with the built-in font. Glyphs are made when they are first displayed, and cached.
 - Japanese fonts are large, so `tools/subset_font.py` can make a small file with only the characters in use
