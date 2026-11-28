@@ -1,8 +1,8 @@
-# bind、動作、ポップアップ、多言語、専用の部品
+# bind, actions, popups, multiple languages, special widgets
 
-キーの一覧は `widgets.md`。ここは使い方です。
+The list of keys is in `widgets.md`. This file is how to use them.
 
-## タグ（`project.json` の `tags`）
+## Tags (`tags` in `project.json`)
 
 ```json
 { "name": "temp",  "type": "float",  "init": 20.0 },
@@ -11,14 +11,14 @@
 { "name": "state", "type": "string", "init": "Idle" }
 ```
 
-- `min` / `max` を付けると、画面からの書き込みがその範囲に丸められる。操作できる数値のタグには付ける。
-- `sys.` で始まるタグはランタイムが持つ（`sys.date`、`sys.time`、`sys.datetime`、`sys.screen`（表示中の画面の名前）、`sys.lang`、`sys.languages`（言語の一覧 `ja,en`）、`sys.user.name`、`sys.user.level`、`sys.user.level_name`、`sys.user.logged_in`、`sys.alarm.active`、`sys.alarm.unacked`、`sys.alarm.latest`（いちばん新しい未確認のアラームのメッセージ。なければ発生中のもの）、`sys.alarm.latest_severity`、`sys.screen.off` など）。作らない。
-  ここと `project-features.md` にない `sys.` の名前は書かない（`--check` は、そのプロジェクトにない `sys.` のタグを知らせる。
-  `sys.sound.*` などは、その機能が `project.json` にあるときだけある）。
+- With `min` / `max`, writes from the screen are clamped to that range. Add them to numeric tags that can be operated.
+- Tags that start with `sys.` belong to the runtime (`sys.date`, `sys.time`, `sys.datetime`, `sys.screen` (name of the screen being shown), `sys.lang` (the language shown now: a code of `languages`, such as `en`), `sys.languages` (list of languages `ja,en`), `sys.user.name`, `sys.user.level`, `sys.user.level_name`, `sys.user.logged_in`, `sys.alarm.active`, `sys.alarm.unacked`, `sys.alarm.latest` (message of the newest unacknowledged alarm. If there is none, of an active one), `sys.alarm.latest_severity`, `sys.screen.off` and so on). Do not create them.
+  Do not write a `sys.` name that is not here or in `project-features.md` (`--check` reports `sys.` tags that the project does not have.
+  `sys.sound.*` and the like exist only when that feature is in `project.json`).
 
 ## bind
 
-短い形 `"bind": "tag"` は、部品に合ったプロパティにつながる（`widgets.md` の表）。入力する部品は自動で双方向。
+The short form `"bind": "tag"` connects to the property that fits the widget (table in `widgets.md`). Input widgets are two-way automatically.
 
 ```json
 "bind": {
@@ -36,65 +36,65 @@
 }
 ```
 
-| キー | 意味 |
+| Key | Meaning |
 | --- | --- |
-| `format` | printf 形式、変換指定子は 1 つ。`%d` `%x` 整数、`%f` `%g` 実数、`%s` 文字列。`%` そのものは `%%`（`"%d %%"`） |
-| `scale` / `offset` | 部品の値 = タグの値 × scale + offset（書き込みは逆算） |
-| `invert` | 真偽を反転 |
-| `eq` `ne` `gt` `lt` `ge` `le` | 条件。`visible` `hidden` `enabled` `disabled` `checked` `on` で使う。比べる相手は定数か `{ "tag": "temp_hi" }` |
-| `map` | 値 → 色（`bg_color` `text_color` `border_color` `image_recolor`）、値 → 文字（`text`。`"@ID"` が使える）。`default` がその他。bool は `"true"` / `"false"`。文字列のタグには、その文字のキーが当たる（`{ "main": "#26c6da" }`） |
-| `part` | `bg_color` を付ける場所: `main`（既定）/ `indicator` / `knob` |
+| `format` | printf format, one conversion specifier. `%d` `%x` integer, `%f` `%g` real, `%s` string. A literal `%` is `%%` (`"%d %%"`) |
+| `scale` / `offset` | Widget value = tag value × scale + offset (writes are computed in reverse) |
+| `invert` | Inverts true / false |
+| `eq` `ne` `gt` `lt` `ge` `le` | Condition. Used with `visible` `hidden` `enabled` `disabled` `checked` `on`. The value compared against is a constant or `{ "tag": "temp_hi" }` |
+| `map` | Value → colour (`bg_color` `text_color` `border_color` `image_recolor`), value → text (`text`. `"@ID"` can be used). `default` is everything else. bool is `"true"` / `"false"`. For a string tag, the key with that text matches (`{ "main": "#26c6da" }`) |
+| `part` | Where `bg_color` is applied: `main` (default) / `indicator` / `knob` |
 
-- 短い形と一緒にほかの種類も付けたいときは、長い形で書く:
-  `"bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } }`。
-- `enabled` / `disabled` はどの部品にも付けられ、無効のあいだは薄く表示されて押せない。親の `panel` に付けても
-  子は無効にならないので、操作する部品それぞれに付ける。
-- 条件は 1 つのタグだけ（「A かつ B」は書けない）。要るときは、条件をまとめた bool のタグを作り、スクリプトで
-  計算する。`project.json` の `scripts` に
-  `{ "name": "can_run", "trigger": "tag", "tags": ["auto_mode", "run"], "code": "tag.can_run = not tag.auto_mode and not tag.run" }`。
-- 状態の番号や文字列のタグを言葉で出すときは、`text` の `map`（上の例。値ごとに `label` を重ねなくてよい）。
-  当たるキーも `default` もない値は、そのまま（`format` で）出る。言葉と一緒に色も変えるなら、同じタグで `text_color` か `bg_color` の `map` を並べて書く。
-  言葉はすべての値の分を書き、いちばん長い言葉で `--set` して入るか確かめる。
-- `"checkable": true` のボタンに `bind` の `checked` を付けると、押すだけでタグが ON / OFF する（`toggle` の動作は要らない。
-  同じタグを `toggle` すると、ボタンが書いた値をすぐ戻して何も変わらない: `--check` が知らせる）。
-- `checked` に `eq` を付けたボタン（`"checkable": true`）は、押すとその値をタグに書く。同じタグで値を変えて並べると
-  択一（ラジオボタン）になる。
-- 同じ場所に条件違いの `panel` を重ねて `visible` で切り替えると、状態ごとの表示になる。
+- To add other kinds together with the short form, write the long form:
+  `"bind": { "value": "speed_sp", "enabled": { "tag": "auto_mode", "invert": true } }`.
+- `enabled` / `disabled` can be put on any widget; while disabled it is shown dimmed and cannot be pressed. Putting it on the parent `panel`
+  does not disable the children, so put it on each widget that is operated.
+- A condition uses one tag only ("A and B" cannot be written). When needed, make a bool tag that combines the conditions and compute it
+  in a script. In `scripts` of `project.json`:
+  `{ "name": "can_run", "trigger": "tag", "tags": ["auto_mode", "run"], "code": "tag.can_run = not tag.auto_mode and not tag.run" }`.
+- To show a tag holding a state number or a string as words, use the `map` of `text` (example above. No need to stack a `label` per value).
+  A value with no matching key and no `default` is shown as it is (with `format`). To change the colour along with the words, write a `map` of `text_color` or `bg_color` for the same tag beside it.
+  Write the words for all values, and `--set` the longest word to check that it fits.
+- A button with `"checkable": true` and `checked` in `bind` turns the tag ON / OFF just by being pressed (no `toggle` action is needed.
+  A `toggle` on the same tag immediately puts back the value the button wrote and nothing changes: `--check` reports it).
+- A button (`"checkable": true`) with `eq` on `checked` writes that value to the tag when pressed. Lining up several with the same tag and different values
+  makes a choice of one (radio buttons).
+- Stacking `panel`s with different conditions at the same place and switching them with `visible` gives a display per state.
 
-## スタイルを付ける場所
+## Where styles apply
 
-`style` は部品の本体。ほかは部品の一部や状態に付く。
+`style` is the body of the widget. The others apply to a part or a state of the widget.
 
-| キー | 付く所 |
+| Key | Applies to |
 | --- | --- |
-| `style_label` | `button` / `checkbox` の中の文字（ボタンの文字の大きさは `"style_label": { "font": 20 }`） |
-| `style_indicator` | `bar` / `slider` / `arc` の値の部分、`switch` / `checkbox` の印 |
-| `style_indicator_checked` | ON のときのその部分 |
-| `style_knob` | `slider` / `arc` / `switch` のつまみ |
-| `style_items` | `keyboard` のキー、`dropdown` / `roller` の項目 |
-| `style_selected` | `roller` / `dropdown` の選ばれている項目 |
-| `style_pressed` `style_checked` `style_disabled` `style_focused` | 押されている / ON / 無効 / 入力中 のときの本体 |
-| `style_scrollbar` | スクロールバー |
+| `style_label` | The text inside a `button` / `checkbox` (the text size of a button is `"style_label": { "font": 20 }`) |
+| `style_indicator` | The value part of a `bar` / `slider` / `arc`, the mark of a `switch` / `checkbox` |
+| `style_indicator_checked` | That part when ON |
+| `style_knob` | The knob of a `slider` / `arc` / `switch` |
+| `style_items` | The keys of a `keyboard`, the items of a `dropdown` / `roller` |
+| `style_selected` | The selected item of a `roller` / `dropdown` |
+| `style_pressed` `style_checked` `style_disabled` `style_focused` | The body when pressed / ON / disabled / receiving input |
+| `style_scrollbar` | The scrollbar |
 
-`w` `h` を省くと、大きさは中身とテーマで決まる。並べてそろえるもの、押すものには `w` `h` を書く。`panel` の内側の余白も
-テーマで決まるので、位置を計算で合わせたいときは `"style": { "pad": 12 }` のように自分で決める。
+When `w` `h` are omitted, the size is decided by the content and the theme. Write `w` `h` for things that are lined up and aligned, and for things that are pressed. The inner padding of a `panel` is also
+decided by the theme, so when you want to position by calculation, set it yourself, like `"style": { "pad": 12 }`.
 
-## 画像
+## Pictures
 
-画像はプロジェクトのフォルダーの中のファイル（ふつう `assets/`）を、`project.json` からの相対パスで書く。
-**画像は AI が作らない。** `assets/` にあるものを使い（中身と大きさは画像として開いて確かめる）、合うものがなければ、
-要る画像（何の絵か、幅 × 高さ、背景を透かすか）を伝えてユーザーに用意してもらう。それまでは `panel` と `label` で場所を取っておく。
+A picture is a file inside the project folder (usually `assets/`), written as a path relative to `project.json`.
+**The AI does not make pictures.** Use what is in `assets/` (open it as a picture to check its content and size); if nothing fits,
+tell the user which picture is needed (what it shows, width × height, whether the background is transparent) and have the user provide it. Until then, reserve the place with a `panel` and a `label`.
 
-**プリセットのアイコン**: デザイナーに付いている白い絵記号（`<デザイナーのフォルダー>\icons\`）。プロジェクトに `assets/icons/` が
-なければ、フォルダーごと `assets\icons\` にコピーする（デザイナーの プロジェクト > アイコン のボタンと同じ）。
+**Preset icons**: white pictograms that come with the designer (`<designer folder>\icons\`). If the project has no `assets/icons/`,
+copy the whole folder to `assets\icons\` (the same as the Project > Icons button of the designer).
 
-- ファイル: `assets/icons/<大きさ>/<名前>.png`。大きさは `24` `32` `48` `64`（拡大しない。出す大きさのファイルを選ぶ）。
-- 名前の一覧は `assets/icons/icons.txt`、全部の絵は `assets/icons/preview.png`（開いて見て選ぶ）。
-  設備: `motor` `pump` `fan` `heater` `flame` `valve` `tank` `conveyor` `mixer` `oven` `cooling` `slicer` `package`
-  `thermometer` `humidity` `gauge` `factory`。メニュー・操作: `home` `trend` `report` `alarm` `warning` `info` `check` `error`
-  `play` `stop` `pause` `reset` `power` `settings` `user` `lock` `recipe` `io` `back` `forward` `menu` `list` `clock` `process`。
-- 色は `"style": { "image_recolor": "#36c98f" }`（白い絵なのでそのまま色になる）。状態で色を変えるときは `bind` の `image_recolor` + `map`。
-- ボタンに載せるなら、`button` の中に `image` を置く（`"align": "center"` か、文字と並べるなら `flex`）。押せる大きさは `button` で取る。
+- File: `assets/icons/<size>/<name>.png`. The size is `24` `32` `48` `64` (do not enlarge. Choose the file of the size to be shown).
+- The list of names is `assets/icons/icons.txt`, all the pictures are in `assets/icons/preview.png` (open it, look and choose).
+  Equipment: `motor` `pump` `fan` `heater` `flame` `valve` `tank` `conveyor` `mixer` `oven` `cooling` `slicer` `package`
+  `thermometer` `humidity` `gauge` `factory`. Menu and operation: `home` `trend` `report` `alarm` `warning` `info` `check` `error`
+  `play` `stop` `pause` `reset` `power` `settings` `user` `lock` `recipe` `io` `back` `forward` `menu` `list` `clock` `process`.
+- The colour is `"style": { "image_recolor": "#36c98f" }` (the picture is white, so it takes that colour as it is). To change the colour by state, use `image_recolor` + `map` in `bind`.
+- To put one on a button, place an `image` inside the `button` (`"align": "center"`, or `flex` to line it up with text). The pressable size is taken by the `button`.
 
 ```json
 { "type": "image", "x": 16, "y": 16, "src": "assets/logo.png" },
@@ -105,36 +105,36 @@
 { "type": "panel", "w": "100%", "h": "100%", "style": { "bg_image": "assets/plant.png" }, "children": [ ... ] }
 ```
 
-| 形式 | できること |
+| Format | What it can do |
 | --- | --- |
-| PNG | すべて。透過あり。`fit`・`zoom`・`rotation` が使える |
-| JPEG / BMP | **元の大きさで表示するだけ**（`fit`・`zoom`・`rotation` は効かない）。写真は、表示する大きさのファイルを用意してもらう |
-| GIF | アニメーションとして再生される（元の大きさ。`bind` で切り替えられない） |
+| PNG | Everything. Has transparency. `fit`, `zoom` and `rotation` can be used |
+| JPEG / BMP | **Shown at the original size only** (`fit`, `zoom` and `rotation` have no effect). For photos, have a file of the size to be shown provided |
+| GIF | Played as an animation (original size. Cannot be switched with `bind`) |
 
-- `fit`（PNG）: `w` `h` の枠に、`contain`（比率を保って全体が入る）/ `stretch`（引き伸ばす）/ `tile`（敷き詰める）/ `center`。
-  省くと元の大きさで、`w` `h` は画像の大きさになる。
-- **状態で色を変えるアイコン**: `image` に `"bind": { "image_recolor": { "tag": "state", "map": { ... } } }`（白いアイコンがその色になる）。
-  色違いの `image` を重ねる必要はない。カードの枠は `bind` の `border_color` + `map`（枠の太さは `style` の `border_width` で決めておく）。
-- 値で絵を替える: `bind` の `src` に `map`（値 → ファイル。bool は `"true"` / `"false"`、その他は `"default"`）。
-  当てはまるファイルがない値のときは何も表示しない。文字列のタグにファイル名を入れて `"bind": { "src": "タグ" }` でもよい。
-- 背景に敷く: `style` の `bg_image`（画面・`panel`・`button` など。中央に元の大きさ。`"bg_image_tiled": true` で敷き詰め、
-  `bg_image_opa` で薄く）。`style_pressed` などに書けば、その状態のときだけ出る。上に載せる部品の文字が読めるか、画像で確かめる。
-- 絵を重ねる: 同じ親の中で、あとに書いた部品が上に描かれる。2 つの `image` に同じ `align`（`center` など）と同じずれを付けると
-  中心が重なる（ポンプの絵の上に羽根、など）。`rotation` と `zoom` は絵の中心を軸にする。`zoom` と `animate` の回転は一緒に使える。
-- 拡大すると縁がぎざぎざになる（`fit` も `zoom` も補間しない）。大きく見せたい絵は、表示する大きさのファイルを用意してもらう。
-  縮小はきれいに出る。
-- 大きさの調べ方（PowerShell）: `Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile("<ファイル>"); "$($i.Width)x$($i.Height)"; $i.Dispose()`。
-  白い絵に透明の背景のアイコンは、画像として開くと真っ白に見える。暗い `panel` の上に置いて `--render` で確かめる。
-- 押せる絵: `image` に `on_click`。小さい絵は、まわりに `panel` を置いて押せる範囲を 48px 以上にする。
-- 単色のアイコン（白い PNG）は `"style": { "image_recolor": "#4caf50" }` で色を付けられる（値で変えるなら `bind` の `image_recolor`）。
-- 1 枚の画像は幅 × 高さが約 400 万ピクセルまで。画面より大きい画像は使わない（メモリは 幅 × 高さ × 4 バイト要る）。
-- `--check` が見るもの: ファイルがあるか、プロジェクトの中か、形式、JPEG / BMP に `fit` などを付けていないか。
-  壊れたファイルや大きすぎる画像は `runtime:` の行に出る。
+- `fit` (PNG): in the box of `w` `h`, `contain` (the whole picture fits, keeping the ratio) / `stretch` (stretched) / `tile` (tiled) / `center`.
+  When omitted, it is the original size, and `w` `h` become the size of the picture.
+- **An icon that changes colour by state**: `"bind": { "image_recolor": { "tag": "state", "map": { ... } } }` on the `image` (a white icon takes that colour).
+  There is no need to stack `image`s of different colours. For the border of a card, use `border_color` + `map` in `bind` (set the border thickness with `border_width` in `style`).
+- Changing the picture by value: `map` on `src` in `bind` (value → file. bool is `"true"` / `"false"`, everything else is `"default"`).
+  For a value with no matching file, nothing is shown. Putting a file name in a string tag and using `"bind": { "src": "<tag>" }` is also fine.
+- As a background: `bg_image` in `style` (screen, `panel`, `button` and so on. In the centre at the original size. `"bg_image_tiled": true` tiles it,
+  `bg_image_opa` makes it fainter). Written in `style_pressed` and the like, it shows only in that state. Check in the picture that the text of the widgets placed on top can be read.
+- Stacking pictures: within the same parent, a widget written later is rendered on top. Giving 2 `image`s the same `align` (`center` and so on) and the same offset
+  makes their centres coincide (blades on top of a pump picture, and so on). `rotation` and `zoom` use the centre of the picture as the axis. `zoom` and the rotation of `animate` can be used together.
+- Enlarging makes the edges jagged (neither `fit` nor `zoom` interpolates). For a picture to be shown large, have a file of the size to be shown provided.
+  Shrinking comes out clean.
+- How to find the size (PowerShell): `Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile("<file>"); "$($i.Width)x$($i.Height)"; $i.Dispose()`.
+  An icon that is a white picture on a transparent background looks all white when opened as a picture. Place it on a dark `panel` and check with `--render`.
+- A pressable picture: `on_click` on the `image`. For a small picture, put a `panel` around it and make the pressable area 48px or more.
+- A single-colour icon (white PNG) can be coloured with `"style": { "image_recolor": "#4caf50" }` (to change it by value, `image_recolor` in `bind`).
+- One picture may be up to about 4 million pixels in width × height. Do not use a picture larger than the screen (memory needed is width × height × 4 bytes).
+- What `--check` looks at: whether the file exists, whether it is inside the project, the format, whether `fit` and the like are put on a JPEG / BMP.
+  Broken files and pictures that are too large appear on `runtime:` lines.
 
-## アニメーション
+## Animation
 
-どの部品にも `animate` を書ける（1 つ、または配列）。**その画面が表示されていて、`when` が成り立つ間だけ**動き、
-止まると部品は元の見た目に戻る。`when` を省くと、画面が出ている間ずっと動く。
+`animate` can be written on any widget (one, or an array). It moves **only while that screen is shown and `when` holds**;
+when it stops, the widget returns to its original look. When `when` is omitted, it moves all the time the screen is shown.
 
 ```json
 { "type": "label", "text": "@alarm", "animate": { "preset": "blink", "when": "alarm_active" } },
@@ -144,43 +144,43 @@
 { "type": "image", "src": "assets/conv1.png", "animate": { "prop": "frames", "files": ["assets/conv1.png", "assets/conv2.png", "assets/conv3.png"], "time": 600, "when": "run" } }
 ```
 
-| キー | 意味 |
+| Key | Meaning |
 | --- | --- |
-| `preset` | `blink`（点いたり消えたり、1 秒周期）/ `pulse`（ゆっくり明滅）/ `spin`（1 回転 2 秒）。下のキーで上書きできる |
-| `prop` | 動かすもの: `opa`（不透明度 0〜100）/ `x` `y` `w` `h`（px）/ `rotation`（度）/ `zoom`（1 = 元の大きさ）/ `bg_color` `text_color` / `frames`（`image` の絵を順に替える） |
-| `from` / `to` | 両端の値。`from` を省くと今の値から |
-| `time` | 片道の時間（ミリ秒、既定 1000）。`frames` では一巡の時間 |
-| `playback` | true で往復する |
-| `repeat` | 回数（省くとずっと） |
-| `path` | 動き方: `linear`（既定）/ `ease_in` / `ease_out` / `ease_in_out` / `step`（時間の終わりで切り替わる） |
-| `delay` | 始まるまでの時間（ミリ秒） |
-| `when` | タグ名（真のとき）か条件（`{ "tag": "state", "eq": 2 }`。`bind` の条件と同じ書き方） |
+| `preset` | `blink` (on and off, 1 second period) / `pulse` (slow brightening and dimming) / `spin` (one turn in 2 seconds). Can be overridden with the keys below |
+| `prop` | What is animated: `opa` (opacity 0–100) / `x` `y` `w` `h` (px) / `rotation` (degrees) / `zoom` (1 = original size) / `bg_color` `text_color` / `frames` (changes the picture of an `image` in turn) |
+| `from` / `to` | The values at both ends. When `from` is omitted, from the current value |
+| `time` | Time one way (milliseconds, default 1000). For `frames`, the time of one cycle |
+| `playback` | true makes it go back and forth |
+| `repeat` | Number of times (when omitted, forever) |
+| `path` | How it moves: `linear` (default) / `ease_in` / `ease_out` / `ease_in_out` / `step` (switches at the end of the time) |
+| `delay` | Time until it starts (milliseconds) |
+| `when` | A tag name (when true) or a condition (`{ "tag": "state", "eq": 2 }`. Written the same way as a condition of `bind`) |
 
-- `preset` の `time`: `blink` は既定 500（点いている 500 + 消えている 500 = 1 秒周期）、`pulse` は 700、`spin` は 2000（1 回転）。
-  遅くしたいときは `time` を大きくする。既定の `blink` は十分ゆっくりで、そのまま使ってよい。
-- `when` の条件は `bind` と同じで、別のタグとも比べられる: `"when": { "tag": "temp", "gt": { "tag": "temp_hi" } }`。
-- 止まると元の見た目に戻る（回転の途中でも元の角度に、点滅の途中でも見える状態に）。**「条件のときだけ出て、その間点滅する」**
-  ものは、`visible` と `animate` の両方に同じ条件を書く:
+- `time` of a `preset`: `blink` is 500 by default (on 500 + off 500 = 1 second period), `pulse` is 700, `spin` is 2000 (one turn).
+  To make it slower, make `time` larger. The default `blink` is slow enough and may be used as it is.
+- The condition of `when` is the same as in `bind` and can also compare with another tag: `"when": { "tag": "temp", "gt": { "tag": "temp_hi" } }`.
+- When it stops, it returns to the original look (to the original angle even in the middle of a rotation, to the visible state even in the middle of a blink). For something that
+  **"appears only under a condition, and blinks during that time"**, write the same condition on both `visible` and `animate`:
   `{ "type": "image", "src": "assets/warning.png", "bind": { "visible": { "tag": "temp", "gt": { "tag": "temp_hi" } } }, "animate": { "preset": "blink", "when": { "tag": "temp", "gt": { "tag": "temp_hi" } } } }`
 
-使いどころと決まり:
-- **動きは「いま気づいてほしいこと」だけに使う**（未確認のアラーム、運転中、流れている）。飾りに動かさない。
-  1 画面で同時に動くものは少なく（目安 3 つまで）。常に動くもの（`when` なし）は避ける。
-- 点滅（`opa` と色）は 1 秒に 3 回より速くできない（ランタイムが遅くする）。警告は `pulse` か、ゆっくりした `blink` にする。
-- 動いても読めること: 値や操作するボタンそのものは点滅させない。枠・帯・アイコンを動かす。
-- `rotation` と `zoom` は `image`（PNG）に使うのが軽い。ほかの部品に付けると描画が重くなるので、小さい部品だけにする。
-  JPEG / BMP の `image` は回転・拡大できない。
-- `x` `y` を動かす部品は `align` を付けず、`from` / `to` に座標を書く。flex で並べた中の部品は動かさない。
-- `frames` の絵は同じ大きさにする。
-- 確かめ方: `--render` に `--at <ミリ秒>` を付けると、その画面が出てからおよそその時間がたった絵になる。
-  時刻を変えて 2 枚描き、動いていること・`when` が成り立たないとき（`--set`）は止まっていることを見る。
-  `--at` は 1 回の実行で 1 つ（全部の `--render` に効く）なので、時刻ごとに実行する。
-  **点滅は「消えている」瞬間に当たると部品がないように見える**。1 秒周期の `blink` なら `--at 450` と `--at 950` のように
-  半周期ずらした 2 枚を描き、片方に出ていればよい。回転は `--at 200` と `--at 700` で角度が違えばよい。
+Where to use it, and rules:
+- **Use motion only for "what should be noticed now"** (an unacknowledged alarm, running, flowing). Do not animate for decoration.
+  Keep the things moving at the same time on 1 screen few (guide: up to 3). Avoid things that always move (no `when`).
+- Blinking (`opa` and colours) cannot be faster than 3 times per second (the runtime slows it down). For a warning, use `pulse` or a slow `blink`.
+- It must be readable while moving: do not blink a value or an operated button itself. Animate a frame, a band or an icon.
+- `rotation` and `zoom` are light when used on an `image` (PNG). On other widgets rendering becomes heavy, so use them on small widgets only.
+  A JPEG / BMP `image` cannot be rotated or enlarged.
+- A widget whose `x` `y` are animated gets no `align`; write the coordinates in `from` / `to`. Do not animate a widget inside a flex layout.
+- Make the pictures of `frames` the same size.
+- How to check: adding `--at <milliseconds>` to `--render` gives the picture at about that time after the screen appeared.
+  Render 2 pictures at different times, and see that it moves and that it is stopped when `when` does not hold (`--set`).
+  `--at` is one per run (it applies to every `--render`), so run once per time.
+  **When a blink is hit at the moment it is "off", the widget looks as if it were not there**. For a `blink` with a 1 second period, render 2 pictures
+  half a period apart, like `--at 450` and `--at 950`; it is fine if it shows in one of them. For a rotation, it is fine if the angle differs between `--at 200` and `--at 700`.
 
-## 動作
+## Actions
 
-イベント（`on_click` など）に、動作 1 つか配列（順に実行）を書く。
+On an event (`on_click` and so on), write one action or an array (run in order).
 
 ```json
 "on_click": [
@@ -197,22 +197,22 @@
 ]
 ```
 
-- `set` の `value` は、タグの型に合わせて JSON の値で書く（`true` / `false`、数値、文字列）。
-- 押している間だけ ON: `on_press` で `set` true、`on_release` で `set` false。
-- イベントはどの部品にも書ける（`panel` や `label` も、イベントを書けば押せるようになる）。
-- `call` の `fn`（ランタイムに登録された動作）: `alarm.ack_all`（すべてのアラームを確認）、`data_log.sample`（`arg` に
-  グループ名。今の値を記録）、`recipe.write` などレシピの操作（ふつうは `recipe_table` が行う）、
-  `system_log.export` / `data_log.export` / `alarm_log.export` / `operation_log.export`（CSV に書き出す）、
-  `alarm.export_summary`（アラーム集計を CSV に。`arg` は日数）、
-  `sound.play`（`arg` は音の名前）/ `sound.stop` / `sound.silence`、`mail.send`（`arg` は `"件名\n本文"`）/ `mail.test`、
-  `upload.run`（`arg` は `uploads` の名前。省くとすべて）。後ろの 3 組は、プロジェクトにその機能（`sound` / `mail` / `uploads`）が
-  あるときだけ働く（下の「画面の外の機能を画面から使う」）。ほかの名前は書かない。
-- `system` は組み込みのシステム設定画面を開く（ボタンがなくても、装置では画面の左上の隅を 3 秒押すと開く）。`reload` `exit` `restart` は保守用。ふつうの画面には置かない。
-- `script` は Lua。`code` に短く書くか、`name` で `project.json` の `scripts` のものを呼ぶ。タグは `tag.名前`。
+- Write the `value` of `set` as a JSON value that matches the type of the tag (`true` / `false`, a number, a string).
+- ON only while pressed: `set` true in `on_press`, `set` false in `on_release`.
+- Events can be written on any widget (a `panel` or a `label` also becomes pressable when an event is written on it).
+- `fn` of `call` (actions registered in the runtime): `alarm.ack_all` (acknowledges all alarms), `data_log.sample` (group name
+  in `arg`. Records the current values), recipe operations such as `recipe.write` (usually done by `recipe_table`),
+  `system_log.export` / `data_log.export` / `alarm_log.export` / `operation_log.export` (export to CSV),
+  `alarm.export_summary` (the alarm summary to CSV. `arg` is the number of days),
+  `sound.play` (`arg` is the name of the sound) / `sound.stop` / `sound.silence`, `mail.send` (`arg` is `"Subject\nBody"`) / `mail.test`,
+  `upload.run` (`arg` is a name in `uploads`. When omitted, all). The last 3 groups work only when the project has
+  that feature (`sound` / `mail` / `uploads`) (see "Using features outside the screens from a screen" below). Do not write other names.
+- `system` opens the built-in system settings screen (even without a button, on the device, pressing the top-left corner of the screen for 3 seconds opens it). `reload` `exit` `restart` are for maintenance. Do not put them on ordinary screens.
+- `script` is Lua. Write it briefly in `code`, or call one in `scripts` of `project.json` with `name`. Tags are `tag.<name>`.
 
-## ポップアップ
+## Popups
 
-画面ファイルに `"popup": true` を書くと、今の画面の上に重ねて開く。
+Writing `"popup": true` in a screen file makes it open on top of the current screen.
 
 ```json
 { "name": "confirm_stop", "popup": true, "w": 420, "h": 220, "dim": true,
@@ -226,210 +226,221 @@
   ] }
 ```
 
-- 開くのは `{ "action": "popup", "screen": "confirm_stop" }`。開いている間、下の画面は触れない。
-- 確かめるときは `--render <開く元の画面>+confirm_stop,<ファイル.png>`。
-- 中の幅は `w` から `pad` の 2 倍と枠（`border_width`。テーマでは 2 px）の 2 倍を引いたもの。子をぴったりの幅にすると横のスクロールバーが
-  出る。子の幅は `"100%"` にするか、余裕を取る。
-- 大きさと位置は `w` `h` `x` `y` `align`（既定は 60% × 60%、中央）。
-- 確認が要る操作（停止、削除）や、1 台分の詳細表示に使う。`"set"` で「どの装置か」をタグに渡せる。
-- ポップアップも `project.json` の `"screens"` に足す。
+- It is opened with `{ "action": "popup", "screen": "confirm_stop" }`. While it is open, the screen below cannot be touched.
+- To check it, use `--render <screen it is opened from>+confirm_stop,<file.png>`.
+- The inner width is `w` minus 2 times `pad` and 2 times the border (`border_width`. 2 px in the theme). Making a child exactly that wide makes a horizontal scrollbar
+  appear. Make the width of a child `"100%"`, or leave some room.
+- The size and position are `w` `h` `x` `y` `align` (default is 60% × 60%, centre).
+- Use it for operations that need confirmation (stop, delete) and for the detail display of one unit. With `"set"`, "which machine" can be passed in a tag.
+- Add popups to `"screens"` in `project.json` too.
 
-## 多言語
+## Multiple languages
 
-`project.json` に `languages` があるとき、文字は `texts` に置いて `"@ID"` で使う。
+When `project.json` has `languages`, put the text in `texts` and use it with `"@ID"`.
 
 ```json
 "languages": ["ja", "en"],
 "texts": { "temperature": { "ja": "温度", "en": "Temperature" } }
 ```
 
-- `"@ID"` が使えるのは、部品の `text` / `placeholder` / `options` の各項目、アラームの `message`、部品の `labels`。
-- `bind` の `format` の中では使えない。単位や記号だけにして、説明の文字は別の `label` に分ける。
-- 足す ID は既存のものと重ならない、意味のわかる英小文字と `_`。すべての言語の訳を入れる。
-- 操作の言葉（「運転」「停止」: ボタン）と状態の言葉（「運転中」「停止中」: 表示）は別の意味なので、別の ID にする。
-- 同じ意味の ID がもうあれば、それを使う。言い回しが少し違うだけなら既存の言葉に合わせる（既存の訳は変えない）。
-- `languages` がないプロジェクトでは、文字をそのまま書く。
+- `"@ID"` can be used in: the `text` / `placeholder` / each item of `options` of a widget, the `message` of an alarm, the `labels` of a widget.
+- It cannot be used inside the `format` of `bind`. Keep that to units and symbols only, and put the descriptive text in a separate `label`.
+- An ID that is added must not clash with the existing ones, and is made of meaningful lower-case English letters and `_`. Enter the translation for every language.
+- Words for an operation ("Run", "Stop": buttons) and words for a state ("Running", "Stopped": display) have different meanings, so make them different IDs.
+- If an ID with the same meaning already exists, use it. If only the wording differs a little, match the existing words (do not change existing translations).
+- In a project without `languages`, write the text as it is.
 
-## 専用の部品
+- **Adding languages to a project that has none**: `"languages": ["de", "en"]` - any short codes; **the first is the default** and what a
+  missing translation falls back to. `"language"` picks another one for the start. Screens that still have their words written
+  directly keep showing them as they are, in every language: say which screens you converted and which are left.
+  Alarm messages are translated only when they are `"@ID"` - changing the existing ones is part of "this screen in two languages" only
+  when the screen shows them (an alarm table); report it.
+- A button that switches the language: `{ "action": "language", "lang": "next" }`. For its text use a text id whose value in each
+  language is the name of the *other* language (`"lang_other": { "de": "English", "en": "Deutsch" }`), or the fixed word "Language".
+- The built-in screens (system settings, login, the keys "Close" / "OK" of the keyboard) are Japanese or English only.
 
-これらは中に自分の表示（見出し、ボタン、行）を持つので、小さすぎると中身が入らない。下の「大きさ」を守る。
-部品の `style`（`bg_color`、`border_width`、`radius`、`pad`、`font`、`text_color`）は枠と文字に効く。中の行やボタンの色（`alarm_list` の
-重要度の色、履歴の行、`recipe_table` の書き込みボタン）は変えられない。
+## Special widgets
 
-| 部品 | 要るもの | 例 |
+These have their own display inside (headings, buttons, rows), so when too small the content does not fit. Keep to the "Size" given below.
+The `style` of the widget (`bg_color`, `border_width`, `radius`, `pad`, `font`, `text_color`) applies to the frame and the text. The colours of the rows and buttons inside (the severity
+colours of `alarm_list`, the history rows, the write button of `recipe_table`) cannot be changed.
+
+| Widget | What it needs | Example |
 | --- | --- | --- |
-| `alarm_banner` | `project.json` の `alarms` | `{ "type": "alarm_banner", "align": "top_mid", "w": "100%", "h": 36 }`（いちばん新しい未確認のアラームを帯で出す） |
-| `alarm_summary` | `alarms` | `{ "type": "alarm_summary", "w": "100%", "h": 300, "days": 7 }`（アラームごとの回数と時間） |
-| `alarm_list` | `alarms` | `{ "type": "alarm_list", "w": "100%", "h": 300, "mode": "current" }`（`history` で履歴） |
-| `log_view` | 出すログの設定（`system_log` / `operation_log` / `data_log`） | `{ "type": "log_view", "w": "100%", "h": 300, "source": "system" }`（`operation`、`data` + `group`） |
-| `trend` | `data_log` のグループ | `{ "type": "trend", "w": "100%", "h": 300, "group": "process", "tags": ["temp", "level"], "range_s": 3600 }` |
-| `bar_chart` | `data_log` のグループ | `{ "type": "bar_chart", "w": 600, "h": 260, "group": "production", "tag": "production_count", "bars": 12 }`（時間ごとの生産数など） |
-| `chart` | なし（表示している間の値だけ） | `{ "type": "chart", "w": 300, "h": 160, "series": [ { "tag": "temp", "color": "#ff9800" } ], "min": 0, "max": 100 }` |
-| `recipe_table` | `recipes` のブック | `{ "type": "recipe_table", "w": "100%", "h": 300, "book": "products" }` |
-| `keyboard` | なし | `{ "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "45%" }`（入力欄がある画面に 1 つ。ふだんは隠れている） |
+| `alarm_banner` | `alarms` in `project.json` | `{ "type": "alarm_banner", "align": "top_mid", "w": "100%", "h": 36 }` (shows the newest unacknowledged alarm as a band) |
+| `alarm_summary` | `alarms` | `{ "type": "alarm_summary", "w": "100%", "h": 300, "days": 7 }` (count and time per alarm) |
+| `alarm_list` | `alarms` | `{ "type": "alarm_list", "w": "100%", "h": 300, "mode": "current" }` (`history` for the history) |
+| `log_view` | The settings of the log to show (`system_log` / `operation_log` / `data_log`) | `{ "type": "log_view", "w": "100%", "h": 300, "source": "system" }` (`operation`, `data` + `group`) |
+| `trend` | A group of `data_log` | `{ "type": "trend", "w": "100%", "h": 300, "group": "process", "tags": ["temp", "level"], "range_s": 3600 }` |
+| `bar_chart` | A group of `data_log` | `{ "type": "bar_chart", "w": 600, "h": 260, "group": "production", "tag": "production_count", "bars": 12 }` (production count per hour and the like) |
+| `chart` | Nothing (only the values while it is shown) | `{ "type": "chart", "w": 300, "h": 160, "series": [ { "tag": "temp", "color": "#ff9800" } ], "min": 0, "max": 100 }` |
+| `recipe_table` | A book of `recipes` | `{ "type": "recipe_table", "w": "100%", "h": 300, "book": "products" }` |
+| `keyboard` | Nothing | `{ "type": "keyboard", "align": "bottom_mid", "w": "100%", "h": "45%" }` (one on a screen that has input fields. Normally hidden) |
 
 ### `alarm_summary`
 
-- アラームごとの発生回数と発生時間の合計を、期間を選んで出す部品（保全向け: 「何が多いか」「何で長く止まったか」）。`alarms` が要る。
-- 中に、上の帯（期間と並べ方のドロップダウン、合計。高さ約 46px）と行を持つ。1 行 36px、見出し 28px。
-  **高さは「90 + 39 × 行数」を目安**にし、`rows` をそれに合わせる（480x320 の画面なら `rows` 5〜6）。
-  **幅は 360 以上**が安心（320 では、英語の並べ方の文字や長いアラーム名が切れる）。狭い所に置くなら `"bars": false`（回数の棒を出さない）にする。
-  アラームの名前が長いと 1 行に入らず切れる。名前の列が十分に取れる幅にする。
-- `days` で最初の期間（1 / 7 / 30 / 0 = すべて）、`sort` で `count`（回数）か `time`（時間）。どちらも操作者が部品の上で変えられる。
-- 部品の中の文字は英語（`Alarm` `Count` `Time` `24 h` …）。日本語にするには `labels` に書く:
+- A widget that shows, for a chosen period, the number of occurrences and the total active time per alarm (for maintenance: "what happens often", "what caused long stops"). Needs `alarms`.
+- Inside it has a top band (dropdowns for the period and the sort order, the total. About 46px high) and rows. One row is 36px, the heading 28px.
+  **As a guide the height is "90 + 39 × number of rows"**, and `rows` is set to match (on a 480x320 screen, `rows` 5–6).
+  **A width of 360 or more** is safe (at 320, the English sort-order text and long alarm names are cut off). When placing it in a narrow place, set `"bars": false` (the count bars are not shown).
+  A long alarm name does not fit on one row and is cut off. Use a width that leaves enough for the name column.
+- `days` is the initial period (1 / 7 / 30 / 0 = all), `sort` is `count` (count) or `time` (time). The operator can change both on the widget.
+- The text inside the widget is English (`Alarm` `Count` `Time` `24 h` …). To make it Japanese, write it in `labels`:
   `"labels": { "alarm": "アラーム", "count": "回数", "time": "時間", "day": "24 時間", "week": "7 日", "month": "30 日", "all": "すべて", "by_count": "回数順", "by_time": "時間順", "empty": "アラームなし" }`
-- CSV に書き出すボタンを付けるなら `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }`（引数は日数）。
-- `--check --render` の画像では、`--set` でアラームが出る値にすると、その分の行が出る（過去の記録は数えない）。
-  行の見え方は、こうして 1〜2 行出して確かめる。
+- To add a button that exports to CSV, use `{ "action": "call", "fn": "alarm.export_summary", "arg": "7" }` (the argument is the number of days).
+- In the picture of `--check --render`, using `--set` to give values that raise alarms makes those rows appear (past records are not counted).
+  Check how the rows look by making 1–2 rows appear this way.
 
 ### `alarm_list` / `alarm_banner`
 
-- 「今出ているアラームを 1 行で」は `alarm_banner`（いちばん新しい未確認の 1 件。なければ `idle` の文字）。
-  「一覧で」は `alarm_list`。
-- 「対象設備」の列はない。`message` の頭に設備名を書く（`"Oven: temperature high"`）。
-- `alarm_list` の `columns`: `time` `severity` `message` `state` から選ぶ（省くと `["time", "message", "state"]`）。
-  `mode`: `current`（省いたとき。発生中と未確認）/ `history`（履歴。`days` で期間）。`rows` は出す行数の上限
-  （省くと 50、履歴は 20）、`row_height` は省くと 40。`ack_on_tap` は省くと true（行を押すと確認）。
-- 大きさ: 高さ ≒ 見せたい行数 × `row_height` + 16。入りきらない行はスクロールする。
-- `labels` で中の文字を置き換えられる（`"@ID"` も使える）: `unacked` `active` `cleared` `empty`（1 件もないとき）
-  `idle`（バナーで何もないとき）`more`（`%d` が件数）`raised` `cleared_event` `acked_event`。
-  省くと英語（`UNACK`、`No alarms` など）。日本語のプロジェクトでは `labels` を付ける。
-  `severity` の列に出るのは `alarms` に書かれた語（`warning` など）そのままで、訳せない。
+- "The alarm that is active now, in 1 line" is `alarm_banner` (the newest unacknowledged one. If there is none, the `idle` text).
+  "As a list" is `alarm_list`.
+- There is no "target equipment" column. Write the equipment name at the start of `message` (`"Oven: temperature high"`).
+- `columns` of `alarm_list`: choose from `time` `severity` `message` `state` (when omitted, `["time", "message", "state"]`).
+  `mode`: `current` (when omitted. Active and unacknowledged) / `history` (history. Period with `days`). `rows` is the upper limit of rows shown
+  (when omitted 50, for history 20), `row_height` is 40 when omitted. `ack_on_tap` is true when omitted (pressing a row acknowledges it).
+- Size: height ≈ number of rows to show × `row_height` + 16. Rows that do not fit scroll.
+  In `history` mode add about 50 px: a pager ("< 1/1 >") and a filter list ("All") are at the bottom. They cannot be hidden and
+  their words stay English. Give a history list at least 320 px of width.
+- `labels` replaces the text inside (`"@ID"` can also be used): `unacked` `active` `cleared` `empty` (when there is not even one)
+  `idle` (when there is nothing in the banner) `more` (`%d` is the number) `raised` `cleared_event` `acked_event`.
+  When omitted, English (`UNACK`, `No alarms` and so on). In a Japanese project, add `labels`.
+  What appears in the `severity` column is the word written in `alarms` (`warning` and so on) as it is; it cannot be translated.
 
 ### `trend`
 
-- 中に、期間の見出し（上）と操作のボタン 5 つ・凡例（下）を持つ。この 2 つで高さを約 110px 使い、消せない。
-  **高さは 240 以上**（グラフの部分が 130px 以上になるように）、幅は 400 以上。
-- `tags`: タグ名の配列か、色を決める形 `[ { "tag": "temp", "color": "#42a5f5" }, { "tag": "level", "color": "#66bb6a" } ]`。
-  省くとグループの全タグ。色を省くとテーマの色が順に付く（2 本目は橙になりやすい。警告と紛らわしければ色を決める）。
-  `group` に入っていないタグは出せない（`project.json` の `data_log.groups[].tags` を見る）。
-- 縦軸は 1 本。`min` と `max` を両方書くとその範囲、省くと出ているデータに合わせて自動で決まる。範囲が大きく違う値
-  （温度 20〜30 と液面 0〜100）は同じ軸だと片方が平らになるので、頼まれた見え方に合わせて部品を分けるか、そのことを伝える。
-- 凡例にはタグ名がそのまま出る（訳せない）。何の線かは、上に `label` で題を付けて伝える。
-- `labels`: `now`（「今に戻る」ボタンの文字。省くと `Now`）。
+- Inside it has the heading of the period (top) and 5 operation buttons and the legend (bottom). These 2 use about 110px of height and cannot be removed.
+  **Height 240 or more** (so that the graph part is 130px or more), width 400 or more.
+- `tags`: an array of tag names, or the form that sets colours `[ { "tag": "temp", "color": "#42a5f5" }, { "tag": "level", "color": "#66bb6a" } ]`.
+  When omitted, all tags of the group. When the colour is omitted, theme colours are given in turn (the 2nd line tends to be orange. If it can be confused with a warning, set the colours).
+  A tag that is not in `group` cannot be shown (look at `data_log.groups[].tags` in `project.json`).
+- There is 1 vertical axis. Writing both `min` and `max` gives that range; when omitted it is decided automatically from the data shown. Values whose ranges differ greatly
+  (temperature 20–30 and level 0–100) on the same axis make one of them flat, so split the widget to suit the look that was asked for, or say so.
+- The legend shows the tag names as they are (cannot be translated). Say what the lines are by putting a title above with a `label`.
+- `labels`: `now` (text of the "back to now" button. `Now` when omitted).
 
 ### `bar_chart`
 
-- 変数ロギングの 1 つのタグを、時計に合わせた区切り（既定 1 時間）ごとに棒で出す。**時間別の生産数**は、生産数のカウンター
-  （増えていくタグ）を `data_log` のグループに入れ（`"trigger": "interval"`, `"interval_ms": 60000` で十分）、`"mode": "increase"`（既定）にする。
-  区切りごとの最後の値（温度、在庫）は `"mode": "value"`。
-- `bucket_s`（1 本の秒数、既定 3600）、`bars`（本数 1〜48）、`start`: `now`（今までの最後の何本。既定 12 本）/ `day`（0 時から。`bars` を
-  省くと 1 日分 = 24 本。12 本にすると 0〜11 時だけになる）。
-- `target` は各棒の目標の高さに横線を引く（棒の間で切れた破線に見える）。`label` は**棒の下の時刻の書式**（題ではない。題は別の `label` 部品）。
-- `target`（数値）で目標の線、`color` / `target_color`、`decimals`、`show_values`（棒の上の数値）、`label`（棒の下の時刻、strftime。既定は `%H`）。
-- 中に、上の数値・棒・下の時刻を持つ。**高さは 160 以上、1 本あたり幅 24 以上**（12 本なら幅 360 以上。数値が入らなければ `show_values: false`）。
-  文字の大きさと色は部品の `style`（`font`、`text_color`）。
-- `--check --render` ではログを読まないので、棒は空（時刻だけ出る）。棒の見え方は、コピーを動かす手順で、記録がたまってから確かめる。
-  グループとタグの名前の間違いは `--check` が見つける。
+- Shows 1 tag of data logging as bars, per interval aligned to the clock (default 1 hour). For **production count per hour**, put the production counter
+  (a tag that keeps increasing) in a group of `data_log` (`"trigger": "interval"`, `"interval_ms": 60000` is enough) and use `"mode": "increase"` (default).
+  For the last value of each interval (temperature, stock), `"mode": "value"`.
+- `bucket_s` (seconds per bar, default 3600), `bars` (number of bars 1–48), `start`: `now` (the last so many bars up to now. Default 12 bars) / `day` (from 0:00. When `bars` is
+  omitted, one day = 24 bars. With 12 bars it is only 0:00–11:00).
+- `target` draws a horizontal line at the target height on each bar (it looks like a dashed line broken between the bars). `label` is **the format of the time under the bars** (not a title. A title is a separate `label` widget).
+- `target` (number) for the target line, `color` / `target_color`, `decimals`, `show_values` (the numbers above the bars), `label` (the time under the bars, strftime. Default is `%H`).
+- Inside it has the numbers on top, the bars, and the times below. **Height 160 or more, width 24 or more per bar** (for 12 bars, width 360 or more. If the numbers do not fit, `show_values: false`).
+  The size and colour of the text are the `style` of the widget (`font`, `text_color`).
+- `--check --render` does not read the log, so the bars are empty (only the times appear). Check how the bars look with the procedure for running a copy (SKILL.md, "When you want to check what happens after a press"), after records have accumulated.
+  `--check` finds mistakes in the names of the group and the tag.
 
 ### `xy_chart`
 
-- 2 つのタグを横軸と縦軸にするグラフ（位置と荷重、開度と流量）。時間の流れを見せるなら `chart`（短い時間）か `trend`（記録した履歴）を使う。
-- 軸のキーは `x_tag` `x_min` `x_max` / `y_tag` `y_min` `y_max`（`x` `y` は部品の位置）。範囲は必ず書く（自動では決まらない）。
-  軸の両端に範囲の数字が出るだけなので、何の軸かは近くに `label` で書く（「位置 mm」「荷重 kN」）。
-- 大きさは 200x160 以上。**`points` は数百まで**にする（点が増えるたびに全部の線を描き直すので、小さな装置では重い。
-  Raspberry Pi 4 で 300 点なら CPU 5〜8 %、2000 点で 25〜32 %）。
-- 1 サイクルごとの波形を見せるなら、サイクルの開始で真になるタグを `clear_tag` に書く。
-- 複数の曲線は `series` に足す（全部で 4 本、軸は共通）。色は順に青・赤・緑・橙。赤が「異常」に見える画面では `color` を決める。
-- `--check --render` の画像では点は出ない（枠と軸の数字だけ）。線の見え方は、コピーを動かす手順で確かめる。
+- A graph with 2 tags as the horizontal and vertical axes (position and load, opening and flow). To show the passage of time, use `chart` (a short time) or `trend` (recorded history).
+- The keys of the axes are `x_tag` `x_min` `x_max` / `y_tag` `y_min` `y_max` (`x` `y` are the position of the widget). Always write the ranges (they are not decided automatically).
+  Only the range numbers appear at both ends of the axes, so write what each axis is with a `label` nearby ("Position mm", "Load kN").
+- The size is 200x160 or more. Keep **`points` to a few hundred at most** (every time a point is added all the lines are redrawn, so it is heavy on a small device.
+  On a Raspberry Pi 4, 300 points is CPU 5–8 %, 2000 points is 25–32 %).
+- To show the waveform of each cycle, write in `clear_tag` a tag that becomes true at the start of the cycle.
+- Add more curves to `series` (4 in all, the axes are shared). The colours are, in order, blue, red, green, orange. On a screen where red looks like "abnormal", set `color`.
+- In the picture of `--check --render` the points do not appear (only the frame and the axis numbers). Check how the lines look with the procedure for running a copy (SKILL.md, "When you want to check what happens after a press").
 
 ### `table`
 
-- 文字とタグの値を行と列で見せる部品（表示だけ）。同じ形の値が何行も並ぶとき（機械ごとの生産数と状態、レシピの一覧）に使う。
-  数個の値なら `label` や `numeric_display` を並べるほうが大きく読める。
-- `columns` は見出し（文字か `{ "title", "width", "align" }`）、`rows` は行の配列で、セルは文字・数値か `{ "tag": "<タグ>", "format": "%.1f", "map": { "0": "停止", "1": "運転" } }`。
-  数値の列は `"align": "right"` にし、単位は `format` に入れる（`"%d 個"`）か見出しに書く。
-- 状態を `map` で文字にするときは、既存の画面の言い方に合わせる（「運転 / 停止」など）。色は付けられないので、状態は文字で区別する。
-- 1 行は約 36px（`font` 16 のとき。見出しも同じくらい）。高さは「(行数 + 1) × 36 + 8」を目安にし、入りきらない行は表の中でスクロールする
-  （画像で最後の行が切れていないか、スクロールバーが出ていないかを見る）。
-- `map` の値にも `"@ID"` を書ける（言語に合わせて訳される）。
-  幅を書かない列は残りを等分するので、長い文字の列以外には `width` を書くとそろう。
-- `languages` のあるプロジェクトでは、見出しとセルの文字を `"@ID"` で書く。
+- A widget that shows text and tag values in rows and columns (display only). Use it when values of the same shape line up in many rows (production count and state per machine, a list of recipes).
+  For a few values, lining up `label` or `numeric_display` reads larger.
+- `columns` is the headings (text or `{ "title", "width", "align" }`), `rows` is an array of rows, and a cell is text, a number, or `{ "tag": "<tag>", "format": "%.1f", "map": { "0": "Stop", "1": "Run" } }`.
+  Make number columns `"align": "right"`, and put the unit in `format` (`"%d pcs"`) or write it in the heading.
+- When turning a state into text with `map`, match the wording of the existing screens ("Run / Stop" and so on). Colours cannot be applied, so distinguish states by text.
+- One row is about 36px (with `font` 16. The heading is about the same). As a guide the height is "(number of rows + 1) × 36 + 8"; rows that do not fit scroll inside the table
+  (look in the picture at whether the last row is cut off and whether a scrollbar appears).
+- `"@ID"` can also be written in the values of `map` (translated to match the language).
+  Columns without a width share the rest equally, so writing `width` on all but the columns of long text lines them up.
+- In a project with `languages`, write the headings and the cell text with `"@ID"`.
 
 ### `datetime_input`
 
-- 日付・時刻をローラーで入れる部品（キーボード不要）。`"bind": "<タグ>"`、`mode`: `datetime` / `date` / `time`、`seconds` で秒。
-- タグは**文字列**（`2026-11-21 13:05`、`2026-11-21`、`13:05`）か**数値**（Unix 時刻の秒。`time` は 0 時からの秒数）。
-  どちらにするかは、そのタグを使う側（スクリプト、PLC）に合わせる。新しく作るなら文字列が読みやすい。
-- 大きさは中身で決まる（`w` `h` は書かない）: 日付 + 時刻で幅約 350、秒つきで約 420、日付だけ 230、時刻だけ 130、高さ約 110。
-  480x320 の画面では 1 行に 1 つ。隣にラベルを置くなら上に置く。
-- 設定を変える入力なので、既存の画面が同じ種類の設定に `level` を付けていれば、同じ `level` を付ける。
-- `--check --render` の画像では、タグの `init` の日付がローラーに出る（`init` が空なら今の時刻）。
+- A widget for entering a date and time with rollers (no keyboard needed). `"bind": "<tag>"`, `mode`: `datetime` / `date` / `time`, `seconds` for seconds.
+- The tag is a **string** (`2026-11-21 13:05`, `2026-11-21`, `13:05`) or a **number** (Unix time in seconds. For `time`, the number of seconds from 0:00).
+  Which to use follows the side that uses the tag (script, PLC). When making a new one, a string is easier to read.
+- The size is decided by the content (do not write `w` `h`): date + time is about 350 wide, with seconds about 420, date only 230, time only 130, height about 110.
+  On a 480x320 screen, 1 per row. If a label goes next to it, place it above.
+- It is an input that changes a setting, so if the existing screens put `level` on settings of the same kind, put the same `level` on it.
+- In the picture of `--check --render`, the date of the tag's `init` appears on the rollers (the current time if `init` is empty).
 
 ### `meter`
 
-- 針のメーター（表示だけ）。`"bind": "<タグ>"` で値、`min` / `max` で目盛りの範囲。値の数字は部品の中に出る（`unit` で単位、`decimals` で桁）。
-- **一辺 160 以上にする**（140 未満では目盛りの数字が出ない）。正方形に置く（横長にしても、目盛りは短い辺の正方形になる）。
-- 注意・異常の範囲は `zones` で色を付ける: `"zones": [ { "from": 80, "to": 100, "color": "#e53935" } ]`（赤は異常、橙は警告。飾りには使わない）。
-- 目盛りの数字が込むときは `ticks` と `major_every` を減らす（例: 0〜100 なら `"ticks": 11, "major_every": 2`）。
-  `(ticks - 1)` を `major_every` で割り切れるようにすると、最後の数字が `max` になる。
-- `decimals` は目盛りの数字にも効く（`2` にすると `0.00 1.00` になる）。目盛りが込んだら `decimals` を減らす。
-- 大きな数値をまとめて見せるなら `label` や `numeric_display` のほうが読みやすい。メーターは「どのあたりか」を一目で見せたいときに使う。
+- A needle meter (display only). `"bind": "<tag>"` for the value, `min` / `max` for the range of the scale. The number of the value appears inside the widget (`unit` for the unit, `decimals` for the digits).
+- **Make each side 160 or more** (under 140 the scale numbers do not appear). Place it as a square (even if made wide, the scale becomes a square of the shorter side).
+- Colour the caution and abnormal ranges with `zones`: `"zones": [ { "from": 80, "to": 100, "color": "#e53935" } ]` (red is abnormal, orange is warning. Do not use them for decoration).
+- When the scale numbers are crowded, reduce `ticks` and `major_every` (example: for 0–100, `"ticks": 11, "major_every": 2`).
+  Making `(ticks - 1)` divisible by `major_every` makes the last number `max`.
+- `decimals` also applies to the scale numbers (`2` gives `0.00 1.00`). If the scale is crowded, reduce `decimals`.
+- To show large numbers together, `label` or `numeric_display` is easier to read. Use a meter when you want to show "about where it is" at a glance.
 
 ### `log_view`
 
-- ログを表で見る部品（読むだけ）。`source`: `system`（ランタイムのメッセージ）/ `operation`（操作の記録）/ `data`（変数ロギング。`group` が要る）。
-  **`project.json` にそのログの設定がないと何も出ない**（`--check` が指摘する）。ログの設定を足すのは頼まれたときだけ。
-- 中に、上の帯（レベルのドロップダウン、件数、ページ送りのボタン 2 つ。高さ約 46px）と表を持つ。
-  **高さは 200 以上、幅は 440 以上**。1 行は約 32px なので、`rows` は「(高さ − 90) ÷ 32」を目安にする（長いメッセージは折り返して行が高くなる。あふれた分は表の中でスクロールする）。
-- `columns`: `system` は `time` `level` `source` `message` `count`、`operation` は `time` `user` `screen` `kind` `target` `old` `new`、
-  `data` は `time` とグループのタグ名。省くとよく使う列（幅が 560 未満なら `system` は `time` `level` `message`、`operation` は `time` `user` `target` `new`）。
-- 列の見出しは英語（`Time` `Message` …）。日本語などにするには `labels` に書く: `"labels": { "time": "時刻", "level": "種類", "message": "内容", "empty": "記録なし" }`
-  （`languages` のあるプロジェクトでは `"@ID"`）。`data` の列の見出しはタグ名のまま。
-- 文字で絞り込ませたいときは、文字列タグを作り、`text_display`（`"input": true`）をそのタグに結び付け、`"filter_tag": "<タグ>"` を書く（画面に `keyboard` が要る）。
-- 列の幅を決めるには `widths` に列の名前ごとの幅を書く: `"widths": { "time": 150, "user": 90 }`（書かない列は残りを分ける）。
-  見出しが折り返したら（日本語の「ユーザー」など）、その列を広げる。
-- 2 つ並べるには幅が要る（440 + 440）。800 px の画面で操作ログとシステムログの両方を見せるなら、同じ場所に重ねて置き、
-  タグ（ボタンで 0 / 1 を書く）で `bind` の `visible` を切り替える。
-- 操作ログは「誰が何をしたか」の記録。見せる相手を限るなら、その画面か部品に `level` を付ける（既存の画面の `level` に合わせる）。
-- `--check --render` の画像では、表は見出しだけで行は出ない（ログを読まないため）。`system` は、設定があっても
-  「The system log is not recorded …」と出ることがある（検査中は記録しないため。間違いではない）。行の見え方は、コピーを動かす手順で確かめる。
+- A widget for viewing a log as a table (read only). `source`: `system` (messages of the runtime) / `operation` (record of operations) / `data` (data logging. Needs `group`).
+  **If `project.json` has no settings for that log, nothing appears** (`--check` points it out). Add log settings only when asked.
+- Inside it has a top band (a level dropdown, the count, 2 paging buttons. About 46px high) and a table.
+  **Height 200 or more, width 440 or more**. One row is about 32px, so as a guide `rows` is "(height − 90) ÷ 32" (a long message wraps and makes the row taller. What overflows scrolls inside the table).
+- `columns`: for `system`, `time` `level` `source` `message` `count`; for `operation`, `time` `user` `screen` `kind` `target` `old` `new`;
+  for `data`, `time` and the tag names of the group. When omitted, the commonly used columns (if the width is under 560, `system` is `time` `level` `message`, `operation` is `time` `user` `target` `new`).
+- The column headings are English (`Time` `Message` …). To make them Japanese or another language, write them in `labels`: `"labels": { "time": "時刻", "level": "種類", "message": "内容", "empty": "記録なし" }`
+  (`"@ID"` in a project with `languages`). The column headings of `data` stay as the tag names.
+- To let the user filter by text, make a string tag, bind a `text_display` (`"input": true`) to that tag, and write `"filter_tag": "<tag>"` (the screen needs a `keyboard`).
+- To set the column widths, write the width per column name in `widths`: `"widths": { "time": 150, "user": 90 }` (columns not written share the rest).
+  If a heading wraps (the Japanese 「ユーザー」 and so on), widen that column.
+- Placing 2 side by side needs width (440 + 440). To show both the operation log and the system log on an 800 px screen, stack them at the same place and
+  switch `visible` in `bind` with a tag (a button writes 0 / 1).
+- The operation log is a record of "who did what". To limit who sees it, put `level` on that screen or widget (match the `level` of the existing screens).
+- In the picture of `--check --render`, the table has only the headings and no rows (because the log is not read). For `system`, even when the settings exist,
+  "The system log is not recorded …" may appear (because nothing is recorded during the check. It is not a mistake). Check how the rows look with the procedure for running a copy (SKILL.md, "When you want to check what happens after a press").
 
 ### `recipe_table`
 
-- 中に、レシピの一覧と書き込み・保存などのボタンを持つ。高さ 300 以上、幅は画面いっぱいが基本。
-- `labels`: `write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`、確認の文 `confirm_write` `confirm_read`
-  `confirm_delete`（`%s` がレシピ名。書き込みの確認は省くと「Write '%s'?」）。項目の名前と単位は `recipes` の `items` に書く（`project-features.md`）。
+- Inside it has the list of recipes and buttons such as write and save. Height 300 or more; the width is basically the full screen.
+- `labels`: `write` `read` `save_as` `delete` `item` `recipe` `current` `ok` `cancel` `name`, the confirmation sentences `confirm_write` `confirm_read`
+  `confirm_delete` (`%s` is the recipe name. The write confirmation is "Write '%s'?" when omitted). Write the names and units of the items in `items` of `recipes` (`project-features.md`).
 
-これらの部品が要る設定（`alarms`、`data_log` のグループ、`recipes`）の書き方は `project-features.md`。
-プロジェクトにないのにこれらの部品を頼まれたら、設定も足してよい（既存の設定があればその書き方に合わせる。足したことを報告する）。
+How to write the settings these widgets need (`alarms`, groups of `data_log`, `recipes`) is in `project-features.md`.
+If these widgets are asked for and the project does not have the settings, the settings may be added too (if there are existing settings, match how they are written. Report that they were added).
 
-## ユーザーのレベル
+## User levels
 
-`project.json` に `users` があるとき、部品や画面に `"level": 2` を付けると、そのレベル以上のユーザーだけが操作できる。
-`"level_deny"`: `disable`（既定、薄く表示）/ `hide` / `login`（押すとログイン画面）。`users` がなければ付けない。
+When `project.json` has `users`, putting `"level": 2` on a widget or a screen lets only users of that level or higher operate it.
+`"level_deny"`: `disable` (default, shown dimmed) / `hide` / `login` (pressing shows the login screen). Do not add it if there is no `users`.
 
-- **部品の `level`**: 足りないあいだの扱いが `level_deny`。`level` はその部品自身にだけかかる（パネルに付けた `disable` は中の部品に及ばない。
-  操作させたくない部品それぞれに付ける。`hide` は中身ごと隠れる）。
-- **画面の `level`**: `level_deny` は**画面には無い**（書くと `--check` が指摘する）。足りないユーザーがその画面へ行こうとすると
-  ログイン画面が出て、足りるレベルでログインするとそのまま目的の画面へ進む。だから、そこへ行くボタンには `level` を付けなくてよい。
-- ログアウトしたとき（自動ログアウトを含む）、表示中の画面が見られなくなったら**開始画面へ戻る**。`logout` のあとに `goto` を足さない。
-- ログインしていないとき: `sys.user.name` は空、`sys.user.level` は 0、`sys.user.level_name` は空。「未ログイン」と出すなら
-  `map` に空の文字のキーを書く: `"bind": { "text": { "tag": "sys.user.name", "map": { "": "@not_logged_in" } } }`
-  （`map` に無い値はそのまま出る。「まだ何もない」を表す空の文字は、どのタグでもこの形で言葉に替えられる）。
-- レベルの名前（`users.levels`）は 1 つの言語だけ（`"@ID"` は使えない）。
-- **`--check` の画像は、いちばん高いレベルでログインした状態**（ユーザー名は `preview`）で描かれる。ログインしていないとき・
-  低いレベルのときの見え方は、SKILL.md の「押したあとの様子を確かめたいとき」の手順で、ログイン画面の数字を `--click` で押して確かめる
-  （押す座標は、先に撮った画像から読む）。
-- **あとから `users` を足すとき**: プロジェクトにもう `"level"` を書いた部品・画面や `recipes.level` があると、`users` を足したとたんに
-  効き始める（`users` が無いあいだは無視されている。`--check` が「`level` は何もしない」と 1 回だけ知らせる）。足す前に `"level"` を探し、何が制限されるようになるかを報告する。
+- **`level` of a widget**: `level_deny` is how it is treated while the level is not enough. `level` applies only to that widget itself (`disable` put on a panel does not reach the widgets inside.
+  Put it on each widget that must not be operated. `hide` hides it together with its content).
+- **`level` of a screen**: `level_deny` **does not exist for a screen** (if written, `--check` points it out). When a user whose level is not enough tries to go to that screen,
+  the login screen appears, and after logging in with a sufficient level the user goes straight on to the intended screen. So the button that goes there does not need `level`.
+- On logout (including automatic logout), if the screen being shown can no longer be viewed, it **returns to the start screen**. Do not add a `goto` after `logout`.
+- When not logged in: `sys.user.name` is empty, `sys.user.level` is 0, `sys.user.level_name` is empty. To show "Not logged in",
+  write a key of the empty string in `map`: `"bind": { "text": { "tag": "sys.user.name", "map": { "": "@not_logged_in" } } }`
+  (a value not in `map` is shown as it is. An empty string that means "nothing yet" can be replaced by words in this form for any tag).
+- The level names (`users.levels`) are in 1 language only (`"@ID"` cannot be used).
+- **The picture of `--check` is rendered in the state of being logged in at the highest level** (the user name is `preview`). How it looks when not logged in or
+  at a low level is checked with the procedure in "When you want to check what happens after a press" of SKILL.md, pressing the digits of the login screen with `--click`
+  (read the coordinates to press from a picture taken beforehand).
+- **When adding `users` later**: if the project already has widgets or screens with `"level"` written, or `recipes.level`, they start to take effect as soon as `users` is added
+  (while there is no `users` they are ignored. `--check` reports "`level` does nothing" just once). Before adding, search for `"level"` and report what will become restricted.
 
-## 画面の外の機能を画面から使う
+## Using features outside the screens from a screen
 
-スケジュール、音、機器間のデータ転送、メール、ログの送信、テンプレート画面は `project.json`（と画面ファイルの `template`）に書く。
-**設定キーの一覧と書き方は `project-features.md`**。頼まれたときだけ足す・変える。画面の側で使えるのは次のもの
-（タグは、その機能がプロジェクトにあるときだけある。`"enabled": false` でもタグはある）:
+Schedules, sound, data transfer between equipment, mail, sending of logs, and template screens are written in `project.json` (and `template` in the screen file).
+**The list of setting keys and how to write them is in `project-features.md`**. Add or change them only when asked. What can be used from the screen side is the following
+(the tags exist only when the project has that feature. The tags exist even with `"enabled": false`):
 
-| 機能 | 画面から |
+| Feature | From the screen |
 | --- | --- |
-| 音（`sound`） | 消音のスイッチ `{ "type": "switch", "bind": "sys.sound.mute" }`、音量 `{ "type": "slider", "min": 0, "max": 100, "bind": "sys.sound.volume" }`、音を鳴らす `{ "action": "call", "fn": "sound.play", "arg": "beep" }` |
-| 音: ブザー停止 | `{ "type": "button", "text": "ブザー停止", "bind": { "visible": "sys.sound.alarm" }, "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }`（アラーム音が鳴っている間だけ出る。押すと次の新しいアラームまで止まる） |
-| メール（`mail`） | 送る `{ "action": "call", "fn": "mail.send", "arg": "件名\n本文 {タグ名}" }`（文字そのまま。`"@ID"` は使えない）、テスト `"mail.test"`、`sys.mail.waiting`（送信待ちの数）、`sys.mail.error`（失敗中 1） |
-| ログの送信（`uploads`） | 今すぐ送る `{ "action": "call", "fn": "upload.run", "arg": "<name>" }`、`sys.upload.waiting`、`sys.upload.error` |
-| スケジュール（`schedules`） | 画面に出す部品はない（装置の System > Schedule で見る・変える）。`{ "action": "system" }` のボタンで System を開ける |
-| データ転送（`transfers`） | 画面に出す部品はない。転送元と転送先のタグをふつうに表示すればよい（装置の System > Transfers に状態が出る） |
+| Sound (`sound`) | Mute switch `{ "type": "switch", "bind": "sys.sound.mute" }`, volume `{ "type": "slider", "min": 0, "max": 100, "bind": "sys.sound.volume" }`, play a sound `{ "action": "call", "fn": "sound.play", "arg": "beep" }` |
+| Sound: buzzer stop | `{ "type": "button", "text": "Buzzer stop", "bind": { "visible": "sys.sound.alarm" }, "on_click": { "action": "set", "tag": "sys.sound.alarm", "value": false } }` (appears only while the alarm sound is sounding. Pressing it stops the sound until the next new alarm) |
+| Mail (`mail`) | Send `{ "action": "call", "fn": "mail.send", "arg": "Subject\nBody {tag name}" }` (the text as it is. `"@ID"` cannot be used), test `"mail.test"`, `sys.mail.waiting` (number waiting to be sent), `sys.mail.error` (1 while failing) |
+| Sending of logs (`uploads`) | Send now `{ "action": "call", "fn": "upload.run", "arg": "<name>" }`, `sys.upload.waiting`, `sys.upload.error` |
+| Schedules (`schedules`) | There is no widget to put on a screen (view and change them in System > Schedule on the device). A button with `{ "action": "system" }` opens System |
+| Data transfer (`transfers`) | There is no widget to put on a screen. Just display the source and destination tags in the ordinary way (the state appears in System > Transfers on the device) |
 
-- `mail` / `uploads` が `"enabled": false` のとき、`mail.send` や `upload.run` は何も送らない（ログに警告が出るだけ）。
-- `--check --render` の画像では、音・スケジュール・転送・メール・送信は動かない（転送先のタグは `init` の値のまま）。
-  `sys.sound.alarm` は `--set` で 1 にできないので、「ブザー停止」ボタンは画像では確かめられない。位置と色は、ほかのボタンに合わせて決め、報告に書く。
-- 「毎朝 8 時に〜する」「夜にログを送る」は、画面ではなく `schedules` に書く（`project-features.md`）。
+- When `mail` / `uploads` is `"enabled": false`, `mail.send` and `upload.run` send nothing (only a warning appears in the log).
+- In the picture of `--check --render`, sound, schedules, transfers, mail and sending do not run (the destination tags of a transfer stay at their `init` values).
+  `sys.sound.alarm` cannot be set to 1 with `--set`, so the "Buzzer stop" button cannot be checked in the picture. Decide its position and colour to match the other buttons, and write this in the report.
+- "Do ... every morning at 8:00" and "send the logs at night" are written in `schedules`, not in a screen (`project-features.md`).
