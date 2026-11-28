@@ -2955,6 +2955,31 @@ Making a release: push a tag `v1.2.3`. `.github/workflows/release.yml` builds th
 together), and makes a **draft** release with the files and their checksums - it is public only after somebody looks at the draft
 and publishes it. "Run workflow" on that workflow builds the same packages without a release, to try it.
 
+## Code signing policy
+
+**Status: not in place yet.** The Windows programs of the releases so far carry no code-signing certificate. We are applying
+for the free code signing that SignPath Foundation offers to open-source projects; this section is the policy we will follow
+when it is granted, and it will say so here.
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- **What is signed**: `hml_designer.exe` and `hml_runtime.exe` of the Windows package of a release - only files that the release
+  workflow of this repository (`.github/workflows/release.yml`) built from the source at the tag of that release. Nothing that
+  was built on a developer's machine, and no binary of anybody else.
+- **Committers and reviewers**: [bamchoh](https://github.com/bamchoh) (the owner of this repository). Changes from anybody
+  else come in as pull requests and are reviewed by a committer before they are merged.
+- **Approvers**: [bamchoh](https://github.com/bamchoh). Every release is approved for signing by hand.
+- Everybody with these roles uses multi-factor authentication for GitHub and for SignPath.
+- Each package also has an attestation of where it was built (see "Releases"), which does not depend on the certificate.
+
+**Privacy**: this program will not transfer any information to other networked systems unless specifically requested by the
+user or the person installing or operating it. It has no telemetry, no update check and no account. What it sends is what a
+project is set up to send: values to and from PLCs (the drivers), mails, log files to a server (`uploads`), the screen to a VNC
+client (`remote`), and a project to a device when you press Deploy. `hml_runtime <project.json> --capabilities` lists what a
+project may do before it is run.
+
+A signed file that does something it should not: please report it as described in [SECURITY.md](SECURITY.md).
+
 ## Versions
 
 Tsukuraku is at **0.x: it works and it is used, and it still changes**. The numbers follow [Semantic Versioning](https://semver.org):

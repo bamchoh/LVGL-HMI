@@ -1,10 +1,34 @@
 cmake_minimum_required(VERSION 3.24)
 project(hml_runtime C CXX)
+if(WIN32)
+  enable_language(RC)
+endif()
 
 # The version the programs say they are ("hml_runtime --version", System > About). A release
 # build is given it by the release workflow (the tag without its "v"); everything else is "dev".
 set(HML_VERSION "dev" CACHE STRING "version of this build")
 add_compile_definitions(HML_VERSION="${HML_VERSION}")
+
+# The version information of a Windows program (product name, version, description): what
+# Explorer shows under Properties > Details, and what a code signing service checks. The three
+# numbers come from HML_VERSION ("0.1.0", "0.2.0-rc.1"); a build that is not a release is 0.0.0.
+function(hml_version_resource target description)
+  if(NOT WIN32)
+    return()
+  endif()
+  set(HML_VER_MAJOR 0)
+  set(HML_VER_MINOR 0)
+  set(HML_VER_PATCH 0)
+  if(HML_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+    set(HML_VER_MAJOR ${CMAKE_MATCH_1})
+    set(HML_VER_MINOR ${CMAKE_MATCH_2})
+    set(HML_VER_PATCH ${CMAKE_MATCH_3})
+  endif()
+  set(HML_RC_TARGET ${target})
+  set(HML_RC_DESCRIPTION "${description}")
+  configure_file(${CMAKE_SOURCE_DIR}/cmake/version.rc.in ${CMAKE_BINARY_DIR}/${target}_version.rc @ONLY)
+  target_sources(${target} PRIVATE ${CMAKE_BINARY_DIR}/${target}_version.rc)
+endfunction()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -260,6 +284,7 @@ endif()
 # ---------------------------------------------------------------- runtime (C++17)
 file(GLOB HML_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(hml_runtime ${HML_SOURCES})
+hml_version_resource(hml_runtime "Tsukuraku runtime")
 target_include_directories(hml_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(hml_runtime PRIVATE lvgl hml_json hml_lua hml_sqlite hml_miniz hml_mbedtls)
 if(HML_OPCUA)
