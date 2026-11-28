@@ -1,0 +1,8 @@
+start 01:16:56
+01 01:18:27 first version (project.json with tags, simulation, alarms, pressure log; main.json), rendered with syrup_level=12 line_pressure=4.5 | wrong: trend legend 'line_pressure' cut to 'line' (trend 376 wide, skill says 400+); 'bottles/min' unit floats far from the speed number; speed shows 0 (init) so the speed bar looks dead
+02 01:18:57 trend widened to 400 (left column 400, right 352), START/STOP 144 wide 64 apart, speed number+unit in a flex row, alarm messages shortened; rendered with 3 alarms and speed 118 | wrong: trend legend still cut ('line_pr'); rest ok
+03 01:19:10 trend style font 14 to make room for the legend | wrong: legend still cut ('line_pre'), and the trend heading got smaller than the rest
+04 01:19:23 renamed tag line_pressure -> pressure, trend font back to default | wrong: legend still cut ('pressu'): the trend's 5 buttons leave ~55 px for the legend at 400 wide; decide to use a plain chart (last 5 min, no buttons/legend) with own scale labels
+05 01:19:55 replaced trend with a chart panel (5 min, 100 points x 3 s, scale 0/3/6, -5 min / now, current value 4.50 bar), removed the unused data_log group, moved alarm heading to line up | ok (line itself empty in --render, as expected)
+06 01:20:05 no change; rendered the stopped state (line_running=false, speed 0, no alarms) | ok: STOPPED badge grey, START enabled, 'No alarms'
+done 01:20:20

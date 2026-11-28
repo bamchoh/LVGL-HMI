@@ -138,7 +138,7 @@ TEST_CASE("capabilities: from the files of a project - the scripts its buttons c
     CHECK(err.find("not valid JSON") != std::string::npos);
 
     // the projects that come with the repository can all be read
-    for(const char* name : { "demo", "lcd35", "bakery", "factory", "factory35", "metro" }) {
+    for(const char* name : { "demo", "lcd35", "bakery", "bottling", "factory", "factory35", "metro" }) {
         ProjectCapabilities pc;
         CHECK_MESSAGE(project_capabilities_of((hmltest::source_dir() / "projects" / name / "project.json").generic_string(), pc, &err), name << ": " << err);
         CHECK(pc.fingerprint().size() == 64);
