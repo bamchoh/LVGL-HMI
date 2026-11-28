@@ -2923,3 +2923,11 @@ on a target without a file system, replace `read_file()` in `project.cpp`.
   `TagStore::dispatch()` in the main loop.
 - Every write carries its "origin", so loops such as a slider's own write coming back to the slider and
   making it jump during a drag, or the Modbus driver writing a value it read itself back to the PLC, do not happen.
+
+## License
+
+Tsukuraku is licensed under the [Apache License 2.0](LICENSE): you may use it, change it and pass it on, also in commercial
+products, as long as the licence and the notices stay with it. The programs contain third-party components under their own
+licences (MIT, MPL-2.0, zlib, SIL OFL and others): they are listed in [NOTICE](NOTICE). Pass that file on with the binaries.
+
+The projects you make with it (screens, tags, scripts) are yours.
