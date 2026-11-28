@@ -2209,7 +2209,7 @@ When a screen has `"template": "<name of another screen>"`, **the widgets of tha
 | `text_display`        | Text display: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                  |
 | `password_display`    | Password input (always masked): `input` (default true), `placeholder`, `max_length`, `accepted_chars`                     |
 | `image`               | Image: `src` (a path relative to project.json. PNG / JPEG / BMP / GIF), `fit`, `zoom`, `rotation` (see "Images" below)    |
-| `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
+| `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max` (may have decimals), `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]`. No numbers on the axes: put `label`s beside it |
 | `spinner`             | `time`, `angle`                                                                                                           |
 | `keyboard`            | Put one on a screen and it appears when a textarea or a display that accepts input is tapped (a numeric keypad for `numeric_display`). ✓ confirms, × closes (the input is discarded). With the `bottom_mid` / `top_mid` alignment, it appears at the opposite edge when it would hide the input field. The size of the keys is adjusted with `h`, `style_items: { "font": 18 }` and `style: { "pad", "pad_gap" }` |
 | `line`                | `points: [[x,y], ...]`                                                                                                    |
@@ -2544,7 +2544,8 @@ It shows a group of the data log as lines, for a chosen window of time.
 | Key          | Description                                                                      |
 | ------------ | -------------------------------------------------------------------------------- |
 | `group`      | The group of the data log                                                        |
-| `tags`       | The tags to show (omitted: all tags of the group, up to 8 lines). `{ "tag", "color" }` gives the color too |
+| `tags`       | The tags to show (omitted: all tags of the group, up to 8 lines). `{ "tag", "color", "label" }` gives the color and the name in the legend too (`label` may be `"@ID"` of `texts`) |
+| `legend`     | `false`: no legend under the chart (default `true`). A legend that does not fit next to the buttons goes on a row of its own |
 | `range_s`    | The period to show (default 3600 seconds). `−` / `+` make it double / half (1 minute to 1 year) |
 | `min` / `max`| The range of the vertical axis (omitted: fitted to the data)                     |
 | `buckets`    | The number of points across (default 200). Each point becomes two lines, the minimum and the maximum of its interval |

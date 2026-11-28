@@ -415,12 +415,39 @@ TEST_CASE("chart: series follow their tags on the sample timer")
         for(uint32_t i = 0; i < 4; i++) if(ys[i] == v) return true;
         return false;
     };
-    CHECK((has_value(s1, 15) || has_value(s2, 15)));             // 1.5 * 10 sampled once at build time
-    CHECK((has_value(s1, 3) || has_value(s2, 3)));
+    // (a range narrower than 1000 is held 1000 times finer inside: -10 .. 10 is -10000 .. 10000)
+    CHECK((has_value(s1, 15000) || has_value(s2, 15000)));       // 1.5 * 10 sampled once at build time
+    CHECK((has_value(s1, 3000) || has_value(s2, 3000)));
 
     a->set_number(-0.7, nullptr);
     rt.advance(100);
-    CHECK((has_value(s1, -7) || has_value(s2, -7)));
+    CHECK((has_value(s1, -7000) || has_value(s2, -7000)));
+}
+
+TEST_CASE("chart: decimals in min, max and the values are drawn as they are")
+{
+    Runtime rt;
+    Tag* p = rt.tag("p", TagType::Float, 3.2);
+    lv_obj_t* chart = build_widget(R"json({ "type": "chart", "points": 4, "min": 0, "max": 6.5, "series": [ { "tag": "p" } ] })json");
+    REQUIRE(chart);
+    lv_chart_series_t* s = lv_chart_get_series_next(chart, nullptr);
+    REQUIRE(s);
+    const int32_t* ys = lv_chart_get_series_y_array(chart, s);
+    bool found = false;
+    for(uint32_t i = 0; i < 4; i++) found = found || ys[i] == 3200;
+    CHECK(found);                                                 // 3.2, not 3
+    (void)p;
+}
+
+TEST_CASE("chart: a wide range is kept as it is")
+{
+    Runtime rt;
+    rt.tag("rpm", TagType::Int, 1234);
+    lv_obj_t* c2 = build_widget(R"json({ "type": "chart", "points": 4, "min": 0, "max": 5000, "series": [ { "tag": "rpm" } ] })json");
+    const int32_t* y2 = lv_chart_get_series_y_array(c2, lv_chart_get_series_next(c2, nullptr));
+    bool found = false;
+    for(uint32_t i = 0; i < 4; i++) found = found || y2[i] == 1234;
+    CHECK(found);
 }
 
 TEST_CASE("keyboard shows for a focused textarea and hides when done")

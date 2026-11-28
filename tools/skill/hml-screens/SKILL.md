@@ -184,7 +184,8 @@ rendered: overview -> C:\...\overview.png
 
 Things to know:
 - The place of the picture is written the Windows way (`D:/...` or `D:\...`). Git Bash's `/d/...` cannot be written (it says `--render: cannot write`).
-- It does not connect to equipment, so values start from the `init` of `tags` (and `--set`). `trend` is only the frame and the scale; no line appears.
+- It does not connect to equipment, so values start from the `init` of `tags` (and `--set`). `trend`, `chart` and `bar_chart` are only the frame and the scale; no line or bar appears.
+  Values that a `simulation` moves stay at their start in the picture too.
 - The project's scripts (`scripts`) run. If a script that runs periodically rewrites a tag, a value different from the one given with `--set`
   may appear in the picture (reading `scripts` in `project.json` tells you).
 - Usage is `hml_runtime --help`. `--screen` `--screenshot` `--click` `--shot-at` cannot be used together with `--check`.

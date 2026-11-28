@@ -2200,7 +2200,7 @@ Text / Number / Bool / Select / Info。フォーム以外の画面が必要な�
 | `text_display`        | 文字列表示器: `input`, `text`, `placeholder`, `max_length`, `accepted_chars`, `one_line`                                   |
 | `password_display`    | パスワード入力器（常に伏せ字）: `input` (既定 true), `placeholder`, `max_length`, `accepted_chars`                         |
 | `image`               | 画像: `src`（project.json からの相対パス。PNG / JPEG / BMP / GIF）, `fit`, `zoom`, `rotation`（下記「画像」）            |
-| `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]` |
+| `chart`               | `chart_type` (`line`/`bar`), `points`, `min`, `max`（小数も可）, `sample_ms`, `hdiv`, `vdiv`, `series: [{ "tag", "color", "scale" }]`。軸に数字は出ないので、横に `label` を置く |
 | `spinner`             | `time`, `angle`                                                                                                           |
 | `keyboard`            | 画面に 1 つ置くと、textarea / 入力可能な表示器のタップ時に表示される（`numeric_display` ではテンキー）。✓ で確定、× で閉じる（入力は破棄）。`bottom_mid` / `top_mid` 配置なら、入力欄を隠す場合は反対側の端に出る。キーの大きさは `h` と `style_items: { "font": 18 }`、`style: { "pad", "pad_gap" }` で調整 |
 | `line`                | `points: [[x,y], ...]`                                                                                                    |
@@ -2535,7 +2535,8 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | キー         | 内容                                                                             |
 | ------------ | -------------------------------------------------------------------------------- |
 | `group`      | 変数ロギングのグループ                                                           |
-| `tags`       | 表示するタグ（省略時はグループの全タグ、8 本まで）。`{ "tag", "color" }` で色も指定 |
+| `tags`       | 表示するタグ（省略時はグループの全タグ、8 本まで）。`{ "tag", "color", "label" }` で色と凡例の名前も指定（`label` は `texts` の `"@ID"` も可） |
+| `legend`     | `false` で凡例を出さない（既定 `true`）。ボタンの横に収まらない凡例は、次の行に回る |
 | `range_s`    | 表示する期間（既定 3600 秒）。`−` / `+` で 2 倍 / 半分（1 分〜1 年）              |
 | `min` / `max`| 縦軸の範囲（省略時はデータに合わせる）                                           |
 | `buckets`    | 横の点数（既定 200）。各点はその区間の最小値と最大値の 2 本の線になる              |

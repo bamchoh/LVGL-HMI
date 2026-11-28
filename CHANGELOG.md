@@ -14,6 +14,13 @@ Each release lists, where there is something to say:
 - **Simplified Chinese** for the system settings screens, the login screen and the keyboard's keys (`"system_language": "zh"`, or a
   project whose language is `zh`). The translation has not been read by a native speaker yet.
 - A font for Simplified Chinese comes with the designer (Noto Sans SC, the hanzi of GB 2312, 1.7 MB).
+- `trend`: a name for each line in the legend (`"tags": [{ "tag": "p", "label": "Pressure" }]`), and `"legend": false`.
+
+**Fixed**
+
+- `trend`: a legend that did not fit next to the buttons was cut off (at the documented smallest width of 400, even a short tag name). It goes on a
+  row of its own now.
+- `chart`: `min`, `max` and the values were drawn as whole numbers - 3.2 on a 0 to 6 axis was drawn at 3. Decimals are drawn as they are now.
 
 ## 0.1.1 - 2026-11-28
 
