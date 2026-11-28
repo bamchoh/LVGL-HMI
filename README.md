@@ -234,6 +234,15 @@ The `fbdev` backend depends on nothing but libc, so it cross-compiles without a 
 Copy the resulting binary and the `projects/` directory to the Pi and it runs.
 (Cross-building `drm` / `sdl` requires a sysroot that contains the target libraries.)
 
+**In WSL, with the checkout on a Windows drive** (`/mnt/d/...`), building from there is slow: every source is read across the
+Windows file system (a one-file change took 18 minutes). `tools/rpi/wsl_build.sh` copies the sources into the WSL file system
+(only what changed), builds the runtime there and puts it where `build.sh` would (`build-fbdev-aarch64/bin/hml_runtime`).
+The first build takes about 10 minutes, a one-file change about 30 seconds:
+
+```
+wsl -d Ubuntu -- bash -lc "/mnt/d/dev/lvgl-hml/tools/rpi/wsl_build.sh aarch64"
+```
+
 ### Running on the Raspberry Pi
 
 ```

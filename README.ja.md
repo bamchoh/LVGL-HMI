@@ -236,6 +236,15 @@ sudo apt install gcc-arm-linux-gnueabihf      # 32bit OS 用
 できたバイナリと `projects/` ディレクトリを Pi にコピーすれば動作します。
 （`drm` / `sdl` をクロスビルドするには対象ライブラリ入りの sysroot が必要です。）
 
+**WSL で、チェックアウトが Windows のドライブ（`/mnt/d/...`）にある場合**、そのままビルドすると遅くなります。ソースを 1 つずつ
+Windows のファイルシステム越しに読むためです（ファイル 1 つの変更で 18 分かかっていました）。`tools/rpi/wsl_build.sh` は、ソースを
+WSL 側に写し（変わった所だけ）、そこでランタイムをビルドして、`build.sh` と同じ場所（`build-fbdev-aarch64/bin/hml_runtime`）に置きます。
+初回は 10 分ほど、ファイル 1 つの変更なら 30 秒ほどです:
+
+```
+wsl -d Ubuntu -- bash -lc "/mnt/d/dev/lvgl-hml/tools/rpi/wsl_build.sh aarch64"
+```
+
 ### Raspberry Pi で実行する
 
 ```
