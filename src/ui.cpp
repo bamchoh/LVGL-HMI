@@ -903,7 +903,7 @@ void Binding::tag_event(const Value& v, const void* source)
 // value as it was (LV_EVENT_CANCEL), "OK" takes what was typed (LV_EVENT_READY). An "x" was
 // read as "delete", a check mark had to be learnt. The words are in the language of the system
 // screens; the layouts are ours for that (LVGL's own have icons there).
-char s_kb_close[16] = "Close", s_kb_done[16] = "OK", s_kb_clear[16] = "Clear";
+char s_kb_close[24] = "Close", s_kb_done[24] = "OK", s_kb_clear[24] = "Clear";
 bool s_kb_light = false;            // the theme of the project is light: the keyboard is too
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
 const char* const kKbMapUpper[] = {
@@ -1035,11 +1035,16 @@ void kb_value_changed(lv_event_t* e)
 
 void install_keyboard_maps(lv_obj_t* kb)
 {
-    // the words of the two keys, in the language of the system screens (Japanese only with a font that has it)
-    const bool ja = system_language() == "ja" && font_file_has("閉じる確定クリア");
-    lv_snprintf(s_kb_clear, sizeof s_kb_clear, "%s", ja ? "クリア" : "Clear");
-    lv_snprintf(s_kb_close, sizeof s_kb_close, "%s", ja ? "閉じる" : "Close");
-    lv_snprintf(s_kb_done, sizeof s_kb_done, "%s", ja ? "確定" : "OK");
+    // the words of the keys that end typing, in the language of the system screens - when the
+    // font of the project has their letters (else English, which every font has)
+    auto word = [](const char* english, char* out, size_t size) {
+        std::string t = sys_text(std::string("key:") + english);
+        if(t.rfind("key:", 0) == 0 || !font_file_has(t)) t = english;       // (no entry, or letters that are missing)
+        lv_snprintf(out, static_cast<uint32_t>(size), "%s", t.c_str());
+    };
+    word("Clear", s_kb_clear, sizeof s_kb_clear);
+    word("Close", s_kb_close, sizeof s_kb_close);
+    word("OK", s_kb_done, sizeof s_kb_done);
     // (lv_keyboard_set_map() changes the layouts for every keyboard: set again, the words may have changed)
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kKbMapUpper, ctrl_table(kKbCtrlLower));
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kKbMapLower, ctrl_table(kKbCtrlLower));

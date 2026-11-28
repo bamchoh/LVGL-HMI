@@ -590,7 +590,9 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         });
         // The clock of the device, in the head of every system screen: what is set here (a
         // schedule, the time a screen goes dark) is set against it. The date too where there is room.
-        const int apply_w = apply_page.empty() ? 0 : (compact ? 96 : large ? 150 : 120);
+        // (as wide as its word needs: "Übernehmen" is longer than "Apply")
+        const int apply_min = compact ? 96 : large ? 150 : 120;
+        const int apply_w = apply_page.empty() ? 0 : label_width(sys_text("Apply"), apply_min - 28, font + 2, 170) + 28;
         const int clock_w = compact ? 72 : large ? 200 : 170;
         const int title_w = std::max(60, col_w - 2 * margin - (header_h + 16) - clock_w - 8 - (apply_w ? apply_w + 8 : 0));
         children.push_back(json{ { "type", "label" }, { "align", "left_mid" }, { "x", header_h + 16 }, { "w", title_w }, { "long_mode", "dots" }, { "text", sys_text(title) },
@@ -598,7 +600,7 @@ std::vector<json> SystemSettings::screens(int width, int height) const
         children.push_back(json{ { "type", "label" }, { "align", "right_mid" }, { "x", -(apply_w ? apply_w + 8 : 0) }, { "bind", { { "text", compact ? "sys.time" : "sys.datetime" } } },
                                  { "style", { { "font", font }, { "text_color", "#9fb3c8" } } } });
         if(!apply_page.empty())
-            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", sys_text("Apply") }, { "w", compact ? 96 : large ? 150 : 120 }, { "h", header_h - 6 },
+            children.push_back(json{ { "type", "button" }, { "align", "right_mid" }, { "text", sys_text("Apply") }, { "w", apply_w }, { "h", header_h - 6 },
                                      { "style", { { "bg_color", accent }, { "radius", 8 }, { "shadow_width", 0 } } }, { "style_label", { { "font", font + 2 } } },
                                      { "on_click", { { "action", "call" }, { "fn", "system.apply" }, { "arg", apply_page } } } });
         return json{
@@ -1175,7 +1177,8 @@ void choose_system_language(Project& proj)
     }
     // only when the project's font can show it: without the characters there would be empty boxes
     system_settings().set_light(!proj.info().dark);
-    if(want == "ja" && !font_file_has("システム設定を開く適用戻る")) want = "en";
+    // (a language the system screens do not have, "fr": English)
+    if(const std::string need = system_language_sample(want); !need.empty() && !font_file_has(need)) want = "en";
     set_system_language(want);
 }
 

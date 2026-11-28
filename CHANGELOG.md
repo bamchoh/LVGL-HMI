@@ -13,6 +13,13 @@ Each release lists, where there is something to say:
 
 - Every package of a release has an attestation of where it was built (`gh attestation verify <file> --repo bamchoh/tsukuraku`).
 - `CHANGELOG.md` and `docs/` (the quick start) are in the packages.
+- The system settings screens, the login screen and the keys of the on-screen keyboard in **German** (`"system_language": "de"`, or
+  a project whose language is `de`), with a font that has ä ö ü ß.
+- The Windows programs carry their product name and version (Properties > Details).
+
+**Changed**
+
+- The header's "Apply" button of the system screens is as wide as its word; "Refresh" on the USB page is a sign.
 
 ## 0.1.0 - 2026-11-28
 

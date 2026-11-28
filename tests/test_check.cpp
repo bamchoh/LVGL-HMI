@@ -417,11 +417,13 @@ TEST_CASE("check: system_language is ja or en, and ja wants a font file")
     project(R"json(, "system_language": "en")json");
     CHECK_FALSE(has(p.check(), "system_language"));
     project(R"json(, "system_language": "fr")json");
-    CHECK(has(p.check(), "\"ja\" or \"en\""));
+    CHECK(has(p.check(), "\"en\", \"ja\" or \"de\""));
     project(R"json(, "system_language": "ja")json");
     CHECK(has(p.check(), "needs a font file"));
     project(R"json(, "system_language": "ja", "font": { "file": "assets/x.otf" })json");
     CHECK_FALSE(has(p.check(), "needs a font file"));
+    project(R"json(, "system_language": "de")json");
+    CHECK(has(p.check(), "\"de\" needs a font file"));
 }
 
 TEST_CASE("check: a level without users is said once; level_deny is not for a screen")

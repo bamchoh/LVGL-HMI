@@ -175,3 +175,8 @@
 { "Logout", "ログアウト" },
 { "< Back", "< 戻る" },
 { "Pick a user", "ユーザーを選んでください" },
+
+// ---- the keys of the keyboard that end typing
+{ "key:Close", "閉じる" },
+{ "key:OK", "確定" },
+{ "key:Clear", "クリア" },
