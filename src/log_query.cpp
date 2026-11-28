@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "log_query.hpp"
 #include <algorithm>
 #include "data_log.hpp"
@@ -14,7 +15,7 @@ std::string short_time(int64_t ms)
 {
     if(ms <= 0) return "";
     const std::string t = LogDb::format_time(ms);          // YYYY-MM-DD HH:MM:SS.mmm
-    return t.size() >= 19 ? t.substr(5, 14) : t;
+    return t.size() >= 19 ? local_time_text(t.substr(5, 14)) : t;
 }
 
 int64_t since(const LogViewQuery& q, int64_t now_ms)

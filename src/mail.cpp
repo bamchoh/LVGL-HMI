@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "mail.hpp"
 
 #include <algorithm>
@@ -356,9 +357,9 @@ void Mail::on_alarm(const AlarmEvent& e)
     if(last != m.last_alarm.end() && c.min_interval_s > 0 && now - last->second < static_cast<int64_t>(c.min_interval_s) * 1000 && now >= last->second) return;
     m.last_alarm[key] = now;
     const std::map<std::string, std::string> vars{
-        { "project", m.title }, { "time", LogDb::format_time(now).substr(0, 19) },
+        { "project", m.title }, { "time", local_time_text(LogDb::format_time(now).substr(0, 19)) },
         { "alarm.name", e.name }, { "alarm.message", e.message }, { "alarm.severity", e.severity }, { "alarm.value", e.value },
-        { "alarm.event", e.event }, { "alarm.time", LogDb::format_time(e.ts_ms).substr(0, 19) }, { "alarm.user", e.user } };
+        { "alarm.event", e.event }, { "alarm.time", local_time_text(LogDb::format_time(e.ts_ms).substr(0, 19)) }, { "alarm.user", e.user } };
     std::string why;
     if(!queue(mail_expand(c.subject, vars), mail_expand(c.body, vars), &why)) HML_WARN("mail: alarm '%s': %s", e.name.c_str(), why.c_str());
 }
@@ -444,7 +445,7 @@ std::string Mail::set_local(bool enabled, const std::string& to, const std::stri
 
 std::string Mail::expand(const std::string& text) const
 {
-    return mail_expand(text, { { "project", impl_->title }, { "time", LogDb::format_time(impl_->now()).substr(0, 19) } });
+    return mail_expand(text, { { "project", impl_->title }, { "time", local_time_text(LogDb::format_time(impl_->now()).substr(0, 19)) } });
 }
 
 Mail& mail()

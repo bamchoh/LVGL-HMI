@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "ui.hpp"
 #include "src/misc/lv_text_private.h"
 #include "system_i18n.hpp"
@@ -666,7 +667,7 @@ void Binding::apply_value(double n)
         case Widget::Roller:   lv_roller_set_selected(obj, static_cast<uint32_t>(iv < 0 ? 0 : iv), LV_ANIM_OFF); break;
         case Widget::Led:      lv_led_set_brightness(obj, static_cast<uint8_t>(iv < 0 ? 0 : iv > 255 ? 255 : iv)); break;
         default: {
-            std::string text = Value::number(n * scale + offset).format(format);
+            std::string text = local_number_text(Value::number(n * scale + offset).format(format));
             if(wk == Widget::Textarea) ta_show(obj, text);
             else if(wk == Widget::Checkbox) lv_checkbox_set_text(obj, text.c_str());
             else if(lv_obj_check_type(obj, &lv_label_class)) lv_label_set_text(obj, text.c_str());   // (nothing else has a text)
@@ -681,6 +682,7 @@ void Binding::on_tag_changed(const Value& v, const void* source)
     switch(kind) {
         case BindKind::Text: {
             std::string text = v.format(format);
+            if(v.type == TagType::Float || (v.type == TagType::Int && !format.empty())) text = local_number_text(text);   // (a number: its decimal sign)
             if(!text_map.empty() && wk != Widget::Image && wk != Widget::Textarea) {
                 if(const std::string* t = text_map.find(v)) text = *t;
             }
@@ -789,8 +791,10 @@ void Binding::write_from_widget(lv_obj_t* target)
     }
     if(kind == BindKind::Text) {
         if(wk == Widget::Textarea) {
-            tag->set_string(lv_textarea_get_text(target), this);
-            if(commit_on_ready) ta_show(target, tag->get().format(format));   // normalised echo
+            // (a number is typed with the decimal sign of the locale, and read with a point)
+            const bool number = tag->type() == TagType::Float || tag->type() == TagType::Int;
+            tag->set_string(number ? plain_number_text(lv_textarea_get_text(target)) : std::string(lv_textarea_get_text(target)), this);
+            if(commit_on_ready) ta_show(target, number ? local_number_text(tag->get().format(format)) : tag->get().format(format));   // normalised echo
         }
         return;
     }
@@ -801,7 +805,7 @@ void Binding::write_from_widget(lv_obj_t* target)
             case Widget::Arc:      wv = lv_arc_get_value(target); break;
             case Widget::Dropdown: wv = lv_dropdown_get_selected(target); break;
             case Widget::Roller:   wv = lv_roller_get_selected(target); break;
-            case Widget::Textarea: wv = std::atof(lv_textarea_get_text(target)); break;
+            case Widget::Textarea: wv = std::atof(plain_number_text(lv_textarea_get_text(target)).c_str()); break;
             default: return;
         }
         double tv = scale != 0 ? (wv - offset) / scale : wv;
@@ -904,6 +908,7 @@ void Binding::tag_event(const Value& v, const void* source)
 // read as "delete", a check mark had to be learnt. The words are in the language of the system
 // screens; the layouts are ours for that (LVGL's own have icons there).
 char s_kb_close[24] = "Close", s_kb_done[24] = "OK", s_kb_clear[24] = "Clear";
+char s_kb_decimal[2] = ".";         // the decimal key of the number pad: "." or "," ("locale" of project.json)
 bool s_kb_accents = false;          // the font of the project has the letters with accents: the keyboard offers them
 bool s_kb_light = false;            // the theme of the project is light: the keyboard is too
 #define HML_KB_BTN(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
@@ -990,7 +995,7 @@ const char* const kKbMapNumber[] = {
     "1", "2", "3", LV_SYMBOL_BACKSPACE, "\n",
     "4", "5", "6", s_kb_clear, "\n",
     "7", "8", "9", s_kb_close, "\n",
-    "+/-", "0", ".", s_kb_done, "",
+    "+/-", "0", s_kb_decimal, s_kb_done, "",
 };
 const int kKbCtrlNumber[] = {
     1, 1, 1, 2,
@@ -1097,6 +1102,7 @@ void install_keyboard_maps(lv_obj_t* kb)
         if(t.rfind("key:", 0) == 0 || !font_file_has(t)) t = english;       // (no entry, or letters that are missing)
         lv_snprintf(out, static_cast<uint32_t>(size), "%s", t.c_str());
     };
+    s_kb_decimal[0] = display_locale().decimal;
     word("Clear", s_kb_clear, sizeof s_kb_clear);
     word("Close", s_kb_close, sizeof s_kb_close);
     word("OK", s_kb_done, sizeof s_kb_done);
@@ -2079,7 +2085,7 @@ lv_obj_t* Ui::Impl::build_widget(lv_obj_t* parent, const json& w)
         lv_textarea_set_text(obj, jstr(w, "text", "").c_str());
         if(auto ph = jstr_opt(w, "placeholder")) lv_textarea_set_placeholder_text(obj, texts().resolve(*ph).c_str());
         if(jhas(w, "max_length")) lv_textarea_set_max_length(obj, static_cast<uint32_t>(jnum(w, "max_length", 0)));
-        std::string accepted = jstr(w, "accepted_chars", numeric ? "0123456789.-+" : "");
+        std::string accepted = jstr(w, "accepted_chars", numeric ? (display_locale().decimal == ',' ? "0123456789.,-+" : "0123456789.-+") : "");
         if(!accepted.empty()) {
             owned_strings.push_back(std::make_unique<std::string>(accepted));
             lv_textarea_set_accepted_chars(obj, owned_strings.back()->c_str());

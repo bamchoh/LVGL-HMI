@@ -447,3 +447,20 @@ TEST_CASE("check: a level without users is said once; level_deny is not for a sc
         { "type": "button", "text": "x", "on_click": { "action": "system" } } ] })json");
     CHECK(has(p.check(), "\"level_deny\" is for widgets"));
 }
+
+TEST_CASE("check: locale is { date: ymd | dmy | mdy, decimal: . | , }")
+{
+    Proj p;
+    p.write("screens/a.json", R"json({ "name": "a", "children": [ { "type": "button", "on_click": { "action": "system" } } ] })json");
+    auto project = [&](const std::string& more) {
+        p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ])json" + more + " }");
+    };
+    project(R"json(, "locale": { "date": "dmy", "decimal": "," })json");
+    CHECK_FALSE(has(p.check(), "locale"));
+    project(R"json(, "locale": { "date": "german" })json");
+    CHECK(has(p.check(), "is not ymd, dmy or mdy"));
+    project(R"json(, "locale": { "decimal": ";" })json");
+    CHECK(has(p.check(), "decimal"));
+    project(R"json(, "locale": { "time": "12h" })json");
+    CHECK(has(p.check(), "unknown key \"time\""));
+}

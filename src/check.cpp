@@ -676,6 +676,18 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(!start.empty() && !c.screens.count(start)) c.add("start_screen", "unknown screen \"" + start + "\"");
     else if(c.popups.count(start)) c.add("start_screen", "\"" + start + "\" is a popup");
 
+    // ---- locale: how dates and numbers are written on the screen
+    if(const json* lo = jget(root, "locale")) {
+        if(!lo->is_object()) c.add("locale", "\"locale\" is { \"date\": \"dmy\", \"decimal\": \",\" }");
+        else {
+            for(auto k = lo->begin(); k != lo->end(); ++k)
+                if(!k.key().empty() && k.key()[0] != '_' && k.key() != "date" && k.key() != "decimal") c.add("locale", "unknown key \"" + k.key() + "\"");
+            const std::string date = jstr(*lo, "date", "ymd"), dec = jstr(*lo, "decimal", ".");
+            if(date != "ymd" && date != "dmy" && date != "mdy") c.add("locale", "date: \"" + date + "\" is not ymd, dmy or mdy");
+            if(dec != "." && dec != ",") c.add("locale", "decimal: \"" + dec + "\" is not \".\" or \",\"");
+        }
+    }
+
     // ---- system_language: the language of the system screens
     if(const json* sl = jget(root, "system_language")) {
         const std::string lang = sl->is_string() ? sl->get<std::string>() : std::string();

@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "table_view.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -31,11 +32,11 @@ struct Live {                             // a cell that follows a tag
         const Value v = tag->get();
         if(has_map) {
             if(!v.is_string()) { const double n = v.as_number(); for(const auto& m : by_number) if(m.first == n) return m.second; }
-            const std::string s = v.format();
+            const std::string s = (v.type == TagType::Float) ? local_number_text(v.format()) : v.format();
             for(const auto& m : by_text) if(m.first == s) return m.second;
             if(has_fallback) return fallback;
         }
-        return log_view_text(v.format(format));
+        return log_view_text((v.type == TagType::Float || v.type == TagType::Int) ? local_number_text(v.format(format)) : v.format(format));
     }
 };
 

@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "alarm_view.hpp"
 #include <algorithm>
 #include <map>
@@ -34,7 +35,7 @@ std::string short_time(int64_t ms, bool with_date)
 {
     if(ms <= 0) return "";
     std::string t = LogDb::format_time(ms);               // YYYY-MM-DD HH:MM:SS.mmm
-    return t.size() >= 19 ? (with_date ? t.substr(5, 14) : t.substr(11, 8)) : t;
+    return t.size() >= 19 ? (with_date ? local_time_text(t.substr(5, 14)) : t.substr(11, 8)) : t;
 }
 
 bool on_shown_screen(lv_obj_t* obj) { return lv_obj_get_screen(obj) == lv_screen_active(); }
