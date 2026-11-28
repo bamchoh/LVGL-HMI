@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
 project(hml_runtime C CXX)
 
+# The version the programs say they are ("hml_runtime --version", System > About). A release
+# build is given it by the release workflow (the tag without its "v"); everything else is "dev".
+set(HML_VERSION "dev" CACHE STRING "version of this build")
+add_compile_definitions(HML_VERSION="${HML_VERSION}")
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)

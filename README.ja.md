@@ -2921,6 +2921,17 @@ Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動
 - 各書き込みには「書き込み元」が付くため、スライダー自身の書き込みがスライダーに戻って
   ドラッグ中に跳ねる、Modbus ドライバーが自分で読んだ値を PLC に書き戻す、といったループは起きません。
 
+## リリース
+
+実行ファイルは [releases](https://github.com/bamchoh/tsukuraku/releases) から入手できます。`windows-x64.zip`（PC 用のデザイナーとランタイム。
+展開して `hml_designer.exe` を起動）、`linux-aarch64.tar.gz`（Raspberry Pi 用のランタイム。64 bit の Raspberry Pi OS 12 以降）、
+`linux-x64.tar.gz`（Linux の PC 用のランタイム、フレームバッファ）です。どれにも `examples/`、ライセンス（`LICENSE`、`NOTICE`、`licenses/`）、
+この README が入っています。`hml_runtime --version` でバージョンが分かり、装置では System > About に出ます。実行ファイルに署名はありません（#153）。
+
+リリースの作り方: `v1.2.3` の形のタグを push します。`.github/workflows/release.yml` が 3 つのパッケージを作り（中身をそろえるのは
+`tools/package.py`）、ファイルとチェックサムを付けた**下書き**のリリースを作ります。だれかが下書きを見て公開するまで、外からは見えません。
+このワークフローの「Run workflow」は、リリースを作らずに同じパッケージだけを作ります（試す用）。
+
 ## ライセンス
 
 Tsukuraku は [Apache License 2.0](LICENSE) です。ライセンスと表示を付けたままであれば、商用の製品でも、使う・変える・配ることが

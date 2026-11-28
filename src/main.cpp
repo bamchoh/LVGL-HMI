@@ -298,6 +298,10 @@ int main(int argc, char** argv)
     // hml_runtime --list-serial-ports: the serial ports of this machine, one per line:
     //   <device> TAB <stable name (Linux USB adapters) or empty> TAB <description>
     if(argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) { usage(argv[0]); return 0; }
+    if(argc >= 2 && std::string(argv[1]) == "--version") {
+        std::printf("Tsukuraku runtime %s (LVGL %d.%d.%d)\n", HML_VERSION, LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);
+        return 0;
+    }
     if(argc >= 2 && std::string(argv[1]) == "--list-serial-ports") {
         for(const hml::SerialPortInfo& p : hml::list_serial_ports())
             std::printf("%s\t%s\t%s\n", p.device.c_str(), p.stable.c_str(), p.description.c_str());
