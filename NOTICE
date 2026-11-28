@@ -1,0 +1,46 @@
+Tsukuraku
+Copyright 2026 bamchoh
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+
+Third-party software
+====================
+
+The source tree contains no third-party source code. The build downloads the
+components below (CMake FetchContent) and links them into the programs; a binary
+of Tsukuraku therefore contains them. Each keeps its own licence. When you pass
+binaries on, pass on these notices and the licence texts of the components
+(they are in the downloaded sources, build/_deps/<name>-src).
+
+In the runtime (hml_runtime) and the designer (hml_designer):
+
+  LVGL 9.6.0                 MIT                        https://github.com/lvgl/lvgl
+    with the fonts Montserrat (SIL Open Font License 1.1) and
+    Font Awesome Free icons (SIL OFL 1.1 for the font, CC BY 4.0 for the icons)
+  nlohmann/json 3.11.3       MIT                        https://github.com/nlohmann/json
+  Lua 5.4.8                  MIT                        https://www.lua.org
+  SQLite 3.50.4              public domain              https://www.sqlite.org
+  miniz 3.0.2                MIT                        https://github.com/richgel999/miniz
+  Mbed TLS 3.6.4             Apache-2.0 (or GPL-2.0-or-later; used under Apache-2.0)
+                                                        https://github.com/Mbed-TLS/mbedtls
+  open62541 1.4.22           MPL-2.0                    https://github.com/open62541/open62541
+    (linked unchanged; its source is available at the address above)
+  SDL 2.32.8                 zlib                       https://github.com/libsdl-org/SDL
+    (the PC build of the runtime only)
+
+In the designer only:
+
+  webview 0.12.0             MIT                        https://github.com/webview/webview
+  Microsoft Edge WebView2    Microsoft's terms (the loader that comes with webview;
+                             the WebView2 runtime is part of Windows or installed separately)
+
+In the tests only (not in what is passed on):
+
+  doctest 2.4.11             MIT                        https://github.com/doctest/doctest
+
+Fonts in this repository:
+
+  Noto Sans JP (a subset), in projects/*/assets/fonts and with the designer
+                             SIL Open Font License 1.1 (OFL.txt beside each file)
+                             Copyright 2014-2021 Adobe (http://www.adobe.com/)
