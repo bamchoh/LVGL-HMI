@@ -2946,8 +2946,9 @@ gh attestation verify tsukuraku-0.1.1-windows-x64.zip --repo bamchoh/tsukuraku
 ## コード署名の方針（Code signing policy）
 
 **状況: まだ始まっていません。** これまでのリリースの Windows 用の実行ファイルには、コード署名の証明書が付いていません。
-SignPath Foundation がオープンソース向けに提供している無料のコード署名に申請します。この節は、認められたときに守る方針です
-（認められたら、ここにそう書きます）。
+できたばかりのプロジェクトなので、利用者の実績ができた段階で、SignPath Foundation がオープンソース向けに提供している無料の
+コード署名に申請する予定です。この節は、そのときに守る方針です（署名が始まったら、ここにそう書きます）。それまでは、
+ダウンロードしたファイルを出どころの証明（「リリース」の節）で確かめてください。
 
 Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
