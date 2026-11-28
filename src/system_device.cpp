@@ -72,7 +72,7 @@ public:
         text("value", value_);
         info("values", values_);
         info("error", error_);
-        info("help", d ? d->device_help() : "No driver that runs reads addresses (Modbus, SLMP and FINS do).");
+        info("help", d ? d->device_help() : "No driver that runs reads addresses (Modbus, SLMP, FINS and S7 do).");
         flag("has_driver", d != nullptr);
         flag("has_error", !error_.empty());
         return out;
@@ -255,7 +255,7 @@ bool has_device_driver(const json* drivers)
     if(!drivers || !drivers->is_array()) return false;
     for(const json& cfg : *drivers) {
         const std::string type = jstr(cfg, "type", "");
-        if(type.rfind("modbus", 0) == 0 || type == "slmp" || type == "fins") return true;
+        if(type.rfind("modbus", 0) == 0 || type == "slmp" || type == "fins" || type == "s7") return true;
     }
     return false;
 }

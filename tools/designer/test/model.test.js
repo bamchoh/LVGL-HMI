@@ -1720,6 +1720,31 @@ test('U.finsAddress agrees with the runtime parser; M.problems names wrong FINS 
   deq(texts.sort(), ['plc: "Q5" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
 });
 
+test('U.s7Address agrees with the runtime parser; M.problems names wrong S7 addresses; the driver is offered', () => {
+  const { U, M, SCHEMA: S } = load();
+  const ok = s => !!U.s7Address(s);
+  // (the same lists as tests/test_driver_s7.cpp)
+  for (const s of ['DB1.DBX0.0', 'db12.dbx300.7', 'DB1.DBB2', 'DB1.DBW4', 'DB1.DBD6', 'DB65535.DBW0', ' %DB1.DBX0.0 ', 'M0.0', '%M10.3', 'MX10.3', 'MB1', 'MW2', 'MD4',
+    'I0.0', 'IB0', 'IW0', 'ID0', 'Q0.1', 'QB0', 'QW2', 'QD4', 'E0.7', 'EW2', 'A1.1', 'AB0', 'AD4', 'MW65534', 'MB65535']) assert.ok(ok(s), s);
+  for (const s of ['', '%', 'D100', 'T5', 'DB1', 'DB1.DBQ0', 'DB1.W4', 'DB1.DB4', 'DB0.DBW0', 'DB65536.DBW0', 'DBX.DBW0', 'DB1.DBX0', 'M0', 'M0.8', 'M0.', 'M0.10',
+    'MW2.1', 'MW', 'M', 'MW1A', 'MW-1', 'MW65535', 'MD65533', 'MB65536', 'MB999999', '%%M0.0', 'M'.repeat(5000), null, undefined]) assert.ok(!ok(s), String(s));
+  deq(U.s7Address('db1.dbx0.3'), { area: 'DB', db: 1, number: 0, bit: 3, size: 1 });
+  deq(U.s7Address('%DB7.DBD12'), { area: 'DB', db: 7, number: 12, bit: -1, size: 4 });
+  deq(U.s7Address('e0.7'), { area: 'I', db: 0, number: 0, bit: 7, size: 1 });
+  deq(U.s7Address('AW6'), { area: 'Q', db: 0, number: 6, bit: -1, size: 2 });
+  M.newProject('T', 800, 480);
+  M.st.project.tags = [{ name: 'a', type: 'int' }];
+  M.st.project.drivers = [{ type: 's7', name: 'plc', map: [{ tag: 'a', addr: 'DB1.DBW4' }, { tag: 'a', addr: 'D100' }, { tag: 'b', addr: 'M0.0' }] }];
+  const texts = M.problems().map(p => p.text);
+  deq(texts.sort(), ['plc: "D100" is not a device address', 'plc: no host is set', 'unknown tag "b" (map)'].sort());
+  // the form of the driver: its own keys, the same names as the other PLC drivers, and a default to start from
+  const keys = S.drivers.s7.fields.map(f => f.k);
+  for (const k of ['host', 'port', 'rack', 'slot', 'poll_ms', 'timeout_ms', 'status_tag', 'write_ranges', 'allow_system_write']) assert.ok(keys.includes(k), k);
+  assert.ok(/PUT\/GET/.test(S.drivers.s7.fields.find(f => f.k === 'host').hint));
+  deq(S.drivers.s7.table.columns.map(c => c.k), ['tag', 'addr', 'dtype', 'length', 'scale', 'offset', 'access']);
+  deq([S.driverDefaults.s7.type, S.driverDefaults.s7.port, S.driverDefaults.s7.rack, S.driverDefaults.s7.slot], ['s7', 102, 0, 1]);
+});
+
 test('M trend widgets: group and tags are checked, tag renames follow', () => {
   const { M } = load();
   M.newProject('T', 800, 480);

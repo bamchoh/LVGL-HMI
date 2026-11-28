@@ -70,6 +70,33 @@ const U = {
     if (m[2] !== undefined && (parseInt(m[2], 10) > 15 || area === 'T' || area === 'C')) return null;
     return { area, number, bit: m[2] === undefined ? -1 : parseInt(m[2], 10) };
   },
+  // An S7 (Siemens) address as the runtime reads it (src/s7.cpp): { area, db, number, bit, size } or null.
+  // area: I (also E), Q (also A), M, DB; size: bytes (1 2 4); bit -1 = not a bit.
+  s7Address(text) {
+    let s = String(text === undefined || text === null ? '' : text).replace(/\s+/g, '').toUpperCase();
+    if (s.length > 25) return null;
+    if (s[0] === '%') s = s.slice(1);
+    let area, db = 0, rest;
+    let m = /^DB([0-9]{1,5})\.DB([XBWD].*)$/.exec(s);
+    if (m) {
+      db = parseInt(m[1], 10);
+      if (db < 1 || db > 65535) return null;
+      area = 'DB'; rest = m[2];
+    }
+    else {
+      m = /^([IEQAM])(.+)$/.exec(s);
+      if (!m) return null;
+      area = { I: 'I', E: 'I', Q: 'Q', A: 'Q', M: 'M' }[m[1]]; rest = m[2];
+    }
+    m = /^([XBWD]?)([0-9]{1,5})(?:\.([0-9]))?$/.exec(rest);
+    if (!m) return null;
+    const isBit = m[1] === 'X' || m[1] === '';
+    const size = m[1] === 'W' ? 2 : m[1] === 'D' ? 4 : 1;
+    const number = parseInt(m[2], 10);
+    if (number + size - 1 > 65535) return null;
+    if (isBit !== (m[3] !== undefined) || (isBit && parseInt(m[3], 10) > 7)) return null;
+    return { area, db, number, bit: isBit ? parseInt(m[3], 10) : -1, size };
+  },
   // the width of a text in "half-width" units (a CJK character counts 2): for "may not fit"
   textWidth(s) { let n = 0; for (const c of String(s)) n += /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(c) ? 2 : 1; return n; },
   // rows of a pasted table: commas or tabs, "..." with "" inside

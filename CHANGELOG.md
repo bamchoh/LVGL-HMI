@@ -22,6 +22,15 @@ Each release lists, where there is something to say:
 - `"locale": { "date": "dmy" | "mdy", "decimal": "," }` in `project.json`: how dates and decimal numbers are written on the
   screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form. In the designer: Project tab > "Dates and numbers".
 
+- Driver **`s7`**: Siemens S7-300 / 400 / 1200 / 1500 over S7comm (PUT/GET, ISO-on-TCP port 102). Addresses as in TIA Portal
+  (`DB1.DBW4`, `M0.0`, `IW2`, `QB0`), bool / 8 / 16 / 32-bit integers / float / STRING, `write_ranges`, the Addresses page.
+  S7-1200 / 1500 need "PUT/GET communication" permitted in the CPU. **Tested against a simulated PLC only, not yet against a real one.**
+
+**Security**
+
+- FINS and SLMP: a `"write_ranges"` that named no valid range (a typing mistake, an empty list) logged "nothing can be
+  written" but let every write through. It allows nothing now, as it says.
+
 **Changed**
 
 - The header's "Apply" button of the system screens is as wide as its word; "Refresh" on the USB page is a sign.

@@ -508,6 +508,8 @@ TEST_CASE("System > Device: an address without a tag is read while the page is s
     CHECK(has_device_driver(&arr));
     arr = json::parse(R"([{"type":"fins"}])");
     CHECK(has_device_driver(&arr));
+    arr = json::parse(R"([{"type":"s7"}])");
+    CHECK(has_device_driver(&arr));
 
     Runtime rt;
     auto owned = std::make_unique<FakeDeviceDriver>();

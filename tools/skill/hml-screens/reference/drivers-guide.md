@@ -9,8 +9,8 @@ Do this **only when asked**. A wrong address means writing to the wrong place in
 - **Do not guess**: take the destination (IP address, port, model, station number / unit number, broker, endpoint) and the addresses from the request or from the
   address table the user handed over (CSV, spreadsheet, the PLC's label list). If there is none, do not make them up; ask. Do not write "probably D100".
 - **Start read-only**: newly made rows are `"access": "ro"`. Rows that write (setpoints, run commands) are `rw` only for those the user approved for writing
-  (`wo` for those that are not read back, such as a command that is ON only while pressed). For SLMP and FINS, put only the ranges that may be written into `write_ranges`
-  (`["D100-D199", "M0-M15"]`). Do not write the system areas (SM / SD, A of FINS) (do not add `allow_system_write`).
+  (`wo` for those that are not read back, such as a command that is ON only while pressed). For SLMP, FINS and S7, put only the ranges that may be written into `write_ranges`
+  (`["D100-D199", "M0-M15"]`; S7: bytes, `["DB1.DBB0-DB1.DBB19", "MB10-MB11"]`). Do not write the system areas (SM / SD, A of FINS, the inputs I of S7) (do not add `allow_system_write`).
 - **Do not write passwords or keys**: up to the user name may be written. The password is entered on the device's System screen (`--check` tells you).
   Leave encryption at the default (MQTT is `tls: true`, `verify: true`; OPC UA is `security: "sign_encrypt"`). Turn encryption off only when asked, and write it in the report.
 - **In existing `drivers`, change only what was asked** (do not reorder, delete or rename other rows).
@@ -30,6 +30,11 @@ Do this **only when asked**. A wrong address means writing to the wrong place in
    | Real (32-bit floating point) | `float` | `float` (uses 2 words) |
    | Integer with a decimal point (in units of 0.1 °C and the like) | `float` | `int16` + `"scale": 0.1` |
    | String | `string` | `string` + `"length"` (number of characters) |
+
+   **S7 is different**: the address says the size (`DBX` / `M0.0` a bit, `DBB` a byte, `DBW` a word, `DBD` a double word) and `dtype` only how it is read:
+   Bool → no `dtype`; Byte / USInt → `DBB` (`uint8`, the default) and SInt → `DBB` + `int8`; Int → `DBW` (`int16`, the default) and Word / UInt → `DBW` + `uint16`;
+   DInt → `DBD` (`int32`, the default), DWord / UDInt → `DBD` + `uint32`, Real → `DBD` + `float`; String[n] → `DBB` + `string` + `"length": n`.
+   A `dtype` that does not fit the size of the address is a mistake (`--check` tells you). LReal, LInt, Time, Date_And_Time, WString and arrays cannot be read: ask.
 
    Give the tags of values that are written `min` / `max` (writes from the screen are clamped to the range).
    **When using an existing tag**: match the type to the address (if it is an int tag on a real address, change it to float and report it. `--check` tells you).
@@ -60,8 +65,10 @@ Have the PLC side act on the rising edge (say so in the report).
 
 ## Strings
 
-`"dtype": "string"` of SLMP / FINS is 1 byte per character (ASCII. 2 characters in 1 word: for SLMP the low byte comes first, for FINS the high byte comes first); `length` is the number of characters. Japanese (Shift-JIS and the like) cannot be read.
+`"dtype": "string"` of SLMP / FINS / S7 is 1 byte per character (ASCII. 2 characters in 1 word: for SLMP the low byte comes first, for FINS the high byte comes first); `length` is the number of characters. Japanese (Shift-JIS and the like) cannot be read.
 Even if the table says "16 characters", ask if they are full-width.
+S7: the address is where the STRING starts (`DB1.DBB20`; in TIA Portal the offset `20.0`), and `length` is the declared length (`String[16]` → 16; `String` alone → 254).
+The string takes `length` + 2 bytes (the two length bytes come first). WString and Array of Char are not read.
 
 ## How to write addresses
 
@@ -70,6 +77,12 @@ Even if the table says "16 characters", ask if they are full-width.
   32 bits uses two in a row (`addr` and `addr + 1`). If the word order is reversed, `swap_words`.
 - **SLMP (Mitsubishi MELSEC)**: as written in GX Works: `D100` `M0` `X1F` `Y20` `W1A` `ZR100` (X Y B W SB SW DX DY ZR are hexadecimal). `D10.3` is a bit of a word (read-only).
 - **FINS (Omron)**: `D100` `CIO10` `W0.00` `H5` `A0` `E0_100` `T1` `C1` (`.00` to `.15` are bits). BCD values are `bcd16` / `bcd32`.
+- **S7 (Siemens)**: as written in STEP 7 / TIA Portal, with the absolute address (not the symbolic name `"Data".speed`: if the table has only names, ask for the
+  DB number and the offsets). `DB1.DBX0.0` (bit) `DB1.DBB2` (byte) `DB1.DBW4` (word) `DB1.DBD6` (double word); `M0.0` `MB1` `MW2` `MD4`; inputs `I0.0` `IB0` `IW0` `ID0`
+  (German `E`), outputs `Q0.0` `QB0` ... (German `A`); a leading `%` is allowed. An offset `4.0` of an Int in DB1 is `DB1.DBW4`. Values are big-endian (no `swap_words`).
+  `rack` / `slot`: 0 / 1 for S7-1200 / 1500, 0 / 2 for S7-300 (ask for an S7-400). **Put in the report what has to be set in the PLC**: for S7-1200 / 1500 "Permit access
+  with PUT/GET communication" (CPU properties > Protection & Security), and "Optimized block access" off for every DB that is read (their offsets exist only then).
+  The driver has been tested against a simulated PLC only, not against a real Siemens PLC: say so in the report.
 - **OPC UA server** (`opcua_server`: shows tags to SCADA and the like): signing and encryption by default. Put the certificates of the clients to accept in `client_certs`
   (put the files received from the user into the project. If there are none, ask. With none at all, no client can get in). `"security": "none"` only
   when asked (write it in the report). If login is needed, write only `username` and have the password set on the device. Narrow the tags shown down with `tags`, and

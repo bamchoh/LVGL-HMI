@@ -25,6 +25,7 @@ add_executable(hml_tests
   test_images.cpp
   test_animate.cpp
   test_driver_fins.cpp
+  test_driver_s7.cpp
   test_karakuri.cpp
   test_log_view.cpp
   test_meter.cpp

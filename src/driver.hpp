@@ -93,6 +93,7 @@ std::unique_ptr<Driver> make_modbus_rtu_driver(const json& cfg);     // serial l
 std::unique_ptr<Driver> make_modbus_ascii_driver(const json& cfg);
 std::unique_ptr<Driver> make_fins_driver(const json& cfg);          // OMRON, FINS/TCP
 std::unique_ptr<Driver> make_slmp_driver(const json& cfg);          // Mitsubishi MELSEC, SLMP / MC protocol 3E / 4E over TCP
+std::unique_ptr<Driver> make_s7_driver(const json& cfg);            // Siemens S7, S7comm (PUT/GET) over ISO-on-TCP
 std::unique_ptr<Driver> make_mqtt_driver(const json& cfg);          // MQTT 3.1.1 client (TLS by default)
 std::unique_ptr<Driver> make_opcua_server_driver(const json& cfg);   // returns nullptr when built without HML_OPCUA
 std::unique_ptr<Driver> make_opcua_client_driver(const json& cfg);   // nodes of another OPC UA server as tags (same)
