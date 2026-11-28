@@ -1664,6 +1664,14 @@ that has those characters into the project.
 python -I tools/subset_font.py NotoSansJP-Regular.otf projects/myhmi/assets/fonts/NotoSansJP-subset.otf --text projects/myhmi/project.json projects/myhmi/screens/*.json
 ```
 
+**A font for the languages of Europe comes with the designer too** (`<designer folder>/fonts/NotoSans-subset.ttf`, a subset of
+Noto Sans, SIL Open Font License, 0.2 MB): Latin with all accents (German, French, Spanish, Polish, Czech, Hungarian, Turkish,
+Romanian, the Baltic and Nordic languages), Greek, Cyrillic and the euro sign. The built-in font has the letters of English only -
+no ä, é or € - so a project in any other European language needs it: "Font" in the dialog for a new project, or
+Project tab > Font > "Add the font for European languages". The designer lists letters that the built-in font does not have
+among the problems. (The Japanese font has the letters of Western Europe as well, but not €, œ, or those of Central and Eastern Europe.)
+It was made with `python -I tools/subset_font.py NotoSans-Regular.ttf NotoSans-subset.ttf --latin`.
+
 **The designer comes with a Japanese font (a subset of Noto Sans JP, SIL Open Font License)** (`<designer folder>/fonts/`).
 The built-in font of the runtime is Latin only, so put the font into a project that shows Japanese in one of the following two ways. The font and the license text are
 copied to `assets/fonts/` of the project, and `font.file` is set (they also go into deploys and project files).

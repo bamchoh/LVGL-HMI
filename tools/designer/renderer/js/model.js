@@ -1297,6 +1297,14 @@ const M = {
       const where = cjk.test(JSON.stringify(p.texts || {})) ? 'the texts' : st.screens.some(s => cjk.test(JSON.stringify(s.data))) ? 'a screen'
                   : cjk.test(JSON.stringify(p.alarms || {})) ? 'the alarms' : '';
       if (where) out.push({ text: 'Japanese text is used (' + where + '), but the project has no font for it: it is shown as empty boxes. Project tab > Font', view: 'screen' });
+      // ... and it has the letters of English only: no ä, é, ł, no euro sign, no Cyrillic or Greek
+      // (of what is above ASCII it has the degree sign and the bullet)
+      const beyond = /[\u00a1-\u00af\u00b1-\u024f\u0370-\u04ff\u20a0-\u20bf]/g;
+      const found = new Set();
+      for (const part of [p.texts, p.alarms, p.title].concat(st.screens.map(s => s.data)))
+        for (const ch of (JSON.stringify(part || '').match(beyond) || [])) found.add(ch);
+      if (found.size) out.push({ text: 'Letters that the built-in font does not have are used (' + [...found].slice(0, 8).join(' ') + (found.size > 8 ? ' …' : '')
+        + '): they are shown as empty boxes. Project tab > Font > "Add the font for European languages"', view: 'screen' });
     }
     for (const w of this.userProblems()) out.push({ text: w, view: 'users' });
     for (const r of this.recipeProblems()) out.push(r);

@@ -639,10 +639,11 @@ const Panels = {
     });
     el.append(Props.section('Font', false,
       Props.row('file', Props.editor(fontHolder, 'file', { t: 'text', placeholder: 'assets/fonts/NotoSansJP-subset.otf' }, fk + '.font'),
-        'a TTF / OTF file in the project for every text (any size); empty = the built-in font (Latin letters only). tools/subset_font.py makes a small copy with the characters the project needs'),
-      U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.font.add' }, disabled: !(App.info && App.info.fontsDir), onclick: () => App.addBundledFont() }, 'Add the Japanese font (Noto Sans JP)'),
+        'a TTF / OTF file in the project for every text (any size); empty = the built-in font (English letters only: no ä, é, €). tools/subset_font.py makes a small copy with the characters the project needs'),
+      U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.font.add' }, disabled: !(App.info && App.info.fontsDir), onclick: () => App.addBundledFont('ja') }, 'Add the Japanese font (Noto Sans JP)'),
+        U.el('button', { class: 'mini', dataset: { fk: fk + '.font.add_europe' }, disabled: !(App.info && App.info.fontsDir), onclick: () => App.addBundledFont('europe') }, 'Add the font for European languages (Noto Sans)'),
         U.el('span', { class: 'dim' }, 'copies it into assets/fonts/ of the project, with its license, and sets it here')),
-      U.el('div', { class: 'hint' }, 'Keep the license of the font next to it (Noto Sans JP: SIL Open Font License, OFL.txt).')));
+      U.el('div', { class: 'hint' }, 'European languages: Latin with all accents (ä é ñ ł ő ş …), Greek, Cyrillic, the euro sign (0.2 MB). Japanese: kana and kanji, and the letters of Western Europe (1.2 MB). Keep the license of the font next to it (SIL Open Font License: OFL.txt / OFL-NotoSans.txt).')));
     el.append(Props.section('Icons', false,
       U.el('div', { class: 'row' }, U.el('label'), U.el('button', { class: 'mini', dataset: { fk: fk + '.icons.add' }, disabled: !(App.info && App.info.iconsDir), onclick: () => App.addBundledIcons() }, 'Add the preset icons'),
         U.el('span', { class: 'dim' }, 'copies them into assets/icons/ of the project')),

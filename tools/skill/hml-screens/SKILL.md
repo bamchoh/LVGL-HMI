@@ -111,9 +111,15 @@ match the size of the neighbouring widgets (if that is smaller than the minimum,
   make `primary` and `secondary` the same as the accent colour.
 - **Only plain ASCII letters, digits and `°` are in the runtime's built-in font.** Everything else needs `font.file` in `project.json`,
   or it is drawn as □: Japanese and Chinese, but also **accented Latin letters (ä ö ü ß é è ñ å …)**, Cyrillic and Greek.
-  `--check` names every character that has no glyph. The font that comes with the designer is for Japanese; whether it has the letters of
-  another language is found by `--check`. When they are missing, say so and ask the user for a font file that has them
-  (a TTF / OTF in `assets/fonts/`, named in `font.file`) - do not rewrite the words to avoid the letters unless the user agrees.
+  `--check` names every character that has no glyph. **Two fonts come with the designer** (`<designer folder>\fonts\`):
+  - `NotoSans-subset.ttf` with `OFL-NotoSans.txt` - **the languages of Europe**: Latin with all accents (German, French, Spanish, Polish, Czech,
+    Hungarian, Turkish, Romanian, the Baltic and Nordic languages), Greek, Cyrillic, the euro sign. 0.2 MB. No arrows, no ≤ ≥ ≠.
+  - `NotoSansJP-subset.otf` with `OFL.txt` - **Japanese** (kana, kanji), and the letters of Western Europe (ä é ñ å, but no €, œ, ł, č, ő, Cyrillic, Greek). 1.2 MB.
+
+  When the project has no font and such letters must be shown, put the fitting one into the project: copy the font **and its licence file**
+  (always together) into `assets/fonts/` of the project and set `"font": { "file": "assets/fonts/<the file>" }` - the same as the buttons
+  on the designer's Project tab > Font do. Report it. A project has one font: when it already has one that lacks the letters, say so and
+  let the user decide (another font file; or other words) - do not rewrite the words to avoid the letters unless the user agrees.
   When the project has no font and Japanese must be shown, **put the Japanese font that comes with the designer into the project**:
   copy `NotoSansJP-subset.otf` and `OFL.txt` (the licence text. Always together) from `<designer folder>\fonts\` to
   the project's `assets\fonts\`, and add `"font": { "file": "assets/fonts/NotoSansJP-subset.otf" }` to `project.json`

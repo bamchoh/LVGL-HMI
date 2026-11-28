@@ -596,7 +596,10 @@ Object.assign(I18N.TEXT_JA, {
 });
 // ---- the font that comes with the designer
 Object.assign(I18N.TEXT_JA, {
-  'Japanese font': '日本語フォント',
+  'Japanese font': '日本語フォント', 'Font': 'フォント',
+  'Built-in (English letters only)': '組み込み（英字のみ）', 'European languages (Noto Sans, 0.2 MB)': '欧州の言語（Noto Sans、0.2 MB）',
+  'Japanese (Noto Sans JP, 1.2 MB)': '日本語（Noto Sans JP、1.2 MB）',
+  'Add the font for European languages (Noto Sans)': '欧州の言語のフォントを入れる（Noto Sans）',
   'put Noto Sans JP into the project (about 1.2 MB). Without a font Japanese text is shown as empty boxes': 'Noto Sans JP をプロジェクトに入れます（約 1.2 MB）。フォントがないと日本語は □ で表示されます',
   'Add the Japanese font (Noto Sans JP)': '日本語フォントを入れる（Noto Sans JP）',
   'copies it into assets/fonts/ of the project, with its license, and sets it here': 'プロジェクトの assets/fonts/ にライセンス文と一緒にコピーし、ここに設定します',
@@ -614,6 +617,8 @@ Object.assign(I18N.TEXT_JA, {
   'Values for a demo or for trying screens without a device, kept apart from the drivers: changing them never touches the connection to the PLC. Same items as the simulator driver; "when" (a tag) makes an item run only while it is true, mode "follow" moves towards "target" (a tag or a number) at "rate" a second and to "idle" while "when" is false, "noise" adds a little randomness. The tag sys.sim.active is 1 while values are simulated: show it on the screens ("SIMULATION").':
     'デモや、機器なしで画面を試すための値です。ドライバーとは別なので、変えても PLC との接続には触れません。項目はシミュレーターのドライバーと同じです。「when」（タグ）はそれが真の間だけ動かし、mode「follow」は「target」（タグか数値）へ 1 秒に「rate」ずつ近づき、when が偽の間は「idle」へ戻ります。「noise」は少し揺らします。タグ sys.sim.active はシミュレーション中 1 です。画面に出してください（「SIMULATION」）。',
 });
+I18N.PATTERNS_JA.push([/^Letters that the built-in font does not have are used \((.*)\): they are shown as empty boxes\. Project tab > Font > "Add the font for European languages"$/,
+  '組み込みのフォントに無い文字が使われています（$1）。空の四角で表示されます。プロジェクト タブ > フォント >「欧州の言語のフォントを入れる」']);
 I18N.PATTERNS_JA.push([/^Japanese text is used \((.*)\), but the project has no font for it: it is shown as empty boxes\. Project tab > Font$/,
   '日本語の文字が使われていますが、プロジェクトにフォントがありません（□ で表示されます）。プロジェクト タブ > フォント']);
 // ---- animation

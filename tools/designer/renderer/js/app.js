@@ -13,7 +13,7 @@ const host = {
   projectStamp: (dir, files) => host.call('hml_projectStamp', dir || '', files || []),
   openFolder: dir => host.call('hml_openFolder', dir || ''),
   installSkill: () => host.call('hml_installSkill'),
-  addFont: dir => host.call('hml_addFont', dir || ''),
+  addFont: (dir, which) => host.call('hml_addFont', dir || '', which || 'ja'),
   addIcons: dir => host.call('hml_addIcons', dir || ''),
   writeFiles: (dir, files) => host.call('hml_writeFiles', dir, files),
   openDialog: (kind, dir) => host.call('hml_openDialog', kind, dir || ''),
@@ -592,15 +592,21 @@ const App = {
       U.el('div', { class: 'hint' }, 'You will be asked where to save the project: as one file (name.hmlproj, easy to carry around), or as a folder (choose "Project folder" in the dialog: project.json with screens/ and assets/ next to it).'));
     // Japanese (and other non-Latin) text needs a font in the project: offered here, on by default
     // when the designer itself is shown in Japanese
-    const jp = U.el('input', { type: 'checkbox', checked: I18N.lang === 'ja' && !!(this.info && this.info.fontsDir), disabled: !(this.info && this.info.fontsDir), dataset: { fk: 'new.font' } });
-    body.append(U.el('div', { class: 'row' }, U.el('label', null, 'Japanese font'), jp,
-      U.el('span', { class: 'dim' }, 'put Noto Sans JP into the project (about 1.2 MB). Without a font Japanese text is shown as empty boxes')));
+    // The built-in font has the letters of English only: ä, é, ł, the euro sign, Cyrillic or Japanese
+    // need a font in the project. Offered here; Japanese by default when the designer is shown in Japanese.
+    const has = !!(this.info && this.info.fontsDir);
+    const jp = U.el('select', { disabled: !has, dataset: { fk: 'new.font' } },
+      U.el('option', { value: '' }, I18N.t('Built-in (English letters only)')),
+      U.el('option', { value: 'europe' }, I18N.t('European languages (Noto Sans, 0.2 MB)')),
+      U.el('option', { value: 'ja', selected: I18N.lang === 'ja' && has }, I18N.t('Japanese (Noto Sans JP, 1.2 MB)')));
+    body.append(U.el('div', { class: 'row' }, U.el('label', null, 'Font'), jp),
+      U.el('div', { class: 'hint' }, 'Letters that the font of the project does not have are shown as empty boxes. "European languages": Latin with all accents (ä é ñ ł ő ş …), Greek, Cyrillic, the euro sign. It can be added later on the Project tab.'));
     this.modal({ title: 'New project', body, buttons: [{ label: 'Cancel' }, { label: 'Create', primary: true, onclick: async () => {
       M.newProject(title.value.trim() || 'New HMI', Number(w.value) || 800, Number(h.value) || 480);
       if (chosen && chosen.touch && Number(w.value) === chosen.width && Number(h.value) === chosen.height) M.st.project.display.touch = U.clone(chosen.touch);
       this.refresh();
       setTimeout(() => this.zoomFit(), 50);          // (the whole screen in view, as after opening a project)
-      if ((await this.save(true)) && jp.checked && (await this.addBundledFont())) await this.save(false);
+      if ((await this.save(true)) && jp.value && (await this.addBundledFont(jp.value))) await this.save(false);
     } }] });
   },
 
@@ -668,11 +674,11 @@ const App = {
 
   // Put the Japanese font that comes with the designer into the project (assets/fonts/) and
   // make it the project's font. The project must have a folder: it is saved first.
-  async addBundledFont() {
+  async addBundledFont(which) {
     const st = M.st;
     if (!st.project) return false;
     if (!st.path && !(await this.save(false))) return false;
-    const r = await host.addFont(st.dir);
+    const r = await host.addFont(st.dir, which || 'ja');
     if (!r || !r.ok) { this.toast('failed: ' + (r && r.error), 6000); return false; }
     M.mutate(() => { st.project.font = Object.assign({}, st.project.font, { file: r.rel }); });
     this.toast(I18N.f('font added: {0}', r.rel), 4000);

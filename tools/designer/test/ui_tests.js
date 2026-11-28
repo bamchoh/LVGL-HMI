@@ -1115,6 +1115,13 @@
     ok(!App.problems.some(p => /no font for it/.test(p.text)), 'the problem is gone');
     const s = await host.projectStamp(M.st.dir, ['assets/fonts/NotoSansJP-subset.otf', 'assets/fonts/OFL.txt']);
     ok(!/NotoSansJP-subset\.otf:-;/.test(s.stamp) && !/OFL\.txt:-;/.test(s.stamp), 'the font and its license are in the project: ' + s.stamp);
+    // ... and the one for the languages of Europe, with a license of its own
+    const eu = document.querySelector('[data-fk$=".font.add_europe"]');
+    ok(eu && !eu.disabled, 'the button for European languages');
+    await App.addBundledFont('europe'); App.doRefresh();
+    eq(M.st.project.font.file, 'assets/fonts/NotoSans-subset.ttf');
+    const s2 = await host.projectStamp(M.st.dir, ['assets/fonts/NotoSans-subset.ttf', 'assets/fonts/OFL-NotoSans.txt']);
+    ok(!/NotoSans-subset\.ttf:-;/.test(s2.stamp) && !/OFL-NotoSans\.txt:-;/.test(s2.stamp), 'the European font and its license are in the project: ' + s2.stamp);
     M.mutate(() => { M.st.project.font = before; });
     Panels.show('widgets');
   });

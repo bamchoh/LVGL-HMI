@@ -1660,6 +1660,14 @@ python tools\opcua_client_test.py --write speed_sp=77   # 書き込み（型は�
 python -I tools/subset_font.py NotoSansJP-Regular.otf projects/myhmi/assets/fonts/NotoSansJP-subset.otf --text projects/myhmi/project.json projects/myhmi/screens/*.json
 ```
 
+**欧州の言語のフォントもデザイナーに付いています**（`<デザイナーのフォルダー>/fonts/NotoSans-subset.ttf`。Noto Sans のサブセット、
+SIL Open Font License、0.2 MB）。アクセント付きの欧文（ドイツ語、フランス語、スペイン語、ポーランド語、チェコ語、ハンガリー語、
+トルコ語、ルーマニア語、バルト・北欧の言語）、ギリシャ文字、キリル文字、ユーロ記号が入っています。組み込みのフォントは英語の文字だけで、
+ä も é も € も出ないので、英語以外の欧州の言語のプロジェクトにはこれが要ります。新規作成のダイアログの「フォント」か、
+プロジェクト タブ > フォント の「欧州の言語のフォントを入れる」で入ります。組み込みのフォントに無い文字を使っていると、問題一覧に出ます。
+（日本語フォントにも西欧の文字は入っていますが、€、œ、中東欧の文字は入っていません。）
+作り方: `python -I tools/subset_font.py NotoSans-Regular.ttf NotoSans-subset.ttf --latin`
+
 **デザイナーには日本語フォント（Noto Sans JP のサブセット、SIL Open Font License）が付いています**（`<デザイナーのフォルダー>/fonts/`）。
 ランタイムの組み込みフォントは欧文だけなので、日本語を出すプロジェクトには次のどちらかで入れます。フォントとライセンス文が
 プロジェクトの `assets/fonts/` にコピーされ、`font.file` が設定されます（デプロイやプロジェクトファイルにも一緒に入ります）。
