@@ -16,7 +16,6 @@ Each release lists, where there is something to say:
 - A font for Simplified Chinese comes with the designer (Noto Sans SC, the hanzi of GB 2312, 1.7 MB).
 - `README.zh-CN.md`: an overview in Simplified Chinese (also in the packages), with the video in Chinese.
 - `trend`: a name for each line in the legend (`"tags": [{ "tag": "p", "label": "Pressure" }]`), and `"legend": false`.
-
 - Alarms (#130): `equipment` of an alarm and an `equipment` column in `alarm_list`; `colors` of `alarm_list` / `alarm_banner` (per severity,
   the text, the cleared and the history rows); `labels` `"severity.<name>"` translates the severity words. The columns of the list line up.
 
