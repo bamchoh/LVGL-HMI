@@ -11,6 +11,7 @@
 // change it. Write / Read current / Delete ask first; Save as asks for a name. Changing anything
 // needs the recipes' "level" (else the login screen). "%s" in a label is the recipe name; the
 // label is never used as a printf format.
+#include "locale_fmt.hpp"
 #include "recipe.hpp"
 #include <algorithm>
 #include <functional>
@@ -97,7 +98,7 @@ void dialog(const std::string& question, const std::string* input, bool number, 
         lv_textarea_set_max_length(d->ta, number ? 24 : 32);
         lv_textarea_set_text(d->ta, input->c_str());
         lv_obj_set_width(d->ta, lv_pct(100));
-        if(number) lv_textarea_set_accepted_chars(d->ta, "0123456789.-+eE");
+        if(number) lv_textarea_set_accepted_chars(d->ta, "0123456789.,-+eE");
     }
     lv_obj_t* row = lv_obj_create(box);
     lv_obj_remove_style_all(row);
@@ -232,12 +233,13 @@ struct TableCtx {
             cell(row, one_line(item_name(b, item), 40), 36, fg);
             // a value that will change when the recipe is written: colour and a sign (not only colour;
             // "*" because the built-in fonts have no "≠")
-            lv_obj_t* v = cell(row, (differs ? std::string("* ") : std::string()) + one_line(val), 32, differs ? lv_palette_main(LV_PALETTE_ORANGE) : fg);
+            const bool number = t && t->type() != TagType::String;                // (a number: with the decimal sign of the locale)
+            lv_obj_t* v = cell(row, (differs ? std::string("* ") : std::string()) + one_line(number ? local_number_text(val) : val), 32, differs ? lv_palette_main(LV_PALETTE_ORANGE) : fg);
             lv_obj_set_clickable(v, true);
             lv_obj_set_height(v, row_h);
             lv_obj_set_style_pad_top(v, row_h / 2 - 10, 0);
             lv_obj_add_event_cb(v, &TableCtx::on_value, LV_EVENT_CLICKED, this);
-            cell(row, one_line(cur), 32, fg);
+            cell(row, one_line(number ? local_number_text(cur) : cur), 32, fg);
             row_items.push_back(item);
         }
     }
@@ -261,12 +263,13 @@ struct TableCtx {
         const std::string item = c->row_items[static_cast<size_t>(i)], name = b->selected;
         const Recipe* r = recipes().recipe(c->book, name);
         auto it = r->values.find(item);
-        std::string start = it == r->values.end() ? "" : it->second.format();
         Tag* t = tags().find(item);
         const bool number = t && t->type() != TagType::String;
+        std::string start = it == r->values.end() ? "" : it->second.format();
+        if(number) start = local_number_text(start);
         std::string book = c->book;
         dialog(one_line(name, 32) + ": " + one_line(item_name(*b, item), 40), &start, number, c->labels,
-               [book, name, item](const std::string& text) { recipes().set_value(book, name, item, text); });
+               [book, name, item, number](const std::string& text) { recipes().set_value(book, name, item, number ? plain_number_text(text) : text); });
     }
     static void on_write(lv_event_t* e)
     {

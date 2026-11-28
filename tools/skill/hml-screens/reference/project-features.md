@@ -402,10 +402,10 @@ in `font.file` (without it, it stays English).
 - `date`: `"ymd"` 2026-11-28 (default) / `"dmy"` 28.11.2026 / `"mdy"` 11/28/2026. `decimal`: `"."` (default) / `","`.
 - **Only when asked** ("German number format", "dates as in the US"); do not guess it from the language of the texts.
 - It changes what is shown and typed: `sys.date` / `sys.datetime`, the times of `alarm_list`, `log_view`, `trend`; the numbers of labels
-  and `numeric_display` bound to a tag, of `table` and `trend`; the number pad. Do not write `"12,5"` yourself: write the tag and its
+  and `numeric_display` bound to a tag, of `table`, `meter`, `trend`, `xy_chart` and `recipe_table`; the number pad. Do not write `"12,5"` yourself: write the tag and its
   `format` (`"%.1f"`) as always, the runtime puts the decimal sign.
-- It does not change what is stored (logs, CSV, tag values, Lua). Not covered yet: the scale of `meter`, the axes of `xy_chart`,
-  `recipe_table`. With a decimal comma, check the pictures for those and tell the user.
+- It does not change what is stored (logs, CSV, tag values, Lua). Text that you write yourself (a label `"text": "0.5 bar"`) is shown
+  as written: with a decimal comma, write it with a comma.
 - With `dmy` / `mdy` a date is 1 to 2 characters longer than before in lists: check the widths in the picture.
 
 ## Users and levels (`users`)

@@ -546,6 +546,18 @@ const Panels = {
     el.append(Props.section('Boot splash (Raspberry Pi)', false,
       ...Props.fields(d, [{ k: 'splash', t: 'image' }, { k: 'splash_bg', t: 'color' }], fk + '.display'),
       U.el('div', { class: 'hint' }, 'Shown during boot by hml-splash.service (hml_runtime --splash) until the HMI starts. PNG, centred and shrunk to fit; empty = the project title. Background default: black.')));
+    // "locale": how dates and decimal numbers are written on the screens (exists only while it says something)
+    const locHolder = new Proxy({}, {
+      get: (t, k) => (p.locale || {})[k],
+      set: (t, k, v) => { p.locale = Object.assign({}, p.locale, { [k]: v }); return true; },
+      deleteProperty: (t, k) => { if (p.locale) { delete p.locale[k]; if (!Object.keys(p.locale).length) delete p.locale; } return true; },
+      has: (t, k) => !!p.locale && k in p.locale,
+    });
+    el.append(Props.section('Dates and numbers', !!p.locale,
+      ...Props.fields(locHolder, [
+        { k: 'date', t: 'select', o: ['', 'ymd', 'dmy', 'mdy'], empty: 'ymd', hint: 'how a date is written on the screens: ymd 2026-11-28, dmy 28.11.2026, mdy 11/28/2026' },
+        { k: 'decimal', t: 'select', o: ['', '.', ','], empty: '.', hint: 'the decimal sign of numbers on the screens and of the number pad: 12.5 or 12,5' }], fk + '.locale'),
+      U.el('div', { class: 'hint' }, 'Only what an operator reads and types. Logs, CSV exports and the values of tags keep one form.')));
     // "screen_saver" exists only while it says something
     const ssHolder = new Proxy({}, {
       get: (t, k) => (p.screen_saver || {})[k],

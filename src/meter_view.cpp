@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "meter_view.hpp"
 #include <algorithm>
 #include <cmath>
@@ -44,7 +45,7 @@ struct Ctx {
         // the needle: from the middle to just short of the ticks
         lv_scale_set_line_needle_value(scale, needle, std::max<int32_t>(size / 2 - 14, 4), to_scale(has_value && std::isfinite(value) ? value : min));
         if(label) {
-            const std::string t = !has_value || !std::isfinite(value) ? "---" : vformat("%.*f", decimals, value) + (unit.empty() ? "" : " " + unit);
+            const std::string t = !has_value || !std::isfinite(value) ? "---" : local_number_text(vformat("%.*f", decimals, value)) + (unit.empty() ? "" : " " + unit);
             lv_label_set_text(label, t.c_str());
         }
     }
@@ -109,7 +110,7 @@ lv_obj_t* build_meter(lv_obj_t* parent, const json& w)
     const int majors = (ticks - 1) / major + 1;
     for(int i = 0; i < majors; i++) {
         const double v = c->min + (c->max - c->min) * (i * major) / (ticks - 1);
-        c->tick_text.push_back(vformat("%.*f", c->decimals, v));
+        c->tick_text.push_back(local_number_text(vformat("%.*f", c->decimals, v)));
     }
     if(c->angle == 360 && c->tick_text.size() > 1) c->tick_text.back().clear();   // (a full circle: the end is where the start is)
     for(const std::string& s : c->tick_text) c->tick_ptr.push_back(s.c_str());

@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "xy_chart_view.hpp"
 #include <algorithm>
 #include <cmath>
@@ -205,10 +206,10 @@ lv_obj_t* build_xy_chart(lv_obj_t* parent, const json& w)
         else c->clear_was = c->clear_tag->get().truthy();
     }
 
-    c->lx0 = end_label(obj, vformat("%.*f", decimals, c->x_min));
-    c->lx1 = end_label(obj, vformat("%.*f", decimals, c->x_max));
-    c->ly0 = end_label(obj, vformat("%.*f", decimals, c->y_min));
-    c->ly1 = end_label(obj, vformat("%.*f", decimals, c->y_max));
+    c->lx0 = end_label(obj, local_number_text(vformat("%.*f", decimals, c->x_min)));
+    c->lx1 = end_label(obj, local_number_text(vformat("%.*f", decimals, c->x_max)));
+    c->ly0 = end_label(obj, local_number_text(vformat("%.*f", decimals, c->y_min)));
+    c->ly1 = end_label(obj, local_number_text(vformat("%.*f", decimals, c->y_max)));
 
     registry()[obj] = c;
     c->timer = lv_timer_create([](lv_timer_t* t) { static_cast<Ctx*>(lv_timer_get_user_data(t))->tick(); }, period, c);
