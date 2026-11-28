@@ -9,6 +9,41 @@ Each release lists, where there is something to say:
 
 ## Unreleased
 
-The first public version will be 0.1.0. It will contain what is in the repository at that point:
-the designer, the runtime for Windows, Linux and Raspberry Pi, the drivers for Modbus, SLMP, FINS, OPC UA and MQTT,
-and the skill with which an AI makes screens.
+Nothing yet.
+
+## 0.1.0 - 2026-11-28
+
+The first public version. Tsukuraku is work in progress (0.x): it works, and it still changes.
+
+**What it is**
+
+- **Designer** (Windows): screens, tags, drivers, scripts, logs, users, recipes and texts of a project; preview and run with the
+  real runtime; a problem list; deploy to a device.
+- **Runtime**: Windows, Linux x64 and Raspberry Pi (aarch64, framebuffer). The same project runs on all of them.
+- **An AI makes the screens**: a project is text, the runtime checks it (`--check`) and draws it to a picture (`--render`), and the
+  skill (`skills/hml-screens`, English) tells an assistant how. The designer's **AI** button hands it over.
+- **Drivers**: Modbus TCP / RTU / ASCII, SLMP (Mitsubishi MELSEC), FINS (OMRON), OPC UA client and server, MQTT; a simulation.
+- **Widgets**: labels, buttons, switches, sliders, meters, charts (trend, bar, XY), tables, alarm list and summary, recipe table,
+  log view, date and time input, images, popups, templates, animations.
+- **On the device**: alarms, data log, operation log, system log (SQLite, CSV export), recipes, schedules, sound, mail, log upload,
+  data transfer between PLCs, Lua scripts, users with levels and PINs, several languages, a screen saver, remote view (VNC).
+- **System settings on the device** (hold the top left corner): network, display, users, drivers, tags, addresses of a PLC,
+  deploy, update from a USB memory. In English or Japanese, dark or light after the project.
+- **Deploy**: over SSH, or directly over TLS with fingerprints on both sides and a question on the device's screen
+  (also for a new runtime). `--capabilities` says what a project may do before it is run.
+- **Fonts** for Japanese and for the languages of Europe come with the designer.
+
+**Security**
+
+Three problems were found in a review and fixed before this first release; no released version has them. They are published as
+advisories for those who built from source before 2026-11-26 (commit 62296eb):
+
+- The designer read and wrote files outside the project through paths in `screens` of a project made by somebody else.
+- A project could open remote access (VNC) to the device on the network with a password known to its author.
+- A Lua script could use up the memory of the device.
+
+**Known limits**
+
+- The programs are not signed: Windows warns when the designer is started for the first time.
+- The system screens and the designer are in English and Japanese only.
+- No drivers yet for Siemens S7 and EtherNet/IP.
