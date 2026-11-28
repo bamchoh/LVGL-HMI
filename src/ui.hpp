@@ -41,6 +41,8 @@ public:
     // Delete every screen and register them again from their descriptions (built when shown,
     // like after add_screen): texts in another language. No screen is shown afterwards.
     void rebuild_all();
+    // The theme of the project is light (or dark): how what cannot be pressed is shown follows.
+    void set_light_theme(bool light);
 
     // Named actions for { "action": "call", "fn": "<name>", "arg": "..." }. Registering a name again replaces it.
     void register_action(const std::string& name, std::function<void(const std::string& arg)> fn);

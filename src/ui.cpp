@@ -1051,7 +1051,7 @@ constexpr size_t kHistoryLen = 16;
 
 } // namespace
 
-void set_keyboard_light(bool light) { s_kb_light = light; }
+void set_keyboard_light(bool light) { s_kb_light = light; ui().set_light_theme(light); }
 const char* keyboard_close_text() { return s_kb_close; }
 const char* keyboard_done_text() { return s_kb_done; }
 
@@ -1085,6 +1085,7 @@ struct Ui::Impl {
     std::vector<std::unique_ptr<std::vector<lv_point_precise_t>>> line_points;   // must outlive lv_line objects
     std::vector<std::unique_ptr<std::string>>  owned_strings;  // textarea accepted_chars: LVGL stores the pointer only
     lv_group_t*   group = nullptr;
+    bool          disabled_ready = false;
     lv_style_t    style_disabled{};   // visual feedback for LV_STATE_DISABLED (the theme has none for most widgets)
     lv_indev_t*   kb_indev = nullptr;
     AppCallbacks  app;
@@ -2273,10 +2274,25 @@ void Ui::init(lv_indev_t* keyboard_indev, AppCallbacks cb)
     if(!m.group) {
         lv_style_init(&m.style_disabled);
         lv_style_set_opa(&m.style_disabled, LV_OPA_40);
+        m.disabled_ready = true;
+        set_light_theme(s_kb_light);
         m.group = lv_group_create();
         lv_group_set_default(m.group);
         if(m.kb_indev) lv_indev_set_group(m.kb_indev, m.group);
     }
+}
+
+// What cannot be pressed is faded. On a dark screen that is enough: light text on a dimmed
+// colour. On a light one the same fading left white text on a pale colour - nothing to read:
+// there the text is dark, and it is faded a little less.
+void Ui::set_light_theme(bool light)
+{
+    Impl& m = *impl_;
+    if(!m.disabled_ready) return;                    // (set again when the style is made)
+    lv_style_set_opa(&m.style_disabled, light ? LV_OPA_60 : LV_OPA_40);
+    if(light) lv_style_set_text_color(&m.style_disabled, lv_color_hex(0x16202b));
+    else lv_style_remove_prop(&m.style_disabled, LV_STYLE_TEXT_COLOR);
+    lv_obj_report_style_change(&m.style_disabled);
 }
 
 void Ui::register_action(const std::string& name, std::function<void(const std::string& arg)> fn)

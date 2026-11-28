@@ -423,3 +423,25 @@ TEST_CASE("check: system_language is ja or en, and ja wants a font file")
     project(R"json(, "system_language": "ja", "font": { "file": "assets/x.otf" })json");
     CHECK_FALSE(has(p.check(), "needs a font file"));
 }
+
+TEST_CASE("check: a level without users is said once; level_deny is not for a screen")
+{
+    Proj p;
+    auto project = [&](const std::string& more) {
+        p.write("project.json", R"json({ "start_screen": "a", "screens": [ "screens/a.json" ])json" + more + " }");
+    };
+    const std::string users = R"json(, "users": { "list": [ { "name": "admin", "level": 3, "pin": "0000" } ] })json";
+    p.write("screens/a.json", R"json({ "name": "a", "level": 2, "children": [
+        { "type": "button", "text": "x", "level": 1, "on_click": { "action": "system" } },
+        { "type": "button", "text": "y", "level": 2, "level_deny": "hide" } ] })json");
+    project("");
+    std::vector<std::string> lines = p.check();
+    CHECK(std::count_if(lines.begin(), lines.end(), [](const std::string& l) { return l.find("\"level\" does nothing") != std::string::npos; }) == 1);
+    project(users);
+    CHECK_FALSE(has(p.check(), "\"level\" does nothing"));
+    CHECK_FALSE(has(p.check(), "level_deny"));                    // (on a widget: fine)
+
+    p.write("screens/a.json", R"json({ "name": "a", "level": 2, "level_deny": "login", "children": [
+        { "type": "button", "text": "x", "on_click": { "action": "system" } } ] })json");
+    CHECK(has(p.check(), "\"level_deny\" is for widgets"));
+}

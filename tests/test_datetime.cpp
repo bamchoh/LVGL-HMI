@@ -383,7 +383,7 @@ TEST_CASE("datetime_input: --check takes its keys and finds a wrong one and an u
         for(const CheckProblem& p : check_project((dir / "project.json").generic_string())) all += p.line() + "\n";
         return all;
     };
-    CHECK(problems(R"({ "type": "datetime_input", "bind": "t", "mode": "date", "seconds": true, "year_min": 2020, "year_max": 2030, "level": 1 })") == "");
+    CHECK(problems(R"({ "type": "datetime_input", "bind": "t", "mode": "date", "seconds": true, "year_min": 2020, "year_max": 2030 })") == "");
     const std::string out = problems(R"({ "type": "datetime_input", "bind": "nope", "format": "x" })");
     CHECK(out.find("children[0] (datetime_input): bind: unknown tag \"nope\"") != std::string::npos);
     CHECK(out.find("children[0] (datetime_input): unknown key \"format\"") != std::string::npos);

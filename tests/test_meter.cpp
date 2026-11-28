@@ -206,7 +206,7 @@ TEST_CASE("meter: --check takes its keys and finds a wrong one and an unknown ta
         return all;
     };
     CHECK(problems(R"({ "type": "meter", "bind": "t", "min": 0, "max": 100, "value": 5, "angle": 240, "ticks": 11, "major_every": 2, "decimals": 1, "unit": "bar",
-                        "show_value": false, "needle_color": "#ff0000", "zones": [ { "from": 80, "to": 100, "color": "#e53935" } ], "level": 1 })") == "");
+                        "show_value": false, "needle_color": "#ff0000", "zones": [ { "from": 80, "to": 100, "color": "#e53935" } ] })") == "");
     const std::string out = problems(R"({ "type": "meter", "bind": "nope", "maximum": 5 }, { "type": "meter", "bind": { "value": { "tag": "gone" } } })");
     CHECK(out.find("children[0] (meter): bind: unknown tag \"nope\"") != std::string::npos);
     CHECK(out.find("children[0] (meter): unknown key \"maximum\"") != std::string::npos);
