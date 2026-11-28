@@ -1,54 +1,54 @@
-# project.json の機能（画面の外）
+# Features of project.json (outside the screens)
 
-画面（`screens/*.json`）ではなく `project.json` に書く機能の一覧です。**頼まれたときだけ**足す・変える（機器や外のサーバーに関わる）。
-書いたら `--check` を通す（キーの書き間違い、ないタグ・画面・ログ、暗号化なしなどを見つける）。
-**パスワードは `project.json` に書かない**（装置の System 画面で設定する。`--check` が指摘する）。
+A list of the features written in `project.json`, not in the screens (`screens/*.json`). Add or change them **only when asked** (they concern equipment and outside servers).
+After writing, pass `--check` (it finds mistyped keys, tags, screens and logs that do not exist, no encryption, and so on).
+**Do not write passwords in `project.json`** (they are set on the System screen of the device. `--check` points it out).
 
-目次: [テンプレート画面](#テンプレート画面) / [アラーム](#アラーム-alarms) / [データのログとトレンド](#データのログとトレンド-data_log) /
-[レシピ](#レシピ-recipes) / [スクリプト](#スクリプト-scripts) / [日付と時刻](#日付と時刻) / [機器なしで値を動かす](#機器なしで値を動かす) /
-[スケジュール](#スケジュール-schedules) / [音](#音-sound) /
-[機器間のデータ転送](#機器間のデータ転送-transfers) / [メール](#メール-mail) / [ログの送信](#ログの送信-uploads) /
-[遠隔表示](#遠隔表示-remote) / [システム設定を開く長押し](#システム設定を開く長押し-system_access) /
-[見た目の土台](#見た目の土台-display--theme--font) / [ユーザーとレベル](#ユーザーとレベル-users) / [画面消灯](#画面消灯-screen_saver) /
-[操作ログとシステムログ](#操作ログとシステムログ-operation_log--system_log) / [装置へ送る](#装置へ送るデプロイ)
+Contents: [Template screens](#template-screens) / [Alarms](#alarms-alarms) / [Data logging and trends](#data-logging-and-trends-data_log) /
+[Recipes](#recipes-recipes) / [Scripts](#scripts-scripts) / [Date and time](#date-and-time) / [Moving values without equipment](#moving-values-without-equipment) /
+[Schedules](#schedules-schedules) / [Sound](#sound-sound) /
+[Data transfer between equipment](#data-transfer-between-equipment-transfers) / [Mail](#mail-mail) / [Sending logs](#sending-logs-uploads) /
+[Remote display](#remote-display-remote) / [Long press that opens the system settings](#long-press-that-opens-the-system-settings-system_access) /
+[Basis of the look](#basis-of-the-look-display--theme--font) / [Users and levels](#users-and-levels-users) / [Screen saver](#screen-saver-screen_saver) /
+[Operation log and system log](#operation-log-and-system-log-operation_log--system_log) / [Send to the device](#send-to-the-device-deploy)
 
-`screens` に並べるファイルは**プロジェクトのフォルダーの中**の相対パスだけ（`..`、絶対パス、ドライブ文字は不可。デザイナーが開かない）。
+The files listed in `screens` are relative paths **inside the project folder** only (`..`, absolute paths and drive letters are not allowed. The designer does not open it).
 
-アラーム・トレンド・レシピの画面を頼まれたら、その部品が要る設定（`alarms`、`data_log` のグループ、`recipes`）も頼まれたものとして足してよい。
-プロジェクトにもう設定があれば、**その書き方に合わせて足す**（既存の項目は消さない・名前を変えない）。足したことを報告する。
+When asked for an alarm, trend or recipe screen, you may also add the settings that widget needs (`alarms`, a group of `data_log`, `recipes`) as something that was asked for.
+If the project already has the settings, **add in the same style** (do not delete existing items, do not rename them). Report what you added.
 
-## テンプレート画面
+## Template screens
 
-ヘッダーやナビゲーションを 1 つの画面（テンプレート）に置き、ほかの画面の土台にする。**これは画面ファイルのキー**。
+Put the header and navigation on 1 screen (the template) and make it the base of the other screens. **This is a key of the screen file**.
 
 ```json
-// screens/frame.json: 土台（ふつうの画面と同じ書き方。"${名前}" が各画面の値に置き換わる）
+// screens/frame.json: the base (written like an ordinary screen. "${name}" is replaced by the value of each screen)
 { "name": "frame", "scrollable": false, "style": { "bg_color": "#141a22", "pad": 0 }, "children": [
   { "type": "label", "x": 16, "y": 12, "text": "${title}", "style": { "font": 24 } },
   { "type": "button", "x": 16, "y": 424, "w": 120, "h": 48, "text": "@main", "on_click": { "action": "goto", "screen": "main" } } ] }
 
-// screens/report.json: 土台の上に作る画面
+// screens/report.json: a screen made on top of the base
 { "name": "report", "template": "frame", "template_args": { "title": "@report" }, "children": [ ... ] }
 ```
 
-- 画面のキー: `template`（土台の画面の名前）、`template_args`（`{ "名前": 文字・数値・true/false }`）。
-- 土台の部品が先に置かれ、画面自身の部品がその上に載る。土台の `style` `scrollable` `flex` も引き継ぎ、画面側に書けばそちらが優先。
-- 置き換わるのは土台の部品の `${名前}`（`${screen}` は画面の名前。渡さなかったものは空）。画面自身の部品では置き換わらない。
-  **`${名前}` は `text` などの表示する文字に使う。** 色（`bg_color`）やタグ名に書くと、土台の画面そのものには `${…}` のまま残るので、
-  `--check` が土台を問題にする（`runtime: unknown color '${…}'`）。
-- 「今いる画面のボタンだけ色を変える」は土台でできる: タグ `sys.screen`（表示中の画面の名前。ポップアップは含まない）を、
-  各ボタンの `bind` に書く: `"bind": { "bg_color": { "tag": "sys.screen", "map": { "trend": "#26c6da", "default": "#192538" } } }`
-  （`trend` はそのボタンの行き先）。下線などを出すなら、`visible` に `{ "tag": "sys.screen", "eq": "trend" }`。
-- 土台もふつうの画面なので、`project.json` の `"screens"` に入れる。土台にポップアップは使えない。8 段まで重ねられる。
-- **土台を重ねるとき**（`frame` の上に `equip_frame`、その上に各画面）: 真ん中の土台は自分の `template_args` で、上の画面から
-  来る値を下へ渡す: `{ "name": "equip_frame", "template": "frame", "template_args": { "title": "${title}" }, ... }`。
-  渡さないと `--check` が「template … has ${title}, which template_args does not give」と出す。
-- 画面自身の部品は、土台の部品（ヘッダー、ナビゲーション）に重ならない位置に置く。`--render` の画像には土台も描かれる。
-- 既存の画面がテンプレートを使っているプロジェクトでは、新しい画面も同じ `template` を付ける（共通部分を書き写さない）。
+- Keys of the screen: `template` (the name of the base screen), `template_args` (`{ "name": text, number or true/false }`).
+- The widgets of the base are placed first, and the screen's own widgets go on top of them. The `style` `scrollable` `flex` of the base are inherited too; if the screen writes them, the screen's take priority.
+- What is replaced is `${name}` in the widgets of the base (`${screen}` is the name of the screen. What was not passed is empty). It is not replaced in the screen's own widgets.
+  **Use `${name}` in displayed text such as `text`.** Written in a colour (`bg_color`) or a tag name, it stays as `${…}` in the base screen itself, so
+  `--check` reports a problem in the base (`runtime: unknown color '${…}'`).
+- "Change the colour of only the button of the current screen" can be done in the base: write the tag `sys.screen` (the name of the screen being shown. Popups are not included)
+  in the `bind` of each button: `"bind": { "bg_color": { "tag": "sys.screen", "map": { "trend": "#26c6da", "default": "#192538" } } }`
+  (`trend` is where that button goes). To show an underline or the like, put `{ "tag": "sys.screen", "eq": "trend" }` in `visible`.
+- The base is an ordinary screen too, so put it in `"screens"` of `project.json`. A popup cannot be used as a base. Up to 8 levels can be stacked.
+- **When stacking bases** (`equip_frame` on top of `frame`, and each screen on top of that): the middle base passes the values that come from
+  the screen above down, with its own `template_args`: `{ "name": "equip_frame", "template": "frame", "template_args": { "title": "${title}" }, ... }`.
+  If it does not pass them, `--check` says "template … has ${title}, which template_args does not give".
+- Place the screen's own widgets where they do not overlap the widgets of the base (header, navigation). The picture of `--render` renders the base too.
+- In a project whose existing screens use a template, give the new screen the same `template` too (do not copy the common parts).
 
-## アラーム (`alarms`)
+## Alarms (`alarms`)
 
-タグの値が条件を満たす間、アラームが出る（`alarm_list` / `alarm_banner` / `alarm_summary` に出る。記録は `logs/alarm.db`）。
+While the value of a tag meets the condition, the alarm is raised (shown in `alarm_list` / `alarm_banner` / `alarm_summary`. The record is `logs/alarm.db`).
 
 ```json
 "alarms": {
@@ -61,27 +61,27 @@
 }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `items[].name` | 名前（必須、重複不可。記録と CSV に出る） |
-| `items[].tag` | 見るタグ（必須） |
-| `items[].condition` | `"true"`（既定。タグが真の間）/ `"false"` / `"eq"` `"ne"` `"gt"` `"lt"` `"ge"` `"le"`（`value` か `value_tag` と比べる） |
-| `items[].value`、`items[].value_tag` | 比べる値（定数）、または比べる相手のタグ（設定値を画面で変えられるようにするなら `value_tag`） |
-| `items[].severity` | 重要度の語（既定 `"warning"`。ふつう `"info"` `"warning"` `"critical"`）。`alarm_list` の列にそのまま出る（訳せない） |
-| `items[].message` | 出す文字（`"@ID"` が使える。省くと `name`） |
-| `items[].ack` | `false`: 確認しなくても、条件が消えれば一覧から消える（既定 true: 確認されるまで残る） |
-| `items[].enabled` | `false` で使わない |
-| `ack_level` | 確認できるユーザーのレベル（`users` があるとき） |
-| `enabled`、`path`、`retention_days`、`max_rows`、`max_size_mb` | 記録の設定（省いてよい。既定 `logs/alarm.db`、30 日、10 万行） |
+| `items[].name` | Name (required, must be unique. Shown in the record and the CSV) |
+| `items[].tag` | Tag to watch (required) |
+| `items[].condition` | `"true"` (default. While the tag is true) / `"false"` / `"eq"` `"ne"` `"gt"` `"lt"` `"ge"` `"le"` (compared with `value` or `value_tag`) |
+| `items[].value`, `items[].value_tag` | Value to compare with (constant), or the tag to compare with (use `value_tag` to let the setpoint be changed on a screen) |
+| `items[].severity` | Severity word (default `"warning"`. Usually `"info"` `"warning"` `"critical"`). Shown as is in the column of `alarm_list` (cannot be translated) |
+| `items[].message` | Text to show (`"@ID"` can be used. If omitted, `name`) |
+| `items[].ack` | `false`: disappears from the list when the condition goes away, even without acknowledging (default true: stays until acknowledged) |
+| `items[].enabled` | `false`: not used |
+| `ack_level` | Level of the user who can acknowledge (when there is `users`) |
+| `enabled`, `path`, `retention_days`, `max_rows`, `max_size_mb` | Settings of the record (may be omitted. Default `logs/alarm.db`, 30 days, 100,000 rows) |
 
-- タグ: `sys.alarm.active`（出ている数）、`sys.alarm.unacked`（未確認の数）、`sys.alarm.latest`（いちばん新しいものの文字）。
-- 確認の動作: `{ "action": "call", "fn": "alarm.ack_all" }`（`alarm_list` の行を押しても確認できる）。
-- 「A かつ B のとき」は 1 つのアラームでは書けない。bool のタグをスクリプトで計算し、そのタグを `tag` にする。
-- `--check --render` では、条件が成り立つ値を `--set` すると出る（`--set oven_temperature=260`）。
+- Tags: `sys.alarm.active` (number raised), `sys.alarm.unacked` (number not acknowledged), `sys.alarm.latest` (text of the newest one).
+- Action to acknowledge: `{ "action": "call", "fn": "alarm.ack_all" }` (pressing a row of `alarm_list` acknowledges too).
+- "When A and B" cannot be written with 1 alarm. Calculate a bool tag with a script and use that tag as `tag`.
+- In `--check --render`, it is raised when you `--set` a value that meets the condition (`--set oven_temperature=260`).
 
-## データのログとトレンド (`data_log`)
+## Data logging and trends (`data_log`)
 
-タグの値を記録する（`logs/data.db`）。`trend` 部品はここの**グループ**を描く。
+Records the values of tags (`logs/data.db`). The `trend` widget renders a **group** from here.
 
 ```json
 "data_log": {
@@ -93,21 +93,21 @@
 }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `groups[].name` | グループの名前（必須、重複不可。`trend` の `group`、`log_view` の `group`、`uploads` の `"data:<名前>"`） |
-| `groups[].tags` | 記録するタグ名の配列（必須。数値のタグ。`trend` に出せるのはここにあるタグだけ） |
-| `groups[].trigger` | `"interval"`（既定。`interval_ms` ごと、100 以上、既定 1000）/ `"change"`（どれかが変わったとき）/ `"tag"`（`trigger_tag` が偽から真になったとき）/ `"manual"`（`data_log.sample` の動作のときだけ） |
-| `groups[].enabled` | `false` で記録しない |
-| `enabled`、`path`、`retention_days`、`max_rows`、`max_size_mb` | 記録の設定（省いてよい。既定 `logs/data.db`、30 日、100 万行） |
+| `groups[].name` | Name of the group (required, must be unique. The `group` of `trend`, the `group` of `log_view`, `"data:<name>"` of `uploads`) |
+| `groups[].tags` | Array of the tag names to record (required. Numeric tags. Only the tags listed here can be shown in `trend`) |
+| `groups[].trigger` | `"interval"` (default. Every `interval_ms`, 100 or more, default 1000) / `"change"` (when any of them changes) / `"tag"` (when `trigger_tag` goes from false to true) / `"manual"` (only on the `data_log.sample` action) |
+| `groups[].enabled` | `false`: not recorded |
+| `enabled`, `path`, `retention_days`, `max_rows`, `max_size_mb` | Settings of the record (may be omitted. Default `logs/data.db`, 30 days, 1,000,000 rows) |
 
-- トレンドを描くなら `trigger` は `interval`（1000〜5000 ms）。範囲の大きく違う値（温度 200 °C と湿度 80 %）は、
-  グループは同じでもよいが、`trend` 部品を分ける（縦軸は 1 本）。
-- 記録は装置の SD カードに書かれる。速い周期（100 ms）にたくさんのタグを入れない。
+- To render a trend, `trigger` is `interval` (1000 to 5000 ms). Values with very different ranges (temperature 200 °C and humidity 80 %)
+  may be in the same group, but use separate `trend` widgets (there is 1 vertical axis).
+- The record is written to the SD card of the device. Do not put many tags in a fast period (100 ms).
 
-## レシピ (`recipes`)
+## Recipes (`recipes`)
 
-タグの組（品種ごとの設定値）に名前を付けて持ち、`recipe_table` で選んでタグへ書き込む。
+Holds named sets of tags (the setpoints of each product); choose one in `recipe_table` and write it to the tags.
 
 ```json
 "recipes": {
@@ -124,33 +124,33 @@
 }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `books[].name` | ブックの名前（必須、1〜32 文字、`/ \ : * ? " < > | .` は使えない。`recipe_table` の `book`） |
-| `books[].items` | レシピが持つタグ（必須。設定値のタグにする: 書き込むと機器へ送られる）。タグ名か `{ "tag", "label", "unit" }`: `recipe_table` には「label (unit)」と出る（`label` は `"@ID"` も可。省くとタグ名）。**読みやすい名前と単位を必ず付ける** |
-| `books[].recipes` | 最初から入っているレシピ: `{ "name", "values": { タグ名: 値 } }`（名前は重複不可） |
-| `level` | 書き込み・保存・削除ができるユーザーのレベル（`users` があるとき。0 = だれでも） |
-| `verify_ms` | 書き込んだあと、機器の値が同じになったか確かめる時間（既定 2000、0 = 確かめない） |
-| `path` | 装置で変えたレシピを置くフォルダー（既定 `recipes`。そこにファイルがあれば、プロジェクトの `recipes` より優先） |
+| `books[].name` | Name of the book (required, 1 to 32 characters, `/ \ : * ? " < > | .` cannot be used. The `book` of `recipe_table`) |
+| `books[].items` | Tags the recipe holds (required. Use setpoint tags: writing sends them to the equipment). A tag name or `{ "tag", "label", "unit" }`: `recipe_table` shows "label (unit)" (`label` may also be `"@ID"`. If omitted, the tag name). **Always give a readable name and a unit** |
+| `books[].recipes` | Recipes that are there from the start: `{ "name", "values": { tag name: value } }` (names must be unique) |
+| `level` | Level of the user who can write, save and delete (when there is `users`. 0 = anyone) |
+| `verify_ms` | Time to check, after writing, that the value of the equipment became the same (default 2000, 0 = do not check) |
+| `path` | Folder for the recipes changed on the device (default `recipes`. If there is a file there, it takes priority over the `recipes` of the project) |
 
-- レシピの名前は表示にそのまま出る（`"@ID"` は使えない）。日本語の名前にするならフォントが要る。
-- `recipe_table` を置かずにボタンで操作するときの動作（`{ "action": "call", "fn": ..., "arg": ... }`）:
-  `recipe.select`（`"ブック,名前"`）、`recipe.write`（`"ブック[,名前]"`。名前を省くと選んでいるもの）、
-  `recipe.save`（`"ブック,名前"`: 今のタグの値で保存）、`recipe.delete`（`"ブック,名前"`）、
-  `recipe.export`（`"ブック[,ファイル]"`）、`recipe.import`（`"ブック,ファイル"`）。
-  `recipes.level` が要るのは `write` / `save` / `delete` / `import`（足りないとログイン画面が出て、何も行われない）。`select` と `export` はだれでもできる。
-- `recipes.level` は**全部のブックに 1 つ**。ある `recipe_table` だけをもっと高いレベルにしたいときは、その部品に `"level"` を付ける。
-- `sys.recipe.<ブック名>.selected` は、起動したときから**最初のレシピ**が入っている（空ではない）。画面から書き換えない（選ぶのは `recipe.select`）。
-  選んでいるボタンの色を変えるのは `"bind": { "bg_color": { "tag": "sys.recipe.<ブック名>.selected", "map": { "<レシピ名>": "<色>", "default": "<色>" } } }`。
-- `sys.recipe.status` は英語の 1 行（`'Product B' written, checking ...` や、失敗の理由）。長さが決まらないので、幅を決めて `"long_mode": "wrap"` にする。
-- 「書き込んだあと」の見た目は、`--check` に `--set "sys.recipe.<ブック名>.written=<レシピ名>"` を付けて描ける
-  （`sys.recipe.status` にも入れられる）。実際に書き込む流れは、SKILL.md の「押したあとの様子を確かめたいとき」の手順で確かめる。
-- `sys.recipe.<ブック名>.selected` は**一覧で選んでいる**レシピ、`sys.recipe.<ブック名>.written` は**最後に書き込んだ（今使っている）**レシピ
-  （書き込むまでは空）。「今のレシピ」をヘッダーなどに出すなら `written`。最後の操作の結果は `sys.recipe.status`。
+- The name of a recipe is shown as is (`"@ID"` cannot be used). A Japanese name needs a font.
+- Actions for operating with buttons without placing a `recipe_table` (`{ "action": "call", "fn": ..., "arg": ... }`):
+  `recipe.select` (`"book,name"`), `recipe.write` (`"book[,name]"`. If the name is omitted, the selected one),
+  `recipe.save` (`"book,name"`: saves with the current values of the tags), `recipe.delete` (`"book,name"`),
+  `recipe.export` (`"book[,file]"`), `recipe.import` (`"book,file"`).
+  `recipes.level` is needed for `write` / `save` / `delete` / `import` (if it is not enough, the login screen appears and nothing is done). Anyone can do `select` and `export`.
+- `recipes.level` is **one setting shared by all books**. To give only a certain `recipe_table` a higher level, put `"level"` on that widget.
+- `sys.recipe.<book name>.selected` holds the **first recipe** from startup (it is not empty). Do not write it from a screen (selecting is `recipe.select`).
+  To change the colour of the selected button: `"bind": { "bg_color": { "tag": "sys.recipe.<book name>.selected", "map": { "<recipe name>": "<colour>", "default": "<colour>" } } }`.
+- `sys.recipe.status` is 1 line of English (`'Product B' written, checking ...`, or the reason of a failure). Its length is not fixed, so fix the width and set `"long_mode": "wrap"`.
+- The look "after writing" can be rendered by adding `--set "sys.recipe.<book name>.written=<recipe name>"` to `--check`
+  (`sys.recipe.status` can be set too). Check the flow of actually writing with the steps of "When you want to check what happens after a press" in SKILL.md.
+- `sys.recipe.<book name>.selected` is the recipe **selected in the list**; `sys.recipe.<book name>.written` is the recipe **written last (in use now)**
+  (empty until one is written). To show "the current recipe" in the header or the like, use `written`. The result of the last operation is `sys.recipe.status`.
 
-## スクリプト (`scripts`)
+## Scripts (`scripts`)
 
-Lua で、タグを計算する・画面を切り替えるなど。`{ "action": "script", "name": "<名前>" }` で呼ぶか、`trigger` で自動に動く。
+In Lua: calculate tags, switch screens and so on. Call one with `{ "action": "script", "name": "<name>" }`, or it runs automatically by `trigger`.
 
 ```json
 "scripts": [
@@ -160,38 +160,38 @@ Lua で、タグを計算する・画面を切り替えるなど。`{ "action": 
 ]
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `name` | 名前（重複不可） |
-| `code` / `file` | Lua のコード（文字列か、1 行ずつの配列）、またはプロジェクトの中の `.lua` ファイル |
-| `trigger` | `"manual"`（既定。動作から呼ぶ）/ `"startup"` / `"interval"`（+ `interval_ms`）/ `"tag"`（+ `tags`: どれかが変わったとき）/ `"screen_show"` `"screen_hide"`（+ `screen`） |
-| `enabled` | `false` で使わない |
+| `name` | Name (must be unique) |
+| `code` / `file` | Lua code (a string, or an array of single lines), or a `.lua` file inside the project |
+| `trigger` | `"manual"` (default. Called from an action) / `"startup"` / `"interval"` (+ `interval_ms`) / `"tag"` (+ `tags`: when any of them changes) / `"screen_show"` `"screen_hide"` (+ `screen`) |
+| `enabled` | `false`: not used |
 
-Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["sys.alarm.active"]`）、`goto_screen("名前")`、`back()`、
-`current_screen()`、`run("スクリプト")`、`call("fn", "arg")`（`call` の動作と同じ）、`log(...)` / `warn(...)`、`millis()`、
-`os.time()` / `os.date(...)` / `os.clock()`、`event.trigger` / `event.tag` / `event.value` / `event.screen`。
-ライブラリは `string` `table` `math` `utf8` `coroutine`（ファイルやプロセスは使えない）。1 回 500 ms を超えると止められる。
-メモリはスクリプト全体で 32 MB まで（超えたスクリプトが "not enough memory" で失敗する）。大きな表や文字列をグローバルにためこまない。
+Available in Lua: `tag.name` (read and write. `sys.` tags are `tag["sys.alarm.active"]`), `goto_screen("name")`, `back()`,
+`current_screen()`, `run("script")`, `call("fn", "arg")` (the same as the `call` action), `log(...)` / `warn(...)`, `millis()`,
+`os.time()` / `os.date(...)` / `os.clock()`, `event.trigger` / `event.tag` / `event.value` / `event.screen`.
+The libraries are `string` `table` `math` `utf8` `coroutine` (files and processes cannot be used). A run that exceeds 500 ms is stopped.
+Memory is up to 32 MB for all scripts together (the script that exceeds it fails with "not enough memory"). Do not pile up large tables or strings in globals.
 
-- 書いたタグは、機器につながるタグなら機器へ送られる。**機器が持つ値（実際の温度など）をスクリプトで書かない**（下の「機器なしで値を動かす」は別）。
-- `--check --render` でもスクリプトは動く（周期のものは描く前に数回動く）。
+- A written tag is sent to the equipment if it is a tag connected to equipment. **Do not write values that the equipment owns (the actual temperature and the like) from a script** ("Moving values without equipment" below is a different matter).
+- Scripts run in `--check --render` too (periodic ones run a few times before rendering).
 
-## 日付と時刻
+## Date and time
 
-ランタイムが持つ文字列のタグ: `sys.date`（`2026-11-22`）、`sys.time`（`13:05:07`）、`sys.datetime`（`2026-11-22 13:05:07`）。
-装置の時刻（その地域の時刻）で、秒ごとに変わる。ヘッダーの時計は `{ "type": "label", "bind": { "text": "sys.datetime" } }`。
+String tags that the runtime has: `sys.date` (`2026-11-22`), `sys.time` (`13:05:07`), `sys.datetime` (`2026-11-22 13:05:07`).
+They are the time of the device (the local time of its region) and change every second. A clock in the header is `{ "type": "label", "bind": { "text": "sys.datetime" } }`.
 
-- 別の形（`13:05`、曜日つき）が要るときは、文字列のタグを作り、周期のスクリプトで `tag.clock = os.date("%H:%M")` と書く。
-- `--check --render` の画像は、実行したときの時刻になる。決まった時刻で描くなら `--set "sys.datetime=2026-11-22 08:30:00"`
-  （`--set` はそのタグだけを変える。`sys.date` / `sys.time` も出しているなら、それぞれに `--set` する）。
+- When another form is needed (`13:05`, with the day of the week), make a string tag and write `tag.clock = os.date("%H:%M")` in a periodic script.
+- The picture of `--check --render` has the time when it was run. To render at a fixed time, `--set "sys.datetime=2026-11-22 08:30:00"`
+  (`--set` changes only that tag. If `sys.date` / `sys.time` are shown too, `--set` each of them).
 
-## 機器なしで値を動かす
+## Moving values without equipment
 
-デモや確認で PLC なしに値を動かすのは、**頼まれたときだけ**（頼まれていなければ、値は `tags` の `init` のまま止まる。それで正しい）。
-動いて見える値は本物ではないので、**画面に必ず「SIMULATION」と出す**（`sys.sim.active` が 1 の間だけ出る `label`。下）。
+Moving values without a PLC for a demo or a check is **only when asked** (if not asked, the values stay at the `init` of `tags`. That is correct).
+Values that appear to move are not real, so **always show "SIMULATION" on the screen** (a `label` shown only while `sys.sim.active` is 1. Below).
 
-**`simulation`（`project.json`）に書く**。`drivers`（機器との接続）とは別の場所なので、「`drivers` に触らない」という決まりのままで足せる。
-`drivers` の `"type": "sim"` は使わない（既にあれば、そのままにする）。
+**Write it in `simulation` (`project.json`)**. It is a different place from `drivers` (the connections to equipment), so it can be added while keeping the rule "do not touch `drivers`".
+Do not use `"type": "sim"` of `drivers` (if it is already there, leave it as it is).
 
 ```json
 "simulation": { "items": [
@@ -202,31 +202,31 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 ] }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `tag` | 書くタグ（必須） |
-| `mode` | `sine` `triangle` `ramp`（`min` → `max` を繰り返す）/ `square`（`max` と `min` を交互）/ `random` / `counter`（`period_ms` ごとに 1 増え、`max` の次は `min`）/ `cycle`（`values` の文字を順に）/ `follow`（下） |
-| `min`、`max`、`period_ms` | 範囲（省くとタグの `min` / `max`）、周期（既定 1000） |
-| `when` | タグ名（真の間だけ動く）か `{ "tag": "mode", "eq": 2 }`。偽の間は書かない（カウンターは止まる） |
-| `target`、`rate`、`idle` | `follow`: `target`（タグか数値）へ 1 秒に `rate` ずつ近づく。`when` が偽の間は `idle`（既定 `min`）へ。運転ボタンで回転数が上がる、ヒーターで温度が上がる、という動き |
-| `noise` | `sine` `triangle` `ramp` `follow` の値に ± `noise` の揺れを足す（本物らしく見せる。小さく）。`follow` は `when` が偽の間は揺らさず、揺れても `min`..`max` の外に出ない |
-| `enabled`（`simulation` の） | `false` で止める |
+| `tag` | Tag to write (required) |
+| `mode` | `sine` `triangle` `ramp` (repeats `min` → `max`) / `square` (alternates `max` and `min`) / `random` / `counter` (increases by 1 every `period_ms`; after `max` comes `min`) / `cycle` (the texts of `values` in order) / `follow` (below) |
+| `min`, `max`, `period_ms` | Range (if omitted, the `min` / `max` of the tag), period (default 1000) |
+| `when` | A tag name (moves only while true) or `{ "tag": "mode", "eq": 2 }`. Does not write while false (a counter stops) |
+| `target`, `rate`, `idle` | `follow`: approaches `target` (a tag or a number) by `rate` per second. While `when` is false, goes to `idle` (default `min`). Movements such as: the speed rises with the run button, the temperature rises with the heater |
+| `noise` | Adds a fluctuation of ± `noise` to the value of `sine` `triangle` `ramp` `follow` (to make it look real. Keep it small). `follow` does not fluctuate while `when` is false, and even when fluctuating does not go outside `min`..`max` |
+| `enabled` (of `simulation`) | `false`: stops it |
 
-- **始まりの値**: `counter` はタグの `init`（`min`..`max` の中なら）から数え続ける（今日の生産数 3420 から増える）。波形は位相 0 から:
-  `sine` は真ん中、`ramp` / `triangle` は `min` から始まる。起動直後にアラームの条件に入らないよう `min` / `max` を決める（下限アラームの
-  あるタグを `ramp` で `min` から始めない）。bool のタグは `square`（`period_ms` の半分ずつ真と偽）で動かす。
-- 操作に応じて動かす: ボタンが書くタグ（`mixer_running`、設定値 `mixer_rpm_sp`）を `when` と `target` に使う。
-  「A かつ B のとき」はスクリプトで bool のタグを作って `when` にする。もっと複雑な動きはスクリプト（`projects/demo` の `pump`）。
-- 機器の値（実際の温度など）を、機器がつながったあとも書き続けないよう、PLC のつながりを示すタグがあれば
-  `"when": { "tag": "plc_online", "eq": false }` を付ける。
-- 表示: `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" }, "style": { "text_color": "#f5b942" } }`
-  をヘッダー（テンプレート）に置く。`sys.sim.active` は、`simulation` か有効な `sim` ドライバーがあるとき 1。
-- `--check --render` では動かない（値は `init`。`--set` で確かめる）。動きを見るのは「押したあとの様子を確かめたいとき」の手順で
-  （コピーの `drivers` を消しても `simulation` は残る）。
+- **Starting value**: `counter` continues counting from the `init` of the tag (if it is within `min`..`max`) (today's production count increases from 3420). Waveforms start from phase 0:
+  `sine` starts at the middle, `ramp` / `triangle` start at `min`. Decide `min` / `max` so that an alarm condition is not met right after startup (do not start a tag
+  that has a low-limit alarm from `min` with `ramp`). Move a bool tag with `square` (true and false for half of `period_ms` each).
+- Moving in response to operation: use the tags that buttons write (`mixer_running`, the setpoint `mixer_rpm_sp`) for `when` and `target`.
+  For "when A and B", make a bool tag with a script and use it as `when`. More complex movements are for a script (a periodic script that moves the values itself).
+- So as not to keep writing the values of the equipment (the actual temperature and the like) after the equipment is connected, if there is a tag that shows the PLC connection,
+  add `"when": { "tag": "plc_online", "eq": false }`.
+- Display: put `{ "type": "label", "text": "SIMULATION", "bind": { "visible": "sys.sim.active" }, "style": { "text_color": "#f5b942" } }`
+  in the header (template). `sys.sim.active` is 1 when there is `simulation` or an enabled `sim` driver.
+- It does not move in `--check --render` (the values are `init`. Check with `--set`). See the movement with the steps of "When you want to check what happens after a press"
+  (`simulation` remains even if the `drivers` of the copy are deleted).
 
-## スケジュール (`schedules`)
+## Schedules (`schedules`)
 
-決まった時刻にアクション（ボタンと同じ動作）を実行する。
+Runs actions (the same actions as a button) at a fixed time.
 
 ```json
 "schedules": [
@@ -236,36 +236,36 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 ]
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `name` | 名前（必須、重複不可、64 文字まで） |
-| `at` | `"HH:MM"`（毎日 / `days` の曜日）、または `"YYYY-MM-DD HH:MM"`（1 回だけ） |
-| `days` | `"daily"`（既定）、`"weekdays"`、`"weekend"`、または `["mon", "wed"]`（`sun mon tue wed thu fri sat`）。日付つきの `at` には書かない |
-| `do` | アクション 1 つ、またはその配列（必須） |
-| `enabled` | `false` で実行しない |
-| `catch_up` | `true`: 装置が止まっていた間に過ぎた時刻を、次の起動時に 1 回実行する |
+| `name` | Name (required, must be unique, up to 64 characters) |
+| `at` | `"HH:MM"` (every day / the days of `days`), or `"YYYY-MM-DD HH:MM"` (once only) |
+| `days` | `"daily"` (default), `"weekdays"`, `"weekend"`, or `["mon", "wed"]` (`sun mon tue wed thu fri sat`). Do not write it with an `at` that has a date |
+| `do` | 1 action, or an array of them (required) |
+| `enabled` | `false`: not run |
+| `catch_up` | `true`: a time that passed while the device was stopped is run once at the next startup |
 
-装置では System > Schedule で時刻・曜日・オン / オフを変えられる（`do` は変えられない）。200 件まで。
+On the device, the time, days and on / off can be changed in System > Schedule (`do` cannot be changed). Up to 200 items.
 
-## 音 (`sound`)
+## Sound (`sound`)
 
-`"sound": {}` があるだけで、タッチ音（`click`）とアラーム音（`alarm`、確認されるまで 3 秒ごと）が鳴る。
+With just `"sound": {}` present, the touch sound (`click`) and the alarm sound (`alarm`, every 3 seconds until acknowledged) play.
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `volume` | 0〜100（既定 80） |
-| `mute` | `true` で消音 |
-| `touch`、`alarm` | 音: `"click"` `"beep"` `"alarm"`、プロジェクトの中の `.wav`（`"assets/tap.wav"`）、または `false` |
-| `alarm_every_s` | アラーム音を鳴らし直す間隔の秒（既定 3、0 = 1 回だけ） |
-| `output` | `"auto"`（既定）/ `"audio"` / `"gpio"` / `"none"` |
-| `device` | Linux の ALSA デバイス（Raspberry Pi のイヤホン端子: `"plughw:CARD=Headphones,DEV=0"`） |
-| `gpio`、`gpio_active_low`、`gpio_chip` | ブザーをつないだ GPIO（Linux） |
+| `volume` | 0 to 100 (default 80) |
+| `mute` | `true`: muted |
+| `touch`, `alarm` | Sound: `"click"` `"beep"` `"alarm"`, a `.wav` inside the project (`"assets/tap.wav"`), or `false` |
+| `alarm_every_s` | Interval in seconds for playing the alarm sound again (default 3, 0 = once only) |
+| `output` | `"auto"` (default) / `"audio"` / `"gpio"` / `"none"` |
+| `device` | ALSA device of Linux (headphone jack of the Raspberry Pi: `"plughw:CARD=Headphones,DEV=0"`) |
+| `gpio`, `gpio_active_low`, `gpio_chip` | GPIO with a buzzer connected (Linux) |
 
-画面からの使い方（消音、音量、ブザー停止、音を鳴らす）は `binding-and-actions.md` の「画面の外の機能を画面から使う」。
+How to use it from a screen (mute, volume, stop the buzzer, play a sound) is in "Using features outside the screens from a screen" of `binding-and-actions.md`.
 
-## 機器間のデータ転送 (`transfers`)
+## Data transfer between equipment (`transfers`)
 
-タグの値を別のタグに写す（PLC → 別の PLC など）。切断中は書かない。
+Copies the value of a tag to another tag (PLC → another PLC and the like). Does not write while disconnected.
 
 ```json
 "transfers": [
@@ -274,103 +274,103 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 ]
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `name` | 名前（必須、重複不可） |
-| `from`、`to` | タグ名（必須。同じタグは不可、`to` に `sys.*` は不可） |
-| `trigger` | `"change"`（既定）/ `"cyclic"`（+ `every_ms`、100 以上、既定 1000） |
-| `scale`、`offset` | 書く値 = 元の値 × `scale` + `offset` |
-| `out_of_range` | 転送先のタグの `min` / `max` を外れた値: `"skip"`（既定）/ `"clamp"` |
-| `when` | 条件: タグ名、または `{ "tag": "mode", "eq": 2 }`（`eq ne gt lt ge le`） |
-| `enabled` | `false` で実行しない |
+| `name` | Name (required, must be unique) |
+| `from`, `to` | Tag names (required. The same tag is not allowed, `sys.*` is not allowed in `to`) |
+| `trigger` | `"change"` (default) / `"cyclic"` (+ `every_ms`, 100 or more, default 1000) |
+| `scale`, `offset` | Value written = source value × `scale` + `offset` |
+| `out_of_range` | A value outside the `min` / `max` of the destination tag: `"skip"` (default) / `"clamp"` |
+| `when` | Condition: a tag name, or `{ "tag": "mode", "eq": 2 }` (`eq ne gt lt ge le`) |
+| `enabled` | `false`: not run |
 
-輪（A → B → A）は実行されない（`--check` が指摘）。500 件まで。
+A loop (A → B → A) is not run (`--check` points it out). Up to 500 items.
 
-## メール (`mail`)
+## Mail (`mail`)
 
-アラームをメールで送る（SMTP）。
+Sends alarms by mail (SMTP).
 
 ```json
 "mail": { "host": "smtp.example.com", "security": "starttls", "username": "hmi",
           "from": "hmi@example.com", "to": ["shift@example.com"],
-          "alarms": { "severities": ["critical"], "subject": "[{project}] {alarm.message}", "body": "{alarm.time}\n液位 {level} %" } }
+          "alarms": { "severities": ["critical"], "subject": "[{project}] {alarm.message}", "body": "{alarm.time}\nLevel {level} %" } }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `host`、`port` | メールサーバー（必須）。`port` を省くと 587 / 465 / 25 |
-| `security` | `"starttls"`（既定）/ `"tls"` / `"none"`（暗号化なし: `--check` が知らせる） |
-| `username` | ログイン名（省くとログインしない）。**`password` は書かない**（装置の System > Mail） |
-| `from`、`to` | 差出人のアドレス（必須）、宛先（1 つ、または配列。必須、20 件まで） |
-| `verify`、`ca_file` | 証明書を検証する（既定 true）。`ca_file` はプロジェクトの中のファイル |
-| `timeout_ms`、`retry_s`、`retries`、`queue` | 待ち時間、再送の間隔と回数、送信待ちの上限 |
-| `alarms` | `events`（`"raised"` 既定、`"cleared"`、`"acked"`）、`severities`、`min_interval_s`、`subject`、`body`。`false` でアラームは送らない |
-| `enabled` | `false` で送らない |
+| `host`, `port` | Mail server (required). If `port` is omitted, 587 / 465 / 25 |
+| `security` | `"starttls"` (default) / `"tls"` / `"none"` (no encryption: `--check` tells you) |
+| `username` | Login name (if omitted, no login). **Do not write `password`** (System > Mail on the device) |
+| `from`, `to` | Sender address (required), recipients (1, or an array. Required, up to 20) |
+| `verify`, `ca_file` | Verify the certificate (default true). `ca_file` is a file inside the project |
+| `timeout_ms`, `retry_s`, `retries`, `queue` | Timeout, interval and number of resends, limit of mails waiting to be sent |
+| `alarms` | `events` (`"raised"` default, `"cleared"`, `"acked"`), `severities`, `min_interval_s`, `subject`, `body`. `false`: alarms are not sent |
+| `enabled` | `false`: not sent |
 
-件名・本文の `{名前}`: タグの値、`{project}`、`{time}`、`{alarm.name}` `{alarm.message}` `{alarm.severity}` `{alarm.value}` `{alarm.event}` `{alarm.time}`。
-`"enabled": false` でも設定は検査され、`sys.mail.*` のタグもある（送らないだけ）。画面からの使い方は `binding-and-actions.md`。
+`{name}` in the subject and body: the value of a tag, `{project}`, `{time}`, `{alarm.name}` `{alarm.message}` `{alarm.severity}` `{alarm.value}` `{alarm.event}` `{alarm.time}`.
+Even with `"enabled": false` the settings are checked, and the `sys.mail.*` tags exist too (it only does not send). How to use it from a screen is in `binding-and-actions.md`.
 
-## ログの送信 (`uploads`)
+## Sending logs (`uploads`)
 
-ログを CSV ファイルにしてサーバーへ送る。**自動では送らない**: `upload.run` アクションをスケジュールやボタンに置く。
+Makes logs into CSV files and sends them to a server. **It does not send automatically**: put the `upload.run` action in a schedule or a button.
 
 ```json
 "uploads": [ { "name": "nightly", "url": "https://files.example.com/hml/", "username": "hmi",
                "logs": ["data:line1", "alarms", "operation", "system"] } ]
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `name` | 名前（必須。英数字、`_`、`-`） |
-| `url` | `https://サーバー/フォルダー/`、`http://…`、`ftp://サーバー/フォルダー/`（http と ftp は暗号化なし: `--check` が知らせる）。URL にユーザー名・`?`・`..` は書けない |
-| `method` | HTTP: `"put"`（既定）/ `"post"` |
-| `username` | ログイン名。**`password` は書かない**（装置の System > Upload） |
-| `logs` | 送るもの（必須）: `"data:<data_log のグループ名>"`、`"alarms"`、`"operation"`、`"system"`。そのログがプロジェクトにあること |
-| `verify`、`ca_file`、`timeout_ms`、`retry_s`、`retries`、`keep` | 証明書の検証、待ち時間、再送、送信待ちのファイルの上限 |
-| `enabled` | `false` で送らない |
+| `name` | Name (required. Letters and digits, `_`, `-`) |
+| `url` | `https://server/folder/`, `http://…`, `ftp://server/folder/` (http and ftp are not encrypted: `--check` tells you). A user name, `?` and `..` cannot be written in the URL |
+| `method` | HTTP: `"put"` (default) / `"post"` |
+| `username` | Login name. **Do not write `password`** (System > Upload on the device) |
+| `logs` | What to send (required): `"data:<group name of data_log>"`, `"alarms"`, `"operation"`, `"system"`. That log must exist in the project |
+| `verify`, `ca_file`, `timeout_ms`, `retry_s`, `retries`, `keep` | Certificate verification, timeout, resends, limit of files waiting to be sent |
+| `enabled` | `false`: not sent |
 
-スケジュールから送るなら `"do": { "action": "call", "fn": "upload.run", "arg": "nightly" }`。画面からの使い方は `binding-and-actions.md`。
-`"enabled": false` でも設定は検査され、`sys.upload.*` のタグもある。10 件まで。
+To send from a schedule, `"do": { "action": "call", "fn": "upload.run", "arg": "nightly" }`. How to use it from a screen is in `binding-and-actions.md`.
+Even with `"enabled": false` the settings are checked, and the `sys.upload.*` tags exist too. Up to 10 items.
 
-## 遠隔表示 (`remote`)
+## Remote display (`remote`)
 
-装置の画面を VNC ビューアーで見る・操作する。
+View and operate the screen of the device with a VNC viewer.
 
 ```json
 "remote": { "enabled": true, "port": 5900, "view_only": false }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `enabled` | `true` で待ち受ける（既定 `false`） |
-| `port` | 既定 5900 |
-| `view_only` | `true` で見るだけ |
+| `enabled` | `true`: listens (default `false`) |
+| `port` | Default 5900 |
+| `view_only` | `true`: view only |
 
-- **`password` は書かない**（書いても使われず、`--check` が指摘する）。パスワードは装置の System > Remote で設定する。
-  設定するまでは装置自身（127.0.0.1）からしかつなげない。そのことを使う人に伝える。
-- VNC は暗号化されない。閉じたネットワーク向け。
+- **Do not write `password`** (even if written it is not used, and `--check` points it out). The password is set in System > Remote on the device.
+  Until it is set, a connection is possible only from the device itself (127.0.0.1). Tell that to the person who uses it.
+- VNC is not encrypted. It is for closed networks.
 
-## システム設定を開く長押し (`system_access`)
+## Long press that opens the system settings (`system_access`)
 
-装置のシステム設定（System）は、`{ "action": "system" }` のボタンがなくても、**画面の左上の隅を 3 秒押す**と開く（何も書かなくてよい）。
+The system settings of the device (System) open when **the top left corner of the screen is pressed for 3 seconds**, even without a `{ "action": "system" }` button (nothing needs to be written).
 
 ```json
 "system_access": { "hold": "top_left", "hold_s": 3 }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `hold` | `"top_left"`（既定）/ `"top_right"` / `"bottom_left"` / `"bottom_right"` / `"none"` |
-| `hold_s` | 押し続ける秒数（2〜10、既定 3） |
+| `hold` | `"top_left"` (default) / `"top_right"` / `"bottom_left"` / `"bottom_right"` / `"none"` |
+| `hold_s` | Seconds to keep pressing (2 to 10, default 3) |
 
-- 隅は短い辺の 1/8（最小 48 px）の正方形。**その隅に `repeat` や長押しで動くボタンを置かない**（置くなら `hold` で別の隅にする）。
-- 頼まれずに `"none"` にしない（`{ "action": "system" }` もないと、装置で設定を開けなくなる。`--check` が指摘する）。
+- The corner is a square of 1/8 of the short side (minimum 48 px). **Do not place a button that works by `repeat` or by a long press in that corner** (if you place one, choose another corner with `hold`).
+- Do not set `"none"` without being asked (if there is no `{ "action": "system" }` either, the settings can no longer be opened on the device. `--check` points it out).
 
-システム設定画面の言語は、プロジェクトの表示言語（`texts`）に従う（日本語 / 英語）。言語を持たないプロジェクトは
-タイトルが日本語なら日本語。固定するなら `"system_language": "ja"`（または `"en"`）。日本語には `font.file` に
-日本語フォントが要る（無ければ英語のまま）。
+The language of the system settings screens follows the display language of the project (`texts`) (Japanese / English). A project that has no languages
+is Japanese if its title is Japanese. To fix it, `"system_language": "ja"` (or `"en"`). Japanese needs a Japanese font
+in `font.file` (without it, it stays English).
 
-## 見た目の土台 (`display` / `theme` / `font`)
+## Basis of the look (`display` / `theme` / `font`)
 
 ```json
 "display": { "width": 800, "height": 480 },
@@ -378,24 +378,24 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 "font":    { "file": "assets/fonts/NotoSansJP-subset.otf" }
 ```
 
-- **変えない。読んで合わせる。** 画面の大きさ・明暗・主な色は、そのプロジェクトの全画面の前提。頼まれたときだけ変える。
-- **「明るいテーマにして」と頼まれたとき**: `theme.dark` を変えるだけでは足りない。たいていの画面は背景や文字の色を決め打ちで
-  書いているので、**全部の画面とテンプレートの色を置き換える**（頼まれたのだから、テンプレートを変えてよい）。配置は変えない。
-  - 目安: 画面の背景 `#eef1f5`、上や下の帯 `#dfe5ec`、カード `#ffffff`、文字 `#1c2733`、控えめな文字 `#546e7a`。
-    状態の色は白い背景で読める濃さにする（緑 `#2e7d32`、橙 `#e65100`、赤 `#c62828`）。
-  - **色の付いたボタン・バッジの上の白い文字は白のまま**（背景の白い文字だけを濃くする）。置き換えたあと、全部の画面を描いて見る。
-  - 押せないボタンは、明るいテーマでは淡い色に濃い文字で出る。文字の色を決め打ち（`style_label` の `text_color`）にしたボタンは
-    その色のまま薄くなるので、押せなくなることのあるボタンには白い文字を決め打ちで書かない。
-- `theme.dark`: `false` なら明るいテーマ。スイッチ・ドロップダウン・入力欄・キーボード、**システム設定画面とログイン画面**も明るくなる。
-  新しい画面の背景と文字の色は、既存の画面に合わせる（明るいテーマの画面に、暗い背景の色を決め打ちで書かない）。
-- `theme.primary`: 選んだもの・押す主なボタンの色。システム設定画面の「適用」や、キーボードの「確定」もこの色。
-  自分の画面でも「確定・保存・進む」はこの色、**赤は取り消せない操作とアラームだけ**にする。
-- `theme.font`: 文字の既定の大きさ。`font.file`: 日本語などを出すフォント（無ければ組み込みの欧文だけ）。
-- `display.touch`（`swap_axes`、`calibration`、`jitter` など）と `display.fbdev` / `input` は、その装置の配線と調整の値。**触らない**。
+- **Do not change. Read and match.** The screen size, light or dark, and the main colours are the premise of all screens of that project. Change them only when asked.
+- **When asked "make it a light theme"**: changing `theme.dark` alone is not enough. Most screens write the background and text colours as fixed values,
+  so **replace the colours of all screens and templates** (it was asked for, so you may change the templates). Do not change the layout.
+  - Guide: screen background `#eef1f5`, top and bottom bands `#dfe5ec`, card `#ffffff`, text `#1c2733`, subdued text `#546e7a`.
+    Make the state colours dark enough to read on a white background (green `#2e7d32`, orange `#e65100`, red `#c62828`).
+  - **White text on coloured buttons and badges stays white** (darken only the white text on the background). After replacing, render all screens and look at them.
+  - A button that cannot be pressed is shown in a pale colour with dark text in the light theme. A button with a fixed text colour (`text_color` of `style_label`)
+    fades with that colour kept, so do not write fixed white text on a button that can become unpressable.
+- `theme.dark`: `false` is the light theme. Switches, dropdowns, input fields, the keyboard, and **the system settings screens and the login screen** become light too.
+  Match the background and text colours of a new screen to the existing screens (do not write a fixed dark background colour on a screen of the light theme).
+- `theme.primary`: the colour of what is selected and of the main buttons to press. "Apply" on the system settings screens and "OK" on the keyboard are this colour too.
+  On your own screens too, make "confirm, save, next" this colour, and use **red only for operations that cannot be undone and for alarms**.
+- `theme.font`: the default size of text. `font.file`: the font that shows Japanese and the like (without it, only the built-in Latin).
+- `display.touch` (`swap_axes`, `calibration`, `jitter` and so on) and `display.fbdev` / `input` are the wiring and adjustment values of that device. **Do not touch them**.
 
-## ユーザーとレベル (`users`)
+## Users and levels (`users`)
 
-書いたときだけ有効（無ければ、だれでも全部操作できる）。**頼まれたときだけ足す**。
+Active only when written (without it, anyone can operate everything). **Add it only when asked**.
 
 ```json
 "users": {
@@ -405,71 +405,70 @@ Lua で使えるもの: `tag.名前`（読み書き。`sys.` のタグは `tag["
 }
 ```
 
-| キー | 内容 |
+| Key | Content |
 | --- | --- |
-| `levels` | レベル 1, 2, 3 … の名前（最大 9）。レベル 0 は「だれもログインしていない」 |
-| `list` | ユーザー（最大 16）: `name`（16 文字まで）、`level`、`pin`（4〜8 桁の数字） |
-| `auto_logout_s` | 操作がないとログアウトするまでの秒数（既定 300、0 = しない） |
-| `max_failures` / `lock_s` | PIN をこの回数まちがえると、この秒数ロック（既定 5 回 / 60 秒） |
-| `system_level` | システム設定画面を開けるレベル（既定: いちばん高いレベル） |
+| `levels` | Names of levels 1, 2, 3 … (at most 9). Level 0 is "nobody is logged in" |
+| `list` | Users (at most 16): `name` (up to 16 characters), `level`, `pin` (4 to 8 digits) |
+| `auto_logout_s` | Seconds without operation until logout (default 300, 0 = never) |
+| `max_failures` / `lock_s` | After this many wrong PINs, locked for this many seconds (default 5 times / 60 seconds) |
+| `system_level` | Level that can open the system settings screens (default: the highest level) |
 
-- 画面と部品の `"level"` / `"level_deny"` の書き方は `binding-and-actions.md`。ログイン画面は組み込み
-  （`{ "action": "login" }` で開く。レベルが要る操作をしたときは自分で出る）。`{ "action": "logout" }`。
-- タグ: `sys.user.name`、`sys.user.level`（0 = ログインしていない）、`sys.user.level_name`、`sys.user.logged_in`。
-  ヘッダーにユーザー名を出す、ログイン中だけ「ログアウト」を見せる、などに使う。
-- 役割（オペレーター、保守、管理者）ごとに 1 人ずつ作れば足りる。人を増やすのは装置の System > Users でできると伝える。
-- `auto_logout_s` の既定は 300 秒。`screen_saver` の `logout` と一緒に使うときは、**短い方で先にログアウトする**。
-  「画面が消えたときだけログアウト」にするなら `auto_logout_s` を `screen_saver.after_s` 以上（または 0）にする。
-- **PIN は仮のものを書き、ユーザーに「装置の System > Users で変えてください」と伝える。** 実際の PIN を聞いて書かない
-  （`project.json` は人に渡るファイル）。`system_level` 以上のユーザーを必ず 1 人入れる（いないと、だれもシステム設定を開けない）。
-- 装置でユーザーを編集すると、その装置は自分の一覧（`project.local.json`）を使い、`project.json` の `list` は使われなくなる。
+- How to write `"level"` / `"level_deny"` on screens and widgets is in `binding-and-actions.md`. The login screen is built in
+  (opened with `{ "action": "login" }`. It appears by itself when an operation that needs a level is done). `{ "action": "logout" }`.
+- Tags: `sys.user.name`, `sys.user.level` (0 = not logged in), `sys.user.level_name`, `sys.user.logged_in`.
+  Use them to show the user name in the header, to show "Log out" only while logged in, and so on.
+- Making 1 user per role (operator, maintenance, administrator) is enough. Tell the user that more people can be added in System > Users on the device.
+- The default of `auto_logout_s` is 300 seconds. When used together with the `logout` of `screen_saver`, **the shorter one logs out first**.
+  For "log out only when the screen goes off", set `auto_logout_s` to `screen_saver.after_s` or more (or 0).
+- **Write a temporary PIN and tell the user "change it in System > Users on the device".** Do not ask for the real PIN and write it
+  (`project.json` is a file that is handed to other people). Always include 1 user of `system_level` or higher (without one, nobody can open the system settings).
+- When users are edited on the device, that device uses its own list (`project.local.json`), and the `list` of `project.json` is no longer used.
 
-## 画面消灯 (`screen_saver`)
+## Screen saver (`screen_saver`)
 
 ```json
 "screen_saver": { "after_s": 600, "wake_on_alarm": true, "logout": false }
 ```
 
-- `after_s` 秒操作がないと画面を消す（0 = 消さない）。新しいアラームで点く（`wake_on_alarm`）。`logout`: 消えたらログアウト。
-- 点けるためのタッチでは何も押されない。タグ `sys.screen.off`（消灯中 1。1 を書くとすぐ消える: 「画面を消す」ボタン）。
+- After `after_s` seconds without operation, the screen is turned off (0 = never). A new alarm turns it on (`wake_on_alarm`). `logout`: log out when it turns off.
+- The touch that turns it on presses nothing. Tag `sys.screen.off` (1 while off. Writing 1 turns it off at once: a "turn the screen off" button).
 
-## 操作ログとシステムログ (`operation_log` / `system_log`)
+## Operation log and system log (`operation_log` / `system_log`)
 
 ```json
 "operation_log": { "user_tag": "operator" },
 "system_log":    { "level": "info", "retention_days": 30 }
 ```
 
-- `operation_log`: 画面からの値の書き込み（変更前と後）、画面の切り替え、`call` や再起動を記録する。`user_tag` は
-  「だれが」を入れる文字列タグ（`users` があるプロジェクトでは使われず、ログイン中のユーザー名が入る）。パスワード欄に打った内容は記録しない。
-- `system_log`: ランタイムのメッセージ（スクリプトのエラー、機器との接続・切断）を記録する。`level`: `info` / `warn` / `error`。
-- どちらも画面には `log_view` で出す（`binding-and-actions.md`）。CSV は `operation_log.export` / `system_log.export`。
-- 「操作の記録を残して」と頼まれたら、まず `operation_log` がもうあるかを見る（あれば足すものはない。そう報告する）。
-  `users` があるプロジェクトでは、ログイン・ログアウト・ログインの失敗も記録され、`user_tag` は使われない（残っていても害はない。消さない）。
+- `operation_log`: records value writes from the screens (before and after the change), screen switches, `call` and restarts. `user_tag` is
+  the string tag that holds "who" (not used in a project with `users`; the name of the logged-in user goes in). What was typed in a password field is not recorded.
+- `system_log`: records the messages of the runtime (script errors, connection to and disconnection from equipment). `level`: `info` / `warn` / `error`.
+- Both are shown on a screen with `log_view` (`binding-and-actions.md`). CSV is `operation_log.export` / `system_log.export`.
+- When asked "keep a record of operations", first see whether `operation_log` is already there (if it is, there is nothing to add. Report that).
+  In a project with `users`, login, logout and failed logins are recorded too, and `user_tag` is not used (it does no harm if it remains. Do not delete it).
 
-## 装置へ送る（デプロイ）
+## Send to the device (deploy)
 
-**頼まれたときだけ。** 送る前に必ず `--check` を通し、`--capabilities` の内容をユーザーに見せる。
+**Only when asked.** Before sending, always pass `--check` and show the user the content of `--capabilities`.
 
 ```
-hml_runtime --capabilities project.json            # このプロジェクトができること（機器への書き込み、外への送信、自分で動くもの）
-hml_designer --deploy project.json --direct --host <装置のアドレス> --check     # つながるか、相手が前と同じ装置かを見るだけ
-hml_designer --deploy project.json --direct --host <装置のアドレス>             # 送って、装置のランタイムを再起動する
+hml_runtime --capabilities project.json            # what this project can do (writes to equipment, sending to the outside, things that run by themselves)
+hml_designer --deploy project.json --direct --host <device address> --check     # only looks at whether it connects and whether the other side is the same device as before
+hml_designer --deploy project.json --direct --host <device address>             # sends, and restarts the runtime of the device
 ```
 
-- `hml_designer` は `hml_runtime` と同じフォルダーにある。オプションの順番はどちらでもよい（`project.json` が先でも後でも）。
-- `--deploy ... --check` は**何も送らない**（つながるかと、相手の指紋を見るだけ）。「送らないで」と言われていても、これは実行してよい。
-  「送り方を教えて」と言われたときは、実行せずに手順を伝える: `--check`、`--capabilities` の中身、上の 2 つのコマンド、
-  装置の画面で確認が出ること、仮の PIN を変えること。
-- 装置のアドレスは推測しない（聞く）。`hml_designer --help` は実行しない（デザイナーの窓が開いて止まる）。
-- 初めての装置・初めてのデザイナーのときと、**できることが増える**プロジェクトのときは、装置の画面に確認が出る
-  （System > Deploy）。装置の前の人が押すまで数分待ち、押されなければ送られない。**送る前に、そう伝える**。
-- ユーザー・ドライバーの設定など、装置で変えた値（`project.local.json`）はデプロイで上書きされない。
-- ランタイム本体の入れ替え（`--runtime <ファイル>`）は、ユーザーがそう言ったときだけ。
+- `hml_designer` is in the same folder as `hml_runtime`. The order of the options does not matter (`project.json` first or last).
+- `--deploy ... --check` **sends nothing** (it only looks at whether it connects and at the fingerprint of the other side). Even when told "do not send", this may be run.
+  When told "tell me how to send it", do not run it; tell the steps: `--check`, the content of `--capabilities`, the 2 commands above,
+  that a confirmation appears on the screen of the device, and to change the temporary PIN.
+- Do not guess the address of the device (ask). Do not run `hml_designer --help` (the designer window opens and it stops there).
+- For a first device or a first designer, and for a project that **can do more**, a confirmation appears on the screen of the device
+  (System > Deploy). It waits a few minutes until the person at the device presses it; if it is not pressed, nothing is sent. **Tell this before sending**.
+- Values changed on the device (`project.local.json`), such as the user and driver settings, are not overwritten by a deploy.
+- Replacing the runtime itself (`--runtime <file>`) is only when the user says so.
 
-## システム設定画面について（作らない・まねない）
+## About the system settings screens (do not make them, do not imitate them)
 
-装置の設定（ネットワーク、ドライバーの接続先、ユーザー、時刻合わせに使う表示、USB メモリでの更新、デプロイの受け付け）は
-組み込みの画面にある。**同じものをプロジェクトの画面として作らない**。入口だけ置く: `{ "action": "system" }` のボタン
-（無くても、画面の隅の長押しで開く）。この画面は、プロジェクトのテーマ（明暗、`primary`）と言語に合わせて表示される。
-
+The settings of the device (network, connection targets of the drivers, users, the clock, update from a USB memory, acceptance of deploys) are
+in the built-in screens. **Do not make the same thing as screens of the project**. Place only the entrance: a `{ "action": "system" }` button
+(even without it, a long press on the corner of the screen opens them). These screens are displayed to match the theme (light or dark, `primary`) and the language of the project.
