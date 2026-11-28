@@ -36,7 +36,7 @@ The first public version. Tsukuraku is work in progress (0.x): it works, and it 
 **Security**
 
 Three problems were found in a review and fixed before this first release; no released version has them. They are published as
-advisories for those who built from source before 2026-11-21:
+advisories for those who built from source before 2026-11-26 (commit 62296eb):
 
 - The designer read and wrote files outside the project through paths in `screens` of a project made by somebody else.
 - A project could open remote access (VNC) to the device on the network with a password known to its author.
