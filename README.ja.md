@@ -2943,6 +2943,30 @@ gh attestation verify tsukuraku-0.1.1-windows-x64.zip --repo bamchoh/tsukuraku
 `tools/package.py`）、ファイルとチェックサムを付けた**下書き**のリリースを作ります。だれかが下書きを見て公開するまで、外からは見えません。
 このワークフローの「Run workflow」は、リリースを作らずに同じパッケージだけを作ります（試す用）。
 
+## コード署名の方針（Code signing policy）
+
+**状況: まだ始まっていません。** これまでのリリースの Windows 用の実行ファイルには、コード署名の証明書が付いていません。
+SignPath Foundation がオープンソース向けに提供している無料のコード署名に申請します。この節は、認められたときに守る方針です
+（認められたら、ここにそう書きます）。
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- **署名するもの**: リリースの Windows 用パッケージの `hml_designer.exe` と `hml_runtime.exe` だけ。このリポジトリのリリースの CI
+  （`.github/workflows/release.yml`）が、そのリリースのタグのソースからビルドしたものに限ります。開発者の PC でビルドしたものや、
+  他人のバイナリには署名しません。
+- **コミッターとレビュアー（Committers and reviewers）**: [bamchoh](https://github.com/bamchoh)（このリポジトリの所有者）。
+  ほかの人からの変更はプルリクエストで受け取り、コミッターがレビューしてからマージします。
+- **承認者（Approvers）**: [bamchoh](https://github.com/bamchoh)。リリースごとに、署名を手で承認します。
+- これらの役割の人は、GitHub と SignPath の両方で多要素認証を使います。
+- 各パッケージには、証明書とは別に、出どころの証明（「リリース」の節）も付きます。
+
+**プライバシー**: このプログラムは、利用者（または導入・運用する人）が明示的に求めたとき以外、ほかのネットワーク上のシステムに
+情報を送りません。利用状況の送信、更新の確認、アカウントはありません。送るのは、プロジェクトでそう設定したものだけです: PLC との
+値のやり取り（ドライバー）、メール、サーバーへのログの送信（`uploads`）、VNC クライアントへの画面（`remote`）、デプロイを押したときの
+プロジェクト。`hml_runtime <project.json> --capabilities` で、プロジェクトができることを動かす前に確かめられます。
+
+署名されたファイルがおかしな動きをする場合は、[SECURITY.md](SECURITY.md) の方法で知らせてください。
+
 ## バージョン
 
 Tsukuraku は **0.x です。動いていて使えますが、まだ変わります**。番号は [Semantic Versioning](https://semver.org/lang/ja/) に従います。

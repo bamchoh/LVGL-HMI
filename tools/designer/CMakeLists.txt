@@ -22,6 +22,7 @@ FetchContent_MakeAvailable(webview)
 # (project_archive.cpp: the project file format, shared with the runtime)
 # (deploy_link.cpp: deploying without SSH - the certificates and the TLS connection, shared with the runtime)
 add_executable(hml_designer WIN32 host/main.cpp ${CMAKE_SOURCE_DIR}/src/project_archive.cpp ${CMAKE_SOURCE_DIR}/src/deploy_link.cpp)
+hml_version_resource(hml_designer "Tsukuraku designer")
 target_include_directories(hml_designer PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(hml_designer PRIVATE webview::core hml_json hml_miniz hml_mbedtls)
 target_compile_definitions(hml_designer PRIVATE
