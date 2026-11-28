@@ -117,6 +117,7 @@ private:
     Tag*        status_tag_ = nullptr;
     bool        allow_system_ = false;
     std::vector<Range> write_ranges_;
+    bool               write_limited_ = false;   // "write_ranges" is there: only what it lists is written (nothing, if it lists nothing valid)
     std::vector<Item>  items_;
     std::vector<Block> blocks_;
     std::vector<std::vector<size_t>> block_items_;
@@ -152,8 +153,13 @@ FinsDriver::FinsDriver(const json& cfg)
         if(!status_tag_) HML_WARN("fins: unknown status_tag '%s'", st->c_str());
     }
     allow_system_ = jbool(cfg, "allow_system_write", false);
-    if(const json* wr = jget(cfg, "write_ranges"); wr && wr->is_array()) {
-        for(const json& r : *wr) {
+    // "write_ranges" limits what may be written. A list that is there but names no valid range
+    // (a typing mistake, an empty list, not a list at all) allows NOTHING: a protection that
+    // somebody wrote down must not turn into "everything" by a mistake in it.
+    if(const json* wr = jget(cfg, "write_ranges")) {
+        write_limited_ = true;
+        if(!wr->is_array()) HML_WARN("fins: write_ranges is not a list of ranges: nothing can be written");
+        for(const json& r : wr->is_array() ? *wr : json::array()) {
             std::string s = r.is_string() ? r.get<std::string>() : "";
             size_t dash = s.find('-');
             std::string err;
@@ -223,7 +229,7 @@ FinsDriver::FinsDriver(const json& cfg)
 bool FinsDriver::write_allowed(const FinsAddress& a, int words, std::string& why) const
 {
     if(a.system && !allow_system_) { why = "the Auxiliary Area is written only with \"allow_system_write\""; return false; }
-    if(write_ranges_.empty()) return true;
+    if(!write_limited_) return true;
     const uint32_t last = a.number + static_cast<uint32_t>(words - 1);
     for(const Range& r : write_ranges_) if(r.code == a.word_code && a.number >= r.from && last <= r.to) return true;
     why = "outside \"write_ranges\"";

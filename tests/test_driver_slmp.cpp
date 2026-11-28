@@ -676,3 +676,24 @@ TEST_CASE("slmp: nonsense in the address and the value of System > Device sends 
     CHECK(srv.reads == reads + 2);                                        // (the two good questions above)
     CHECK(tagv("online") == 1);
 }
+
+TEST_CASE("slmp: write_ranges that names no valid range allows nothing (it does not turn into everything)")
+{
+    for(const json& ranges : { json::array({ "nonsense" }), json::array(), json("D0-D999") }) {
+        Runtime rt;
+        FakeSlmpServer srv;
+        rt.tag("online", TagType::Bool);
+        rt.tag("d0", TagType::Int);
+        json cfg = slmp_cfg(srv, json::parse(R"([ { "tag": "d0", "addr": "D0" } ])"));
+        cfg["write_ranges"] = ranges;
+        REQUIRE(start(rt, cfg) == 1);
+        REQUIRE(wait_for([] { return tagv("online") == 1; }));
+        Driver* d = rt.drivers.all().at(0);
+        const int before = srv.writes.load();
+        CHECK_MESSAGE(put(d, "D110", "1").error.find("write_ranges") != std::string::npos, ranges.dump());
+        tags().find("d0")->set_number(7, nullptr);                  // a tag of the map is not written either
+        wait_for([] { return false; }, 400);                       // (time for a write to go out, if one would)
+        CHECK_MESSAGE(srv.writes == before, ranges.dump());
+        rt.drivers.stop_all();
+    }
+}
