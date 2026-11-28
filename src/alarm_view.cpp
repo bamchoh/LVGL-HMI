@@ -1,6 +1,7 @@
 #include "locale_fmt.hpp"
 #include "alarm_view.hpp"
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <vector>
 #include "alarm.hpp"
@@ -15,7 +16,7 @@ namespace {
 
 constexpr uint32_t kPollMs = 250;
 
-lv_color_t severity_color(const std::string& sev)
+lv_color_t default_severity_color(const std::string& sev)
 {
     if(iequals(sev, "critical") || iequals(sev, "error") || iequals(sev, "alarm")) return lv_palette_main(LV_PALETTE_RED);
     if(iequals(sev, "warning")) return lv_palette_darken(LV_PALETTE_AMBER, 2);
@@ -38,6 +39,40 @@ std::string short_time(int64_t ms, bool with_date)
     return t.size() >= 19 ? (with_date ? local_time_text(t.substr(5, 14)) : t.substr(11, 8)) : t;
 }
 
+std::string to_lower(std::string s)
+{
+    for(char& ch : s) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    return s;
+}
+
+// "colors": { "<severity>": "#rrggbb", ..., "history": row of the history, "cleared": a cleared row,
+//             "text": text on a coloured row, "history_text": text on the history and cleared rows }
+struct Colors {
+    std::map<std::string, lv_color_t> sev;
+    lv_color_t history = lv_palette_lighten(LV_PALETTE_GREY, 3), cleared = lv_palette_lighten(LV_PALETTE_GREY, 2);
+    lv_color_t text = lv_color_white(), history_text = lv_color_hex(0x263238);
+    void load(const json& w)
+    {
+        const json* c = jget(w, "colors");
+        if(!c || !c->is_object()) return;
+        for(auto it = c->begin(); it != c->end(); ++it) {
+            if(!it.value().is_string()) continue;
+            const std::string k = it.key();
+            const lv_color_t col = parse_color(it.value().get<std::string>(), lv_color_black());
+            if(k == "history") history = col;
+            else if(k == "cleared") cleared = col;
+            else if(k == "text") text = col;
+            else if(k == "history_text") history_text = col;
+            else sev[to_lower(k)] = col;
+        }
+    }
+    lv_color_t of(const std::string& severity) const
+    {
+        auto it = sev.find(to_lower(severity));
+        return it == sev.end() ? default_severity_color(severity) : it->second;
+    }
+};
+
 bool on_shown_screen(lv_obj_t* obj) { return lv_obj_get_screen(obj) == lv_screen_active(); }
 
 struct Labels {
@@ -53,6 +88,12 @@ struct Labels {
         for(auto it = l->begin(); it != l->end(); ++it) if(it.value().is_string()) m[it.key()] = alarm_text_line(texts().resolve(it.value().get<std::string>()), 64);
     }
     const std::string& operator[](const std::string& k) const { static const std::string none; auto it = m.find(k); return it == m.end() ? none : it->second; }
+    // the word of a severity: "severity.<name>" of labels, else the name as the alarms write it
+    std::string severity(const std::string& sev) const
+    {
+        auto it = m.find("severity." + sev);
+        return it != m.end() ? it->second : alarm_text_line(sev, 24);
+    }
 };
 
 lv_obj_t* make_label(lv_obj_t* parent, const std::string& text, lv_color_t color, bool grow = false)
@@ -88,12 +129,11 @@ struct ListCtx {
     std::vector<std::string> columns{ "time", "message", "state" };
     std::vector<std::string> severities;                 // of the history's dropdown ("" = all)
     Labels      labels;
+    Colors      colors;
     uint64_t    seen = 0;                                // generation drawn
     bool        dirty = true;
     int         page = 0;
     std::vector<std::string> row_names;                  // alarm of each row (current mode)
-
-    bool has(const char* col) const { return std::find(columns.begin(), columns.end(), col) != columns.end(); }
 
     void refresh(bool force = false)
     {
@@ -140,24 +180,20 @@ struct ListCtx {
         if(!severity.empty()) list.erase(std::remove_if(list.begin(), list.end(), [&](const AlarmStatus& a) { return !iequals(a.severity, severity); }), list.end());
         if(list.empty()) { empty_row(labels["empty"]); return; }
         const size_t shown = std::min(list.size(), static_cast<size_t>(std::max(1, rows)));
-        const lv_color_t white = lv_color_white(), dark = lv_color_hex(0x263238);
         for(size_t i = 0; i < shown; i++) {
             const AlarmStatus& a = list[i];
-            const lv_color_t sc = severity_color(a.severity);
+            const lv_color_t sc = colors.of(a.severity);
             // unacknowledged: filled; acknowledged but active: tinted; cleared, not acknowledged: grey with the colour at the edge
             const bool unacked = !a.acked, cleared = !a.active;
-            lv_obj_t* r = cleared ? row(lv_palette_lighten(LV_PALETTE_GREY, 2), LV_OPA_COVER, sc)
+            lv_obj_t* r = cleared ? row(colors.cleared, LV_OPA_COVER, sc)
                         : unacked ? row(sc, LV_OPA_COVER, sc) : row(sc, LV_OPA_40, sc);
-            const lv_color_t fg = cleared ? dark : white;
-            if(has("time")) make_label(r, short_time(a.raised_ms, false), fg);
-            if(has("severity")) make_label(r, std::string(severity_symbol(a.severity)) + " " + alarm_text_line(a.severity, 24), fg);
-            if(has("message")) make_label(r, alarm_text_line(a.message), fg, true);
-            if(has("state")) {
-                // the state also in words and with a symbol: not only by colour
-                std::string st = unacked ? std::string(LV_SYMBOL_BELL " ") + labels[cleared ? "cleared" : "unacked"]
-                               : std::string(LV_SYMBOL_OK " ") + labels["active"];
-                if(unacked && !cleared) st = std::string(LV_SYMBOL_BELL " ") + labels["unacked"];
-                make_label(r, st, fg);
+            const lv_color_t fg = cleared ? colors.history_text : colors.text;
+            for(const std::string& col : columns) {
+                if(col == "time") make_label(r, short_time(a.raised_ms, false), fg);
+                else if(col == "severity") make_label(r, std::string(severity_symbol(a.severity)) + " " + labels.severity(a.severity), fg);
+                else if(col == "equipment") make_label(r, alarm_text_line(a.equipment, 48), fg);
+                else if(col == "message") make_label(r, alarm_text_line(a.message), fg, true);
+                else if(col == "state") state_label(r, a, fg);
             }
             row_names.push_back(a.name);
             if(ack_on_tap && unacked) lv_obj_set_clickable(r, true);
@@ -170,6 +206,40 @@ struct ListCtx {
             std::string n = std::to_string(list.size() - shown);
             empty_row(at == std::string::npos ? more + " " + n : more.replace(at, 2, n));
         }
+        align_columns();
+    }
+
+    // Every column but the message as wide as its widest cell, so that the columns line up from row
+    // to row (an equipment name or a severity word is not the same length in every row).
+    void align_columns()
+    {
+        const uint32_t n = lv_obj_get_child_count(body);
+        for(size_t c = 0; c < columns.size(); c++) {
+            if(columns[c] == "message") continue;
+            int32_t widest = 0;
+            for(uint32_t i = 0; i < n; i++) {
+                lv_obj_t* r = lv_obj_get_child(body, static_cast<int32_t>(i));
+                if(lv_obj_get_child_count(r) != columns.size()) continue;            // ("+3 more", "No alarms")
+                lv_obj_t* l = lv_obj_get_child(r, static_cast<int32_t>(c));
+                lv_point_t size;
+                lv_text_get_size(&size, lv_label_get_text(l), lv_obj_get_style_text_font(l, LV_PART_MAIN),
+                                 lv_obj_get_style_text_letter_space(l, LV_PART_MAIN), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+                widest = std::max(widest, size.x);
+            }
+            for(uint32_t i = 0; i < n; i++) {
+                lv_obj_t* r = lv_obj_get_child(body, static_cast<int32_t>(i));
+                if(lv_obj_get_child_count(r) == columns.size()) lv_obj_set_width(lv_obj_get_child(r, static_cast<int32_t>(c)), widest);
+            }
+        }
+    }
+
+    void state_label(lv_obj_t* r, const AlarmStatus& a, lv_color_t fg)
+    {
+        // the state also in words and with a symbol: not only by colour
+        const bool unacked = !a.acked, cleared = !a.active;
+        std::string st = unacked ? std::string(LV_SYMBOL_BELL " ") + labels[cleared ? "cleared" : "unacked"]
+                       : std::string(LV_SYMBOL_OK " ") + labels["active"];
+        make_label(r, st, fg);
     }
 
     int64_t since() const { return days > 0 ? LogDb::now_ms() - static_cast<int64_t>(days) * 86400000LL : 0; }
@@ -185,18 +255,22 @@ struct ListCtx {
         if(page >= pages - 1) lv_obj_add_state(next, LV_STATE_DISABLED); else lv_obj_remove_state(next, LV_STATE_DISABLED);
         std::vector<AlarmEvent> ev = alarms().history(per, page * per, severity, since());
         if(ev.empty()) { empty_row(labels["empty"]); return; }
-        const lv_color_t fg = lv_color_hex(0x263238);
+        const lv_color_t fg = colors.history_text;
         for(const AlarmEvent& e : ev) {
-            lv_obj_t* r = row(lv_palette_lighten(LV_PALETTE_GREY, 3), LV_OPA_COVER, severity_color(e.severity));
-            if(has("time")) make_label(r, short_time(e.ts_ms, true), fg);
-            if(has("severity")) make_label(r, std::string(severity_symbol(e.severity)) + " " + alarm_text_line(e.severity, 24), fg);
-            if(has("message")) make_label(r, alarm_text_line(e.message), fg, true);
-            if(has("state")) {
-                std::string what = e.event == "raised" ? labels["raised"] : e.event == "cleared" ? labels["cleared_event"] : labels["acked_event"];
-                if(e.event == "acked" && !e.user.empty()) what += " (" + alarm_text_line(e.user, 32) + ")";
-                make_label(r, what, fg);
+            lv_obj_t* r = row(colors.history, LV_OPA_COVER, colors.of(e.severity));
+            for(const std::string& col : columns) {
+                if(col == "time") make_label(r, short_time(e.ts_ms, true), fg);
+                else if(col == "severity") make_label(r, std::string(severity_symbol(e.severity)) + " " + labels.severity(e.severity), fg);
+                else if(col == "equipment") make_label(r, alarm_text_line(alarms().equipment_of(e.name), 48), fg);
+                else if(col == "message") make_label(r, alarm_text_line(e.message), fg, true);
+                else if(col == "state") {
+                    std::string what = e.event == "raised" ? labels["raised"] : e.event == "cleared" ? labels["cleared_event"] : labels["acked_event"];
+                    if(e.event == "acked" && !e.user.empty()) what += " (" + alarm_text_line(e.user, 32) + ")";
+                    make_label(r, what, fg);
+                }
             }
         }
+        align_columns();
     }
 
     static void on_row_click(lv_event_t* e)
@@ -253,6 +327,7 @@ struct BannerCtx {
     bool        blink = true;
     bool        ack_on_tap = false;
     Labels      labels;
+    Colors      colors;
     uint64_t    seen = 0;
     bool        captured = false, on = false, lit = true;
     lv_color_t  idle_bg{}, idle_fg{};
@@ -281,9 +356,9 @@ struct BannerCtx {
                 std::string text = std::string(severity_symbol(top->severity)) + " " + short_time(top->raised_ms, false) + "  " + alarm_text_line(top->message);
                 if(list.size() > 1) text += vformat("  (+%d)", static_cast<int>(list.size() - 1));
                 lv_label_set_text(label, text.c_str());
-                lv_obj_set_style_bg_color(obj, severity_color(top->severity), 0);
+                lv_obj_set_style_bg_color(obj, colors.of(top->severity), 0);
                 lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
-                lv_obj_set_style_text_color(label, lv_color_white(), 0);
+                lv_obj_set_style_text_color(label, colors.text, 0);
                 blinking = !top->acked;
             }
             else {
@@ -330,6 +405,7 @@ lv_obj_t* build_alarm_list(lv_obj_t* parent, const json& w)
     c->severity = jstr(w, "severity", "");
     c->days = std::max(0, static_cast<int>(jnum(w, "days", 0)));
     c->labels.load(w);
+    c->colors.load(w);
     if(const json* cols = jget(w, "columns"); cols && cols->is_array()) {
         c->columns.clear();
         for(const json& col : *cols) if(col.is_string()) c->columns.push_back(col.get<std::string>());
@@ -366,7 +442,7 @@ lv_obj_t* build_alarm_list(lv_obj_t* parent, const json& w)
         if(c->severity.empty()) {
             c->severities.push_back("");
             std::string opts = c->labels["all"];
-            for(const std::string& s : alarms().severities()) { c->severities.push_back(s); opts += "\n" + alarm_text_line(s, 24); }
+            for(const std::string& s : alarms().severities()) { c->severities.push_back(s); opts += "\n" + c->labels.severity(s); }
             c->sev_dd = lv_dropdown_create(foot);
             lv_dropdown_set_options(c->sev_dd, opts.c_str());
             lv_obj_set_width(c->sev_dd, 150);
@@ -386,6 +462,7 @@ lv_obj_t* build_alarm_banner(lv_obj_t* parent, const json& w)
     c->blink = jbool(w, "blink", true);
     c->ack_on_tap = jbool(w, "ack_on_tap", false);
     c->labels.load(w);
+    c->colors.load(w);
     lv_obj_t* obj = lv_obj_create(parent);
     c->obj = obj;
     lv_obj_set_size(obj, lv_pct(100), 36);

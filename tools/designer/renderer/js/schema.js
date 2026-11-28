@@ -117,7 +117,7 @@ const SCHEMA = {
                              { k: 'labels', t: 'map', hint: 'the texts of the widget', keys: () => ['empty', 'alarm', 'count', 'time', 'day', 'week', 'month', 'all', 'by_count', 'by_time'] }] },
     alarm_list: { label: 'Alarm list', def: { w: '100%', h: 240, ack_on_tap: true },
                 props: [{ k: 'mode', t: 'select', o: ['', 'current', 'history'], empty: 'current' }, { k: 'rows', t: 'number' },
-                        { k: 'row_height', t: 'number' }, { k: 'columns', t: 'csv' }, { k: 'ack_on_tap', t: 'bool' },
+                        { k: 'row_height', t: 'number' }, { k: 'columns', t: 'csv', hint: 'in this order, from: time, severity, equipment, message, state' }, { k: 'ack_on_tap', t: 'bool' },
                         { k: 'severity', t: 'text' }, { k: 'days', t: 'number' }] },
     alarm_banner: { label: 'Alarm banner', def: { w: '100%', h: 36 },
                 props: [{ k: 'blink', t: 'bool' }, { k: 'ack_on_tap', t: 'bool' }] },

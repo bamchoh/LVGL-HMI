@@ -295,8 +295,9 @@ colours of `alarm_list`, the history rows, the write button of `recipe_table`) c
 
 - "The alarm that is active now, in 1 line" is `alarm_banner` (the newest unacknowledged one. If there is none, the `idle` text).
   "As a list" is `alarm_list`.
-- There is no "target equipment" column. Write the equipment name at the start of `message` (`"Oven: temperature high"`).
-- `columns` of `alarm_list`: choose from `time` `severity` `message` `state` (when omitted, `["time", "message", "state"]`).
+- The equipment of an alarm is `equipment` of its item in `alarms` (`"Oven 1"`); the `equipment` column shows it. In the history it is what the alarm is set to now.
+- `columns` of `alarm_list`: choose and order from `time` `severity` `equipment` `message` `state` (when omitted, `["time", "message", "state"]`).
+  The columns line up (each is as wide as its widest cell); `message` takes the rest.
   `mode`: `current` (when omitted. Active and unacknowledged) / `history` (history. Period with `days`). `rows` is the upper limit of rows shown
   (when omitted 50, for history 20), `row_height` is 40 when omitted. `ack_on_tap` is true when omitted (pressing a row acknowledges it).
 - Size: height ≈ number of rows to show × `row_height` + 16. Rows that do not fit scroll.
@@ -305,7 +306,11 @@ colours of `alarm_list`, the history rows, the write button of `recipe_table`) c
 - `labels` replaces the text inside (`"@ID"` can also be used): `unacked` `active` `cleared` `empty` (when there is not even one)
   `idle` (when there is nothing in the banner) `more` (`%d` is the number) `raised` `cleared_event` `acked_event`.
   When omitted, English (`UNACK`, `No alarms` and so on). In a Japanese project, add `labels`.
-  What appears in the `severity` column is the word written in `alarms` (`warning` and so on) as it is; it cannot be translated.
+  The `severity` column and the history's filter show the word written in `alarms` (`warning` and so on); `labels` replaces it per severity:
+  `"severity.critical": "@sev_critical"`, `"severity.warning": "@sev_warning"` (a project in another language should do this).
+- `colors` matches the colours to the project's rules (default: `critical` red, `warning` amber, `info` blue, white text, grey history):
+  `"colors": { "critical": "#c62828", "warning": "#ef6c00", "info": "#1565c0", "text": "#ffffff", "cleared": "#cfd8dc", "history": "#eceff1", "history_text": "#263238" }`.
+  On a light theme set `history` / `cleared` / `history_text` so the rows match the panels. `alarm_banner` takes the severities and `text` too.
 
 ### `trend`
 

@@ -67,7 +67,8 @@ While the value of a tag meets the condition, the alarm is raised (shown in `ala
 | `items[].tag` | Tag to watch (required) |
 | `items[].condition` | `"true"` (default. While the tag is true) / `"false"` / `"eq"` `"ne"` `"gt"` `"lt"` `"ge"` `"le"` (compared with `value` or `value_tag`) |
 | `items[].value`, `items[].value_tag` | Value to compare with (constant), or the tag to compare with (use `value_tag` to let the setpoint be changed on a screen) |
-| `items[].severity` | Severity word (default `"warning"`. Usually `"info"` `"warning"` `"critical"`). Shown as is in the column of `alarm_list` (cannot be translated) |
+| `items[].severity` | Severity word (default `"warning"`. Usually `"info"` `"warning"` `"critical"`). The word in the column of `alarm_list` can be replaced with its `labels` (`"severity.warning": "Warnung"`) |
+| `items[].equipment` | The machine or place the alarm belongs to (`"Oven 1"`, or `"@ID"` of `texts`). Shown by the `equipment` column of `alarm_list`; write it instead of putting the equipment at the start of `message` |
 | `items[].message` | Text to show (`"@ID"` can be used. If omitted, `name`) |
 | `items[].ack` | `false`: disappears from the list when the condition goes away, even without acknowledging (default true: stays until acknowledged) |
 | `items[].enabled` | `false`: not used |

@@ -679,18 +679,26 @@ const Canvas = {
     // (at least three rows, so that the three states - not acknowledged, acknowledged, cleared - are all shown)
     const rows = items.length ? Math.min(Math.max(items.length * (history ? 2 : 1), 3), Math.max(1, U.num(w.rows, history ? 20 : 50)), 6) : 0;
     if (!items.length) body.append(U.el('div', { class: 'lv-al-empty' }, lab.empty || 'No alarms'));
+    const colors = (w.colors && typeof w.colors === 'object') ? w.colors : {};
+    const sevColor = s => colors[String(s).toLowerCase()] || colors[s] || this.alarmColor(s);
+    const sevWord = s => lab['severity.' + s] != null ? M.resolveText(lab['severity.' + s]) : s;
     for (let i = 0; i < rows; i++) {
-      const a = items[i % items.length], sev = a.severity || 'warning', c = this.alarmColor(sev);
+      const a = items[i % items.length], sev = a.severity || 'warning', c = sevColor(sev);
       // current: the first is not acknowledged, the second acknowledged, the third cleared
       const kind = history ? 'hist' : ['unacked', 'active', 'cleared'][i % 3];
       const row = U.el('div', { class: 'lv-al-row lv-al-' + kind, style: { height: h + 'px', borderLeftColor: c } });
       if (kind === 'unacked') row.style.background = c;
       else if (kind === 'active') row.style.background = c + '66';
+      else if (kind === 'cleared' && colors.cleared) row.style.background = colors.cleared;
+      else if (kind === 'hist' && colors.history) row.style.background = colors.history;
+      if ((kind === 'unacked' || kind === 'active') && colors.text) row.style.color = colors.text;
+      if ((kind === 'cleared' || kind === 'hist') && colors.history_text) row.style.color = colors.history_text;
       const hh = String(10 + (i % 10)).padStart(2, '0');
       const time = history ? '11-19 ' + hh + ':0' + (i % 6) + ':12' : hh + ':0' + (i % 6) + ':12';
       for (const col of cols) {
         if (col === 'time') row.append(U.el('span', null, time));
-        else if (col === 'severity') row.append(U.el('span', null, '⚠ ' + sev));
+        else if (col === 'severity') row.append(U.el('span', null, '⚠ ' + sevWord(sev)));
+        else if (col === 'equipment') row.append(U.el('span', null, a.equipment ? String(M.resolveText(a.equipment)) : ''));
         else if (col === 'message') row.append(U.el('span', { class: 'lv-grow' }, a.message || a.name));
         else if (col === 'state') row.append(U.el('span', null, history ? (i % 2 ? (lab.cleared_event || 'cleared') : (lab.raised || 'raised'))
           : kind === 'unacked' ? '🔔 ' + (lab.unacked || 'UNACK') : kind === 'cleared' ? '🔔 ' + (lab.cleared || 'CLEARED') : '✓ ' + (lab.active || 'ACTIVE')));

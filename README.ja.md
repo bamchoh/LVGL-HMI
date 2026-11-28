@@ -2599,6 +2599,7 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | `condition`           | `true`（既定: タグがオン / 0 以外）、`false`、`eq` `ne` `gt` `lt` `ge` `le`（`==` `!=` `>` `<` `>=` `<=` も可） |
 | `value` / `value_tag` | 比較する値。`value_tag` を書くと、別のタグの現在値と比較する（設定値タグをしきい値にできる）       |
 | `severity`            | `warning`（既定）/ `critical` / `info` など。記録されるだけで、動作は変わらない                    |
+| `equipment`           | アラームが属する設備や場所（`texts` の `"@ID"` も可）。`alarm_list` の `equipment` 列に出る |
 | `message`             | 記録するメッセージ（省略時はアラーム名）                                                           |
 | `ack`                 | `true`（既定）: 確認されるまで「発生中のアラーム」に残る。`false`: 復帰すれば消える（確認は不要）    |
 | `ack_level`（全体）   | 確認に必要なユーザーレベル（既定 0 = 誰でも。ユーザー管理を使うとき）。足りなければログイン画面が出る |
@@ -2662,14 +2663,15 @@ hml_runtime --export-data-log process.csv projects/demo/project.json --group pro
 | `mode`         | `current`（既定: 発生中・未確認のアラーム、新しい順）/ `history`（記録、新しい順。ページ送りと重要度の絞り込み付き） |
 | `rows`         | `current`: 表示する最大行数（既定 50、超えた分は「+N more」）。`history`: 1 ページの行数（既定 20）     |
 | `row_height`   | 行の高さ（既定 40 px。指で押しやすい高さ）                                                             |
-| `columns`      | `time` / `severity` / `message` / `state` から選んで並べる（既定 `time, message, state`）              |
+| `columns`      | `time` / `severity` / `equipment` / `message` / `state` から選んで並べる（既定 `time, message, state`）。列はそろう: 各列はいちばん長い中身の幅になる |
 | `ack_on_tap`   | `current`: 行をタップするとそのアラームを確認する（既定 `true`）。バナーでは既定 `false`               |
 | `severity`     | その重要度だけ表示する                                                                                 |
 | `days`         | `history`: 直近 N 日だけ（既定 0 = すべて）                                                            |
 | `blink`        | バナー: 未確認の間点滅する（既定 `true`）                                                              |
-| `labels`       | 表示文字の置き換え: `unacked` `active` `cleared` `empty` `idle` `all` `more`（`%d` が件数）`raised` `cleared_event` `acked_event` |
+| `labels`       | 表示文字の置き換え: `unacked` `active` `cleared` `empty` `idle` `all` `more`（`%d` が件数）`raised` `cleared_event` `acked_event`、列と絞り込みに出る重要度の語: `severity.critical`、`severity.warning` … |
+| `colors`       | 色をプロジェクトの色の決まりに合わせる: `{ "critical": "#c62828", "warning": "#ef6c00", "info": …, "text": 色付きの行の文字, "cleared": 解除済みの行, "history": 履歴の行, "history_text": それらの文字 }`（バナーも重要度と `text` を使う） |
 
-- 色は重要度（`critical` 赤 / `warning` 琥珀 / `info` 青）、状態は塗り方（未確認 = 塗りつぶし、確認済み = 薄く、
+- 色は重要度（`critical` 赤 / `warning` 琥珀 / `info` 青、または `colors`）、状態は塗り方（未確認 = 塗りつぶし、確認済み = 薄く、
   復帰・未確認 = 灰色に色の帯）に加えて、文字とアイコンでも示します（色だけに頼らない）。
 - バナーは、いちばん新しい未確認のアラーム（なければ発生中のアラーム）と、ほかの件数を出します。`on_click` に
   アラーム画面への `goto` などを書けます。

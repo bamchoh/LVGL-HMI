@@ -2,7 +2,7 @@
 //
 //   "alarms": { "path": "logs/alarm.db", "retention_days": 90, "max_rows": 100000, "ack_level": 1,
 //     "items": [ { "name": "temp_high", "tag": "temp", "condition": "gt", "value_tag": "temp_hi",
-//                  "message": "Temperature high", "severity": "warning" },
+//                  "message": "Temperature high", "severity": "warning", "equipment": "Oven 1" },
 //                { "name": "estop", "tag": "estop", "message": "Emergency stop", "severity": "critical" },
 //                { "name": "info", "tag": "door", "ack": false } ] }
 //
@@ -38,6 +38,7 @@ struct AlarmEvent {
 // An alarm as the lists show it.
 struct AlarmStatus {
     std::string name, message, severity, value, acked_by;
+    std::string equipment;               // "equipment" of the item (texts resolved), "" when not given
     bool        active = false;
     bool        acked = true;            // nothing to acknowledge
     bool        need_ack = true;
@@ -72,6 +73,9 @@ public:
     uint64_t generation() const;
     int ack_level() const;
     std::vector<std::string> severities() const;           // used by the alarms, in definition order
+    // "equipment" of an alarm as the project defines it now (texts resolved; "" = none or unknown).
+    // The history has no column for it: its rows show what the alarm is set to now.
+    std::string equipment_of(const std::string& name) const;
 
     // Acknowledge (records "acked" with the user). false: unknown, or nothing to acknowledge.
     bool ack(const std::string& name, const std::string& user);
