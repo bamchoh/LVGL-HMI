@@ -9,7 +9,7 @@ Contents: [Template screens](#template-screens) / [Alarms](#alarms-alarms) / [Da
 [Schedules](#schedules-schedules) / [Sound](#sound-sound) /
 [Data transfer between equipment](#data-transfer-between-equipment-transfers) / [Mail](#mail-mail) / [Sending logs](#sending-logs-uploads) /
 [Remote display](#remote-display-remote) / [Long press that opens the system settings](#long-press-that-opens-the-system-settings-system_access) /
-[Basis of the look](#basis-of-the-look-display--theme--font) / [Users and levels](#users-and-levels-users) / [Screen saver](#screen-saver-screen_saver) /
+[Basis of the look](#basis-of-the-look-display--theme--font) / [Dates and numbers](#dates-and-numbers-as-the-operator-reads-them-locale) / [Users and levels](#users-and-levels-users) / [Screen saver](#screen-saver-screen_saver) /
 [Operation log and system log](#operation-log-and-system-log-operation_log--system_log) / [Send to the device](#send-to-the-device-deploy)
 
 The files listed in `screens` are relative paths **inside the project folder** only (`..`, absolute paths and drive letters are not allowed. The designer does not open it).
@@ -392,6 +392,21 @@ in `font.file` (without it, it stays English).
   On your own screens too, make "confirm, save, next" this colour, and use **red only for operations that cannot be undone and for alarms**.
 - `theme.font`: the default size of text. `font.file`: the font that shows Japanese and the like (without it, only the built-in Latin).
 - `display.touch` (`swap_axes`, `calibration`, `jitter` and so on) and `display.fbdev` / `input` are the wiring and adjustment values of that device. **Do not touch them**.
+
+## Dates and numbers as the operator reads them (`locale`)
+
+```json
+"locale": { "date": "dmy", "decimal": "," }
+```
+
+- `date`: `"ymd"` 2026-11-28 (default) / `"dmy"` 28.11.2026 / `"mdy"` 11/28/2026. `decimal`: `"."` (default) / `","`.
+- **Only when asked** ("German number format", "dates as in the US"); do not guess it from the language of the texts.
+- It changes what is shown and typed: `sys.date` / `sys.datetime`, the times of `alarm_list`, `log_view`, `trend`; the numbers of labels
+  and `numeric_display` bound to a tag, of `table` and `trend`; the number pad. Do not write `"12,5"` yourself: write the tag and its
+  `format` (`"%.1f"`) as always, the runtime puts the decimal sign.
+- It does not change what is stored (logs, CSV, tag values, Lua). Not covered yet: the scale of `meter`, the axes of `xy_chart`,
+  `recipe_table`. With a decimal comma, check the pictures for those and tell the user.
+- With `dmy` / `mdy` a date is 1 to 2 characters longer than before in lists: check the widths in the picture.
 
 ## Users and levels (`users`)
 

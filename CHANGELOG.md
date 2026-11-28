@@ -19,6 +19,9 @@ Each release lists, where there is something to say:
 - The on-screen keyboard has a key "äé" for the letters with accents of Western Europe (ä ö ü ß é è ñ ç å ø …, capitals, €), when
   the font of the project has them.
 
+- `"locale": { "date": "dmy" | "mdy", "decimal": "," }` in `project.json`: how dates and decimal numbers are written on the
+  screen and typed (28.11.2026, 12,5). What is stored and exported keeps one form.
+
 **Changed**
 
 - The header's "Apply" button of the system screens is as wide as its word; "Refresh" on the USB page is a sign.

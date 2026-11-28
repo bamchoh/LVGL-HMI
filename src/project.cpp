@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "project.hpp"
 #include "schedule.hpp"
 #include "alarm.hpp"
@@ -214,6 +215,7 @@ bool Project::load(const std::string& path)
         }
     }
 
+    set_display_locale(jget(root_, "locale"));      // how dates and numbers are written on the screen
     const json* theme = jget(root_, "theme");
     const json& t = theme ? *theme : none;
     info_.dark = jbool(t, "dark", true);
@@ -457,6 +459,7 @@ int Project::build_screens()
 
 void Project::unload()
 {
+    set_display_locale(nullptr);
     screen_saver().clear();
     system_access().clear();
     scheduler().clear();

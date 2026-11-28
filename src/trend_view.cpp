@@ -18,6 +18,7 @@
 // A slice without a sample breaks the line, except where the group would not have recorded one
 // anyway (see TrendFill): a window so short that the slices are shorter than the interval of the
 // group, or a group that records on change.
+#include "locale_fmt.hpp"
 #include "trend_view.hpp"
 #include <algorithm>
 #include <atomic>
@@ -46,16 +47,16 @@ struct Shared {                       // between the widget (UI thread) and the 
 std::string short_time(int64_t ms)
 {
     std::string t = LogDb::format_time(ms);                // YYYY-MM-DD HH:MM:SS.mmm
-    return t.size() >= 19 ? t.substr(5, 14) : t;
+    return t.size() >= 19 ? local_time_text(t.substr(5, 14)) : t;
 }
 
 std::string num(double v)
 {
-    if(std::fabs(v) >= 1e6 || (std::fabs(v) < 1e-3 && v != 0)) return vformat("%.3g", v);
+    if(std::fabs(v) >= 1e6 || (std::fabs(v) < 1e-3 && v != 0)) return local_number_text(vformat("%.3g", v));
     std::string s = vformat("%.3f", v);
     while(!s.empty() && s.back() == '0') s.pop_back();
     if(!s.empty() && s.back() == '.') s.pop_back();
-    return s == "-0" ? "0" : s;
+    return s == "-0" ? "0" : local_number_text(s);
 }
 
 constexpr int32_t kScale = 10000;      // chart values are 0..kScale of the y range

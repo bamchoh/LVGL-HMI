@@ -1,6 +1,7 @@
 // numeric_display / text_display / password_display: purpose-built data displays on top of
 // lv_textarea with confirm-on-ready input.
 #include <doctest.h>
+#include "locale_fmt.hpp"
 #include "lvgl_fixture.hpp"
 #include "ui.hpp"
 
@@ -697,4 +698,61 @@ TEST_CASE("keyboard: letters with accents are offered when the font of the proje
     }
     ui().unload_all();
     set_font_file("");
+}
+
+TEST_CASE("locale: dates and numbers as the operator reads and types them; what is stored is unchanged")
+{
+    // the functions
+    set_display_locale(nullptr);
+    CHECK(local_time_text("2026-11-28 15:50:00") == "2026-11-28 15:50:00");
+    CHECK(local_number_text("12.5 C") == "12.5 C");
+    {
+        const json de = { { "date", "dmy" }, { "decimal", "," } };
+        set_display_locale(&de);
+        CHECK(local_time_text("2026-11-28 15:50:00") == "28.11.2026 15:50:00");
+        CHECK(local_time_text("2026-11-28") == "28.11.2026");
+        CHECK(local_time_text("11-28 15:50:00") == "28.11. 15:50:00");       // (a list: without the year)
+        CHECK(local_time_text("15:50:00") == "15:50:00");
+        CHECK(local_time_text("pump_1") == "pump_1");
+        CHECK(local_number_text("12.5 C") == "12,5 C");
+        CHECK(local_number_text("-0.25") == "-0,25");
+        CHECK(local_number_text("100") == "100");
+        CHECK(local_number_text("v1.2.3") == "v1,2.3");                      // (only meant for numbers: one sign)
+        CHECK(local_number_text("ok.") == "ok.");
+        CHECK(plain_number_text("12,5") == "12.5");
+        CHECK(plain_number_text("-7") == "-7");
+        const json us = { { "date", "mdy" } };
+        set_display_locale(&us);
+        CHECK(local_time_text("2026-11-28 15:50:00") == "11/28/2026 15:50:00");
+        CHECK(local_time_text("11-28 15:50") == "11/28 15:50");
+        CHECK(local_number_text("12.5") == "12.5");
+    }
+
+    // on a screen: a decimal comma is shown, typed and read; the tag holds the number
+    const json de = { { "date", "dmy" }, { "decimal", "," } };
+    set_display_locale(&de);
+    {
+        Runtime rt;
+        Tag* sp = rt.tag("sp", TagType::Float, 10);
+        rt.tag("name", TagType::String, 0)->set_string("v1.2", nullptr);
+        lv_obj_t* s = build_widgets(J(R"json([
+            { "type": "numeric_display", "bind": "sp", "input": true, "decimals": 1, "unit": " rpm", "min": 0, "max": 100 },
+            { "type": "label", "bind": { "text": { "tag": "sp", "format": "%.2f bar" } } },
+            { "type": "label", "bind": "name" }
+        ])json"));
+        rt.pump();
+        lv_obj_t* in = nth(s, 0);
+        CHECK(ta_text(in) == "10,0 rpm");
+        CHECK(std::string(lv_label_get_text(nth(s, 1))) == "10,00 bar");
+        CHECK(std::string(lv_label_get_text(nth(s, 2))) == "v1.2");            // (a text is not a number)
+        type_and_confirm(in, "42,26");
+        CHECK(sp->get_number() == doctest::Approx(42.26));
+        CHECK(ta_text(in) == "42,3 rpm");
+        type_and_confirm(in, "7.5");                                        // (a point is still read)
+        CHECK(sp->get_number() == doctest::Approx(7.5));
+        rt.pump();
+        CHECK(std::string(lv_label_get_text(nth(s, 1))) == "7,50 bar");
+        CHECK(sp->get().format() == "7.5");                                 // what is stored and passed on: as before
+    }
+    set_display_locale(nullptr);
 }

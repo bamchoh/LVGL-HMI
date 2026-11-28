@@ -4,6 +4,7 @@
 // settings is behind "users.system_level", a change is in the operation log.
 #include <algorithm>
 #include <ctime>
+#include "locale_fmt.hpp"
 #include "logdb.hpp"
 #include "schedule.hpp"
 #include "system_settings.hpp"
@@ -68,7 +69,7 @@ public:
             std::string next;
             if(s) {
                 if(!s->enabled) next = "off";
-                else if(auto t = schedule_next_due(*s, now)) { const std::string full = LogDb::format_time(*t * 1000); next = "Next " + (full.size() >= 16 ? full.substr(5, 11) : full); }
+                else if(auto t = schedule_next_due(*s, now)) { const std::string full = LogDb::format_time(*t * 1000); next = "Next " + local_time_text(full.size() >= 16 ? full.substr(5, 11) : full); }
                 else next = "done";
             }
             info("x" + k, next);

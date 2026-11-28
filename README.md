@@ -1376,6 +1376,27 @@ The runtime keeps the date and time of the device in three string tags, for a cl
 - Another layout (`13:05`, the day of the week): a string tag of the project and an interval script, `tag.clock = os.date("%H:%M")`.
 - `--check --render` draws the time it is run at; `--set "sys.datetime=2026-11-22 08:30:00"` draws a fixed one (each tag is set on its own).
 
+## Dates and numbers on the screen (`locale`)
+
+How a date and a decimal number are written differs from country to country. `locale` sets it for what an operator reads and types:
+
+```json
+"locale": { "date": "dmy", "decimal": "," }
+```
+
+| Key | Values |
+| --- | --- |
+| `date` | `"ymd"` 2026-11-28 (default) / `"dmy"` 28.11.2026 / `"mdy"` 11/28/2026 |
+| `decimal` | `"."` (default) / `","` |
+
+- **Changed**: the clock (`sys.date`, `sys.datetime`, the head of the system screens), the times in the alarm list, the log view, the
+  trend, the schedule page and in mails (`{time}`); the numbers of labels and numeric displays that are bound to a tag, of tables and
+  of the trend; and what is typed into a number field - the number pad has the decimal sign of the locale, and a point is still read.
+- **Not changed** - one form everywhere, so that a file from one device reads on another: the databases and CSV exports, file names,
+  the values of tags, what Lua sees, `project.json`, the value a `datetime_input` writes into its tag.
+- Not yet: the scale of `meter`, the axes of `xy_chart`, the values of `recipe_table`, the order of the rollers of `datetime_input`,
+  a 12-hour clock.
+
 ## Schedules (actions that run by the clock)
 
 At a set time, the runtime runs the same actions as a button on a screen. Typical uses: enable operation at the start of work, switch the lights off at night,

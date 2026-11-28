@@ -1,3 +1,4 @@
+#include "locale_fmt.hpp"
 #include "clock_tags.hpp"
 #include <cstdio>
 #include <string>
@@ -29,9 +30,10 @@ void update_clock_tags(std::time_t now)
     char date[16], time[16];
     std::snprintf(date, sizeof date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
     std::snprintf(time, sizeof time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
-    set_text("sys.date", date);
+    // (as the operator reads a date: "locale" of project.json. The time of day has one form)
+    set_text("sys.date", local_time_text(date));
     set_text("sys.time", time);
-    set_text("sys.datetime", std::string(date) + " " + time);
+    set_text("sys.datetime", local_time_text(std::string(date) + " " + time));
 }
 
 void poll_clock_tags()
