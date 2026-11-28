@@ -1,6 +1,6 @@
 # Tsukuraku (ツクラク) — HMI screens drawn by an AI
 
-**English** | [日本語](README.ja.md)
+**English** | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
 [![CI](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml/badge.svg)](https://github.com/bamchoh/tsukuraku/actions/workflows/ci.yml)
 

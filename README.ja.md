@@ -1,6 +1,6 @@
 # ツクラク (Tsukuraku) — AI が作画する HMI
 
-[English](README.md) | **日本語**
+[English](README.md) | **日本語** | [简体中文](README.zh-CN.md)
 
 > 英語版（[README.md](README.md)）が基準です。この日本語版は訳で、内容が食い違うときは英語版が正しいものとします。
 
