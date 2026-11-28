@@ -2957,9 +2957,10 @@ and publishes it. "Run workflow" on that workflow builds the same packages witho
 
 ## Code signing policy
 
-**Status: not in place yet.** The Windows programs of the releases so far carry no code-signing certificate. We are applying
-for the free code signing that SignPath Foundation offers to open-source projects; this section is the policy we will follow
-when it is granted, and it will say so here.
+**Status: not in place yet.** The Windows programs of the releases so far carry no code-signing certificate. The project is
+new; we plan to apply for the free code signing that SignPath Foundation offers to open-source projects once it has users to
+show. This section is the policy we will follow then, and it will say here when signing has begun. Until then, check a download
+by its attestation (see "Releases").
 
 Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
