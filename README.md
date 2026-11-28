@@ -14,6 +14,8 @@ connected to PLCs over Modbus, SLMP (MELSEC), FINS (OMRON), OPC UA and MQTT.
 
 The name is *tsukuru* (作る, to make) + *raku* (楽, easy).
 
+**New here? [The first five minutes](docs/quickstart.md)**: download, open the demo, let an AI make a screen. Version 0.x - see [Versions](#versions).
+
 | | | |
 | --- | --- | --- |
 | ![Production: meters, an XY chart, a table](docs/images/demo_production_en.png) | ![Reports: a log view and the alarm summary](docs/images/demo_reports_en.png) | ![Planner: date and time, data transfer, sound, mail](docs/images/demo_planner_en.png) |
@@ -2943,6 +2945,22 @@ shows it on System > About. The binaries are not signed (#153).
 Making a release: push a tag `v1.2.3`. `.github/workflows/release.yml` builds the three packages (`tools/package.py` puts them
 together), and makes a **draft** release with the files and their checksums - it is public only after somebody looks at the draft
 and publishes it. "Run workflow" on that workflow builds the same packages without a release, to try it.
+
+## Versions
+
+Tsukuraku is at **0.x: it works and it is used, and it still changes**. The numbers follow [Semantic Versioning](https://semver.org):
+
+| Version | What it means |
+| --- | --- |
+| `0.MINOR.PATCH` (now) | Work in progress. A new `MINOR` (0.1 → 0.2) may change how something behaves or is written; the changelog says what, under "Changed". A new `PATCH` (0.1.0 → 0.1.1) only fixes things |
+| `0.2.0-rc.1` | A candidate for 0.2.0, to try before it is released |
+| `1.0.0` and later | A promise: a project that works with 1.x keeps working with every later 1.x; only 2.0 may break it |
+
+What "works with" covers: the project files (`project.json`, the screens, `.hmlproj`), the command line of the runtime, the settings
+a device keeps (`project.local.json`, its keys), and the Direct deploy between a designer and a device of the same `MINOR`.
+Until 1.0, keep the designer and the runtimes of your devices at the same version: Deploy can send the runtime along.
+
+[CHANGELOG.md](CHANGELOG.md) lists what changed. Releases of 0.x are marked "pre-release" on GitHub.
 
 ## License
 

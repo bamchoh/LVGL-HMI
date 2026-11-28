@@ -135,5 +135,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft --title "Tsukuraku ${GITHUB_REF_NAME#v}" --generate-notes \
+          # 0.x ("it still changes") and anything with a suffix (v1.2.0-rc.1) is a pre-release:
+          # GitHub shows it as such and does not offer it as "the latest release"
+          pre=""; case "$GITHUB_REF_NAME" in v0.*|*-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft $pre --title "Tsukuraku ${GITHUB_REF_NAME#v}" --generate-notes \
             --notes "Downloads: **windows-x64.zip** is the designer and the runtime for a PC (unpack, start hml_designer.exe). **linux-aarch64.tar.gz** is the runtime for a Raspberry Pi (64-bit Raspberry Pi OS 12 or later), **linux-x64.tar.gz** the runtime for a PC with Linux (framebuffer). Each has examples/ and the licences. SHA256SUMS.txt has the checksums. The binaries are not signed."
