@@ -6,6 +6,7 @@
 #include "lvgl_fixture.hpp"
 #include "operation_log.hpp"
 #include "project.hpp"
+#include "texts.hpp"
 #include "users.hpp"
 
 #include <atomic>
@@ -378,6 +379,89 @@ TEST_CASE("alarm widgets: empty list, more than fit, history pages, deleting the
     CHECK(std::string(lv_label_get_text(lv_obj_get_child(foot, 1))) == "1 / 3");
 
     ui().unload_all();                                       // the widgets' timers go with them
+    rt.advance(600);
+    alarms().ack_all("");
+    rt.advance(600);
+}
+
+TEST_CASE("alarm list: the equipment column, colours per severity, the words of the severities (#130)")
+{
+    Runtime rt;
+    TempDir t;
+    rt.tag("temp", TagType::Float, 0);
+    rt.tag("door", TagType::Bool, 0);
+    rt.tag("note", TagType::Bool, 0);
+    texts().load(json::parse(R"~({ "texts": { "oven": { "en": "Oven 1" } } })~"));
+    json cfg = J(R"~({ "items": [
+        { "name": "hot",  "tag": "temp", "condition": "gt", "value": 50, "message": "Too hot", "severity": "critical", "equipment": "@oven" },
+        { "name": "door", "tag": "door", "message": "Door open", "severity": "warning", "equipment": "Line A" },
+        { "name": "note", "tag": "note", "message": "Note", "severity": "info" } ] })~");
+    REQUIRE(alarms().load(&cfg, t.base()) == 3);
+    CHECK(alarms().equipment_of("hot") == "Oven 1");          // "@ID" of texts
+    CHECK(alarms().equipment_of("note").empty());
+    CHECK(alarms().equipment_of("nope").empty());
+    lv_obj_t* s = show("eq", J(R"~([
+        { "type": "alarm_list", "columns": ["equipment", "severity", "message"],
+          "labels": { "severity.critical": "Stoerung", "severity.warning": "Warnung" },
+          "colors": { "critical": "#112233", "text": "#fefefe", "cleared": "#445566", "history_text": "#010203" } },
+        { "type": "alarm_list", "mode": "history", "columns": ["equipment", "severity", "message", "time"],
+          "labels": { "severity.warning": "Warnung" }, "colors": { "history": "#778899", "warning": "#aabbcc" } } ])~"));
+    tags().find("temp")->set_number(60, nullptr);
+    tags().find("door")->set_number(1, nullptr);
+    tags().find("note")->set_number(1, nullptr);
+    rt.advance(300);
+    lv_obj_t* cur = body_of(lv_obj_get_child(s, 0));
+    REQUIRE(lv_obj_get_child_count(cur) == 3);
+    // in the order of "columns"; the words of labels; an alarm without equipment has an empty cell
+    std::vector<std::string> rows;
+    for(uint32_t i = 0; i < 3; i++) rows.push_back(text_of_row(lv_obj_get_child(cur, static_cast<int32_t>(i))));
+    auto has_row = [&](const std::string& want) { return std::find(rows.begin(), rows.end(), want) != rows.end(); };
+    CHECK(has_row("Oven 1|" LV_SYMBOL_WARNING " Stoerung|Too hot"));
+    CHECK(has_row("Line A|" LV_SYMBOL_WARNING " Warnung|Door open"));
+    CHECK(has_row("|" LV_SYMBOL_BELL " info|Note"));          // no label for info: the word as the alarms write it
+    // the columns line up: every equipment cell (and every severity cell) is as wide as the widest
+    for(int32_t col = 0; col < 2; col++) {
+        const int32_t w0 = lv_obj_get_style_width(lv_obj_get_child(lv_obj_get_child(cur, 0), col), LV_PART_MAIN);
+        CHECK(w0 > 0);
+        for(int32_t i = 1; i < 3; i++) CHECK(lv_obj_get_style_width(lv_obj_get_child(lv_obj_get_child(cur, i), col), LV_PART_MAIN) == w0);
+    }
+    // the colour of the critical row (not acknowledged: filled) and its text
+    lv_obj_t* hot = nullptr;
+    for(uint32_t i = 0; i < 3; i++) if(rows[i].rfind("Oven 1", 0) == 0) hot = lv_obj_get_child(cur, static_cast<int32_t>(i));
+    REQUIRE(hot);
+    CHECK(lv_color_to_u32(lv_obj_get_style_bg_color(hot, LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0x112233)));
+    CHECK(lv_color_to_u32(lv_obj_get_style_text_color(lv_obj_get_child(hot, 0), LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0xfefefe)));
+    // cleared and not acknowledged: the "cleared" colour, the "history_text" text
+    tags().find("temp")->set_number(20, nullptr);
+    rt.advance(300);
+    lv_obj_t* cleared = nullptr;
+    for(uint32_t i = 0; i < lv_obj_get_child_count(cur); i++)
+        if(text_of_row(lv_obj_get_child(cur, static_cast<int32_t>(i))).rfind("Oven 1", 0) == 0) cleared = lv_obj_get_child(cur, static_cast<int32_t>(i));
+    REQUIRE(cleared);
+    CHECK(lv_color_to_u32(lv_obj_get_style_bg_color(cleared, LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0x445566)));
+    CHECK(lv_color_to_u32(lv_obj_get_style_text_color(lv_obj_get_child(cleared, 0), LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0x010203)));
+
+    // the history: equipment as the alarm is set now, the colours of its rows, the words in the filter
+    lv_obj_t* hist = lv_obj_get_child(s, 1);
+    lv_obj_t* hb = body_of(hist);
+    REQUIRE(lv_obj_get_child_count(hb) >= 4);
+    bool door_seen = false;
+    for(uint32_t i = 0; i < lv_obj_get_child_count(hb); i++) {
+        lv_obj_t* r = lv_obj_get_child(hb, static_cast<int32_t>(i));
+        CHECK(lv_color_to_u32(lv_obj_get_style_bg_color(r, LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0x778899)));
+        const std::string row = text_of_row(r);
+        if(row.rfind("Line A|" LV_SYMBOL_WARNING " Warnung|Door open|", 0) == 0) {
+            door_seen = true;
+            CHECK(lv_color_to_u32(lv_obj_get_style_border_color(r, LV_PART_MAIN)) == lv_color_to_u32(lv_color_hex(0xaabbcc)));
+        }
+    }
+    CHECK(door_seen);
+    std::string o = lv_dropdown_get_options(lv_obj_get_child(lv_obj_get_child(hist, 1), 3));
+    CHECK(o.find("Warnung") != std::string::npos);
+    CHECK(o.find("critical") != std::string::npos);          // no label for it in this widget
+
+    ui().unload_all();
+    texts().clear();
     rt.advance(600);
     alarms().ack_all("");
     rt.advance(600);

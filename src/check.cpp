@@ -237,6 +237,7 @@ struct Checker {
             if(type == "meter") own.insert("zones");
             if(type == "table") { own.insert("columns"); own.insert("rows"); }
             if(type == "xy_chart") own.insert("series");
+            if(type == "alarm_list" || type == "alarm_banner") own.insert("colors");   // (an object: colours per severity)
         }
         for(auto it = w.begin(); it != w.end(); ++it) {
             const std::string& k = it.key();

@@ -12,7 +12,7 @@ namespace {
 enum class Cond { True, False, Eq, Ne, Gt, Lt, Ge, Le };
 
 struct Alarm {
-    std::string name, message, severity;
+    std::string name, message, severity, equipment;
     Tag*        tag = nullptr;
     Cond        cond = Cond::True;
     bool        value_is_str = false;
@@ -60,6 +60,7 @@ struct Alarm {
     {
         AlarmStatus s;
         s.name = name; s.message = texts().resolve(message); s.severity = severity; s.value = value; s.acked_by = acked_by;
+        s.equipment = equipment.empty() ? "" : texts().resolve(equipment);
         s.active = active; s.acked = acked; s.need_ack = need_ack;
         s.raised_ms = raised_ms; s.cleared_ms = cleared_ms; s.acked_ms = acked_ms; s.seq = seq;
         return s;
@@ -230,6 +231,7 @@ int Alarms::load(const json* section, const std::string& base_dir, bool read_onl
             }
             a->message = jstr(aj, "message", a->name);
             a->severity = jstr(aj, "severity", "warning");
+            a->equipment = jstr(aj, "equipment", "");
             a->need_ack = jbool(aj, "ack", true);
 
             Alarm* raw = a.get();
@@ -290,6 +292,12 @@ std::vector<std::string> Alarms::severities() const
     std::vector<std::string> out;
     for(const auto& a : impl_->items) if(std::find(out.begin(), out.end(), a->severity) == out.end()) out.push_back(a->severity);
     return out;
+}
+
+std::string Alarms::equipment_of(const std::string& name) const
+{
+    for(const auto& a : impl_->items) if(a->name == name) return a->equipment.empty() ? "" : texts().resolve(a->equipment);
+    return "";
 }
 
 bool Alarms::ack(const std::string& name, const std::string& user)

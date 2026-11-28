@@ -2608,6 +2608,7 @@ and when the alarm is acknowledged (`acked`).
 | `condition`           | `true` (default: the tag is on / not 0), `false`, `eq` `ne` `gt` `lt` `ge` `le` (`==` `!=` `>` `<` `>=` `<=` are accepted too) |
 | `value` / `value_tag` | The value to compare with. With `value_tag`, the comparison is with the current value of another tag (a setpoint tag can be the threshold) |
 | `severity`            | `warning` (default) / `critical` / `info` and so on. It is only recorded; the behavior does not change |
+| `equipment`           | The machine or place the alarm belongs to (`"@ID"` of `texts` works). Shown by the `equipment` column of `alarm_list` |
 | `message`             | The message to record (omitted: the name of the alarm)                                             |
 | `ack`                 | `true` (default): stays in the "active alarms" until it is acknowledged. `false`: disappears when it clears (no acknowledgment needed) |
 | `ack_level` (for all) | The user level needed to acknowledge (default 0 = anybody. For use with "Users"). If it is not enough, the login screen appears |
@@ -2671,14 +2672,15 @@ It counts from the alarm log on the spot.
 | `mode`         | `current` (default: the active and the unacknowledged alarms, newest first) / `history` (the records, newest first. With paging and a severity filter) |
 | `rows`         | `current`: the maximum number of rows shown (default 50, the rest as "+N more"). `history`: the rows of one page (default 20) |
 | `row_height`   | The height of a row (default 40 px. A height that is easy to press with a finger)                      |
-| `columns`      | Chosen and ordered from `time` / `severity` / `message` / `state` (default `time, message, state`)     |
+| `columns`      | Chosen and ordered from `time` / `severity` / `equipment` / `message` / `state` (default `time, message, state`). The columns line up: each is as wide as its widest cell |
 | `ack_on_tap`   | `current`: a tap on a row acknowledges that alarm (default `true`). For the banner the default is `false` |
 | `severity`     | Shows that severity only                                                                               |
 | `days`         | `history`: the last N days only (default 0 = all)                                                      |
 | `blink`        | Banner: blinks while unacknowledged (default `true`)                                                   |
-| `labels`       | Replaces the displayed texts: `unacked` `active` `cleared` `empty` `idle` `all` `more` (`%d` is the count) `raised` `cleared_event` `acked_event` |
+| `labels`       | Replaces the displayed texts: `unacked` `active` `cleared` `empty` `idle` `all` `more` (`%d` is the count) `raised` `cleared_event` `acked_event`, and the word of a severity in the column and the filter: `severity.critical`, `severity.warning`, ... |
+| `colors`       | The colours, to match the colours of the project: `{ "critical": "#c62828", "warning": "#ef6c00", "info": ..., "text": text on a coloured row, "cleared": a cleared row, "history": a row of the history, "history_text": text on those }` (the banner takes the severities and `text` too) |
 
-- The color is the severity (`critical` red / `warning` amber / `info` blue); the state is shown by the fill (unacknowledged = filled, acknowledged = faint,
+- The color is the severity (`critical` red / `warning` amber / `info` blue, or `colors`); the state is shown by the fill (unacknowledged = filled, acknowledged = faint,
   cleared and unacknowledged = grey with a color band) and also by text and an icon (it does not rely on color alone).
 - The banner shows the newest unacknowledged alarm (or an active alarm if there is none) and the number of the others. `on_click` can
   hold a `goto` to the alarm screen and the like.

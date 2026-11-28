@@ -17,6 +17,9 @@ Each release lists, where there is something to say:
 - `README.zh-CN.md`: an overview in Simplified Chinese (also in the packages), with the video in Chinese.
 - `trend`: a name for each line in the legend (`"tags": [{ "tag": "p", "label": "Pressure" }]`), and `"legend": false`.
 
+- Alarms (#130): `equipment` of an alarm and an `equipment` column in `alarm_list`; `colors` of `alarm_list` / `alarm_banner` (per severity,
+  the text, the cleared and the history rows); `labels` `"severity.<name>"` translates the severity words. The columns of the list line up.
+
 **Fixed**
 
 - `trend`: a legend that did not fit next to the buttons was cut off (at the documented smallest width of 400, even a short tag name). It goes on a
