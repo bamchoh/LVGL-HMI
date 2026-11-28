@@ -7,7 +7,7 @@ two example projects, and the licences. Used by .github/workflows/release.yml; c
 
 windows: hml_designer.exe and hml_runtime.exe with designer/, skills/, fonts/, icons/
 linux:   hml_runtime with tools/rpi (the systemd units and scripts for a Raspberry Pi)
-both:    examples/ (projects/demo, projects/lcd35), README.md, README.ja.md, CHANGELOG.md, docs/, LICENSE, NOTICE and
+both:    examples/ (projects/demo, projects/lcd35), README.md, README.ja.md, README.zh-CN.md, CHANGELOG.md, docs/, LICENSE, NOTICE and
          licenses/ - the licence text of every third-party component that the build downloaded
          (taken from <build>/_deps/<name>-src), which has to go along with the binaries.
 """
@@ -87,7 +87,7 @@ def main():
 
     for p in ('demo', 'lcd35'):
         copy_tree(os.path.join(ROOT, 'projects', p), os.path.join(out, 'examples', p))
-    for f in ('README.md', 'README.ja.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE', 'SECURITY.md'):
+    for f in ('README.md', 'README.ja.md', 'README.zh-CN.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE', 'SECURITY.md'):
         shutil.copyfile(os.path.join(ROOT, f), os.path.join(out, f))
     # the README links to docs/ (the quick start and its pictures)
     copy_tree(os.path.join(ROOT, 'docs'), os.path.join(out, 'docs'))
