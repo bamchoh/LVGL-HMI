@@ -219,7 +219,7 @@ TEST_CASE("table: --check takes its keys and finds a wrong row, cell and tag")
         return all;
     };
     CHECK(problems(R"({ "type": "table", "header": false, "columns": [ "A", { "title": "B", "width": 80, "align": "right" } ],
-                        "rows": [ [ "x", { "tag": "t", "format": "%.1f", "map": { "0": "zero" } } ], [ 1, 2.5, true ] ], "level": 1 })") == "");
+                        "rows": [ [ "x", { "tag": "t", "format": "%.1f", "map": { "0": "zero" } } ], [ 1, 2.5, true ] ] })") == "");
     const std::string out = problems(R"({ "type": "table", "columns": "A,B", "rows": [ "x", [ { "tag": "nope" }, { "text": "t" }, { "tag": "t", "colour": "red" } ] ] },
                                         { "type": "table", "rows": {}, "row": [] })");
     CHECK(out.find("children[0] (table): columns: a list is needed") != std::string::npos);

@@ -161,10 +161,11 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
         hml::ui().init(nullptr, hml::AppCallbacks{ [] {}, [] {}, [](hml::RestartTarget) {} });
         hml::system_settings().register_actions();
         hml::register_user_actions();
+        std::vector<std::pair<std::string, std::string>> late_sets;
         for(const auto& [name, value] : sets) {
             hml::Tag* t = hml::tags().find(name);
             auto v = t ? hml::Value::parse(t->type(), value) : std::nullopt;
-            if(!t) notes.push_back("--set: unknown tag \"" + name + "\"");
+            if(!t) late_sets.emplace_back(name, value);          // (sys.recipe.*, sys.alarm.*: made below)
             else if(!v) notes.push_back("--set: \"" + value + "\" is not a value for " + name);
             else t->set(*v, nullptr);
         }
@@ -174,6 +175,13 @@ int run_check(const std::string& project_path, const std::vector<Render>& render
         const std::filesystem::path scratch = std::filesystem::temp_directory_path(ec) / ("hml-check-" + std::to_string(hml::LogDb::now_ms()));
         std::filesystem::create_directories(scratch, ec);
         hml::project().start_logs(false, scratch.generic_u8string());
+        for(const auto& [name, value] : late_sets) {
+            hml::Tag* t = hml::tags().find(name);
+            auto v = t ? hml::Value::parse(t->type(), value) : std::nullopt;
+            if(!t) notes.push_back("--set: unknown tag \"" + name + "\"");
+            else if(!v) notes.push_back("--set: \"" + value + "\" is not a value for " + name);
+            else t->set(*v, nullptr);
+        }
         {   // the settings of the drivers, read by the drivers themselves (addresses ...); nothing connects
             hml::DriverRegistry reg;
             reg.register_builtins();

@@ -175,7 +175,11 @@ struct TableCtx {
             lv_obj_t* btn = lv_button_create(list);
             lv_obj_set_size(btn, lv_pct(100), row_h);
             if(r.name == b.selected) lv_obj_add_state(btn, LV_STATE_CHECKED);
-            else lv_obj_set_style_bg_opa(btn, LV_OPA_20, 0);
+            else {
+                // (a faint background: the white text of a button would be white on nearly white with a light theme)
+                lv_obj_set_style_bg_opa(btn, LV_OPA_20, 0);
+                lv_obj_set_style_text_color(btn, lv_obj_get_style_text_color(list, LV_PART_MAIN), 0);
+            }
             lv_obj_t* l = lv_label_create(btn);
             lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
             lv_obj_set_width(l, lv_pct(100));

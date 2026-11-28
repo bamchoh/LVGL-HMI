@@ -42,7 +42,8 @@ struct Checker {
     std::set<std::string> tags, screens, popups, scripts, texts, languages, books;
     std::map<std::string, std::string> tag_types;                 // name -> "bool" / "int" / "float" / "string"
     std::map<std::string, std::set<std::string>> groups;      // data log group -> its tags (empty = all)
-    bool has_texts = false, has_alarms = false;
+    bool has_texts = false, has_alarms = false, has_users = false;
+    bool level_said = false;                                   // "level without users" is said once, where it is first seen
     std::set<std::string> log_sections;                       // "system" / "operation": the project records that log
     std::string file;                                          // the file being read
 
@@ -246,6 +247,14 @@ struct Checker {
             else if(!(common.count(k) || own.count(k) || (screen ? screen_keys.count(k) : any.count(k))))
                 add(where, "unknown key \"" + k + "\" (ignored by the runtime)");
         }
+        // A level needs users: without "users" it is not looked at - and all of them start to act
+        // the day "users" is added. Said once, with the place of the first.
+        if(!has_users && !level_said && jnum(w, "level", 0) > 0) {
+            level_said = true;
+            add(where, "\"level\" does nothing: the project has no \"users\" (everybody may do everything). Every \"level\" of the project starts to act when \"users\" is added");
+        }
+        // (a screen below the level always opens the login screen: there is nothing to choose)
+        if(screen && w.contains("level_deny")) add(where, "\"level_deny\" is for widgets; a screen with a \"level\" opens the login screen");
         if(screen) return;
 
         if(const json* an = jget(w, "animate")) check_animate(where, type, *an);
@@ -435,6 +444,7 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(const json* rc = jget(root, "recipes")) if(const json* bs = jget(*rc, "books"); bs && bs->is_array())
         for(const json& b : *bs) c.books.insert(jstr(b, "name", ""));
     if(const json* al = jget(root, "alarms")) c.has_alarms = al->is_object() && jget(*al, "items");
+    if(const json* us = jget(root, "users")) c.has_users = us->is_object() && jbool(*us, "enabled", true);
     for(const char* n : { "system", "operation" })
         if(const json* sec = jget(root, (std::string(n) + "_log").c_str()); sec && sec->is_object() && jbool(*sec, "enabled", true)) c.log_sections.insert(n);
     if(const json* f = jget(root, "font")) {
