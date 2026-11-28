@@ -756,6 +756,7 @@ struct Host {
     fs::path exe, renderer, runtime, settings_path;
     fs::path fonts;                    // fonts shipped with the designer (<exe dir>/fonts), or empty
     fs::path icons;                    // preset icons shipped with the designer (<exe dir>/icons), or empty
+    std::vector<fs::path> font_dirs_europe;   // where NotoSans-subset.ttf may be
     fs::path skill;                    // the AI skill shipped with the designer (<exe dir>/skills/hml-screens), or empty
     std::string argv_project;
     json settings = json::object();
@@ -908,18 +909,28 @@ struct Host {
 
     // Put the font that comes with the designer into a project: assets/fonts/<file> and its
     // license next to it. Returns the path to write into "font": { "file": ... }.
-    json add_font(const std::string& project_dir)
+    // which: "ja" = Noto Sans JP (Japanese; it has the letters of Western Europe too), "europe" =
+    // Noto Sans (accented Latin of all of Europe, Greek, Cyrillic, the euro sign; small).
+    json add_font(const std::string& project_dir, const std::string& which = "ja")
     {
-        static const char* kFile = "NotoSansJP-subset.otf";
-        if(fonts.empty()) return err("no font was found next to the designer");
-        const fs::path to = upath(project_dir) / "assets" / "fonts";
+        const bool europe = which == "europe";
+        const char* file = europe ? "NotoSans-subset.ttf" : "NotoSansJP-subset.otf";
+        const char* license = europe ? "OFL-NotoSans.txt" : "OFL.txt";
+        // (the two are looked for apart: in a source tree they are in two folders)
+        fs::path from = fonts;
         std::error_code ec;
+        if(europe) {
+            from.clear();
+            for(const fs::path& c : font_dirs_europe) if(fs::exists(c / file, ec)) { from = c; break; }
+        }
+        if(from.empty() || !fs::exists(from / file, ec)) return err("no font was found next to the designer");
+        const fs::path to = upath(project_dir) / "assets" / "fonts";
         fs::create_directories(to, ec);
-        for(const char* name : { kFile, "OFL.txt" }) {
-            fs::copy_file(fonts / name, to / name, fs::copy_options::overwrite_existing, ec);
+        for(const char* name : { file, license }) {
+            fs::copy_file(from / name, to / name, fs::copy_options::overwrite_existing, ec);
             if(ec) return err(std::string("cannot copy ") + name + " into " + ustr(to) + ": " + ec.message());
         }
-        return json{ { "ok", true }, { "rel", std::string("assets/fonts/") + kFile } };
+        return json{ { "ok", true }, { "rel", std::string("assets/fonts/") + file } };
     }
 
     // Put the preset icons that come with the designer into a project: assets/icons/<size>/<name>.png
@@ -1739,7 +1750,7 @@ struct Host {
             return project_stamp(str(a, 0), a.size() > 1 ? a[1] : json::array()).dump(-1, ' ', false, json::error_handler_t::replace);
         });
         w->bind("hml_openFolder", [this, args_of, str](const std::string& req) { return open_folder(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
-        w->bind("hml_addFont", [this, args_of, str](const std::string& req) { return add_font(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
+        w->bind("hml_addFont", [this, args_of, str](const std::string& req) { return add_font(str(args_of(req), 0), str(args_of(req), 1)).dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_addIcons", [this, args_of, str](const std::string& req) { return add_icons(str(args_of(req), 0)).dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_installSkill", [this](const std::string&) { return install_skill().dump(-1, ' ', false, json::error_handler_t::replace); });
         w->bind("hml_writeFiles", [this, args_of, str](const std::string& req) {
@@ -1995,6 +2006,10 @@ int app_main(const std::vector<std::string>& args)
         font_dirs.push_back(upath(HML_DESIGNER_FONTS_DIR));
 #endif
         for(const auto& c : font_dirs) if(fs::exists(c / "NotoSansJP-subset.otf", ec)) { h.fonts = fs::absolute(c); break; }
+        h.font_dirs_europe = { exe_dir() / "fonts" };
+#ifdef HML_DESIGNER_EUROPE_FONTS_DIR
+        h.font_dirs_europe.push_back(upath(HML_DESIGNER_EUROPE_FONTS_DIR));
+#endif
         std::vector<fs::path> icon_dirs{ exe_dir() / "icons" };
 #ifdef HML_DESIGNER_ICONS_DIR
         icon_dirs.push_back(upath(HML_DESIGNER_ICONS_DIR));

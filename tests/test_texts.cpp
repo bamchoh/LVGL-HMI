@@ -298,3 +298,22 @@ TEST_CASE("font: cmap parsing refuses broken data without reading past it")
         cm.parse(v.data(), v.size(), &err);
     }
 }
+
+TEST_CASE("font: the one for European languages that comes with the designer has the letters")
+{
+    Runtime rt;
+    const std::string file = (hmltest::source_dir() / "tools" / "designer" / "fonts" / "NotoSans-subset.ttf").generic_string();
+    set_font_file(file);
+    CHECK(font_file_has("äöüÄÖÜß éèêçœ ñ¿¡ åøæ"));
+    CHECK(font_file_has("ąćęłńśźż čďěňřšťůž őű ğışİ ășț āēīūėįų"));
+    CHECK(font_file_has("Привет мир ЖЩЫ"));
+    CHECK(font_file_has("Καλημέρα Ω"));
+    CHECK(font_file_has("5 € £ ± × ÷ µ ‰ ™ – — … °"));
+    CHECK_FALSE(font_file_has("温度"));                              // (not a font for Japanese)
+    const lv_font_t* f = font_of_size(16);
+    REQUIRE(f);
+    lv_font_glyph_dsc_t g;
+    CHECK(lv_font_get_glyph_dsc(f, &g, 0x00FC /* ü */, 0));
+    CHECK(g.adv_w > 0);
+    set_font_file("");
+}

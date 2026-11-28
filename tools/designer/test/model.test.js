@@ -1916,3 +1916,16 @@ test('M presets: a ready-made button comes with what it does', () => {
   // and nothing of it is a problem
   deq(M.problems().filter(p => /on_click|button/.test(JSON.stringify(p))), []);
 });
+
+test('problems: letters the built-in font does not have, in a project without a font', () => {
+  const { M } = load();
+  M.newProject('t', 800, 480);
+  M.screen().children = [{ type: 'label', text: 'Temperature 20 °C' }];       // (the degree sign is in the built-in font)
+  deq(M.problems().filter(p => /built-in font/.test(p.text)), []);
+  M.screen().children = [{ type: 'label', text: 'Übersicht' }, { type: 'label', text: 'Preis 5 €' }];
+  const p = M.problems().filter(x => /built-in font/.test(x.text));
+  assert.equal(p.length, 1);
+  assert.ok(/Ü/.test(p[0].text) && /€/.test(p[0].text), p[0].text);
+  M.st.project.font = { file: 'assets/fonts/NotoSans-subset.ttf' };
+  deq(M.problems().filter(x => /built-in font/.test(x.text)), []);
+});
