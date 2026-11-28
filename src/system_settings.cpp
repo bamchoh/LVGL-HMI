@@ -839,7 +839,7 @@ public:
             f("project", "Project", info.title),
             f("file", "Project file", info.path),
             f("display", "Display", vformat("%s %dx%d", backend_name(), info.width, info.height)),
-            f("version", "Runtime", vformat("HML built %s, LVGL %d.%d.%d", __DATE__, LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH)),
+            f("version", "Runtime", vformat("Tsukuraku %s, built %s, LVGL %d.%d.%d", HML_VERSION, __DATE__, LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH)),
         };
     }
     std::string apply(const std::map<std::string, std::string>&) override { return ""; }

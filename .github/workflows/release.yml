@@ -1,0 +1,139 @@
+name: Release
+
+# A tag "v1.2.3" builds the programs for Windows and Linux, packs them with the licences, and
+# makes a DRAFT release with the files attached. Nothing is public until somebody looks at the
+# draft and presses "Publish". "Run workflow" (workflow_dispatch) builds and packs the same way
+# but makes no release: the packages are artifacts of the run, to look at.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64 (designer + runtime)
+            os: windows-latest
+            kind: windows
+            suffix: windows-x64
+            cmake_args: ''
+          # Ubuntu 22.04: its C library (glibc 2.35) is old enough for Raspberry Pi OS 12
+          # (bookworm) and later, Debian 12, Ubuntu 22.04 and later. A newer runner would make
+          # binaries that do not start there.
+          - name: Linux x64 (runtime, framebuffer)
+            os: ubuntu-22.04
+            kind: linux
+            suffix: linux-x64
+            cmake_args: -DHML_BACKEND=fbdev
+          - name: Linux aarch64 (runtime for Raspberry Pi, framebuffer)
+            os: ubuntu-22.04
+            kind: linux
+            suffix: linux-aarch64
+            cmake_args: -DHML_BACKEND=fbdev -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake
+            cross: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: v
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-dev.${GITHUB_SHA::7}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "name=tsukuraku-$v-${{ matrix.suffix }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ${{ matrix.cross }}
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja -y --no-progress }
+
+      # FetchContent downloads from github.com; retry so that a transient 5xx does not fail the run
+      - name: Configure
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DHML_VERSION=${{ steps.v.outputs.version }} \
+              ${{ matrix.cmake_args }} && exit 0
+            echo "::warning::configure attempt $attempt failed, retrying in 30 s"
+            sleep 30
+          done
+          exit 1
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.kind }}" = windows ]; then cmake --build build; else cmake --build build --target hml_runtime; fi
+
+      # what is passed on must at least start and say what it is (not for the cross build: it
+      # cannot run here)
+      - name: Smoke run
+        if: matrix.suffix != 'linux-aarch64'
+        shell: bash
+        run: |
+          ./build/bin/hml_runtime --version
+          ./build/bin/hml_runtime projects/demo/project.json --capabilities
+
+      - name: Package
+        shell: bash
+        run: |
+          PY=python3; command -v python3 > /dev/null 2>&1 || PY=python
+          $PY -I tools/package.py --build build --kind ${{ matrix.kind }} --out "dist/${{ steps.v.outputs.name }}"
+          cd dist
+          if [ "${{ matrix.kind }}" = windows ]; then
+            7z a -tzip -mx=9 "${{ steps.v.outputs.name }}.zip" "${{ steps.v.outputs.name }}" > /dev/null
+          else
+            tar -czf "${{ steps.v.outputs.name }}.tar.gz" "${{ steps.v.outputs.name }}"
+          fi
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.v.outputs.name }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft --title "Tsukuraku ${GITHUB_REF_NAME#v}" --generate-notes \
+            --notes "Downloads: **windows-x64.zip** is the designer and the runtime for a PC (unpack, start hml_designer.exe). **linux-aarch64.tar.gz** is the runtime for a Raspberry Pi (64-bit Raspberry Pi OS 12 or later), **linux-x64.tar.gz** the runtime for a PC with Linux (framebuffer). Each has examples/ and the licences. SHA256SUMS.txt has the checksums. The binaries are not signed."
