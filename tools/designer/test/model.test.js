@@ -1906,11 +1906,11 @@ test('M font: Japanese text without a font in the project is a problem', () => {
   M.screen().children = [{ type: 'label', text: 'Temperature' }];
   deq(M.problems(), []);
   M.screen().children = [{ type: 'label', text: '温度' }];
-  deq(M.problems().map(p => p.text), ['Japanese text is used (a screen), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
+  deq(M.problems().map(p => p.text), ['Japanese or Chinese text is used (a screen), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
   M.screen().children = [{ type: 'label', text: '@temp' }];
   M.st.project.languages = ['ja'];
   M.st.project.texts = { temp: { ja: '温度' } };
-  deq(M.problems().map(p => p.text), ['Japanese text is used (the texts), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
+  deq(M.problems().map(p => p.text), ['Japanese or Chinese text is used (the texts), but the project has no font for it: it is shown as empty boxes. Project tab > Font']);
   M.st.project.font = { file: 'assets/fonts/NotoSansJP-subset.otf' };
   deq(M.problems(), []);
 });

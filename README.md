@@ -1760,7 +1760,7 @@ that has those characters into the project.
   or by Lua, the screens are rebuilt and displayed in that language (the displayed screen and the "back" history stay as they are. The state of
   the scripts is also kept). `sys.languages` has the list (`ja,en`).
 - The alarm record keeps the message in the language of that moment.
-- The built-in system settings screens and the login screen are shown in English, German or Japanese, following the language of the project ("System settings screens").
+- The built-in system settings screens and the login screen are shown in English, German, Japanese or Simplified Chinese, following the language of the project ("System settings screens").
 - When there is a font file, the glyphs of each size are made from that file (TinyTTF), and characters that are not in the file (such as the `LV_SYMBOL_*`
   icons) are displayed with the built-in font. Glyphs are made when they are first displayed, and cached.
 - Japanese fonts are large, so `tools/subset_font.py` can make a small file with only the characters in use
@@ -1779,6 +1779,10 @@ no ä, é or € - so a project in any other European language needs it: "Font" 
 Project tab > Font > "Add the font for European languages". The designer lists letters that the built-in font does not have
 among the problems. (The Japanese font has the letters of Western Europe as well, but not €, œ, or those of Central and Eastern Europe.)
 It was made with `python -I tools/subset_font.py NotoSans-Regular.ttf NotoSans-subset.ttf --latin`.
+
+**And one for Simplified Chinese** (`<designer folder>/fonts/NotoSansSC-subset.otf`, a subset of Noto Sans SC, SIL Open Font
+License, 1.7 MB): the 6763 hanzi of GB 2312 and the CJK punctuation. "Font" in the dialog for a new project, or Project tab > Font >
+"Add the Simplified Chinese font". Made with `python -I tools/subset_font.py NotoSansSC-Regular.otf NotoSansSC-subset.otf --sc`.
 
 **The designer comes with a Japanese font (a subset of Noto Sans JP, SIL Open Font License)** (`<designer folder>/fonts/`).
 The built-in font of the runtime is Latin only, so put the font into a project that shows Japanese in one of the following two ways. The font and the license text are
@@ -1961,9 +1965,9 @@ go before the end does nothing.
 **Light or dark.** The system screens follow the theme of the project: with `"theme": { "dark": false }` they are light
 (light backgrounds, dark text), otherwise dark. What is chosen or pressed has the `primary` colour of the project in both.
 
-**The language of the system screens.** They are shown in English, German or Japanese, following the project: the language the
+**The language of the system screens.** They are shown in English, German, Japanese or Simplified Chinese, following the project: the language the
 project is shown in (`texts`; switching it with `set_language` switches the system screens too), or - in a project without
-languages - Japanese when the title of the project is written in Japanese. `"system_language": "en"`, `"de"` or `"ja"` in
+languages - Japanese when the title of the project is written in Japanese. `"system_language": "en"`, `"de"`, `"ja"` or `"zh"` in
 `project.json` fixes it. Japanese needs a font file of the project (`font.file`) that has the characters; without one the
 screens stay in English instead of showing empty boxes. Names that come from the project or the machine (tags, drivers, host
 names, fingerprints) are shown as they are.

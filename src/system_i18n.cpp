@@ -119,10 +119,61 @@ const Language& german()
     return l;
 }
 
+const Language& chinese()
+{
+    static const Language l = {
+        {
+#include "system_i18n_zh.inc"
+        },
+        {
+        { std::regex(R"(^Driver: (.*)$)"), "驱动：$1" },
+        { std::regex(R"(^Receiving, (\d+) designer\(s\)$)"), "接收中，设计器 $1 个" },
+        { std::regex(R"(^(\d+) accepted designer\(s\)$)"), "已接受的设计器：$1 个" },
+        { std::regex(R"(^(\d+) key\(s\)$)"), "密钥 $1 个" },
+        { std::regex(R"(^(\d+) registered key\(s\) in (.*)$)"), "已登记的密钥 $1 个（$2）" },
+        { std::regex(R"(^\.\.\. and (\d+) more \(not shown\)$)"), "… 另有 $1 个（未显示）" },
+        { std::regex(R"(^On for (\d+):(\d+) more: deploy from the new designer now\.$)"), "还将开启 $1:$2：请现在从新的设计器部署。" },
+        { std::regex(R"(^On, port (\d+) at ([^\n]*)\nThis device: (.*)$)"), "开，端口 $1，地址 $2\n本机：$3" },
+        { std::regex(R"(^(\d+) user\(s\), edited on this device$)"), "用户 $1 个（在本机编辑）" },
+        { std::regex(R"(^(\d+) user\(s\), as defined in the project$)"), "用户 $1 个（按项目定义）" },
+        { std::regex(R"(^Port (\d+): other machines can connect(.*)$)"), "端口 $1：其他设备可以连接$2" },
+        { std::regex(R"(^Port (\d+): this device only \(no password set\)(.*)$)"), "端口 $1：仅限本机（未设置密码）$2" },
+        { std::regex(R"(^(\d+) s$)"), "$1 秒" },
+        { std::regex(R"(^Next (.*)$)"), "下次 $1" },
+        { std::regex(R"(^Saved: (.*)  \(off\)$)"), "已保存：$1（关）" },
+        { std::regex(R"(^Saved: (.*)$)"), "已保存：$1" },
+        { std::regex(R"(^(\d\d:\d\d)  weekdays$)"), "$1  工作日" },
+        { std::regex(R"(^(\d\d:\d\d)  daily$)"), "$1  每天" },
+        { std::regex(R"(^(\d\d:\d\d)  weekends$)"), "$1  周末" },
+        { std::regex(R"(^'(.*)' changed\.$)"), "已更改“$1”。" },
+        { std::regex(R"(^'(.*)' added\.$)"), "已添加“$1”。" },
+        { std::regex(R"(^'(.*)' deleted\.$)"), "已删除“$1”。" },
+        { std::regex(R"(^'(.*)' is the last user who can open the system settings$)"), "“$1”是最后一个可以打开系统设置的用户" },
+        { std::regex(R"(^(.*) = (.*)  \(kept inside the limits of the tag\)$)"), "$1 = $2（输入的值超出变量范围，已限制在范围内）" },
+        { std::regex(R"re(^"(.*)" is not a value for a tag of type (.*)\.$)re"), "“$1”不是 $2 类型变量的值。" },
+        // the login screen
+        { std::regex(R"(^Logged in, but this needs (.*) or higher\.$)"), "已登录，但需要 $1 或更高级别。" },
+        { std::regex(R"(^(.*) or higher is needed\.$)"), "需要 $1 或更高级别。" },
+        { std::regex(R"(^Locked\. Try again in (\d+) s\.$)"), "已锁定。请在 $1 秒后重试。" },
+        { std::regex(R"(^Wrong PIN \((\d+) more tries\)\.$)"), "PIN 错误（还可尝试 $1 次）。" },
+        // what went wrong, with the reason as it came
+        { std::regex(R"(^Not installed: ([\s\S]*)$)"), "未安装：$1" },
+        { std::regex(R"(^Not changed: ([\s\S]*)$)"), "未更改：$1" },
+        { std::regex(R"(^Not removed: ([\s\S]*)$)"), "未移除：$1" },
+        { std::regex(R"(^Not written: ([\s\S]*)$)"), "未写入：$1" },
+        { std::regex(R"(^Backup failed: ([\s\S]*)$)"), "备份失败：$1" },
+        { std::regex(R"(^Backup written to ([\s\S]*)$)"), "备份已写入 $1" },
+        { std::regex(R"(^A project was received but not installed: ([\s\S]*)$)"), "已接收项目，但未安装：$1" },
+        },
+    };
+    return l;
+}
+
 const Language* language(const std::string& code)
 {
     if(code == "ja") return &japanese();
     if(code == "de") return &german();
+    if(code == "zh") return &chinese();
     return nullptr;                                  // English: the texts as they are
 }
 
@@ -130,7 +181,7 @@ const Language* language(const std::string& code)
 
 const std::vector<std::string>& system_languages()
 {
-    static const std::vector<std::string> codes = { "en", "ja", "de" };
+    static const std::vector<std::string> codes = { "en", "ja", "de", "zh" };
     return codes;
 }
 
@@ -142,6 +193,7 @@ std::string system_language_sample(const std::string& lang)
     // letters the font of the project must have for the language to be used (else: English)
     if(lang == "ja") return "システム設定を開く適用戻る";
     if(lang == "de") return "äöüÄÖÜß";
+    if(lang == "zh") return "系统设置应用关闭确定";
     return "";
 }
 

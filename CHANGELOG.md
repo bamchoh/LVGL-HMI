@@ -9,7 +9,11 @@ Each release lists, where there is something to say:
 
 ## Unreleased
 
-Nothing yet.
+**Added**
+
+- **Simplified Chinese** for the system settings screens, the login screen and the keyboard's keys (`"system_language": "zh"`, or a
+  project whose language is `zh`). The translation has not been read by a native speaker yet.
+- A font for Simplified Chinese comes with the designer (Noto Sans SC, the hanzi of GB 2312, 1.7 MB).
 
 ## 0.1.1 - 2026-11-28
 

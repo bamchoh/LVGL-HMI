@@ -692,7 +692,7 @@ std::vector<CheckProblem> check_project(const std::string& path, std::vector<std
     if(const json* sl = jget(root, "system_language")) {
         const std::string lang = sl->is_string() ? sl->get<std::string>() : std::string();
         const auto& known = system_languages();
-        if(std::find(known.begin(), known.end(), lang) == known.end()) c.add("system_language", "\"system_language\" is \"en\", \"ja\" or \"de\"");
+        if(std::find(known.begin(), known.end(), lang) == known.end()) c.add("system_language", "\"system_language\" is \"en\", \"ja\", \"de\" or \"zh\"");
         else if(!system_language_sample(lang).empty() && jstr(jget(root, "font") && jget(root, "font")->is_object() ? *jget(root, "font") : json::object(), "file", "").empty())
             c.add("system_language", "\"" + lang + "\" needs a font file with its letters (\"font\": { \"file\": ... }): without one the system screens stay in English");
     }

@@ -44,6 +44,9 @@ Fonts in this repository:
   Noto Sans JP (a subset), in projects/*/assets/fonts and with the designer
                              SIL Open Font License 1.1 (OFL.txt beside each file)
                              Copyright 2014-2021 Adobe (http://www.adobe.com/)
+  Noto Sans SC (a subset), in tools/designer/fonts and with the designer
+                             SIL Open Font License 1.1 (OFL-NotoSansSC.txt beside the file)
+                             Copyright 2014-2021 Adobe (http://www.adobe.com/)
   Noto Sans (a subset), in tools/designer/fonts and with the designer
                              SIL Open Font License 1.1 (OFL-NotoSans.txt beside the file)
                              Copyright 2022 The Noto Project Authors

@@ -367,7 +367,7 @@ The system settings of the device (System) open when **the top left corner of th
 - Do not set `"none"` without being asked (if there is no `{ "action": "system" }` either, the settings can no longer be opened on the device. `--check` points it out).
 
 The language of the system settings screens follows the display language of the project (`texts`) (Japanese / English). A project that has no languages
-is Japanese if its title is Japanese. To fix it, `"system_language": "en"`, `"de"` or `"ja"`. Japanese needs a Japanese font
+is Japanese if its title is Japanese. To fix it, `"system_language": "en"`, `"de"`, `"ja"` or `"zh"`. Japanese needs a Japanese font
 in `font.file` (without it, it stays English).
 
 ## Basis of the look (`display` / `theme` / `font`)

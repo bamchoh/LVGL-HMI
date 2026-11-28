@@ -910,16 +910,17 @@ struct Host {
     // Put the font that comes with the designer into a project: assets/fonts/<file> and its
     // license next to it. Returns the path to write into "font": { "file": ... }.
     // which: "ja" = Noto Sans JP (Japanese; it has the letters of Western Europe too), "europe" =
-    // Noto Sans (accented Latin of all of Europe, Greek, Cyrillic, the euro sign; small).
+    // Noto Sans (accented Latin of all of Europe, Greek, Cyrillic, the euro sign; small), "sc" =
+    // Noto Sans SC (Simplified Chinese: the hanzi of GB 2312).
     json add_font(const std::string& project_dir, const std::string& which = "ja")
     {
-        const bool europe = which == "europe";
-        const char* file = europe ? "NotoSans-subset.ttf" : "NotoSansJP-subset.otf";
-        const char* license = europe ? "OFL-NotoSans.txt" : "OFL.txt";
-        // (the two are looked for apart: in a source tree they are in two folders)
+        const bool europe = which == "europe", sc = which == "sc";
+        const char* file = europe ? "NotoSans-subset.ttf" : sc ? "NotoSansSC-subset.otf" : "NotoSansJP-subset.otf";
+        const char* license = europe ? "OFL-NotoSans.txt" : sc ? "OFL-NotoSansSC.txt" : "OFL.txt";
+        // (looked for apart: in a source tree they are in two folders)
         fs::path from = fonts;
         std::error_code ec;
-        if(europe) {
+        if(europe || sc) {
             from.clear();
             for(const fs::path& c : font_dirs_europe) if(fs::exists(c / file, ec)) { from = c; break; }
         }

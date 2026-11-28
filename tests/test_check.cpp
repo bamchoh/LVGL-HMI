@@ -417,7 +417,7 @@ TEST_CASE("check: system_language is ja or en, and ja wants a font file")
     project(R"json(, "system_language": "en")json");
     CHECK_FALSE(has(p.check(), "system_language"));
     project(R"json(, "system_language": "fr")json");
-    CHECK(has(p.check(), "\"en\", \"ja\" or \"de\""));
+    CHECK(has(p.check(), "\"en\", \"ja\", \"de\" or \"zh\""));
     project(R"json(, "system_language": "ja")json");
     CHECK(has(p.check(), "needs a font file"));
     project(R"json(, "system_language": "ja", "font": { "file": "assets/x.otf" })json");
