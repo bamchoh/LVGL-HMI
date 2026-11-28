@@ -9,7 +9,10 @@ Each release lists, where there is something to say:
 
 ## Unreleased
 
-Nothing yet.
+**Added**
+
+- Every package of a release has an attestation of where it was built (`gh attestation verify <file> --repo bamchoh/tsukuraku`).
+- `CHANGELOG.md` and `docs/` (the quick start) are in the packages.
 
 ## 0.1.0 - 2026-11-28
 

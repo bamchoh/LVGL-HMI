@@ -2928,7 +2928,16 @@ Linux ボードは上記の `fbdev` / `drm` バックエンドでそのまま動
 実行ファイルは [releases](https://github.com/bamchoh/tsukuraku/releases) から入手できます。`windows-x64.zip`（PC 用のデザイナーとランタイム。
 展開して `hml_designer.exe` を起動）、`linux-aarch64.tar.gz`（Raspberry Pi 用のランタイム。64 bit の Raspberry Pi OS 12 以降）、
 `linux-x64.tar.gz`（Linux の PC 用のランタイム、フレームバッファ）です。どれにも `examples/`、ライセンス（`LICENSE`、`NOTICE`、`licenses/`）、
-この README が入っています。`hml_runtime --version` でバージョンが分かり、装置では System > About に出ます。実行ファイルに署名はありません（#153）。
+この README が入っています。`hml_runtime --version` でバージョンが分かり、装置では System > About に出ます。
+
+0.1.1 以降のパッケージには**出どころの証明（attestation）**が付きます。「このファイルは、このリポジトリのリリースの CI が、タグのコミットから
+作った」という署名付きの記録で、GitHub が保管します。ダウンロードしたファイルは GitHub CLI で確かめられます。
+
+```
+gh attestation verify tsukuraku-0.1.1-windows-x64.zip --repo bamchoh/tsukuraku
+```
+
+実行ファイルにコード署名の証明書はまだありません（#153）。そのため、Windows はデザイナーの初回起動で警告を出します。
 
 リリースの作り方: `v1.2.3` の形のタグを push します。`.github/workflows/release.yml` が 3 つのパッケージを作り（中身をそろえるのは
 `tools/package.py`）、ファイルとチェックサムを付けた**下書き**のリリースを作ります。だれかが下書きを見て公開するまで、外からは見えません。
