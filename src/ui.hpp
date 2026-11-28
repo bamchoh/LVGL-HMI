@@ -104,6 +104,9 @@ bool             font_file_has(const std::string& text);
 void             set_keyboard_light(bool light);
 const char*      keyboard_close_text();
 const char*      keyboard_done_text();
+// The key that leads to the letters with accents ("äé"), or "" when the keyboard has none
+// (the font of the project lacks them).
+const char*      keyboard_accents_text();
 // Does this text field of a screen take numbers (numeric_display)? Its keyboard is the number pad.
 bool             ui_number_pad(lv_obj_t* textarea);
 

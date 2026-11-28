@@ -131,7 +131,7 @@ match the size of the neighbouring widgets (if that is smaller than the minimum,
 - Display is `label` + `bind` (large numbers, values inside a sentence) or `numeric_display` (framed values, values that can also be entered). Input is `"input": true` on `numeric_display` / `text_display`
   (put one `keyboard` on the screen). Give inputs `min` / `max`. The keyboard appears at the top of the screen when the input field is in the lower half (the input field is not hidden).
   The look of the keyboard is fixed (do not make one, do not change its colours): "Close" discards the input, "OK" applies it. A numeric input field gets the number keyboard
-  (delete, Clear, Close, OK. No arrows). A value typed outside the range is clamped to `min` / `max`, so **write the range next to the field** ("0 to 100 %").
+  (delete, Clear, Close, OK. No arrows). The letter keyboard has a key "äé" for the letters with accents of Western Europe (ä ö ü ß é è ñ ç å ø …, small and capital, and €) when the font of the project has them; the letters of Central and Eastern Europe (ł č ő ş …), Cyrillic and Greek cannot be typed on the device yet. A value typed outside the range is clamped to `min` / `max`, so **write the range next to the field** ("0 to 100 %").
 - `switch` and `checkbox` toggle only on a **tap in which the finger hardly moved** (nothing happens on a slide). Do not leave an operation that cannot be undone to
   one switch: make it a button, and show a screen to confirm (`popup`) after it is pressed. Operations that can be put back at once, such as run on / off, may be a switch.
   When the user said "with a switch", do as said (if something concerns you, write it in the report).
